@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "./components/ThemeProvider";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
+import Link from "next/link";
 import LynDeskLogo from "./components/LynDeskLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -354,7 +355,7 @@ export default function Home() {
                         title="Authenticate via GitHub"
                       >
                         <GithubIcon size={14} />
-                        <span className="text-[10px] font-mono tracking-widest uppercase">Git</span>
+                        <span className="text-[10px] font-mono tracking-widest uppercase">GitHub</span>
                       </button>
 
                       <button 
@@ -365,16 +366,6 @@ export default function Home() {
                       >
                         <DiscordIcon size={14} />
                         <span className="text-[10px] font-mono tracking-widest uppercase">Discord</span>
-                      </button>
-
-                      <button 
-                        onClick={() => handleOAuthLogin("linkedin")}
-                        disabled={loading}
-                        className="flex-1 h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
-                        title="Authenticate via LinkedIn"
-                      >
-                        <LinkedinIcon size={14} />
-                        <span className="text-[10px] font-mono tracking-widest uppercase">In</span>
                       </button>
                     </div>
 
@@ -699,10 +690,10 @@ export default function Home() {
         <div>
           © 2026 LYNDESK NETWORK INC.
         </div>
-        <div className="flex gap-6 uppercase">
-          <a href="#" className="hover:text-txt-main transition-colors">Privacy</a>
-          <a href="#" className="hover:text-txt-main transition-colors">Terms</a>
-          <a href="#" className="text-txt-muted">LDK:SYS</a>
+        <div className="flex gap-6 uppercase font-mono">
+          <Link href="/privacy" className="hover:text-txt-main transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-txt-main transition-colors">Terms</Link>
+          <span className="text-txt-muted select-none">LDK:SYS</span>
         </div>
       </footer>
 
