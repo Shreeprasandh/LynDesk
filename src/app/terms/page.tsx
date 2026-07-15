@@ -115,6 +115,7 @@ export default function TermsOfService() {
         <div className="flex gap-6 uppercase font-mono">
           <Link href="/privacy" className="hover:text-txt-main transition-colors">Privacy</Link>
           <Link href="/terms" className="text-txt-main">Terms</Link>
+          <Link href="/help" className="hover:text-txt-main transition-colors">Help</Link>
           <span className="text-txt-muted select-none">LDK:SYS</span>
         </div>
       </footer>

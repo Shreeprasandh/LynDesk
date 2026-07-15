@@ -112,6 +112,7 @@ export default function PrivacyPolicy() {
         <div className="flex gap-6 uppercase font-mono">
           <Link href="/privacy" className="text-txt-main">Privacy</Link>
           <Link href="/terms" className="hover:text-txt-main transition-colors">Terms</Link>
+          <Link href="/help" className="hover:text-txt-main transition-colors">Help</Link>
           <span className="text-txt-muted select-none">LDK:SYS</span>
         </div>
       </footer>

@@ -411,4 +411,5 @@ and engines.
     *   Add responsive design testing on all screen formats (iPhone, Android, 
         Tablet, Desktop, Ultra-wide).
     *   Verify WCAG accessibility requirements.
+    *   **PRODUCTION OAUTH CHECKLIST**: Update GitHub, Discord, LinkedIn, and Google OAuth Homepage URLs, Site URL, and Redirect List in Supabase to point to the live production domain.
 ================================================================================
