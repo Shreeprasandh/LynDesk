@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useTheme } from "../components/ThemeProvider";
+import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { Sun, Moon, ArrowLeft, Mail, MessageSquare, ShieldAlert } from "lucide-react";
 
@@ -12,6 +13,8 @@ export default function HelpCenter() {
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const faqs = [
     {
@@ -32,15 +35,24 @@ export default function HelpCenter() {
     }
   ];
 
-  const handleInquirySubmit = (e: React.FormEvent) => {
+  const handleInquirySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    // In production, this can send a payload to an API route forwarding to shreecode.service@gmail.com
-    setTimeout(() => {
+    setLoading(true);
+    setError(null);
+
+    const { error: insertError } = await supabase
+      .from("support_inquiries")
+      .insert([{ email, subject, message }]);
+
+    setLoading(false);
+    if (insertError) {
+      setError(insertError.message);
+    } else {
+      setSubmitted(true);
       setEmail("");
       setSubject("");
       setMessage("");
-    }, 1000);
+    }
   };
 
   return (
@@ -147,15 +159,22 @@ export default function HelpCenter() {
               </div>
             ) : (
               <form onSubmit={handleInquirySubmit} className="flex flex-col gap-4">
+                {error && (
+                  <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                    {error}
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-txt-sub font-medium">Your Email Address</label>
                   <input 
                     type="email" 
                     required
+                    disabled={loading}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="student@university.edu"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light disabled:opacity-50"
                   />
                 </div>
 
@@ -164,10 +183,11 @@ export default function HelpCenter() {
                   <input 
                     type="text" 
                     required
+                    disabled={loading}
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
                     placeholder="e.g. Academic credit status error"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light disabled:opacity-50"
                   />
                 </div>
 
@@ -176,19 +196,27 @@ export default function HelpCenter() {
                   <textarea 
                     required
                     rows={4}
+                    disabled={loading}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Describe your issue or technical question..."
-                    className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light resize-none"
+                    className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light resize-none disabled:opacity-50"
                   />
                 </div>
 
                 <button 
                   type="submit"
-                  className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 mt-2 transition-opacity cursor-pointer"
+                  disabled={loading}
+                  className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 mt-2 transition-opacity cursor-pointer"
                 >
-                  <Mail size={14} className="stroke-[1.5]" />
-                  Dispatch Inquiry
+                  {loading ? (
+                    <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                  ) : (
+                    <>
+                      <Mail size={14} className="stroke-[1.5]" />
+                      Dispatch Inquiry
+                    </>
+                  )}
                 </button>
               </form>
             )}

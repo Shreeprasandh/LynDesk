@@ -241,3 +241,22 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+
+-- 10. SUPPORT INQUIRIES TABLE (For help form submissions)
+CREATE TABLE public.support_inquiries (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.support_inquiries ENABLE ROW LEVEL SECURITY;
+
+-- Allow anyone to submit support tickets
+CREATE POLICY "Allow public insert to support_inquiries" 
+    ON public.support_inquiries FOR INSERT 
+    WITH CHECK (true);
+
