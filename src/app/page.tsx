@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useTheme } from "./components/ThemeProvider";
+import LynDeskLogo from "./components/LynDeskLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sun, 
@@ -36,12 +37,10 @@ export default function Home() {
       
       {/* 1. Header (Sticky, Frosted Glass, Swiss Grid Style) */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <LynDeskLogo size={18} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
-          </span>
-          <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-            v0.1.0-alpha
           </span>
         </div>
 
