@@ -24,9 +24,6 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "LynDesk",
   description: "Link Your Next Desk — Pinned Events, Team Collaboration, and University Portals.",
-  icons: {
-    icon: "/icon.jpg",
-  },
 };
 
 export default function RootLayout({
