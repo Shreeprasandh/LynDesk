@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTheme } from "./components/ThemeProvider";
+import { useAuth } from "./context/AuthContext";
+import { supabase } from "./lib/supabase";
 import LynDeskLogo from "./components/LynDeskLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -18,18 +20,65 @@ import {
 
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
-  const [authStep, setAuthStep] = useState<"idle" | "login" | "success">("idle");
+  const { user, loading: authLoading, signOut } = useAuth();
+  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) {
+      setAuthStep("success");
+    } else if (authStep === "success") {
+      setAuthStep("idle");
+    }
+  }, [user]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    setError(null);
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      setError(error.message);
       setLoading(false);
-      setAuthStep("success");
-    }, 1200);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      setError("Registration successful. Check your email for verification.");
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -136,8 +185,17 @@ export default function Home() {
                     </p>
                   </div>
 
+                  {error && (
+                    <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                      {error}
+                    </div>
+                  )}
+
                   <button 
-                    onClick={() => setAuthStep("login")}
+                    onClick={() => {
+                      setError(null);
+                      setAuthStep("login");
+                    }}
                     className="w-full h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2.5 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
                   >
                     <Mail size={14} className="stroke-[1.5]" />
@@ -151,17 +209,18 @@ export default function Home() {
                   </div>
 
                   <button 
-                    onClick={() => {
-                      setLoading(true);
-                      setTimeout(() => {
-                        setLoading(false);
-                        setAuthStep("success");
-                      }, 1200);
-                    }}
-                    className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2.5 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2.5 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
                   >
-                    <Globe size={14} className="stroke-[1.5]" />
-                    Institutional Google Sign-In
+                    {loading ? (
+                      <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                    ) : (
+                      <>
+                        <Globe size={14} className="stroke-[1.5]" />
+                        Institutional Google Sign-In
+                      </>
+                    )}
                   </button>
 
                   <p className="text-[10px] text-center text-txt-muted leading-relaxed font-light">
@@ -170,10 +229,10 @@ export default function Home() {
                 </motion.div>
               )}
 
-              {authStep === "login" && (
+              {(authStep === "login" || authStep === "signup") && (
                 <motion.form 
-                  key="login"
-                  onSubmit={handleLogin}
+                  key={authStep}
+                  onSubmit={authStep === "login" ? handleLogin : handleSignUp}
                   initial={{ opacity: 0, y: 3 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -3 }}
@@ -183,15 +242,24 @@ export default function Home() {
                   <div className="flex flex-col gap-1">
                     <button 
                       type="button"
-                      onClick={() => setAuthStep("idle")}
+                      onClick={() => {
+                        setError(null);
+                        setAuthStep("idle");
+                      }}
                       className="text-[10px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase"
                     >
                       ← Back
                     </button>
                     <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main mt-2">
-                      Secure Input
+                      {authStep === "login" ? "Secure Sign In" : "Create Account"}
                     </h2>
                   </div>
+
+                  {error && (
+                    <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight">
+                      {error}
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-3.5">
                     <div className="flex flex-col gap-1">
@@ -209,7 +277,9 @@ export default function Home() {
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-center">
                         <label className="text-xs text-txt-sub font-medium">Password</label>
-                        <a href="#" className="text-[10px] text-txt-muted hover:text-txt-main transition-colors font-light">Forgot?</a>
+                        {authStep === "login" && (
+                          <a href="#" className="text-[10px] text-txt-muted hover:text-txt-main transition-colors font-light">Forgot?</a>
+                        )}
                       </div>
                       <input 
                         type="password" 
@@ -231,11 +301,24 @@ export default function Home() {
                       <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
                     ) : (
                       <>
-                        Authenticate Session
+                        {authStep === "login" ? "Authenticate Session" : "Initialize Registration"}
                         <ArrowRight size={14} />
                       </>
                     )}
                   </button>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setAuthStep(authStep === "login" ? "signup" : "login");
+                      }}
+                      className="text-xs text-txt-muted hover:text-txt-main transition-colors font-light underline"
+                    >
+                      {authStep === "login" ? "Need a new desk? Create an account" : "Already registered? Sign in"}
+                    </button>
+                  </div>
                 </motion.form>
               )}
 
@@ -259,15 +342,15 @@ export default function Home() {
                       Desk Initialized
                     </h2>
                     <p className="text-xs text-txt-sub max-w-xs leading-relaxed font-light">
-                      Verification complete. Accessing your workspaces and project timelines.
+                      Authenticated as <span className="font-mono text-txt-main font-medium">{user?.email}</span>. TIMELINE VAULTS ARE READY.
                     </p>
                   </div>
 
                   <button 
-                    onClick={() => setAuthStep("idle")}
+                    onClick={signOut}
                     className="h-9 px-4 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-medium text-[10px] tracking-wider uppercase transition-colors duration-150 focus:outline-none cursor-pointer"
                   >
-                    Reset Console
+                    Disconnect Session
                   </button>
                 </motion.div>
               )}
