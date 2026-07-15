@@ -8,6 +8,18 @@ import { Sun, Moon, ArrowLeft } from "lucide-react";
 export default function PrivacyPolicy() {
   const { theme, toggleTheme } = useTheme();
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const navigationEntries = window.performance.getEntriesByType("navigation");
+      if (navigationEntries.length > 0) {
+        const navType = (navigationEntries[0] as PerformanceNavigationTiming).type;
+        if (navType === "reload") {
+          window.location.href = "/";
+        }
+      }
+    }
+  }, []);
+
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       

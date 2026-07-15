@@ -8,6 +8,19 @@ import { Sun, Moon, ArrowLeft, Mail, MessageSquare, ShieldAlert } from "lucide-r
 
 export default function HelpCenter() {
   const { theme, toggleTheme } = useTheme();
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const navigationEntries = window.performance.getEntriesByType("navigation");
+      if (navigationEntries.length > 0) {
+        const navType = (navigationEntries[0] as PerformanceNavigationTiming).type;
+        if (navType === "reload") {
+          window.location.href = "/";
+        }
+      }
+    }
+  }, []);
+
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");

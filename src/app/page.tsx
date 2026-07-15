@@ -100,12 +100,24 @@ export default function Home() {
   const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
 
   useEffect(() => {
+    if (!authLoading) {
+      setLoading(false);
+    }
     if (user) {
       setAuthStep("success");
     } else {
       setAuthStep("idle");
     }
-  }, [user]);
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      setLoading(false);
+      setError(null);
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,7 +237,6 @@ export default function Home() {
             <button 
               onClick={signOut}
               className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
-              title="Sign Out"
             >
               <LogOut size={14} />
             </button>
@@ -352,7 +363,6 @@ export default function Home() {
                         onClick={() => handleOAuthLogin("github")}
                         disabled={loading}
                         className="flex-1 h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
-                        title="Authenticate via GitHub"
                       >
                         <GithubIcon size={14} />
                         <span className="text-[10px] font-mono tracking-widest uppercase">GitHub</span>
@@ -362,7 +372,6 @@ export default function Home() {
                         onClick={() => handleOAuthLogin("discord")}
                         disabled={loading}
                         className="flex-1 h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
-                        title="Authenticate via Discord"
                       >
                         <DiscordIcon size={14} />
                         <span className="text-[10px] font-mono tracking-widest uppercase">Discord</span>
