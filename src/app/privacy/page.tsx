@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
       
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
           <img 
             src="/lyndesk-logo.jpg" 
             alt="LynDesk Logo" 
@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>
-        </div>
+        </Link>
 
         <div className="flex items-center gap-4">
           <button 
