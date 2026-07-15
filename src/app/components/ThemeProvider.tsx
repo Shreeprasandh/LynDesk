@@ -35,7 +35,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // Prevent hydration mismatch layout shifts
   if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
+    return (
+      <ThemeContext.Provider value={{ theme, toggleTheme }}>
+        <div style={{ visibility: "hidden" }}>{children}</div>
+      </ThemeContext.Provider>
+    );
   }
 
   return (

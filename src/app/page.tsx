@@ -10,7 +10,7 @@ import {
   Users, 
   Award, 
   ArrowRight, 
-  Chrome, 
+  Globe, 
   FolderGit, 
   Compass, 
   Bell, 
@@ -161,7 +161,7 @@ export default function Home() {
                     }}
                     className="w-full h-11 rounded bg-accent-main hover:opacity-90 text-bg-base font-medium text-sm flex items-center justify-center gap-2.5 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main"
                   >
-                    <Chrome size={15} />
+                    <Globe size={15} />
                     Login with Institution Google Account
                   </button>
 
