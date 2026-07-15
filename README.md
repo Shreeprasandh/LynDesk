@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LynDesk
 
-## Getting Started
+> **The collaborative event tracking and verified project portfolio platform for engineering students.**
 
-First, run the development server:
+LynDesk ("Link Your Next Desk") is a premium, minimal B2B2C platform designed to bridge the gap between engineering student accomplishments in hackathons and college-credit coordination, ultimately facilitating verified professional hiring pipelines.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎨 Visual Identity
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+LynDesk features a handcrafted, minimal, obsidian-to-alabaster interface utilizing CSS hardware acceleration (120Hz smooth layouts) and strict typography styling:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+*   **Headings**: `Outfit` (Geometric serif cleanliness)
+*   **Body & UI**: `Inter`
+*   **Code & Logs**: `JetBrains Mono`
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🚀 Getting Started
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Prerequisites
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+*   Node.js 18.x or later
+*   npm or yarn
 
-## Deploy on Vercel
+### Installation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Clone the repository and install dependencies:
+   ```bash
+   npm install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) to view the application.
+
+---
+
+## 🏢 Platform Architecture
+
+*   **Dashboard & Vault**: Scraping and tracking of upcoming, active, and completed coding events (Devpost, Unstop, Google Forms).
+*   **Team Workspaces**: Live document decks (Pitch decks, Whitepapers) with version histories, text messaging, and built-in voice calls.
+*   **LynDesk Campus**: B2B academic coordinator verification portal for extra-curricular university credits.
+*   **Talent Network**: Verified developer portfolios linked to verified hackathon timelines.

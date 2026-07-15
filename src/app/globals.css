@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: var(--font-inter), sans-serif;
+  --font-display: var(--font-outfit), sans-serif;
+  --font-mono: var(--font-mono), monospace;
+
+  /* Theme variables mapping */
+  --color-bg-base: hsl(var(--bg-primary));
+  --color-bg-surface: hsl(var(--surface));
+  --color-bg-card: hsl(var(--bg-secondary));
+  --color-txt-main: hsl(var(--text-primary));
+  --color-txt-sub: hsl(var(--text-secondary));
+  --color-txt-muted: hsl(var(--text-muted));
+  --color-accent-main: hsl(var(--accent));
+  --color-border-main: hsl(var(--border-line));
+  --color-ring-main: hsl(var(--ring-line));
+  
+  --animate-fade-in: fade-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
+/* Light Theme (Default) */
+:root {
+  --bg-primary: 36 17% 96%;        /* #F8F6F3 - Warm Alabaster */
+  --bg-secondary: 36 22% 93%;      /* #F1EDE7 - Warm Gray-Sand */
+  --surface: 0 0% 100%;            /* #FFFFFF - Crisp White */
+  --text-primary: 0 0% 6%;         /* #0F0F0F - Deep Obsidian */
+  --text-secondary: 37 6% 39%;     /* #6B665E - Muted Stone Gray */
+  --text-muted: 37 5% 60%;         /* #9E9991 - Warm Muted Gray */
+  --accent: 0 0% 11%;              /* #1B1B1B - Charcoal Accent */
+  --border-line: 37 20% 86%;       /* #E2DDD5 - Soft Sand Border */
+  --ring-line: 0 0% 6%;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: 0 0% 6%;           /* #0F0F0F - Obsidian Black */
+  --bg-secondary: 0 0% 11%;        /* #1B1B1B - Charcoal Gray */
+  --surface: 0 0% 11%;             /* #1B1B1B - Charcoal Card */
+  --text-primary: 35 15% 82%;      /* #D8D3CC - Warm Sand/Alabaster */
+  --text-secondary: 34 6% 52%;     /* #8C867E - Muted Sand Gray */
+  --text-muted: 34 5% 35%;         /* #59544F - Dark Muted Sand */
+  --accent: 35 15% 82%;            /* #D8D3CC - Warm Sand Accent */
+  --border-line: 0 0% 17%;         /* #2C2C2C - Obsidian Border */
+  --ring-line: 35 15% 82%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-bg-base);
+  color: var(--color-txt-main);
+  font-family: var(--font-sans);
+  transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), 
+              color 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }

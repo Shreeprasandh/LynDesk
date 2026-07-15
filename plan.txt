@@ -1,0 +1,414 @@
+================================================================================
+                    THE LYNDESK CAMPUS MASTER BLUEPRINT
+================================================================================
+Name: LynDesk (Link Your Next Desk)
+An uncompromising plan for a premium, minimal, human-masterpiece platform
+designed to track hackathons, manage team collaboration, and verify institutional 
+credits. 
+
+This document serves as our source of truth. Every line, spacer, transition, 
+and database constraint must align with these exact specifications.
+================================================================================
+
+================================================================================
+            CRITICAL DEVPair PROGRAMMING GUIDELINES & PRINCIPLES
+================================================================================
+*   **STEP-BY-STEP PROGRESSION**: Work phase-by-phase. Do not skip ahead or attempt 
+    to implement future features before core dependencies are fully functional.
+*   **ZERO SIDE-EFFECTS**: Before changing or updating code, inspect its entire context 
+    and related files. Never write code blindly or make edits that break other modules.
+*   **PRECISE EXECUTION & DOUBLE-CHECKING**: Test and verify all paths, syntax, and 
+    styles. Minimize errors through proactive code review and mock testing.
+*   **CLARIFICATION FIRST**: If there is any ambiguity, confusion, or doubt about 
+    the feature design, user flow, or stack implementation, STOP and ask the User 
+    directly. Do not guess or take automatic actions without alignment.
+*   **HUMAN MASTERPIECE ASSURANCE**: Maintain strict aesthetic controls (minimalism, 
+    frosted glass overlays, subtle transitions, generous padding, responsive alignment) 
+    in every single CSS file, component, and icon.
+================================================================================
+
+1. THE DESIGN SYSTEM: PREMIUM MINIMALISM (HUMAN MASTERPIECE LOOK)
+--------------------------------------------------------------------------------
+To achieve a "human masterpiece" aesthetic, we avoid generic AI-looking templates
+(which use loud neon accents, blocky borders, and overly dramatic 3D transitions). 
+Instead, we focus on:
+*   Generous whitespace (letting components breathe).
+*   High-contrast, geometric typography.
+*   Paper-thin border lines.
+*   Frosted glass overlays (glassmorphism) with light-absorbing background blurs.
+*   Buttery-smooth, low-impact transitions (no bouncing, spinning, or scaling).
+
+A. Dual-Theme Color Variables
+All colors are defined as HSL tokens to ensure perfect, fluid transition blending.
+
+[LIGHT THEME - Default Vibe: Warm Alabaster & Sand]
+  --bg-primary:    0% 0% 97%       /* #F8F6F3 - Warm Bone/Alabaster */
+  --bg-secondary:  40% 12% 95%     /* #F1EDE7 - Light warm gray */
+  --surface:       0% 0% 100%      /* #FFFFFF - Crisp paper white */
+  --text-primary:  0% 0% 6%        /* #0F0F0F - Deep obsidian black */
+  --text-secondary:33% 8% 39%      /* #6B665E - Muted stone gray */
+  --text-muted:    30% 6% 60%      /* #9E9991 - Warm disabled gray */
+  --accent:        25% 10% 10%     /* #1B1B1B - Charcoal accent */
+  --border:        33% 10% 86%     /* #E2DDD5 - Soft sand borders */
+  --ring:          0% 0% 6%        /* Focus outline ring */
+
+[DARK THEME - Obsidian Charcoal & Warm Sand]
+  --bg-primary:    0% 0% 6%        /* #0F0F0F - Deep obsidian black */
+  --bg-secondary:  0% 0% 10%       /* #1B1B1B - Charcoal Card Surface */
+  --surface:       0% 0% 10%       /* #1B1B1B - Charcoal Card Surface */
+  --text-primary:  15% 10% 82%     /* #D8D3CC - Warm sand/alabaster */
+  --text-secondary:15% 7% 52%      /* #8C867E - Muted sand gray */
+  --text-muted:    15% 5% 35%      /* #59544F - Dark disabled sand */
+  --accent:        15% 10% 82%     /* #D8D3CC - Warm sand accent */
+  --border:        0% 0% 17%       /* #2C2C2C - Obsidian borders */
+  --ring:          15% 10% 82%     /* Focus outline ring */
+
+B. Typography & Scale
+*   Primary Font: 'Outfit' (Google Fonts) - Clean, geometric, high-fashion layout.
+*   Secondary Font: 'Inter' (Google Fonts) - Strict, clean UI content text.
+*   Monospace Font: 'JetBrains Mono' - For commit history and file hashes.
+
+Scales:
+*   Display: 40px (lh: 1.1, tracking: -0.02em, weight: 300 Light)
+*   H1: 32px      (lh: 1.2, tracking: -0.02em, weight: 400 Regular)
+*   H2: 24px      (lh: 1.3, tracking: -0.01em, weight: 400 Regular)
+*   H3: 20px      (lh: 1.4, weight: 500 Medium)
+*   Body: 15px    (lh: 1.6, weight: 400 Regular)
+*   Caption: 12px (lh: 1.5, weight: 500 Medium, uppercase, tracking: 0.05em)
+
+C. Spacing Grid (Strict 4px/8px incremental system)
+*   Padding: 8px (dense), 16px (standard component), 24px (containers), 48px (page hero).
+*   Margins: 8px (text block), 16px (component spacing), 32px (section gaps).
+*   Border Radius:
+    - Interactive elements (buttons, inputs): 6px (subtle, sharp corner feeling).
+    - Surfaces (cards, dashboards, panels): 8px.
+    - Avatars / Badges: Circular.
+
+D. Transitions & Animations (Pure Elegance)
+*   Transition Speed: All interactable states must animate over exactly `150ms` or `200ms`.
+*   Easing Curve: `cubic-bezier(0.16, 1, 0.3, 1)` (Ultra-premium ease-out that starts fast and settles softly).
+*   Permissible Animations:
+    - **Hover**: Subtle shift in border color, or slight background shade change. No scale leaps or violent color flashes.
+    - **Modals/Drawers**: Fade in with a tiny vertical translation: `translateY(4px) -> translateY(0px)`.
+    - **Tab switching**: Clean, instant swap or swift opacity fade (100ms).
+
+
+2. MULTI-DEVICE ACCESSIBILITY STRATEGY (EVERY STUDENT, EVERY DEVICE)
+--------------------------------------------------------------------------------
+To ensure LynDesk runs with buttery-smooth responsiveness across mobile phones and laptops:
+
+*   Progressive Web App (PWA) Design
+    *   Single, highly optimized codebase designed mobile-first.
+    *   Installs instantly on iOS (via "Add to Home Screen"), Android, and Laptops 
+        with a native-like icon and layout.
+    *   Keeps styles, updates, and database calls in 100% real-time sync across devices.
+    *   Supports Push Notifications (Web Push API) and Offline capability natively.
+
+Performance & Accessibility (A11y) Rules:
+*   **120Hz Fluid Rendering**: Use CSS hardware acceleration (`translate3d`) and 
+    GPU-bound animations (avoiding layout shifts) for buttery-smooth scrolling 
+    on modern mobile screens (120Hz refresh rates).
+*   **Keyboard Navigation**: Full keyboard shortcuts (hotkeys) for quick actions 
+    (e.g., CMD+K/CTRL+K to search, ESC to close, N to track event) for speed-run 
+    developers.
+*   **Screen Readers & High Contrast**: Fully semantic HTML elements with aria-labels 
+    and strong color contrast ratios following WCAG AA guidelines.
+
+
+3. THE "LYNDESK CAMPUS" B2B SUITE
+--------------------------------------------------------------------------------
+To make LynDesk compulsory for every college and student, we introduce a B2B SaaS 
+layer alongside our B2C product. This converts it from a tracker into an 
+educational operating system.
+
+*   1. The University Console (LynDesk Campus)
+    *   **College-Admin Dashboard**: Colleges get a dedicated portal (e.g., MIT, 
+        IIT, Stanford) to monitor all registered student teams, active hackathon 
+        participation, and credit scores.
+    *   **Credit/Activity Point Verification**: Many engineering colleges mandate 
+        extra-curricular activity points for graduation. LynDesk automatically 
+        exports a certified PDF of a student's verified hackathon participations 
+        and project work, which faculty can approve in one click.
+    *   **Host Internal Events**: Universities can launch internal hackathons, capstone 
+        projects, and code jams natively, utilizing LynDesk's team-matching and workspace.
+
+*   2. Faculty & Mentor Integration
+    *   Teams can invite university professors, alumni, or industry experts as 
+        "Mentors" into their workspace.
+    *   Mentors can review presentation slides, view github repositories, and write 
+        critiques directly inside the chat or leaves voice notes without seeing 
+        private team chats.
+
+*   3. Intra- & Inter-College Leaderboards (Virality Loop)
+    *   **Department Leaderboards**: CS vs EE vs Mechanical teams based on project 
+        submissions and hackathon wins.
+    *   **Inter-College Arena**: National ranking of universities based on cumulative 
+        student project activity. This incentivizes deans to push students to register 
+        on LynDesk to improve their college's global coding rank.
+
+*   4. Verified Student Talent Pipeline (Monetization / Recruitment)
+    *   Recruiters get access to the "Verified Hack" pipeline. Instead of resumes, 
+        recruiters see a student's actual timeline: code commits, uploaded project 
+        PPTs, and peer-reviewed collaboration scores.
+
+
+4. DETAILED PLACEMENT, LAYOUT & ALIGNMENTS
+--------------------------------------------------------------------------------
+The app uses a 100% responsive, viewport-locked desktop layout and a bottom-tab-based 
+mobile structure. Nothing jumps or reflows unpredictably.
+
+A. Global Layout (Desktop - min-width: 1024px)
+*   **Sticky Header (Height: 64px)**:
+    - Left-aligned: The LynDesk wordmark (Outfit font, uppercase, spaced tracking).
+    - Center-aligned: Navigation tabs (Dashboard, Explore, Leaderboard, My College).
+    - Right-aligned: Profile thumbnail, Theme Toggle (Minimal circle button), Notification Bell (Status indicator).
+    - Style: Frosted glass effect (`backdrop-filter: blur(12px)`), solid 1px bottom border.
+*   **Split Workspace View (Grid Layout)**:
+    - Uses a 12-column grid with 24px gaps and 32px page margins.
+    - Page wrapper centered max-width: 1440px.
+
+B. The Shared Project Workspace Grid (Desktop)
+*   **Left Column (3 Columns)**: Timeline & Stage Tracker.
+    - Displays chronological deadlines in a vertical node-line.
+    - Hovering a stage displays stage submission details.
+*   **Center Column (6 Columns)**: Collaborative Space & Chat.
+    - Pinned voice/video strip at the top: Shows active room members.
+    - Main chat history panel.
+    - Bottom of chat contains a pinned input bar (Clean line border, attachment icon, send button).
+*   **Right Column (3 Columns)**: The Artifact Deck & Version History.
+    - Pinned cards at the top representing the *latest, verified* project files:
+      * Card 1: Pitch Deck / PPT (Thumbnail preview + direct PDF link)
+      * Card 2: Technical PDF (Report/Whitepaper)
+      * Card 3: GitHub Repository Link (Includes a tiny live commit-ticker)
+      * Card 4: Prototype Demo URL
+    - Bottom section: "History Drawer" - A vertically stacked list of older uploads, 
+      with dates and the name of the user who uploaded it. Clicking an item expands 
+      its metadata.
+
+C. Global Layout (Mobile - max-width: 1023px)
+*   **Sticky Top Header (Height: 56px)**:
+    - Minimalist branding logo + Notification badge.
+*   **Bottom Navigation Bar (Height: 60px)**:
+    - Floating frosted-glass deck anchored to viewport bottom.
+    - 4 icon actions: Dashboard, Explore, Team Chat, Profile.
+    - Large touch-targets (44x44px minimum) for optimal mobile ergonomics.
+*   **Gestures**: Smooth swipe gestures to slide panels open (drawer overlays).
+
+
+5. COMPREHENSIVE USER JOURNEYS
+--------------------------------------------------------------------------------
+Here is the exact journey mapping to be built into the router:
+
+A. Journey 1: Landing, Auth & Institution Matching
+1.  User enters `lyndesk.app` -> Presented with a minimal dashboard landing preview.
+2.  Click "Authenticate" -> Smooth modal transition: Options for Google Sign-In or 
+    Manual Email/Password.
+3.  Upon Google Auth:
+    - Check email domain. If it ends in `.edu`, `@iit.ac.in`, etc., prompt user: 
+      "We found your institution: IIT. Join official campus?"
+    - Click "Join" -> User profile is linked to the Institute profile.
+    - If manual/gmail: Prompt user to select their college from a curated list or 
+      skip (Personal Workspace mode).
+
+B. Journey 2: Event Registration & Setup
+1.  From the dashboard, user clicks "Track Event" (top right, floating button).
+2.  Modal slides up.
+    - Option 1: Paste Event Link (e.g. Unstop, Devfolio).
+    - Option 2: Enter manually.
+3.  If Link Pasted:
+    - Scraper runs in the background. Spinner is a tiny, rotating warm sand circle.
+    - Scraper extracts Title, Date, Stages.
+    - Fields are pre-filled in the form. User reviews and clicks "Create Vault".
+4.  If Team Event:
+    - Prompt: "Invite Co-workers". Generates a unique invite code: `lyndesk.app/join/xyz`.
+    - User shares the code. When team members click it, they are instantly added.
+
+C. Journey 3: Work & File Submission
+1.  Inside the Event Workspace, the team holds a voice meeting. Click "Join Room" 
+    in the header. An ambient voice channel is established.
+2.  The designer uploads the new project deck: Drag & drop `Pitch_Deck_v2.pdf` into 
+    the upload area.
+3.  The system:
+    - Saves the file to Supabase Storage.
+    - Creates a new entry in `project_artifacts`.
+    - Flags the new file as `is_active: true`.
+    - Automatically marks the previous active PPT as `is_active: false`, moving 
+      it into the Version History Drawer.
+    - Sends an automated message in chat: "Alex updated the Pitch Deck to v2."
+
+D. Journey 4: The University Credit Claim
+1.  The event finishes. The team wins 2nd place.
+2.  The student clicks "Claim Credits" on the project vault.
+3.  The app generates a certified, cryptographic JSON/PDF report containing:
+    - Hackathon Link & Verified Dates.
+    - Student details & Project Github Repo.
+    - Team list and roles.
+4.  This submission appears in the college's Coordinator panel.
+5.  Professor clicks "Verify" -> Credits are added to the student's LynDesk profile 
+    and updated on the College Leaderboard.
+
+
+6. EXPANDED DATABASE SCHEMAS (POSTGRESQL / SUPABASE)
+--------------------------------------------------------------------------------
+We use Postgres tables with strict types and row-level security (RLS) policies.
+
+*   `institutes` (University details)
+    - id: uuid, PK, default gen_random_uuid()
+    - name: text, not null
+    - email_domain: text, unique, not null (e.g. 'stanford.edu')
+    - logo_url: text
+    - created_at: timestamptz, default now()
+
+*   `profiles` (User metadata)
+    - id: uuid, PK (references auth.users)
+    - username: text, unique, not null
+    - full_name: text
+    - avatar_url: text
+    - institute_id: uuid, FK (references institutes.id), nullable
+    - github_url: text
+    - linkedin_url: text
+    - bio: text
+    - academic_credits: integer, default 0
+    - is_profile_public: boolean, default true
+    - created_at: timestamptz, default now()
+
+*   `friendships` (LinkedIn-style relationship)
+    - id: uuid, PK
+    - requester_id: uuid, FK (references profiles.id)
+    - receiver_id: uuid, FK (references profiles.id)
+    - status: text, check(status in ('pending', 'accepted', 'blocked'))
+    - updated_at: timestamptz, default now()
+
+*   `events` (Event database, global + street level)
+    - id: uuid, PK
+    - title: text, not null
+    - source_url: text, nullable
+    - description: text
+    - registration_deadline: timestamptz, not null
+    - location_type: text, check(location_type in ('online', 'offline', 'hybrid'))
+    - event_level: text, check(event_level in ('college', 'national', 'global'))
+    - organizer_id: uuid, FK (references profiles.id), nullable (null for auto-scraped)
+    - created_at: timestamptz, default now()
+
+*   `project_spaces` (The collaborative space for a specific event)
+    - id: uuid, PK
+    - event_id: uuid, FK (references events.id), nullable (null if self-initiated project)
+    - project_name: text, not null
+    - status: text, check(status in ('not_started', 'in_progress', 'submitted', 'completed'))
+    - github_repo: text
+    - live_demo_url: text
+    - created_at: timestamptz, default now()
+
+*   `project_members` (Mapping students to project spaces)
+    - id: uuid, PK
+    - project_space_id: uuid, FK (references project_spaces.id)
+    - profile_id: uuid, FK (references profiles.id)
+    - role: text, check(role in ('lead', 'developer', 'designer', 'mentor', 'contributor'))
+    - created_at: timestamptz, default now()
+
+*   `project_artifacts` (Uploads list & version history)
+    - id: uuid, PK
+    - project_space_id: uuid, FK (references project_spaces.id)
+    - file_name: text, not null
+    - file_url: text, not null
+    - version: integer, not null
+    - is_active: boolean, default true (only 1 file of a specific extension active at a time)
+    - uploaded_by: uuid, FK (references profiles.id)
+    - created_at: timestamptz, default now()
+
+*   `chat_messages` (Chat logs)
+    - id: uuid, PK
+    - project_space_id: uuid, FK (references project_spaces.id)
+    - sender_id: uuid, FK (references profiles.id)
+    - message: text, not null
+    - created_at: timestamptz, default now()
+
+*   `credit_applications` (B2B college credits flow)
+    - id: uuid, PK
+    - student_id: uuid, FK (references profiles.id)
+    - project_space_id: uuid, FK (references project_spaces.id)
+    - faculty_verifier_id: uuid, FK (references profiles.id), nullable
+    - credit_points: integer, default 10
+    - status: text, check(status in ('pending', 'approved', 'rejected'))
+    - submission_details: jsonb (contains links, project description)
+    - created_at: timestamptz, default now()
+
+
+7. DETAILED MECHANICS & TECHNICAL ENGINES
+--------------------------------------------------------------------------------
+A. URL Scraping Engine (Serverless Microservice)
+*   **Trigger**: User inputs a URL on the dashboard.
+*   **Execution**: Simple Node.js endpoint parsing the target URL.
+*   **Scraping targets & patterns**:
+    - *Unstop/Devpost/Devfolio*: Fetches HTML body. Extracts Open Graph tags:
+      * `<meta property="og:title">` -> Event name.
+      * `<meta property="og:description">` -> Event description.
+      * `<meta property="og:image">` -> Banner/Card thumbnail.
+    - *Fallback Parser*: If target site blocks requests (e.g. Cloudflare), parser 
+      simply fetches the page `<title>` and feeds the URL body to a lightweight 
+      regular expression parsing dates matching `YYYY-MM-DD` or standard written 
+      dates (e.g. "August 15"). If this fails, the UI falls back to manual input.
+
+B. Nudge Engine (Deadlines Monitor)
+*   **Architecture**: Runs every 12 hours as a cron job on Supabase Edge Functions.
+*   **Process**:
+    1. Query database for `events` with registration or stage deadlines occurring 
+       in the next 48 hours.
+    2. Cross-reference with `project_spaces` to find teams registered for these events.
+    3. Identify team members associated with these projects.
+    4. Compile templates using **Resend**:
+       - Template is high-contrast, minimalist plain-text style layout (matches theme).
+       - Subject: "LynDesk Nudge: [Event Name] Round due in 24 hours."
+       - Content: Lists teammate status, GitHub repo status, and active PPT.
+    5. Trigger in-app notifications: Flag active indicator dot on the team icon 
+       as red/coral.
+
+C. Local-First Synchronization (Offline Capabilities)
+*   **Framework**: Next.js service worker + LocalStorage / IndexedDB.
+*   **Flow**:
+    1. During active session, the app downloads and stores tracking schedules, 
+       stage dates, and teammates lists into IndexedDB.
+    2. If connection is lost:
+       - Top bar displays a tiny "Offline" sand text badge.
+       - Users can still edit status, update tasks lists, and inspect PPT/PDF details.
+       - All writes are stored in a queue inside IndexedDB: `offline_sync_queue`.
+    3. When connection re-establishes:
+       - App processes the queue, playing back changes to the Supabase database.
+       - Auto-resolves conflicts using a "last write wins" timestamp approach.
+
+
+8. DETAILED EXECUTION ROADMAP
+--------------------------------------------------------------------------------
+We build the foundation first, then layer components, styling, databases, 
+and engines.
+
+*   Phase 1: Environment & Theme System Initialization (Days 1-3)
+    *   Set up Vite React/Next.js environment.
+    *   Create base styling token files using CSS variables (Light mode first, 
+        Dark mode toggleable).
+    *   Install global libraries: Framer Motion (only for linear translations 
+        and fades), Lucide React (for premium wireframe icons).
+*   Phase 2: Database Schema & Auth Setup (Days 4-7)
+    *   Set up PostgreSQL schemas in Supabase.
+    *   Apply Row Level Security (RLS) rules (e.g. only project members can 
+        write/read chat messages).
+    *   Integrate email/password auth and Gmail OAuth.
+*   Phase 3: The Event Vault & Link Scraper (Days 8-12)
+    *   Build responsive desktop & mobile dashboards.
+    *   Implement the Quick Add modal.
+    *   Write the serverless scraper microservice.
+    *   Develop the stage/milestone checklist layout.
+*   Phase 4: Shared Workspaces, File storage & Real-Time Chat (Days 13-18)
+    *   Add file upload to Supabase Storage with automatically managed version logic.
+    *   Configure Supabase Realtime for instant messaging.
+    *   Integrate Agora SDK video/voice channels (and screen sharing).
+*   Phase 5: Friend Lists, Matchmaking & College Admin Portal (Days 19-24)
+    *   Create the LinkedIn-style friend search and request module.
+    *   Build the Teammate Finder matching board.
+    *   Develop the "LynDesk Campus" Faculty coordination console and verified credit log.
+*   Phase 6: Nudge Engine & Production Polish (Days 25-30)
+    *   Set up Cron-based Resend notification workers.
+    *   Add responsive design testing on all screen formats (iPhone, Android, 
+        Tablet, Desktop, Ultra-wide).
+    *   Verify WCAG accessibility requirements.
+================================================================================
