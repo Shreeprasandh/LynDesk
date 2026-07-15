@@ -32,10 +32,10 @@ export default function Home() {
   };
 
   return (
-    <div className="flex-1 flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* 1. Header (Sticky, Frosted Glass, Swiss Grid Style) */}
-      <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150">
+      <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <div className="flex items-center gap-3">
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
@@ -56,8 +56,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 2. Asymmetric Grid Layout (Designed like a premium design studio portal) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-12 md:py-24 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
+      {/* 2. Asymmetric Grid Layout (Locked Viewport, Internal Scroll on Mobile) */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 lg:py-12 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
         
         {/* Left Column: Premium Typographic Layout */}
         <section className="lg:col-span-7 flex flex-col items-start gap-12 lg:pr-8">
@@ -273,7 +273,7 @@ export default function Home() {
       </main>
 
       {/* 3. Footer (Simple, minimal metadata alignment) */}
-      <footer className="h-16 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150">
+      <footer className="h-16 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
         <div>
           © 2026 LYNDESK NETWORK INC.
         </div>
