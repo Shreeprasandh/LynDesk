@@ -38,7 +38,11 @@ export default function Home() {
       {/* 1. Header (Sticky, Frosted Glass, Swiss Grid Style) */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <LynDeskLogo size={18} className="mr-1" />
+          <img 
+            src="/lyndesk-logo.jpg" 
+            alt="LynDesk Logo" 
+            className="w-5 h-5 mr-1 object-contain rounded-full border border-border-main/60 filter grayscale dark:invert"
+          />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>
@@ -244,9 +248,11 @@ export default function Home() {
                   transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
                   className="flex flex-col items-center text-center gap-6 py-6"
                 >
-                  <div className="h-12 w-12 rounded-full border border-border-main/80 bg-bg-card flex items-center justify-center text-txt-main animate-pulse">
-                    <FolderGit size={18} className="stroke-[1.5]" />
-                  </div>
+                  <img 
+                    src="/lyndesk-logo.jpg" 
+                    alt="LynDesk Logo" 
+                    className="h-12 w-12 rounded-full border border-border-main/80 object-cover shadow-sm grayscale dark:invert"
+                  />
                   
                   <div className="flex flex-col gap-2">
                     <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main">
