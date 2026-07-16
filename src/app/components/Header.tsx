@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Link from "next/link";
+import LynAI from "./LynAI";
 import { usePathname, useRouter } from "next/navigation";
 import LynDeskLogo from "./LynDeskLogo";
 import { 
@@ -358,6 +359,7 @@ export default function Header() {
             <Link href="/coding-deck" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Deck</Link>
             <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Leaderboard</Link>
             <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Faculty Console</Link>
+            <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Recruiter Console</Link>
           </nav>
 
           {/* Separator Line */}
@@ -408,6 +410,7 @@ export default function Header() {
           </div>
         </div>
       </header>
+      {user && <LynAI />}
 
       {/* Slide-over Notification Drawer Overlay */}
       {isOpen && (

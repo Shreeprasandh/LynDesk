@@ -1,0 +1,18 @@
+{
+  "short_name": "LynDesk",
+  "name": "LynDesk Academic & Talent Platform",
+  "description": "Collaborative event tracking, competitive coding deck, and institutional talent registry.",
+  "icons": [
+    {
+      "src": "/icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0B0C10",
+  "theme_color": "#66FCF1",
+  "display": "standalone",
+  "orientation": "portrait"
+}

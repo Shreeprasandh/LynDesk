@@ -25,8 +25,14 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "LynDesk",
   description: "Link Your Next Desk — Pinned Events, Team Collaboration, and University Portals.",
+  manifest: "/manifest.json",
   icons: {
     icon: "/icon.jpg",
+  },
+  appleWebApp: {
+    title: "LynDesk",
+    statusBarStyle: "black-translucent",
+    capable: true,
   },
 };
 
