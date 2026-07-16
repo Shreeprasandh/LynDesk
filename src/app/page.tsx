@@ -1,15 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useTheme } from "./components/ThemeProvider";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import Link from "next/link";
-import LynDeskLogo from "./components/LynDeskLogo";
+import Header from "./components/Header";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Sun, 
-  Moon, 
   Link2, 
   Users, 
   Award, 
@@ -17,12 +15,10 @@ import {
   Globe, 
   Mail,
   Plus,
-  LogOut,
   MapPin,
   ExternalLink,
   X,
-  CheckCircle2,
-  FolderGit
+  CheckCircle2
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -38,13 +34,7 @@ const GithubIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-const LinkedinIcon = ({ size = 14 }: { size?: number }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
-    <rect x="2" y="9" width="4" height="12" />
-    <circle cx="4" cy="4" r="2" />
-  </svg>
-);
+
 
 interface EventItem {
   id: string;
@@ -82,8 +72,7 @@ const INITIAL_EVENTS: EventItem[] = [
 ];
 
 export default function Home() {
-  const { theme, toggleTheme } = useTheme();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -98,20 +87,24 @@ export default function Home() {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDeadline, setNewEventDeadline] = useState("");
   const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
+  const [modalError, setModalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading) {
-      setLoading(false);
-    }
-    if (user) {
-      setAuthStep("success");
-    } else {
-      setAuthStep("idle");
-    }
+    const handle = setTimeout(() => {
+      if (!authLoading) {
+        setLoading(false);
+      }
+      if (user) {
+        setAuthStep("success");
+      } else {
+        setAuthStep("idle");
+      }
+    }, 0);
+    return () => clearTimeout(handle);
   }, [user, authLoading]);
 
   useEffect(() => {
-    const handlePageShow = (event: PageTransitionEvent) => {
+    const handlePageShow = () => {
       setLoading(false);
       setError(null);
     };
@@ -165,25 +158,35 @@ export default function Home() {
     }
   };
 
-  // Mock URL Scraper Logic
-  const handleScrape = (e: React.FormEvent) => {
+  // Real URL Scraper Logic fetching /api/scrape
+  const handleScrape = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scraperUrl) return;
     setScraping(true);
+    setModalError(null);
     
-    // Simulate web scraping delay
-    setTimeout(() => {
-      setScraping(false);
-      // Auto-populate based on parsed URL parts
-      try {
-        const urlObj = new URL(scraperUrl);
-        const namePart = urlObj.hostname.replace("www.", "").split(".")[0];
-        setNewEventTitle(`${namePart.charAt(0).toUpperCase() + namePart.slice(1)} Hackathon 2026`);
-      } catch {
-        setNewEventTitle("Scraped Hackathon Event");
+    try {
+      const response = await fetch("/api/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: scraperUrl }),
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setNewEventTitle(data.title || "");
+        setNewEventDeadline(data.deadline || "");
+      } else {
+        setModalError(data.error || "Failed to parse URL metadata.");
       }
-      setNewEventDeadline("Nov 24, 2026");
-    }, 1500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reach scraper service.";
+      setModalError(message);
+    } finally {
+      setScraping(false);
+    }
   };
 
   const handleAddEvent = (e: React.FormEvent) => {
@@ -206,43 +209,14 @@ export default function Home() {
     setScraperUrl("");
     setNewEventTitle("");
     setNewEventDeadline("");
+    setModalError(null);
   };
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
-      {/* 1. Header (Frosted Glass, Swiss Grid Style) */}
-      <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <img 
-            src="/lyndesk-logo.jpg" 
-            alt="LynDesk Logo" 
-            className="w-5 h-5 mr-1 object-contain rounded-full border border-border-main/60 filter grayscale dark:invert"
-          />
-          <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
-            LYNDESK
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={toggleTheme}
-            className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main"
-            aria-label="Toggle Theme"
-          >
-            {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
-          </button>
-          
-          {user && (
-            <button 
-              onClick={signOut}
-              className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
-            >
-              <LogOut size={14} />
-            </button>
-          )}
-        </div>
-      </header>
+      {/* 1. Header (Unified Navigation & Notifications Drawer) */}
+      <Header />
 
       {/* Conditional Layout: Landing VS. Dashboard */}
       {!user ? (
@@ -491,10 +465,12 @@ export default function Home() {
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Verified Session</span>
               <div className="flex items-center gap-3">
-                <img 
+                <Image 
                   src="/lyndesk-logo.jpg" 
                   alt="Profile" 
-                  className="w-10 h-10 rounded-full border border-border-main/60 object-cover"
+                  width={40}
+                  height={40}
+                  className="rounded-full border border-border-main/60 object-cover"
                 />
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs text-txt-main font-mono truncate font-medium">{user.email}</span>
@@ -639,9 +615,12 @@ export default function Home() {
                       <span className="uppercase font-mono">{ev.location}</span>
                     </div>
 
-                    <button className="h-8 px-4 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 cursor-pointer">
+                    <Link 
+                      href={`/workspace/${ev.id}`}
+                      className="h-8 px-4 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none"
+                    >
                       Enter Workspace Deck →
-                    </button>
+                    </Link>
                   </div>
 
                 </div>
@@ -715,7 +694,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={() => { setIsModalOpen(false); setModalError(null); setScraperUrl(""); setNewEventTitle(""); setNewEventDeadline(""); }}
               className="absolute inset-0 bg-bg-primary/60 backdrop-blur-sm"
             />
 
@@ -730,7 +709,7 @@ export default function Home() {
               
               {/* Close Button */}
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setIsModalOpen(false); setModalError(null); setScraperUrl(""); setNewEventTitle(""); setNewEventDeadline(""); }}
                 className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main transition-colors"
               >
                 <X size={15} />
@@ -740,6 +719,12 @@ export default function Home() {
                 <h3 className="font-display text-lg font-semibold text-txt-main">Track New Event Link</h3>
                 <p className="text-xs text-txt-muted font-light">Paste hackathon URL to auto-extract timelines and stages.</p>
               </div>
+
+              {modalError && (
+                <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                  {modalError}
+                </div>
+              )}
 
               {/* Scraper Input */}
               <form onSubmit={handleScrape} className="flex gap-2 items-center">
@@ -791,7 +776,7 @@ export default function Home() {
                     <label className="text-xs text-txt-sub font-medium">Location</label>
                     <select
                       value={newEventLocation}
-                      onChange={(e) => setNewEventLocation(e.target.value as any)}
+                      onChange={(e) => setNewEventLocation(e.target.value as "online" | "in_person" | "hybrid")}
                       className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
                     >
                       <option value="online">Online</option>

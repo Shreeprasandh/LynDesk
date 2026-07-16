@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { useTheme } from "../components/ThemeProvider";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
-import { Sun, Moon, ArrowLeft, Mail, MessageSquare, ShieldAlert } from "lucide-react";
+import { Sun, Moon, ArrowLeft, Mail, MessageSquare } from "lucide-react";
+import LynDeskLogo from "../components/LynDeskLogo";
 
 export default function HelpCenter() {
   const { theme, toggleTheme } = useTheme();
@@ -74,11 +75,7 @@ export default function HelpCenter() {
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <img 
-            src="/lyndesk-logo.jpg" 
-            alt="LynDesk Logo" 
-            className="w-5 h-5 mr-1 object-contain rounded-full border border-border-main/60 filter grayscale dark:invert"
-          />
+          <LynDeskLogo size={20} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>

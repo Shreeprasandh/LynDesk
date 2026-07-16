@@ -21,9 +21,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     
     const initialTheme: Theme = savedTheme || (systemPrefersDark ? "dark" : "light");
-    setTheme(initialTheme);
+    
+    // Set html attribute synchronously to avoid theme flash
     document.documentElement.setAttribute("data-theme", initialTheme);
-    setMounted(true);
+    
+    // Defer state updates to avoid synchronous setState inside useEffect
+    const handle = setTimeout(() => {
+      setTheme(initialTheme);
+      setMounted(true);
+    }, 0);
+
+    return () => clearTimeout(handle);
   }, []);
 
   const toggleTheme = () => {

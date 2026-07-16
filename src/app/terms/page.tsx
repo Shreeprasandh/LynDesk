@@ -4,6 +4,7 @@ import React from "react";
 import { useTheme } from "../components/ThemeProvider";
 import Link from "next/link";
 import { Sun, Moon, ArrowLeft } from "lucide-react";
+import LynDeskLogo from "../components/LynDeskLogo";
 
 export default function TermsOfService() {
   const { theme, toggleTheme } = useTheme();
@@ -26,11 +27,7 @@ export default function TermsOfService() {
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <img 
-            src="/lyndesk-logo.jpg" 
-            alt="LynDesk Logo" 
-            className="w-5 h-5 mr-1 object-contain rounded-full border border-border-main/60 filter grayscale dark:invert"
-          />
+          <LynDeskLogo size={20} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>
@@ -69,13 +66,13 @@ export default function TermsOfService() {
 
           <div className="flex flex-col gap-6 text-sm text-txt-sub font-light leading-relaxed">
             <p>
-              Welcome to LynDesk ("Link Your Next Desk"). By accessing or utilizing our workspace dashboards, tracking registries, and institutional portals, you agree to comply with the terms detailed below.
+              Welcome to LynDesk (&quot;Link Your Next Desk&quot;). By accessing or utilizing our workspace dashboards, tracking registries, and institutional portals, you agree to comply with the terms detailed below.
             </p>
 
             <div className="flex flex-col gap-2">
               <h2 className="font-display text-lg font-semibold text-txt-main">1. Access and Account Registration</h2>
               <p>
-                To enter your college's network directory and workspaces, you must establish an account using a supported email address or OAuth login (Google, GitHub, Discord). 
+                To enter your college&apos;s network directory and workspaces, you must establish an account using a supported email address or OAuth login (Google, GitHub, Discord). 
                 You are responsible for safeguarding your session tokens and password keys. LynDesk is not liable for unauthorized access resulting from negligence.
               </p>
             </div>
@@ -104,7 +101,7 @@ export default function TermsOfService() {
               <h2 className="font-display text-lg font-semibold text-txt-main">4. University Credits & Verification Disclaimer</h2>
               <p>
                 LynDesk acts solely as a tracking coordinator and cryptographic validation platform for extracurricular activity points. 
-                <strong>The final approval and awarding of university academic credits or graduation points rests entirely with your institution's administration and faculty verifiers.</strong> 
+                <strong>The final approval and awarding of university academic credits or graduation points rests entirely with your institution&apos;s administration and faculty verifiers.</strong> 
                 LynDesk makes no guarantee that submission logs will be approved by your university department.
               </p>
             </div>
@@ -112,7 +109,7 @@ export default function TermsOfService() {
             <div className="flex flex-col gap-2">
               <h2 className="font-display text-lg font-semibold text-txt-main">5. Limitation of Liability</h2>
               <p>
-                LynDesk is provided on an "as is" and "as available" basis. We make no warranty that operations will be completely uninterrupted. 
+                LynDesk is provided on an &quot;as is&quot; and &quot;as available&quot; basis. We make no warranty that operations will be completely uninterrupted. 
                 We are not liable for project deadlines missed due to internet outages, GitHub API down-times, or database synchronizer latency.
               </p>
             </div>

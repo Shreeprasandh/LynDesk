@@ -4,6 +4,7 @@ import React from "react";
 import { useTheme } from "../components/ThemeProvider";
 import Link from "next/link";
 import { Sun, Moon, ArrowLeft } from "lucide-react";
+import LynDeskLogo from "../components/LynDeskLogo";
 
 export default function PrivacyPolicy() {
   const { theme, toggleTheme } = useTheme();
@@ -26,11 +27,7 @@ export default function PrivacyPolicy() {
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <img 
-            src="/lyndesk-logo.jpg" 
-            alt="LynDesk Logo" 
-            className="w-5 h-5 mr-1 object-contain rounded-full border border-border-main/60 filter grayscale dark:invert"
-          />
+          <LynDeskLogo size={20} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>
@@ -103,7 +100,7 @@ export default function PrivacyPolicy() {
               </p>
               <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
                 <li><strong>Within Project Teams</strong>: Shared chat logs, slide decks, and codebases are visible to co-workers you invite.</li>
-                <li><strong>To Institutional Admins</strong>: Submitting credit requests routes verified files to your university's grading console.</li>
+                <li><strong>To Institutional Admins</strong>: Submitting credit requests routes verified files to your university&apos;s grading console.</li>
               </ul>
             </div>
 
