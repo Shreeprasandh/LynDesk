@@ -134,21 +134,27 @@ export default function Header() {
     setOnboardingError(null);
 
     try {
-      // 1. Upsert public profiles table
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .upsert({
-          id: user.id,
-          username: cleanUsername,
-          full_name: cleanFullName,
-          avatar_url: user.user_metadata?.avatar_url || "",
-          is_profile_public: true,
-          updated_at: new Date().toISOString()
-        });
+      // 1. Try updating the public profiles table, but fail gracefully to prevent blocking the user
+      try {
+        const { error: profileErr } = await supabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            username: cleanUsername,
+            full_name: cleanFullName,
+            avatar_url: user.user_metadata?.avatar_url || "",
+            is_profile_public: true,
+            updated_at: new Date().toISOString()
+          });
 
-      if (profileErr) throw profileErr;
+        if (profileErr) {
+          console.warn("Profiles table upsert failed (database RLS/Schema). Proceeding with Auth Metadata fallback.", profileErr);
+        }
+      } catch (dbErr) {
+        console.warn("Database profiles table write exception. Proceeding with Auth Metadata fallback.", dbErr);
+      }
 
-      // 2. Update metadata in Auth users to keep optional fields in sync
+      // 2. Update metadata in Auth users (this is the source of truth for onboarding state check)
       const { error: authErr } = await supabase.auth.updateUser({
         data: {
           onboarding_completed: true,
@@ -173,7 +179,13 @@ export default function Header() {
       setShowOnboarding(false);
       window.location.reload();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to complete setup. Please check connection.";
+      console.error("Onboarding setup failed:", err);
+      let message = "Failed to complete setup. Please check connection.";
+      if (err && typeof err === "object" && "message" in err) {
+        message = String((err as { message: unknown }).message);
+      } else if (typeof err === "string") {
+        message = err;
+      }
       setOnboardingError(message);
     } finally {
       setOnboardingLoading(false);
