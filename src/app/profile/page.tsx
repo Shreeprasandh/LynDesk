@@ -54,6 +54,7 @@ interface BackupProfileData {
   department: string;
   gradYear: string;
   isPublic: boolean;
+  portfolioUrl: string;
 }
 
 export default function ProfilePage() {
@@ -71,6 +72,7 @@ export default function ProfilePage() {
   const [githubUrl, setGithubUrl] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [discordUsername, setDiscordUsername] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
   const [resumeUrl, setResumeUrl] = useState("");
   const [resumeFileName, setResumeFileName] = useState("");
   
@@ -111,6 +113,7 @@ export default function ProfilePage() {
       githubUrl,
       linkedinUrl,
       discordUsername,
+      portfolioUrl,
       collegeName,
       department,
       gradYear,
@@ -128,6 +131,7 @@ export default function ProfilePage() {
       setGithubUrl(backupData.githubUrl);
       setLinkedinUrl(backupData.linkedinUrl);
       setDiscordUsername(backupData.discordUsername);
+      setPortfolioUrl(backupData.portfolioUrl);
       setCollegeName(backupData.collegeName);
       setDepartment(backupData.department);
       setGradYear(backupData.gradYear);
@@ -175,6 +179,7 @@ export default function ProfilePage() {
         setGithubUrl(meta.github_url || "");
         setLinkedinUrl(meta.linkedin_url || "");
         setDiscordUsername(meta.discord_username || "");
+        setPortfolioUrl(meta.portfolio_url || "");
         setResumeUrl(meta.resume_url || "");
         setResumeFileName(meta.resume_file_name || "");
         setCollegeName(meta.college_name || (profile?.institutes && profile.institutes.name) || "");
@@ -258,6 +263,28 @@ export default function ProfilePage() {
       return;
     }
 
+    const isValidUrl = (url: string) => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (githubUrl.trim() && !isValidUrl(githubUrl.trim())) {
+      setMessage({ text: "Please enter a valid GitHub URL (including https://).", type: "error" });
+      return;
+    }
+    if (linkedinUrl.trim() && !isValidUrl(linkedinUrl.trim())) {
+      setMessage({ text: "Please enter a valid LinkedIn URL (including https://).", type: "error" });
+      return;
+    }
+    if (portfolioUrl.trim() && !isValidUrl(portfolioUrl.trim())) {
+      setMessage({ text: "Please enter a valid Personal Portfolio URL (including https://).", type: "error" });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
 
@@ -293,6 +320,7 @@ export default function ProfilePage() {
           github_url: githubUrl.trim(),
           linkedin_url: linkedinUrl.trim(),
           discord_username: discordUsername.trim(),
+          portfolio_url: portfolioUrl.trim(),
           resume_url: resumeUrl,
           resume_file_name: resumeFileName,
           college_name: cleanCollege,
@@ -317,6 +345,17 @@ export default function ProfilePage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
+    
+    // Check file size (e.g., 2MB limit)
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage({ text: "Profile image size cannot exceed 2MB.", type: "error" });
+      return;
+    }
+    // Check mime type
+    if (!file.type.startsWith("image/")) {
+      setMessage({ text: "Please upload a valid image file (PNG, JPG, WebP).", type: "error" });
+      return;
+    }
     
     setUploadingAvatar(true);
     setMessage(null);
@@ -355,6 +394,18 @@ export default function ProfilePage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
+    
+    // Check file size (e.g., 3MB limit)
+    if (file.size > 3 * 1024 * 1024) {
+      setMessage({ text: "Resume PDF size cannot exceed 3MB.", type: "error" });
+      return;
+    }
+    // Check mime type
+    const allowedTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!allowedTypes.includes(file.type) && !file.name.endsWith(".pdf") && !file.name.endsWith(".doc") && !file.name.endsWith(".docx")) {
+      setMessage({ text: "Please upload a valid document file (PDF, DOC, or DOCX).", type: "error" });
+      return;
+    }
     
     setUploadingResume(true);
     setMessage(null);
@@ -696,10 +747,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                  <DiscordIcon size={12} /> Discord Username
-                </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                    <DiscordIcon size={12} /> Discord Username
+                  </label>
                   <input 
                     type="text" 
                     value={discordUsername}
@@ -708,6 +760,21 @@ export default function ProfilePage() {
                     placeholder="username#0000"
                     className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
                   />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                    <Globe size={12} /> Personal Portfolio URL
+                  </label>
+                  <input 
+                    type="url" 
+                    value={portfolioUrl}
+                    onChange={(e) => setPortfolioUrl(e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="https://myportfolio.dev"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                  />
+                </div>
               </div>
             </div>
 

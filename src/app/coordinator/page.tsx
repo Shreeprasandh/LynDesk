@@ -191,8 +191,23 @@ useEffect(() => {
           {/* Claims List Table */}
           <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
             {loading ? (
-              <div className="h-full flex items-center justify-center font-mono text-[9px] text-txt-muted">
-                FETCHING PORTFOLIO CLAIMS...
+              <div className="flex flex-col divide-y divide-border-main/40 animate-pulse">
+                {[1, 2, 3, 4].map(n => (
+                  <div key={n} className="p-4 flex justify-between items-center gap-4">
+                    <div className="flex flex-col gap-2 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-20 bg-border-main/20 rounded-sm" />
+                        <div className="h-2 w-12 bg-border-main/10 rounded-sm" />
+                      </div>
+                      <div className="h-2.5 w-32 bg-border-main/10 rounded-sm" />
+                      <div className="h-2 w-24 bg-border-main/10 rounded-sm" />
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="h-3.5 w-12 bg-border-main/20 rounded-sm" />
+                      <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="flex flex-col divide-y divide-border-main/60">

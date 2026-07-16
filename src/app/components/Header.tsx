@@ -82,6 +82,7 @@ export default function Header() {
   const [oGithub, setOGithub] = useState("");
   const [oLinkedIn, setOLinkedIn] = useState("");
   const [oDiscord, setODiscord] = useState("");
+  const [oPortfolio, setOPortfolio] = useState("");
   
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
@@ -143,6 +144,28 @@ export default function Header() {
       return;
     }
 
+    const isValidUrl = (url: string) => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (oGithub.trim() && !isValidUrl(oGithub.trim())) {
+      setOnboardingError("Please enter a valid GitHub URL (including https://).");
+      return;
+    }
+    if (oLinkedIn.trim() && !isValidUrl(oLinkedIn.trim())) {
+      setOnboardingError("Please enter a valid LinkedIn URL (including https://).");
+      return;
+    }
+    if (oPortfolio.trim() && !isValidUrl(oPortfolio.trim())) {
+      setOnboardingError("Please enter a valid Portfolio URL (including https://).");
+      return;
+    }
+
     setOnboardingLoading(true);
     setOnboardingError(null);
 
@@ -183,7 +206,8 @@ export default function Header() {
           skills: cleanSkills,
           github_url: oGithub.trim(),
           linkedin_url: oLinkedIn.trim(),
-          discord_username: oDiscord.trim()
+          discord_username: oDiscord.trim(),
+          portfolio_url: oPortfolio.trim()
         }
       });
 
@@ -750,15 +774,27 @@ export default function Header() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub">Discord Username</label>
-                      <input
-                        type="text"
-                        value={oDiscord}
-                        onChange={(e) => setODiscord(e.target.value)}
-                        placeholder="username#0000"
-                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-txt-sub">Discord Username</label>
+                        <input
+                          type="text"
+                          value={oDiscord}
+                          onChange={(e) => setODiscord(e.target.value)}
+                          placeholder="username#0000"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-txt-sub">Portfolio Link</label>
+                        <input
+                          type="url"
+                          value={oPortfolio}
+                          onChange={(e) => setOPortfolio(e.target.value)}
+                          placeholder="https://myportfolio.dev"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

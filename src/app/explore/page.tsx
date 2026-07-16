@@ -251,8 +251,29 @@ export default function ExplorePage() {
 
         {/* Dynamic content rendering */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center font-mono text-[10px] text-txt-muted">
-            LOADING CAMPUS RECORDS...
+          <div className="flex-1 overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+              {[1, 2, 3, 4].map(n => (
+                <div key={n} className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4 animate-pulse">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-border-main/20" />
+                      <div className="flex flex-col gap-2">
+                        <div className="h-3 w-28 bg-border-main/20 rounded-sm" />
+                        <div className="h-2.5 w-36 bg-border-main/10 rounded-sm" />
+                      </div>
+                    </div>
+                    <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
+                  </div>
+                  <div className="h-3 w-full bg-border-main/10 rounded-sm" />
+                  <div className="h-3 w-2/3 bg-border-main/10 rounded-sm" />
+                  <div className="flex gap-2 pt-2 border-t border-border-main/20">
+                    <div className="h-8 w-20 bg-border-main/20 rounded-sm" />
+                    <div className="h-8 w-20 bg-border-main/10 rounded-sm" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto pr-1">

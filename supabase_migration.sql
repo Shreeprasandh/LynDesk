@@ -130,6 +130,10 @@ CREATE POLICY "Allow users to update own profile"
     ON public.profiles FOR UPDATE 
     USING (auth.uid() = id);
 
+CREATE POLICY "Allow users to insert own profile" 
+    ON public.profiles FOR INSERT 
+    WITH CHECK (auth.uid() = id);
+
 -- Institutes Policies
 CREATE POLICY "Allow public read access to institutes" 
     ON public.institutes FOR SELECT 
@@ -220,9 +224,12 @@ BEGIN
     -- Find if domain is registered to an institute
     SELECT id INTO matched_institute_id FROM public.institutes WHERE email_domain = domain_part LIMIT 1;
     
-    -- Generate fallback username from email prefix
+    -- Generate fallback username from email prefix and handle unique username collisions
     fallback_username := split_part(new.email, '@', 1);
-
+    IF EXISTS (SELECT 1 FROM public.profiles WHERE username = fallback_username) THEN
+        fallback_username := fallback_username || '_' || substr(new.id::text, 1, 4);
+    END IF;
+ 
     INSERT INTO public.profiles (id, institute_id, username, full_name, avatar_url, academic_credits, is_profile_public)
     VALUES (
         new.id,
@@ -232,7 +239,8 @@ BEGIN
         new.raw_user_meta_data->>'avatar_url',
         0,
         true
-    );
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
