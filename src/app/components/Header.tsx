@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList } from "../lib/textNormalization";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import LynDeskLogo from "./LynDeskLogo";
 import { 
   Sun, 
@@ -39,12 +40,24 @@ export default function Header() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
 
+  const pathname = usePathname();
+  const router = useRouter();
+
+  // Global authentication route guard: redirects unauthorized sessions immediately to landing page
+  useEffect(() => {
+    const publicPaths = ["/", "/terms", "/privacy", "/help"];
+    if (!user && !publicPaths.includes(pathname)) {
+      router.push("/");
+    }
+  }, [user, pathname, router]);
+
   // Compute unread count dynamically during render
   const unreadCount = notifications.filter(n => !n.read).length;
 
   // Onboarding Wizard States
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   
   // Compulsory Fields
   const [oFullName, setOFullName] = useState("");
@@ -354,7 +367,7 @@ export default function Header() {
                   <User size={14} />
                 </Link>
                 <button 
-                  onClick={signOut}
+                  onClick={() => setShowLogoutConfirm(true)}
                   className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
                   title="Sign Out"
                 >
@@ -765,6 +778,50 @@ export default function Header() {
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Log Out Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[10000] overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)} />
+          
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="bg-bg-surface border border-border-main/80 max-w-sm w-full p-6 rounded-md flex flex-col gap-4 shadow-2xl animate-fade-in">
+              
+              <div className="flex flex-col gap-1 border-b border-border-main/40 pb-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Security Check</span>
+                <h3 className="text-sm font-semibold text-txt-main font-display">Confirm Sign Out</h3>
+              </div>
+              
+              <p className="text-xs text-txt-sub font-light leading-relaxed">
+                Are you sure you want to end your active session? You will need to sign back in to access your workspaces.
+              </p>
+              
+              <div className="flex justify-end gap-3 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-main text-[10px] uppercase font-mono rounded-sm transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowLogoutConfirm(false);
+                    await signOut();
+                    router.push("/");
+                  }}
+                  className="h-8 px-4 bg-red-500 hover:opacity-90 text-white text-[10px] uppercase font-mono font-semibold rounded-sm transition-opacity cursor-pointer"
+                >
+                  Confirm Sign Out
+                </button>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
