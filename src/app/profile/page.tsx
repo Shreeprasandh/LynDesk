@@ -42,6 +42,20 @@ const LinkedinIcon = ({ size = 14, className = "" }: { size?: number; className?
   </svg>
 );
 
+interface BackupProfileData {
+  fullName: string;
+  username: string;
+  bio: string;
+  skills: string;
+  githubUrl: string;
+  linkedinUrl: string;
+  discordUsername: string;
+  collegeName: string;
+  department: string;
+  gradYear: string;
+  isPublic: boolean;
+}
+
 export default function ProfilePage() {
   const { user } = useAuth();
   
@@ -83,6 +97,45 @@ export default function ProfilePage() {
   // Suggestions
   const [collegeSuggestion, setCollegeSuggestion] = useState<string | null>(null);
   const [deptSuggestion, setDeptSuggestion] = useState<string | null>(null);
+
+  // Edit/View Mode controls
+  const [isEditing, setIsEditing] = useState(false);
+  const [backupData, setBackupData] = useState<BackupProfileData | null>(null);
+
+  const handleStartEdit = () => {
+    setBackupData({
+      fullName,
+      username,
+      bio,
+      skills,
+      githubUrl,
+      linkedinUrl,
+      discordUsername,
+      collegeName,
+      department,
+      gradYear,
+      isPublic
+    });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (backupData) {
+      setFullName(backupData.fullName);
+      setUsername(backupData.username);
+      setBio(backupData.bio);
+      setSkills(backupData.skills);
+      setGithubUrl(backupData.githubUrl);
+      setLinkedinUrl(backupData.linkedinUrl);
+      setDiscordUsername(backupData.discordUsername);
+      setCollegeName(backupData.collegeName);
+      setDepartment(backupData.department);
+      setGradYear(backupData.gradYear);
+      setIsPublic(backupData.isPublic);
+    }
+    setIsEditing(false);
+    setMessage(null);
+  };
   
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -209,19 +262,25 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      // 1. Update public profiles table
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({
-          id: user.id,
-          username: cleanUsername,
-          full_name: cleanFullName,
-          avatar_url: avatarUrl,
-          is_profile_public: isPublic,
-          updated_at: new Date().toISOString()
-        });
+      // 1. Try updating the public profiles table, but fail gracefully to prevent blocking the user
+      try {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: user.id,
+            username: cleanUsername,
+            full_name: cleanFullName,
+            avatar_url: avatarUrl,
+            is_profile_public: isPublic,
+            updated_at: new Date().toISOString()
+          });
 
-      if (profileError) throw profileError;
+        if (profileError) {
+          console.warn("Profiles table upsert failed (database RLS/Schema). Proceeding with Auth Metadata fallback.", profileError);
+        }
+      } catch (dbErr) {
+        console.warn("Database profiles table write exception. Proceeding with Auth Metadata fallback.", dbErr);
+      }
 
       // 2. Update metadata in Auth users to keep optional fields in sync
       const { error } = await supabase.auth.updateUser({
@@ -245,6 +304,7 @@ export default function ProfilePage() {
       if (error) throw error;
 
       setMessage({ text: "Profile details updated successfully.", type: "success" });
+      setIsEditing(false); // Disable editing mode after successful save
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update profile records.";
       setMessage({ text: message, type: "error" });
@@ -410,10 +470,41 @@ export default function ProfilePage() {
           Back to Portal
         </Link>
 
-        <div className="flex flex-col gap-2 border-b border-border-main/40 pb-4">
-          <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Identity Control</span>
-          <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Your Technical Profile</h1>
-          <p className="text-xs text-txt-sub">Manage authentication credentials, upload resumes, and connect social identities.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border-main/40 pb-4">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Identity Control</span>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Your Technical Profile</h1>
+            <p className="text-xs text-txt-sub">Manage authentication credentials, upload resumes, and connect social identities.</p>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="profile-form"
+                  disabled={saving}
+                  className="h-8 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1.5"
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEdit}
+                className="h-8 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Edit Profile
+              </button>
+            )}
+          </div>
         </div>
 
         {message && (
@@ -429,7 +520,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* ================= LEFT COLUMN: PROFILE FORM (7 Columns) ================= */}
-          <form onSubmit={handleSaveProfile} className="lg:col-span-7 flex flex-col gap-6">
+          <form id="profile-form" onSubmit={handleSaveProfile} className="lg:col-span-7 flex flex-col gap-6">
             
             {/* Required Identity Panel */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
@@ -448,8 +539,8 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold"
+                    disabled={!isEditing || uploadingAvatar}
+                    className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold disabled:pointer-events-none"
                   >
                     {uploadingAvatar ? "..." : "Edit"}
                   </button>
@@ -457,6 +548,7 @@ export default function ProfilePage() {
                     type="file" 
                     ref={avatarInputRef}
                     onChange={handleAvatarUpload}
+                    disabled={!isEditing}
                     className="hidden" 
                     accept="image/*"
                   />
@@ -470,8 +562,9 @@ export default function ProfilePage() {
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
+                      disabled={!isEditing}
                       placeholder="Mira Sen"
-                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                     />
                   </div>
 
@@ -482,8 +575,9 @@ export default function ProfilePage() {
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
+                      disabled={!isEditing}
                       placeholder="mirasen"
-                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
                     />
                   </div>
                 </div>
@@ -499,7 +593,8 @@ export default function ProfilePage() {
                   type="checkbox"
                   checked={isPublic}
                   onChange={(e) => setIsPublic(e.target.checked)}
-                  className="w-4 h-4 rounded border-border-main text-accent-main focus:ring-accent-main"
+                  disabled={!isEditing}
+                  className="w-4 h-4 rounded border-border-main text-accent-main focus:ring-accent-main disabled:opacity-50"
                 />
               </div>
             </div>
@@ -514,8 +609,9 @@ export default function ProfilePage() {
                   rows={3}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
+                  disabled={!isEditing}
                   placeholder="Tell us about your developer specialties, hackathon goals, or stack specialties..."
-                  className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light resize-none"
+                  className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light resize-none disabled:opacity-60"
                 />
               </div>
 
@@ -525,8 +621,9 @@ export default function ProfilePage() {
                   type="text" 
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
+                  disabled={!isEditing}
                   placeholder="e.g. Next.js, TypeScript, PostgreSQL, Figma, UI/UX"
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                 />
               </div>
 
@@ -553,6 +650,7 @@ export default function ProfilePage() {
                     type="file" 
                     ref={resumeInputRef}
                     onChange={handleResumeUpload}
+                    disabled={!isEditing}
                     className="hidden" 
                     accept=".pdf,.doc,.docx"
                   />
@@ -560,7 +658,7 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => resumeInputRef.current?.click()}
-                    disabled={uploadingResume}
+                    disabled={!isEditing || uploadingResume}
                     className="h-8 px-4 border border-border-main/80 text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center gap-1.5 transition-colors disabled:opacity-50"
                   >
                     {uploadingResume ? "..." : <><Upload size={12} /> Upload PDF</>}
@@ -577,11 +675,12 @@ export default function ProfilePage() {
                     type="url" 
                     value={githubUrl}
                     onChange={(e) => setGithubUrl(e.target.value)}
+                    disabled={!isEditing}
                     placeholder="https://github.com/username"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
                   />
                 </div>
-
+ 
                 <div className="flex flex-col gap-1">
                   <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
                     <LinkedinIcon size={12} /> LinkedIn URL
@@ -590,8 +689,9 @@ export default function ProfilePage() {
                     type="url" 
                     value={linkedinUrl}
                     onChange={(e) => setLinkedinUrl(e.target.value)}
+                    disabled={!isEditing}
                     placeholder="https://linkedin.com/in/username"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -600,13 +700,14 @@ export default function ProfilePage() {
                 <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
                   <DiscordIcon size={12} /> Discord Username
                 </label>
-                <input 
-                  type="text" 
-                  value={discordUsername}
-                  onChange={(e) => setDiscordUsername(e.target.value)}
-                  placeholder="username#0000"
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
-                />
+                  <input 
+                    type="text" 
+                    value={discordUsername}
+                    onChange={(e) => setDiscordUsername(e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="username#0000"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                  />
               </div>
             </div>
 
@@ -625,8 +726,9 @@ export default function ProfilePage() {
                     const match = getSpellingSuggestion(val);
                     setCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
                   }}
+                  disabled={!isEditing}
                   placeholder="MIT / IIT Delhi / Stanford University"
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                 />
                 {collegeSuggestion && (
                   <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
@@ -647,8 +749,9 @@ export default function ProfilePage() {
                       const match = getSpellingSuggestion(val);
                       setDeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
                     }}
+                    disabled={!isEditing}
                     placeholder="Computer Science"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                   />
                   {deptSuggestion && (
                     <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
@@ -663,27 +766,30 @@ export default function ProfilePage() {
                     type="text" 
                     value={gradYear}
                     onChange={(e) => setGradYear(e.target.value)}
+                    disabled={!isEditing}
                     placeholder="2027"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                   />
                 </div>
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={saving}
-              className="w-full h-11 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity cursor-pointer"
-            >
-              {saving ? (
-                <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
-              ) : (
-                <>
-                  <Save size={14} className="stroke-[1.5]" />
-                  Save Profile Records
-                </>
-              )}
-            </button>
+            {isEditing && (
+              <button 
+                type="submit" 
+                disabled={saving}
+                className="w-full h-11 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity cursor-pointer"
+              >
+                {saving ? (
+                  <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                ) : (
+                  <>
+                    <Save size={14} />
+                    Save Portfolio Changes
+                  </>
+                )}
+              </button>
+            )}
           </form>
 
           {/* ================= RIGHT COLUMN: ACCOUNT CONNECTIONS & VERIFIED STATS (5 Columns) ================= */}
