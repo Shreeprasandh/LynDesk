@@ -15,7 +15,9 @@ import {
   Award,
   Globe,
   Upload,
-  Info
+  Info,
+  Trash2,
+  X
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -68,6 +70,13 @@ export default function ProfilePage() {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  
+  // Delete Account States
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteOtp, setDeleteOtp] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [linking, setLinking] = useState(false);
   
   const resumeInputRef = useRef<HTMLInputElement>(null);
@@ -303,20 +312,80 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-bg-base text-txt-muted font-mono text-xs">
-        <span className="h-5 w-5 rounded-full border border-txt-main/20 border-t-txt-main animate-spin mr-2" />
-        LOADING PORTFOLIO RECORD...
-      </div>
-    );
-  }
+  const handleRequestDelete = async () => {
+    setDeleteError(null);
+    setDeleteSuccess(false);
+    setDeleteOtp("");
+    setShowDeleteModal(true);
+    setDeleteLoading(true);
+
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const response = await fetch("/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`
+        },
+        body: JSON.stringify({ action: "request" })
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to trigger verification code.");
+      }
+      setDeleteSuccess(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to send delete verification code.";
+      setDeleteError(message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deleteOtp.trim()) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      const response = await fetch("/api/auth/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`
+        },
+        body: JSON.stringify({ action: "verify", otp: deleteOtp.trim() })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed.");
+      }
+
+      await supabase.auth.signOut();
+      window.location.href = "/";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Verification code failed.";
+      setDeleteError(message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
+
+      {loading && (
+        <div className="w-full h-0.5 bg-accent-main/20 overflow-hidden flex-shrink-0">
+          <div className="h-full bg-accent-main animate-pulse w-full" />
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto bg-bg-base/30 py-8 px-4 md:px-12 max-w-5xl w-full mx-auto flex flex-col gap-6">
@@ -700,11 +769,93 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Account Deletion Button */}
+            <div className="flex justify-center mt-2 pb-6">
+              <button
+                type="button"
+                onClick={handleRequestDelete}
+                className="text-[9px] font-mono uppercase tracking-widest text-txt-muted hover:text-red-500 transition-colors duration-150 focus:outline-none cursor-pointer"
+              >
+                Delete LynDesk Account
+              </button>
+            </div>
+
           </section>
 
         </div>
 
       </main>
+
+      {/* Delete Account OTP Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowDeleteModal(false)} />
+
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="bg-bg-surface border border-border-main/80 max-w-md w-full p-6 md:p-8 rounded-md flex flex-col gap-5 shadow-2xl animate-fade-in">
+              
+              <div className="flex justify-between items-start gap-4 border-b border-border-main/40 pb-4">
+                <div className="flex flex-col">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-red-500 font-bold">Action Verification</span>
+                  <h3 className="text-base font-semibold text-txt-main font-display">Confirm Permanent Deletion</h3>
+                </div>
+                <button onClick={() => setShowDeleteModal(false)} className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer">
+                  <X size={14} />
+                </button>
+              </div>
+
+              {deleteError && (
+                <div className="text-xs p-3 border border-red-500/50 bg-red-500/10 text-txt-muted font-mono rounded-sm text-center">
+                  {deleteError}
+                </div>
+              )}
+
+              {deleteSuccess ? (
+                <form onSubmit={handleConfirmDelete} className="flex flex-col gap-4">
+                  <p className="text-xs text-txt-sub font-light leading-relaxed">
+                    A 6-digit confirmation code has been generated for your session. Enter the code sent to your email to authorize account deletion.
+                  </p>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Verification Code *</label>
+                    <input 
+                      type="text" 
+                      required
+                      maxLength={6}
+                      value={deleteOtp}
+                      onChange={(e) => setDeleteOtp(e.target.value)}
+                      placeholder="e.g. 123456"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-txt-main font-mono text-center tracking-[0.5em]"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={deleteLoading}
+                    className="w-full h-10 bg-red-500 hover:opacity-90 disabled:opacity-50 text-white font-mono text-xs tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity cursor-pointer"
+                  >
+                    {deleteLoading ? (
+                      <span className="h-4 w-4 rounded-full border border-white/30 border-t-white animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 size={12} />
+                        Confirm Deletion
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 gap-3">
+                  <span className="h-6 w-6 rounded-full border border-accent-main/30 border-t-accent-main animate-spin" />
+                  <span className="text-[10px] font-mono text-txt-muted uppercase">Sending OTP Security Code...</span>
+                </div>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import LynDeskLogo from "./LynDeskLogo";
 import { 
@@ -39,6 +40,130 @@ export default function Header() {
 
   // Compute unread count dynamically during render
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Onboarding Wizard States
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  
+  // Compulsory Fields
+  const [oFullName, setOFullName] = useState("");
+  const [oUsername, setOUsername] = useState("");
+  const [oRole, setORole] = useState<"student" | "employee" | "solo">("student");
+  const [oDob, setODob] = useState("");
+  const [oLocation, setOLocation] = useState("");
+  
+  // Student dynamic fields
+  const [oCollege, setOCollege] = useState("");
+  const [oDepartment, setODepartment] = useState("");
+  const [oGradYear, setOGradYear] = useState("");
+  
+  // Employee dynamic fields
+  const [oCompany, setOCompany] = useState("");
+  const [oDesignation, setODesignation] = useState("");
+  
+  // Optional expandable fields
+  const [oShowOptional, setOShowOptional] = useState(false);
+  const [oBio, setOBio] = useState("");
+  const [oSkills, setOSkills] = useState("");
+  const [oGithub, setOGithub] = useState("");
+  const [oLinkedIn, setOLinkedIn] = useState("");
+  const [oDiscord, setODiscord] = useState("");
+  
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+
+  // Check onboarding status on mount / user change
+  useEffect(() => {
+    if (user) {
+      const isCompleted = user.user_metadata?.onboarding_completed;
+      if (!isCompleted) {
+        const handle = setTimeout(() => {
+          setOFullName(user.user_metadata?.full_name || "");
+          setOUsername(user.user_metadata?.username || user.email?.split("@")[0] || "");
+          setShowOnboarding(true);
+        }, 0);
+        return () => clearTimeout(handle);
+      } else {
+        const handle = setTimeout(() => {
+          setShowOnboarding(false);
+        }, 0);
+        return () => clearTimeout(handle);
+      }
+    } else {
+      const handle = setTimeout(() => {
+        setShowOnboarding(false);
+      }, 0);
+      return () => clearTimeout(handle);
+    }
+  }, [user]);
+
+  const handleSubmitOnboarding = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    if (!oFullName.trim() || !oUsername.trim() || !oDob || !oLocation.trim()) {
+      setOnboardingError("Full Name, Username, Date of Birth, and Location are required.");
+      return;
+    }
+    
+    if (oRole === "student" && (!oCollege.trim() || !oDepartment.trim() || !oGradYear.trim())) {
+      setOnboardingError("Student academic credentials are required.");
+      return;
+    }
+
+    if (oRole === "employee" && (!oCompany.trim() || !oDesignation.trim())) {
+      setOnboardingError("Company and designation details are required.");
+      return;
+    }
+
+    setOnboardingLoading(true);
+    setOnboardingError(null);
+
+    try {
+      // 1. Upsert public profiles table
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .upsert({
+          id: user.id,
+          username: oUsername.trim().toLowerCase(),
+          full_name: oFullName.trim(),
+          avatar_url: user.user_metadata?.avatar_url || "",
+          is_profile_public: true,
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileErr) throw profileErr;
+
+      // 2. Update metadata in Auth users to keep optional fields in sync
+      const { error: authErr } = await supabase.auth.updateUser({
+        data: {
+          onboarding_completed: true,
+          role: oRole,
+          dob: oDob,
+          location: oLocation.trim(),
+          college_name: oRole === "student" ? oCollege.trim() : undefined,
+          department: oRole === "student" ? oDepartment.trim() : undefined,
+          graduation_year: oRole === "student" ? oGradYear.trim() : undefined,
+          company_name: oRole === "employee" ? oCompany.trim() : undefined,
+          company_role: oRole === "employee" ? oDesignation.trim() : undefined,
+          bio: oBio.trim(),
+          skills: oSkills.trim(),
+          github_url: oGithub.trim(),
+          linkedin_url: oLinkedIn.trim(),
+          discord_username: oDiscord.trim()
+        }
+      });
+
+      if (authErr) throw authErr;
+
+      setShowOnboarding(false);
+      window.location.reload();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to complete setup. Please check connection.";
+      setOnboardingError(message);
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
 
   // Initialize notifications
   useEffect(() => {
@@ -155,58 +280,62 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Center Navigation Links */}
-        <nav className="hidden md:flex items-center gap-8 font-mono text-[10px] uppercase tracking-wider">
-          <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-1">Dashboard</Link>
-          <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-1">Explore</Link>
-          <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-1">Leaderboard</Link>
-          <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-1">Faculty Console</Link>
-        </nav>
+        {/* Right Controls Area containing Navigation & Icons */}
+        <div className="flex items-center gap-6">
+          {/* Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-6 font-mono text-[10px] uppercase tracking-wider">
+            <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
+            <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
+            <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Leaderboard</Link>
+            <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Faculty Console</Link>
+          </nav>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-3">
-          
-          {/* Notification Bell (Only visible when user is logged in) */}
-          {user && (
-            <button 
-              onClick={() => setIsOpen(true)}
-              className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none relative cursor-pointer"
-              aria-label="View notifications"
-            >
-              <Bell size={14} />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              )}
-            </button>
-          )}
+          {/* Separator Line */}
+          <div className="hidden lg:block w-[1px] h-4 bg-border-main/60" />
 
-          {/* Theme Switcher */}
-          <button 
-            onClick={toggleTheme}
-            className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
-            aria-label="Toggle theme"
-          >
-            {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
-          </button>
-          
-          {user && (
-            <>
-              <Link 
-                href="/profile"
-                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center"
-                title="View Profile"
-              >
-                <User size={14} />
-              </Link>
+          <div className="flex items-center gap-3">
+            {/* Notification Bell (Only visible when user is logged in) */}
+            {user && (
               <button 
-                onClick={signOut}
-                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
-                title="Sign Out"
+                onClick={() => setIsOpen(true)}
+                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none relative cursor-pointer"
+                aria-label="View notifications"
               >
-                <LogOut size={14} />
+                <Bell size={14} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                )}
               </button>
-            </>
-          )}
+            )}
+
+            {/* Theme Switcher */}
+            <button 
+              onClick={toggleTheme}
+              className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
+              aria-label="Toggle theme"
+            >
+              {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+            
+            {user && (
+              <>
+                <Link 
+                  href="/profile"
+                  className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center"
+                  title="View Profile"
+                >
+                  <User size={14} />
+                </Link>
+                <button 
+                  onClick={signOut}
+                  className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut size={14} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -339,6 +468,256 @@ export default function Header() {
               </div>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Onboarding Wizard Full-Screen Modal */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-bg-base/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-fade-in">
+            
+            <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Profile setup required</span>
+              <h2 className="font-display text-2xl font-light text-txt-main">Setup Your LynDesk Portfolio</h2>
+              <p className="text-xs text-txt-sub">Introduce yourself to the campus directory to collaborate in workspaces.</p>
+            </div>
+
+            {onboardingError && (
+              <div className="text-xs p-3 border border-red-500/50 bg-red-500/10 text-txt-muted font-mono rounded-sm text-center">
+                {onboardingError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitOnboarding} className="flex flex-col gap-4">
+              
+              {/* Primary Identity Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Full Legal Name *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={oFullName}
+                    onChange={(e) => setOFullName(e.target.value)}
+                    placeholder="Mira Sen"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Username handle *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={oUsername}
+                    onChange={(e) => setOUsername(e.target.value)}
+                    placeholder="mirasen"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* General Context Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Date of Birth *</label>
+                  <input 
+                    type="date" 
+                    required
+                    value={oDob}
+                    onChange={(e) => setODob(e.target.value)}
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">City, Country *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={oLocation}
+                    onChange={(e) => setOLocation(e.target.value)}
+                    placeholder="San Francisco, CA"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
+                  />
+                </div>
+              </div>
+
+              {/* Role Selection */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Professional Role *</label>
+                <select
+                  value={oRole}
+                  onChange={(e) => setORole(e.target.value as "student" | "employee" | "solo")}
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main cursor-pointer"
+                >
+                  <option value="student">Student / Academic</option>
+                  <option value="employee">Industry Professional / Employee</option>
+                  <option value="solo">Solo Independent Builder</option>
+                </select>
+              </div>
+
+              {/* Dynamic Context based on Role */}
+              {oRole === "student" && (
+                <div className="border border-border-main/60 p-4 rounded bg-bg-base/30 flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials</span>
+                  
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub">University Name *</label>
+                    <input 
+                      type="text"
+                      required
+                      value={oCollege}
+                      onChange={(e) => setOCollege(e.target.value)}
+                      placeholder="Massachusetts Institute of Technology (MIT)"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Department *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={oDepartment}
+                        onChange={(e) => setODepartment(e.target.value)}
+                        placeholder="Computer Science"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Grad Year *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={oGradYear}
+                        onChange={(e) => setOGradYear(e.target.value)}
+                        placeholder="2027"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {oRole === "employee" && (
+                <div className="border border-border-main/60 p-4 rounded bg-bg-base/30 flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Employment Credentials</span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Company *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={oCompany}
+                        onChange={(e) => setOCompany(e.target.value)}
+                        placeholder="Google Inc."
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Job Title / Designation *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={oDesignation}
+                        onChange={(e) => setODesignation(e.target.value)}
+                        placeholder="Senior Software Engineer"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Expandable Optional Details */}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOShowOptional(!oShowOptional)}
+                  className="text-left text-[10px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main flex items-center gap-1 cursor-pointer self-start"
+                >
+                  {oShowOptional ? "[-] Hide Optional Details" : "[+] Customize Portfolio Links & Bio"}
+                </button>
+
+                {oShowOptional && (
+                  <div className="flex flex-col gap-3 border border-border-main/65 p-4 rounded bg-bg-base/10 animate-fade-in">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Short Developer Bio</label>
+                      <textarea
+                        rows={2}
+                        value={oBio}
+                        onChange={(e) => setOBio(e.target.value)}
+                        placeholder="Frontend builder, hackathon team seeker, Rust lover..."
+                        className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main resize-none"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Skills (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={oSkills}
+                        onChange={(e) => setOSkills(e.target.value)}
+                        placeholder="React, Next.js, Rust, Tailwind"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-txt-sub">GitHub Link</label>
+                        <input
+                          type="url"
+                          value={oGithub}
+                          onChange={(e) => setOGithub(e.target.value)}
+                          placeholder="https://github.com/username"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-txt-sub">LinkedIn Link</label>
+                        <input
+                          type="url"
+                          value={oLinkedIn}
+                          onChange={(e) => setOLinkedIn(e.target.value)}
+                          placeholder="https://linkedin.com/in/username"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub">Discord Username</label>
+                      <input
+                        type="text"
+                        value={oDiscord}
+                        onChange={(e) => setODiscord(e.target.value)}
+                        placeholder="username#0000"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button 
+                type="submit"
+                disabled={onboardingLoading}
+                className="w-full h-11 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity cursor-pointer mt-2"
+              >
+                {onboardingLoading ? (
+                  <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                ) : (
+                  "Complete Profile Onboarding"
+                )}
+              </button>
+
+            </form>
+
           </div>
         </div>
       )}
