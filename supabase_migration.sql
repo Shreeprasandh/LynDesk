@@ -29,6 +29,14 @@ CREATE TABLE public.profiles (
     avatar_url TEXT,
     academic_credits INTEGER DEFAULT 0 NOT NULL,
     is_profile_public BOOLEAN DEFAULT true NOT NULL,
+    leetcode_username TEXT,
+    codeforces_username TEXT,
+    codechef_username TEXT,
+    unstop_username TEXT,
+    hack2skill_username TEXT,
+    college_key TEXT,
+    company_key TEXT,
+    leetcode_daily_completed BOOLEAN DEFAULT false NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

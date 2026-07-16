@@ -13,7 +13,8 @@ import {
   ExternalLink, 
   FileText, 
   Users, 
-  FolderLock
+  FolderLock,
+  Download
 } from "lucide-react";
 
 interface CreditClaim {
@@ -41,6 +42,60 @@ export default function CoordinatorConsole() {
   const [claims, setClaims] = useState<CreditClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<CreditClaim | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"verifications" | "talent_registry">("verifications");
+
+  const registryStudents = [
+    { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", department: "Computer Science", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6 },
+    { id: "s2", name: "Mira Sen", email: "mirasen@mit.edu", department: "Information Technology", leetcode: "mirasen_code", leetcodeSolved: 412, leetcodeEasy: 200, leetcodeMedium: 160, leetcodeHard: 52, leetcodeRank: "Top 5.2%", codeforces: "mira_cf", codeforcesRating: 1590, codeforcesRank: "Specialist", codechef: "mira_cc", codechefStars: "4★", unstop: "mira_unstop", hackathons: 4 },
+    { id: "s3", name: "David Chen", email: "dchen@mit.edu", department: "Electrical Engineering", leetcode: "dchen_dev", leetcodeSolved: 184, leetcodeEasy: 80, leetcodeMedium: 84, leetcodeHard: 20, leetcodeRank: "Top 22%", codeforces: "david_cf", codeforcesRating: 1240, codeforcesRank: "Pupil", codechef: "david_cc", codechefStars: "2★", unstop: "david_un", hackathons: 3 },
+    { id: "s4", name: "Sofia Rodriguez", email: "srodriguez@mit.edu", department: "Computer Science", leetcode: "sofia_algo", leetcodeSolved: 289, leetcodeEasy: 120, leetcodeMedium: 130, leetcodeHard: 39, leetcodeRank: "Top 12%", codeforces: "sofia_r", codeforcesRating: 1410, codeforcesRank: "Specialist", codechef: "sofia_cc", codechefStars: "3★", unstop: "sofia_un", hackathons: 5 },
+  ];
+
+  const [selectedStudent, setSelectedStudent] = useState<typeof registryStudents[0] | null>(registryStudents[0]);
+
+  const handleExportCSV = () => {
+    const headers = [
+      "Full Name",
+      "Email Address",
+      "Department/Major",
+      "LeetCode Handle",
+      "LeetCode Solved",
+      "CodeForces Handle",
+      "CodeForces Rating",
+      "CodeChef Handle",
+      "Unstop Handle",
+      "Hackathons Participated"
+    ];
+
+    const rows = registryStudents.map(s => [
+      s.name,
+      s.email,
+      s.department,
+      s.leetcode,
+      s.leetcodeSolved,
+      s.codeforces,
+      s.codeforcesRating,
+      s.codechef,
+      s.unstop,
+      s.hackathons
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "lyndesk_student_talent_registry.csv");
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   interface DBClaim {
   id: string;
@@ -157,10 +212,37 @@ useEffect(() => {
             Back to Portal
           </Link>
 
-          <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Faculty Console</span>
-            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Academic Credit Claims</h1>
-            <p className="text-xs text-txt-sub">Verify student hackathon portfolios and award extracurricular graduation credits.</p>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Registrar Desk</span>
+              <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">
+                {activeTab === "verifications" ? "Academic Credit Claims" : "Student Talent Registry"}
+              </h1>
+              <p className="text-xs text-txt-sub">
+                {activeTab === "verifications" 
+                  ? "Verify student hackathon portfolios and award extracurricular graduation credits." 
+                  : "Track student performance registry across LeetCode, Codeforces, and Hackathon platforms."}
+              </p>
+            </div>
+            
+            <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start sm:self-center font-mono text-[9px] tracking-wider uppercase">
+              <button 
+                onClick={() => setActiveTab("verifications")}
+                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                  activeTab === "verifications" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                Claims Queue
+              </button>
+              <button 
+                onClick={() => setActiveTab("talent_registry")}
+                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                  activeTab === "talent_registry" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                Talent Registry
+              </button>
+            </div>
           </div>
 
           {/* Quick Metrics Cards */}
@@ -188,180 +270,309 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Claims List Table */}
-          <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
-            {loading ? (
-              <div className="flex flex-col divide-y divide-border-main/40 animate-pulse">
-                {[1, 2, 3, 4].map(n => (
-                  <div key={n} className="p-4 flex justify-between items-center gap-4">
-                    <div className="flex flex-col gap-2 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-20 bg-border-main/20 rounded-sm" />
-                        <div className="h-2 w-12 bg-border-main/10 rounded-sm" />
+          {/* Active Tab contents */}
+          {activeTab === "verifications" ? (
+            <div className="flex-grow flex flex-col min-h-0 gap-4">
+              {/* Claims List Table */}
+              <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
+                {loading ? (
+                  <div className="flex flex-col divide-y divide-border-main/40 animate-pulse">
+                    {[1, 2, 3, 4].map(n => (
+                      <div key={n} className="p-4 flex justify-between items-center gap-4">
+                        <div className="flex flex-col gap-2 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-20 bg-border-main/20 rounded-sm" />
+                            <div className="h-2 w-12 bg-border-main/10 rounded-sm" />
+                          </div>
+                          <div className="h-2.5 w-32 bg-border-main/10 rounded-sm" />
+                          <div className="h-2 w-24 bg-border-main/10 rounded-sm" />
+                        </div>
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                          <div className="h-3.5 w-12 bg-border-main/20 rounded-sm" />
+                          <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
+                        </div>
                       </div>
-                      <div className="h-2.5 w-32 bg-border-main/10 rounded-sm" />
-                      <div className="h-2 w-24 bg-border-main/10 rounded-sm" />
-                    </div>
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <div className="h-3.5 w-12 bg-border-main/20 rounded-sm" />
-                      <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col divide-y divide-border-main/60">
-                {claims.map((claim) => (
-                  <div 
-                    key={claim.id} 
-                    onClick={() => setSelectedClaim(claim)}
-                    className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
-                      selectedClaim?.id === claim.id ? "bg-bg-card/30" : ""
-                    }`}
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-xs text-txt-main font-semibold">{claim.student_name}</span>
-                        <span className="text-[9px] text-txt-muted font-mono">{claim.created_at}</span>
+                ) : (
+                  <div className="flex flex-col divide-y divide-border-main/60">
+                    {claims.map((claim) => (
+                      <div 
+                        key={claim.id} 
+                        onClick={() => setSelectedClaim(claim)}
+                        className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                          selectedClaim?.id === claim.id ? "bg-bg-card/30" : ""
+                        }`}
+                      >
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xs text-txt-main font-semibold">{claim.student_name}</span>
+                            <span className="text-[9px] text-txt-muted font-mono">{claim.created_at}</span>
+                          </div>
+                          <span className="text-[10px] text-txt-sub truncate">{claim.project_name}</span>
+                          <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{claim.event_title}</span>
+                        </div>
+
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                          <span className="text-xs text-txt-main font-bold font-mono">+{claim.points} pts</span>
+                          <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
+                            claim.status === "approved"
+                              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
+                              : claim.status === "rejected"
+                              ? "bg-red-500/10 border-red-500/40 text-red-500"
+                              : "bg-bg-card border-border-main/80 text-txt-muted"
+                          }`}>
+                            {claim.status}
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-txt-sub truncate">{claim.project_name}</span>
-                      <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{claim.event_title}</span>
-                    </div>
-
-                    <div className="flex items-center gap-4 flex-shrink-0">
-                      <span className="text-xs text-txt-main font-bold font-mono">+{claim.points} pts</span>
-                      <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
-                        claim.status === "approved"
-                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
-                          : claim.status === "rejected"
-                          ? "bg-red-500/10 border-red-500/40 text-red-500"
-                          : "bg-bg-card border-border-main/80 text-txt-muted"
-                      }`}>
-                        {claim.status}
-                      </span>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex-grow flex flex-col min-h-0 gap-4">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-mono uppercase text-txt-muted">Enrolled Students: {registryStudents.length}</span>
+                <button 
+                  onClick={handleExportCSV}
+                  className="h-8 px-4 bg-accent-main text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer font-bold"
+                >
+                  <Download size={11} /> Export Registry to CSV
+                </button>
+              </div>
 
+              <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
+                <div className="flex flex-col divide-y divide-border-main/60">
+                  {registryStudents.map((student) => (
+                    <div 
+                      key={student.id} 
+                      onClick={() => setSelectedStudent(student)}
+                      className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                        selectedStudent?.id === student.id ? "bg-bg-card/30" : ""
+                      }`}
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs text-txt-main font-semibold">{student.name}</span>
+                        <span className="text-[9px] text-txt-muted font-mono">{student.email} • {student.department}</span>
+                        <div className="flex items-center gap-2 mt-1 text-[9px] text-txt-sub">
+                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">LC: {student.leetcodeSolved} Solved</span>
+                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">CF Rating: {student.codeforcesRating}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-[10px] text-txt-main font-mono">{student.hackathons} Hacks</span>
+                        <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
+                          Synced
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* ================= RIGHT PANEL: CLAIM INSPECTION / ACTION (5 Columns) ================= */}
+        {/* ================= RIGHT PANEL: INSPECTOR (5 Columns) ================= */}
         <section className="lg:col-span-5 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Security Audit</span>
-            <h2 className="font-display text-lg font-light text-txt-main">Portfolio Inspector</h2>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+              {activeTab === "verifications" ? "Security Audit" : "Skills Analytics"}
+            </span>
+            <h2 className="font-display text-lg font-light text-txt-main">
+              {activeTab === "verifications" ? "Portfolio Inspector" : "Talent Dossier"}
+            </h2>
           </div>
 
-          {selectedClaim ? (
-            <div className="flex flex-col gap-6 animate-fade-in">
-              
-              {/* Student Identification */}
-              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant details</span>
-                <div className="flex flex-col">
-                  <span className="text-sm text-txt-main font-semibold">{selectedClaim.student_name}</span>
-                  <span className="text-xs text-txt-muted font-mono">{selectedClaim.student_email}</span>
-                </div>
-              </div>
-
-              {/* Submission Materials */}
-              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Submission materials</span>
+          {activeTab === "verifications" ? (
+            selectedClaim ? (
+              <div className="flex flex-col gap-6 animate-fade-in">
                 
-                {/* PDF Deck Link */}
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <FileText size={14} className="text-txt-muted" />
-                    <div className="flex flex-col">
-                      <span className="text-xs text-txt-main font-medium">Pitch presentation deck</span>
-                      <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.artifact_name}</span>
-                    </div>
-                  </div>
-                  <a 
-                    href={selectedClaim.repo_url}
-                    className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
-                  >
-                    View
-                    <ExternalLink size={9} />
-                  </a>
-                </div>
-
-                {/* Git Repository Link */}
-                <div className="flex items-center justify-between pb-1">
-                  <div className="flex items-center gap-2">
-                    <GithubIcon size={14} className="text-txt-muted" />
-                    <div className="flex flex-col">
-                      <span className="text-xs text-txt-main font-medium">Git repository codebase</span>
-                      <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.repo_url}</span>
-                    </div>
-                  </div>
-                  <a 
-                    href={`https://${selectedClaim.repo_url}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
-                  >
-                    Repo
-                    <ExternalLink size={9} />
-                  </a>
-                </div>
-              </div>
-
-              {/* Cryptographic verification checklist */}
-              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">LDK:BOT Security Validation</span>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 size={11} /> GitHub Commits Validated
-                    </span>
-                    <span>PASS</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
-                    <span className="flex items-center gap-1.5">
-                      <CheckCircle2 size={11} /> Artifact PDF Hash Verified
-                    </span>
-                    <span>PASS</span>
+                {/* Student Identification */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant details</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-txt-main font-semibold">{selectedClaim.student_name}</span>
+                    <span className="text-xs text-txt-muted font-mono">{selectedClaim.student_email}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Action Buttons (Verify/Decline) */}
-              {selectedClaim.status === "pending" ? (
-                <div className="flex gap-3 border-t border-border-main/40 pt-4">
-                  <button 
-                    onClick={() => handleVerifyClaim(selectedClaim.id, "rejected")}
-                    className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <XCircle size={12} />
-                    Decline Claim
-                  </button>
+                {/* Submission Materials */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Submission materials</span>
                   
-                  <button 
-                    onClick={() => handleVerifyClaim(selectedClaim.id, "approved")}
-                    className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <CheckCircle2 size={12} />
-                    Approve Credit
-                  </button>
-                </div>
-              ) : (
-                <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
-                  This activity point application has been completed ({selectedClaim.status}).
-                </div>
-              )}
+                  {/* PDF Deck Link */}
+                  <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <FileText size={14} className="text-txt-muted" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-txt-main font-medium">Pitch presentation deck</span>
+                        <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.artifact_name}</span>
+                      </div>
+                    </div>
+                    <a 
+                      href={selectedClaim.repo_url}
+                      className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
+                    >
+                      View
+                      <ExternalLink size={9} />
+                    </a>
+                  </div>
 
-            </div>
+                  {/* Git Repository Link */}
+                  <div className="flex items-center justify-between pb-1">
+                    <div className="flex items-center gap-2">
+                      <GithubIcon size={14} className="text-txt-muted" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-txt-main font-medium">Git repository codebase</span>
+                        <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.repo_url}</span>
+                      </div>
+                    </div>
+                    <a 
+                      href={`https://${selectedClaim.repo_url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
+                    >
+                      Repo
+                      <ExternalLink size={9} />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Cryptographic verification checklist */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">LDK:BOT Security Validation</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 size={11} /> GitHub Commits Validated
+                      </span>
+                      <span>PASS</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 size={11} /> Artifact PDF Hash Verified
+                      </span>
+                      <span>PASS</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons (Verify/Decline) */}
+                {selectedClaim.status === "pending" ? (
+                  <div className="flex gap-3 border-t border-border-main/40 pt-4">
+                    <button 
+                      onClick={() => handleVerifyClaim(selectedClaim.id, "rejected")}
+                      className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <XCircle size={12} />
+                      Decline Claim
+                    </button>
+                    
+                    <button 
+                      onClick={() => handleVerifyClaim(selectedClaim.id, "approved")}
+                      className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle2 size={12} />
+                      Approve Credit
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
+                    This activity point application has been completed ({selectedClaim.status}).
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted">
+                <FolderLock size={18} className="mb-2" />
+                <span className="text-[10px] font-mono uppercase tracking-wider">Audit Queue Empty</span>
+                <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
+              </div>
+            )
           ) : (
-            <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted">
-              <FolderLock size={18} className="mb-2" />
-              <span className="text-[10px] font-mono uppercase tracking-wider">Audit Queue Empty</span>
-              <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
-            </div>
+            selectedStudent ? (
+              <div className="flex flex-col gap-6 animate-fade-in">
+                
+                {/* Student Identity */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant Details</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-txt-main font-semibold">{selectedStudent.name}</span>
+                    <span className="text-xs text-txt-muted font-mono">{selectedStudent.email}</span>
+                    <span className="text-[10px] text-txt-sub mt-1">{selectedStudent.department}</span>
+                  </div>
+                </div>
+
+                {/* LeetCode Sync */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">LeetCode Metrics</span>
+                    <span className="text-[9px] font-mono text-accent-main font-bold">@{selectedStudent.leetcode}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                      <span className="text-[8px] font-mono text-txt-muted uppercase">Solved</span>
+                      <span className="text-xs font-semibold text-txt-main font-mono">{selectedStudent.leetcodeSolved}</span>
+                    </div>
+                    <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                      <span className="text-[8px] font-mono text-txt-muted uppercase">Global Rank</span>
+                      <span className="text-[9px] font-semibold text-txt-main font-mono truncate">{selectedStudent.leetcodeRank}</span>
+                    </div>
+                    <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                      <span className="text-[8px] font-mono text-txt-muted uppercase">Easy/Med/Hard</span>
+                      <span className="text-[9px] text-txt-sub font-mono font-semibold">
+                        {selectedStudent.leetcodeEasy}/{selectedStudent.leetcodeMedium}/{selectedStudent.leetcodeHard}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Codeforces & CodeChef */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Competitive Rating</span>
+                  
+                  <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
+                    <span className="text-xs font-semibold text-txt-main">Codeforces Profile</span>
+                    <span className="text-[10px] text-txt-sub font-mono">@{selectedStudent.codeforces} ({selectedStudent.codeforcesRank})</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-txt-main">
+                    <span className="text-txt-sub">Current Rating</span>
+                    <span className="font-mono font-bold text-accent-main">{selectedStudent.codeforcesRating}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-border-main/40 pb-2 mt-2">
+                    <span className="text-xs font-semibold text-txt-main">CodeChef Profile</span>
+                    <span className="text-[10px] text-txt-sub font-mono">@{selectedStudent.codechef} ({selectedStudent.codechefStars})</span>
+                  </div>
+                </div>
+
+                {/* Hackathons */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-bold">Hackathon Standings</span>
+                  <div className="flex justify-between items-center text-xs text-txt-main">
+                    <span className="text-txt-sub">Unstop Handle</span>
+                    <span className="font-mono">@{selectedStudent.unstop}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-txt-main mt-1">
+                    <span className="text-txt-sub">Completed Hackathons</span>
+                    <span className="font-mono font-bold text-accent-main">{selectedStudent.hackathons} events</span>
+                  </div>
+                </div>
+
+              </div>
+            ) : (
+              <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted">
+                <Users size={18} className="mb-2" />
+                <span className="text-[10px] font-mono uppercase tracking-wider">No Student Selected</span>
+                <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student from the registry list to audit their complete coding and hackathon performance profile.</p>
+              </div>
+            )
           )}
 
         </section>

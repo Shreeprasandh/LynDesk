@@ -350,6 +350,7 @@ export default function Header() {
           <nav className="hidden lg:flex items-center gap-6 font-mono text-[10px] uppercase tracking-wider">
             <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
             <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
+            <Link href="/coding-deck" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Deck</Link>
             <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Leaderboard</Link>
             <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Faculty Console</Link>
           </nav>

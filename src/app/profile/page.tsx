@@ -18,7 +18,8 @@ import {
   Upload,
   Info,
   Trash2,
-  X
+  X,
+  Code2
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -55,6 +56,8 @@ interface BackupProfileData {
   gradYear: string;
   isPublic: boolean;
   portfolioUrl: string;
+  collegeKey: string;
+  companyKey: string;
 }
 
 export default function ProfilePage() {
@@ -80,6 +83,8 @@ export default function ProfilePage() {
   const [collegeName, setCollegeName] = useState("");
   const [department, setDepartment] = useState("");
   const [gradYear, setGradYear] = useState("");
+  const [collegeKey, setCollegeKey] = useState("");
+  const [companyKey, setCompanyKey] = useState("");
   
   // Interface states
   const [loading, setLoading] = useState(true);
@@ -117,7 +122,9 @@ export default function ProfilePage() {
       collegeName,
       department,
       gradYear,
-      isPublic
+      isPublic,
+      collegeKey,
+      companyKey
     });
     setIsEditing(true);
   };
@@ -136,6 +143,8 @@ export default function ProfilePage() {
       setDepartment(backupData.department);
       setGradYear(backupData.gradYear);
       setIsPublic(backupData.isPublic);
+      setCollegeKey(backupData.collegeKey);
+      setCompanyKey(backupData.companyKey);
     }
     setIsEditing(false);
     setMessage(null);
@@ -185,6 +194,8 @@ export default function ProfilePage() {
         setCollegeName(meta.college_name || (profile?.institutes && profile.institutes.name) || "");
         setDepartment(meta.department || "");
         setGradYear(meta.graduation_year || "");
+        setCollegeKey(meta.college_key || "");
+        setCompanyKey(meta.company_key || "");
         
       } catch (err) {
         console.error("Error loading user profile: ", err);
@@ -325,7 +336,9 @@ export default function ProfilePage() {
           resume_file_name: resumeFileName,
           college_name: cleanCollege,
           department: cleanDept,
-          graduation_year: gradYear.trim()
+          graduation_year: gradYear.trim(),
+          college_key: collegeKey.trim(),
+          company_key: companyKey.trim()
         }
       });
 
@@ -970,6 +983,70 @@ export default function ProfilePage() {
                 <div className="flex flex-col">
                   <span className="text-2xl font-display font-light tracking-tight text-txt-main">32 Points</span>
                   <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Verified Extracurriculars</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Coding & Platform Deck Integrations Panel */}
+            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
+              <div className="flex flex-col gap-1 border-b border-border-main/40 pb-2">
+                <span className="text-xs font-semibold text-txt-main">Coding & Hackathon Decks</span>
+                <span className="text-[10px] text-txt-sub font-light leading-relaxed">
+                  Link your profiles to aggregate solves, global ranks, and hackathon milestones.
+                </span>
+              </div>
+              <Link 
+                href="/coding-deck"
+                className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity"
+              >
+                <Code2 size={12} /> Manage Coding Deck
+              </Link>
+            </div>
+
+            {/* Institutional Link / Key Enrollment Panel */}
+            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
+              <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-2.5">
+                <span className="text-xs font-semibold text-txt-main">Link College or Employer</span>
+                <span className="text-[10px] text-txt-sub font-light leading-relaxed">
+                  Enter verification codes provided by your institution or coordinator to share your accomplishments.
+                </span>
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold">College Enrollment Key</label>
+                  <input 
+                    type="password"
+                    value={collegeKey}
+                    onChange={(e) => setCollegeKey(e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="Enter College Registrar Key"
+                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                  />
+                  {collegeKey && (
+                    <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
+                      <CheckCircle2 size={10} /> Associated College Verified
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold">Company Access Key</label>
+                  <input 
+                    type="password"
+                    value={companyKey}
+                    onChange={(e) => setCompanyKey(e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="Enter Corporate Access Key"
+                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                  />
+                  {companyKey && (
+                    <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
+                      <CheckCircle2 size={10} /> Connected Employer Verified
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
