@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
-import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList } from "../lib/textNormalization";
+import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Header from "../components/Header";
 import { 
   ArrowLeft, 
@@ -104,6 +104,10 @@ export default function ProfilePage() {
   // Suggestions
   const [collegeSuggestion, setCollegeSuggestion] = useState<string | null>(null);
   const [deptSuggestion, setDeptSuggestion] = useState<string | null>(null);
+
+  // Autocomplete Suggestions
+  const [collegeSuggestions, setCollegeSuggestions] = useState<string[]>([]);
+  const [deptSuggestions, setDeptSuggestions] = useState<string[]>([]);
 
   // Edit/View Mode controls
   const [isEditing, setIsEditing] = useState(false);
@@ -795,7 +799,7 @@ export default function ProfilePage() {
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials (Optional)</span>
               
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1 relative">
                 <label className="text-xs text-txt-sub font-semibold">Institute / College Name</label>
                 <input 
                   type="text" 
@@ -805,12 +809,30 @@ export default function ProfilePage() {
                     setCollegeName(val);
                     const match = getSpellingSuggestion(val);
                     setCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                    setCollegeSuggestions(getAutocompleteSuggestions(val, "college"));
                   }}
                   disabled={!isEditing}
                   placeholder="MIT / IIT Delhi / Stanford University"
                   className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                 />
-                {collegeSuggestion && (
+                {collegeSuggestions.length > 0 && (
+                  <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                    {collegeSuggestions.map((s) => (
+                      <li 
+                        key={s} 
+                        onClick={() => {
+                          setCollegeName(s);
+                          setCollegeSuggestions([]);
+                          setCollegeSuggestion(null);
+                        }}
+                        className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                      >
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {collegeSuggestion && collegeSuggestions.length === 0 && (
                   <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
                     Did you mean: <strong className="underline cursor-pointer" onClick={() => { setCollegeName(collegeSuggestion); setCollegeSuggestion(null); }}>{collegeSuggestion}</strong>?
                   </span>
@@ -818,7 +840,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 relative">
                   <label className="text-xs text-txt-sub font-semibold">Department / Major</label>
                   <input 
                     type="text" 
@@ -828,12 +850,30 @@ export default function ProfilePage() {
                       setDepartment(val);
                       const match = getSpellingSuggestion(val);
                       setDeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                      setDeptSuggestions(getAutocompleteSuggestions(val, "department"));
                     }}
                     disabled={!isEditing}
                     placeholder="Computer Science"
                     className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                   />
-                  {deptSuggestion && (
+                  {deptSuggestions.length > 0 && (
+                    <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                      {deptSuggestions.map((s) => (
+                        <li 
+                          key={s} 
+                          onClick={() => {
+                            setDepartment(s);
+                            setDeptSuggestions([]);
+                            setDeptSuggestion(null);
+                          }}
+                          className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                        >
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {deptSuggestion && deptSuggestions.length === 0 && (
                     <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
                       Did you mean: <strong className="underline cursor-pointer" onClick={() => { setDepartment(deptSuggestion); setDeptSuggestion(null); }}>{deptSuggestion}</strong>?
                     </span>

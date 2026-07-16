@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList } from "../lib/textNormalization";
+import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import LynDeskLogo from "./LynDeskLogo";
@@ -89,6 +89,11 @@ export default function Header() {
   // Suggestions
   const [oCollegeSuggestion, setOCollegeSuggestion] = useState<string | null>(null);
   const [oDeptSuggestion, setODeptSuggestion] = useState<string | null>(null);
+
+  // Autocomplete Suggestions
+  const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
+  const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
+  const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
 
   // Check onboarding status on mount / user change
   useEffect(() => {
@@ -628,7 +633,7 @@ export default function Header() {
                 <div className="border border-border-main/60 p-4 rounded bg-bg-base/30 flex flex-col gap-3">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials</span>
                   
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 relative">
                     <label className="text-[10px] text-txt-sub">University Name *</label>
                     <input 
                       type="text"
@@ -639,11 +644,29 @@ export default function Header() {
                         setOCollege(val);
                         const match = getSpellingSuggestion(val);
                         setOCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                        setOCollegeSuggestions(getAutocompleteSuggestions(val, "college"));
                       }}
                       placeholder="Massachusetts Institute of Technology (MIT)"
                       className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                     />
-                    {oCollegeSuggestion && (
+                    {oCollegeSuggestions.length > 0 && (
+                      <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                        {oCollegeSuggestions.map((s) => (
+                          <li 
+                            key={s} 
+                            onClick={() => {
+                              setOCollege(s);
+                              setOCollegeSuggestions([]);
+                              setOCollegeSuggestion(null);
+                            }}
+                            className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                          >
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {oCollegeSuggestion && oCollegeSuggestions.length === 0 && (
                       <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
                         Did you mean: <strong className="underline cursor-pointer" onClick={() => { setOCollege(oCollegeSuggestion); setOCollegeSuggestion(null); }}>{oCollegeSuggestion}</strong>?
                       </span>
@@ -651,7 +674,7 @@ export default function Header() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 relative">
                       <label className="text-[10px] text-txt-sub">Department *</label>
                       <input 
                         type="text"
@@ -662,11 +685,29 @@ export default function Header() {
                           setODepartment(val);
                           const match = getSpellingSuggestion(val);
                           setODeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                          setODeptSuggestions(getAutocompleteSuggestions(val, "department"));
                         }}
                         placeholder="Computer Science"
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                       />
-                      {oDeptSuggestion && (
+                      {oDeptSuggestions.length > 0 && (
+                        <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                          {oDeptSuggestions.map((s) => (
+                            <li 
+                              key={s} 
+                              onClick={() => {
+                                setODepartment(s);
+                                setODeptSuggestions([]);
+                                setODeptSuggestion(null);
+                              }}
+                              className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                            >
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {oDeptSuggestion && oDeptSuggestions.length === 0 && (
                         <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
                           Did you mean: <strong className="underline cursor-pointer" onClick={() => { setODepartment(oDeptSuggestion); setODeptSuggestion(null); }}>{oDeptSuggestion}</strong>?
                         </span>
@@ -692,16 +733,36 @@ export default function Header() {
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Employment Credentials</span>
                   
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 relative">
                       <label className="text-[10px] text-txt-sub">Company *</label>
                       <input 
                         type="text"
                         required
                         value={oCompany}
-                        onChange={(e) => setOCompany(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setOCompany(val);
+                          setOCompanySuggestions(getAutocompleteSuggestions(val, "company"));
+                        }}
                         placeholder="Google Inc."
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                       />
+                      {oCompanySuggestions.length > 0 && (
+                        <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                          {oCompanySuggestions.map((s) => (
+                            <li 
+                              key={s} 
+                              onClick={() => {
+                                setOCompany(s);
+                                setOCompanySuggestions([]);
+                              }}
+                              className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                            >
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] text-txt-sub">Job Title / Designation *</label>

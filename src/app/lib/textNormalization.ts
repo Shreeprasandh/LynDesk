@@ -191,3 +191,64 @@ export function normalizeSkillsList(skillsStr: string): string {
     .filter(Boolean)
     .join(", ");
 }
+
+const KNOWN_COLLEGES = [
+  "Massachusetts Institute of Technology (MIT)",
+  "Stanford University",
+  "Harvard University",
+  "California Institute of Technology (Caltech)",
+  "Carnegie Mellon University (CMU)",
+  "University of Oxford",
+  "University of Cambridge",
+  "Indian Institute of Technology (IIT Delhi)",
+  "Indian Institute of Technology (IIT Bombay)",
+  "Indian Institute of Technology (IIT Madras)",
+  "Birla Institute of Technology and Science (BITS Pilani)",
+  "Delhi Technological University (DTU)",
+  "Vellore Institute of Technology (VIT)",
+  "Manipal Institute of Technology",
+  "National Institute of Technology (NIT Trichy)",
+  "University of California, Berkeley (UC Berkeley)",
+  "Princeton University",
+  "Yale University",
+  "Columbia University"
+];
+
+const KNOWN_COMPANIES = [
+  "Google",
+  "Microsoft",
+  "Apple",
+  "Amazon",
+  "Meta",
+  "Netflix",
+  "NVIDIA",
+  "TCS (Tata Consultancy Services)",
+  "Infosys",
+  "Wipro",
+  "Cognizant",
+  "Accenture",
+  "Goldman Sachs",
+  "J.P. Morgan",
+  "Adobe",
+  "Salesforce",
+  "Uber",
+  "Lyft",
+  "Stripe",
+  "Intel",
+  "AMD",
+  "Cisco",
+  "IBM"
+];
+
+export function getAutocompleteSuggestions(text: string, type: "college" | "department" | "company"): string[] {
+  const cleaned = text.trim().toLowerCase();
+  if (!cleaned) return [];
+  
+  const source = type === "college" 
+    ? KNOWN_COLLEGES 
+    : type === "department" 
+    ? KNOWN_DEPARTMENTS 
+    : KNOWN_COMPANIES;
+    
+  return source.filter(item => item.toLowerCase().includes(cleaned)).slice(0, 5);
+}
