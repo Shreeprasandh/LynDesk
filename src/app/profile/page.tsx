@@ -58,6 +58,8 @@ interface BackupProfileData {
   portfolioUrl: string;
   collegeKey: string;
   companyKey: string;
+  batchCode: string;
+  grantSharePermission: boolean;
 }
 
 export default function ProfilePage() {
@@ -85,6 +87,8 @@ export default function ProfilePage() {
   const [gradYear, setGradYear] = useState("");
   const [collegeKey, setCollegeKey] = useState("");
   const [companyKey, setCompanyKey] = useState("");
+  const [batchCode, setBatchCode] = useState("");
+  const [grantSharePermission, setGrantSharePermission] = useState(false);
   
   // Interface states
   const [loading, setLoading] = useState(true);
@@ -128,7 +132,9 @@ export default function ProfilePage() {
       gradYear,
       isPublic,
       collegeKey,
-      companyKey
+      companyKey,
+      batchCode,
+      grantSharePermission
     });
     setIsEditing(true);
   };
@@ -149,6 +155,8 @@ export default function ProfilePage() {
       setIsPublic(backupData.isPublic);
       setCollegeKey(backupData.collegeKey);
       setCompanyKey(backupData.companyKey);
+      setBatchCode(backupData.batchCode);
+      setGrantSharePermission(backupData.grantSharePermission);
     }
     setIsEditing(false);
     setMessage(null);
@@ -200,6 +208,8 @@ export default function ProfilePage() {
         setGradYear(meta.graduation_year || "");
         setCollegeKey(meta.college_key || "");
         setCompanyKey(meta.company_key || "");
+        setBatchCode(meta.batch_code || "");
+        setGrantSharePermission(!!meta.grant_share_permission);
         
       } catch (err) {
         console.error("Error loading user profile: ", err);
@@ -342,7 +352,9 @@ export default function ProfilePage() {
           department: cleanDept,
           graduation_year: gradYear.trim(),
           college_key: collegeKey.trim(),
-          company_key: companyKey.trim()
+          company_key: companyKey.trim(),
+          batch_code: batchCode.trim(),
+          grant_share_permission: grantSharePermission
         }
       });
 
@@ -1073,6 +1085,18 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub font-semibold">Batch Code / Section</label>
+                  <input 
+                    type="text"
+                    value={batchCode}
+                    onChange={(e) => setBatchCode(e.target.value)}
+                    disabled={!isEditing}
+                    placeholder="e.g. Batch A / Class of 2026"
+                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors disabled:opacity-60"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
                   <label className="text-[10px] text-txt-sub font-semibold">Company Access Key</label>
                   <input 
                     type="password"
@@ -1087,6 +1111,20 @@ export default function ProfilePage() {
                       <CheckCircle2 size={10} /> Connected Employer Verified
                     </span>
                   )}
+                </div>
+
+                <div className="flex items-start gap-2.5 mt-2 border-t border-border-main/40 pt-3">
+                  <input 
+                    type="checkbox"
+                    id="grantSharePermission"
+                    checked={grantSharePermission}
+                    onChange={(e) => setGrantSharePermission(e.target.checked)}
+                    disabled={!isEditing}
+                    className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
+                  />
+                  <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
+                    <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College/Company coordinators to view, audit, and export my milestones, competitive scores, and code verification statuses.
+                  </label>
                 </div>
               </div>
             </div>

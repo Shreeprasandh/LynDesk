@@ -46,39 +46,61 @@ export default function CoordinatorConsole() {
   const [activeTab, setActiveTab] = useState<"verifications" | "talent_registry">("verifications");
 
   const registryStudents = [
-    { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", department: "Computer Science", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6 },
-    { id: "s2", name: "Mira Sen", email: "mirasen@mit.edu", department: "Information Technology", leetcode: "mirasen_code", leetcodeSolved: 412, leetcodeEasy: 200, leetcodeMedium: 160, leetcodeHard: 52, leetcodeRank: "Top 5.2%", codeforces: "mira_cf", codeforcesRating: 1590, codeforcesRank: "Specialist", codechef: "mira_cc", codechefStars: "4★", unstop: "mira_unstop", hackathons: 4 },
-    { id: "s3", name: "David Chen", email: "dchen@mit.edu", department: "Electrical Engineering", leetcode: "dchen_dev", leetcodeSolved: 184, leetcodeEasy: 80, leetcodeMedium: 84, leetcodeHard: 20, leetcodeRank: "Top 22%", codeforces: "david_cf", codeforcesRating: 1240, codeforcesRank: "Pupil", codechef: "david_cc", codechefStars: "2★", unstop: "david_un", hackathons: 3 },
-    { id: "s4", name: "Sofia Rodriguez", email: "srodriguez@mit.edu", department: "Computer Science", leetcode: "sofia_algo", leetcodeSolved: 289, leetcodeEasy: 120, leetcodeMedium: 130, leetcodeHard: 39, leetcodeRank: "Top 12%", codeforces: "sofia_r", codeforcesRating: 1410, codeforcesRank: "Specialist", codechef: "sofia_cc", codechefStars: "3★", unstop: "sofia_un", hackathons: 5 },
+    { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", department: "Computer Science", batchCode: "Batch A", gradYear: "2026", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6, authorized: true },
+    { id: "s2", name: "Mira Sen", email: "mirasen@mit.edu", department: "Information Technology", batchCode: "Batch A", gradYear: "2027", leetcode: "mirasen_code", leetcodeSolved: 412, leetcodeEasy: 200, leetcodeMedium: 160, leetcodeHard: 52, leetcodeRank: "Top 5.2%", codeforces: "mira_cf", codeforcesRating: 1590, codeforcesRank: "Specialist", codechef: "mira_cc", codechefStars: "4★", unstop: "mira_unstop", hackathons: 4, authorized: true },
+    { id: "s3", name: "David Chen", email: "dchen@mit.edu", department: "Electrical Engineering", batchCode: "Batch B", gradYear: "2026", leetcode: "dchen_dev", leetcodeSolved: 184, leetcodeEasy: 80, leetcodeMedium: 84, leetcodeHard: 20, leetcodeRank: "Top 22%", codeforces: "david_cf", codeforcesRating: 1240, codeforcesRank: "Pupil", codechef: "david_cc", codechefStars: "2★", unstop: "david_un", hackathons: 3, authorized: true },
+    { id: "s4", name: "Sofia Rodriguez", email: "srodriguez@mit.edu", department: "Computer Science", batchCode: "Batch B", gradYear: "2027", leetcode: "sofia_algo", leetcodeSolved: 289, leetcodeEasy: 120, leetcodeMedium: 130, leetcodeHard: 39, leetcodeRank: "Top 12%", codeforces: "sofia_r", codeforcesRating: 1410, codeforcesRank: "Specialist", codechef: "sofia_cc", codechefStars: "3★", unstop: "sofia_un", hackathons: 5, authorized: false },
   ];
 
   const [selectedStudent, setSelectedStudent] = useState<typeof registryStudents[0] | null>(registryStudents[0]);
+
+  // Filter States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterBatch, setFilterBatch] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterSolvedThreshold, setFilterSolvedThreshold] = useState(0);
+
+  const filteredStudents = registryStudents.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          s.department.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesBatch = filterBatch ? s.batchCode === filterBatch : true;
+    const matchesYear = filterYear ? s.gradYear === filterYear : true;
+    const matchesThreshold = s.leetcodeSolved >= filterSolvedThreshold;
+    return matchesSearch && matchesBatch && matchesYear && matchesThreshold;
+  });
 
   const handleExportCSV = () => {
     const headers = [
       "Full Name",
       "Email Address",
       "Department/Major",
+      "Batch Code",
+      "Graduation Year",
       "LeetCode Handle",
       "LeetCode Solved",
       "CodeForces Handle",
       "CodeForces Rating",
       "CodeChef Handle",
       "Unstop Handle",
-      "Hackathons Participated"
+      "Hackathons Participated",
+      "Consent Authorized"
     ];
 
-    const rows = registryStudents.map(s => [
+    const rows = filteredStudents.map(s => [
       s.name,
       s.email,
       s.department,
+      s.batchCode,
+      s.gradYear,
       s.leetcode,
       s.leetcodeSolved,
       s.codeforces,
       s.codeforcesRating,
       s.codechef,
       s.unstop,
-      s.hackathons
+      s.hackathons,
+      s.authorized ? "YES" : "NO"
     ]);
 
     const csvContent = [
@@ -90,7 +112,7 @@ export default function CoordinatorConsole() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "lyndesk_student_talent_registry.csv");
+    link.setAttribute("download", `lyndesk_registry_${filterBatch || "all"}_class_${filterYear || "all"}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -333,8 +355,51 @@ useEffect(() => {
             </div>
           ) : (
             <div className="flex-grow flex flex-col min-h-0 gap-4">
+              
+              {/* Dynamic Filter Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-bg-card/20 p-4 border border-border-main/50 rounded-md flex-shrink-0">
+                <input 
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search name, email, major..."
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/60"
+                />
+
+                <select
+                  value={filterBatch}
+                  onChange={(e) => setFilterBatch(e.target.value)}
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
+                >
+                  <option value="">All Batches</option>
+                  <option value="Batch A">Batch A</option>
+                  <option value="Batch B">Batch B</option>
+                </select>
+
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
+                >
+                  <option value="">All Years</option>
+                  <option value="2026">Class of 2026</option>
+                  <option value="2027">Class of 2027</option>
+                </select>
+
+                <select
+                  value={filterSolvedThreshold}
+                  onChange={(e) => setFilterSolvedThreshold(Number(e.target.value))}
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
+                >
+                  <option value={0}>LeetCode solves: Any</option>
+                  <option value={200}>solved &gt; 200</option>
+                  <option value={300}>solved &gt; 300</option>
+                  <option value={400}>solved &gt; 400</option>
+                </select>
+              </div>
+
               <div className="flex justify-between items-center">
-                <span className="text-[10px] font-mono uppercase text-txt-muted">Enrolled Students: {registryStudents.length}</span>
+                <span className="text-[10px] font-mono uppercase text-txt-muted">Filtered Students: {filteredStudents.length}</span>
                 <button 
                   onClick={handleExportCSV}
                   className="h-8 px-4 bg-accent-main text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer font-bold"
@@ -345,7 +410,7 @@ useEffect(() => {
 
               <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
                 <div className="flex flex-col divide-y divide-border-main/60">
-                  {registryStudents.map((student) => (
+                  {filteredStudents.map((student) => (
                     <div 
                       key={student.id} 
                       onClick={() => setSelectedStudent(student)}
@@ -357,15 +422,20 @@ useEffect(() => {
                         <span className="text-xs text-txt-main font-semibold">{student.name}</span>
                         <span className="text-[9px] text-txt-muted font-mono">{student.email} • {student.department}</span>
                         <div className="flex items-center gap-2 mt-1 text-[9px] text-txt-sub">
-                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">LC: {student.leetcodeSolved} Solved</span>
-                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">CF Rating: {student.codeforcesRating}</span>
+                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">{student.batchCode} • Class {student.gradYear}</span>
+                          <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">LC: {student.leetcodeSolved}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
-                        <span className="text-[10px] text-txt-main font-mono">{student.hackathons} Hacks</span>
-                        <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
-                          Synced
-                        </span>
+                        {student.authorized ? (
+                          <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
+                            Authorized
+                          </span>
+                        ) : (
+                          <span className="text-[8px] font-mono tracking-wider bg-red-500/10 text-red-500 border border-red-500/40 px-2 py-0.5 rounded uppercase">
+                            Pending
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -501,11 +571,22 @@ useEffect(() => {
                 
                 {/* Student Identity */}
                 <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant Details</span>
+                  <div className="flex justify-between items-start">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant Details</span>
+                    {selectedStudent.authorized ? (
+                      <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
+                        Access Authorized
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-mono tracking-wider bg-red-500/10 text-red-500 border border-red-500/40 px-2 py-0.5 rounded uppercase">
+                        Access Revoked
+                      </span>
+                    )}
+                  </div>
                   <div className="flex flex-col">
                     <span className="text-sm text-txt-main font-semibold">{selectedStudent.name}</span>
                     <span className="text-xs text-txt-muted font-mono">{selectedStudent.email}</span>
-                    <span className="text-[10px] text-txt-sub mt-1">{selectedStudent.department}</span>
+                    <span className="text-[10px] text-txt-sub mt-1">{selectedStudent.department} • {selectedStudent.batchCode} (Class of {selectedStudent.gradYear})</span>
                   </div>
                 </div>
 
