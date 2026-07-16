@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList } from "../lib/textNormalization";
 import Link from "next/link";
 import LynDeskLogo from "./LynDeskLogo";
 import { 
@@ -71,6 +72,10 @@ export default function Header() {
   
   const [onboardingError, setOnboardingError] = useState<string | null>(null);
 
+  // Suggestions
+  const [oCollegeSuggestion, setOCollegeSuggestion] = useState<string | null>(null);
+  const [oDeptSuggestion, setODeptSuggestion] = useState<string | null>(null);
+
   // Check onboarding status on mount / user change
   useEffect(() => {
     if (user) {
@@ -100,17 +105,27 @@ export default function Header() {
     e.preventDefault();
     if (!user) return;
     
-    if (!oFullName.trim() || !oUsername.trim() || !oDob || !oLocation.trim()) {
+    // Auto-normalize text fields on submit
+    const cleanFullName = normalizeTitleCase(oFullName);
+    const cleanUsername = oUsername.trim().toLowerCase();
+    const cleanLocation = normalizeTitleCase(oLocation);
+    const cleanCollege = oRole === "student" ? normalizeTitleCase(oCollege) : "";
+    const cleanDept = oRole === "student" ? normalizeTitleCase(oDepartment) : "";
+    const cleanCompany = oRole === "employee" ? normalizeTitleCase(oCompany) : "";
+    const cleanDesignation = oRole === "employee" ? normalizeTitleCase(oDesignation) : "";
+    const cleanSkills = normalizeSkillsList(oSkills);
+
+    if (!cleanFullName || !cleanUsername || !oDob || !cleanLocation) {
       setOnboardingError("Full Name, Username, Date of Birth, and Location are required.");
       return;
     }
     
-    if (oRole === "student" && (!oCollege.trim() || !oDepartment.trim() || !oGradYear.trim())) {
+    if (oRole === "student" && (!cleanCollege || !cleanDept || !oGradYear.trim())) {
       setOnboardingError("Student academic credentials are required.");
       return;
     }
 
-    if (oRole === "employee" && (!oCompany.trim() || !oDesignation.trim())) {
+    if (oRole === "employee" && (!cleanCompany || !cleanDesignation)) {
       setOnboardingError("Company and designation details are required.");
       return;
     }
@@ -124,8 +139,8 @@ export default function Header() {
         .from("profiles")
         .upsert({
           id: user.id,
-          username: oUsername.trim().toLowerCase(),
-          full_name: oFullName.trim(),
+          username: cleanUsername,
+          full_name: cleanFullName,
           avatar_url: user.user_metadata?.avatar_url || "",
           is_profile_public: true,
           updated_at: new Date().toISOString()
@@ -139,14 +154,14 @@ export default function Header() {
           onboarding_completed: true,
           role: oRole,
           dob: oDob,
-          location: oLocation.trim(),
-          college_name: oRole === "student" ? oCollege.trim() : undefined,
-          department: oRole === "student" ? oDepartment.trim() : undefined,
+          location: cleanLocation,
+          college_name: oRole === "student" ? cleanCollege : undefined,
+          department: oRole === "student" ? cleanDept : undefined,
           graduation_year: oRole === "student" ? oGradYear.trim() : undefined,
-          company_name: oRole === "employee" ? oCompany.trim() : undefined,
-          company_role: oRole === "employee" ? oDesignation.trim() : undefined,
+          company_name: oRole === "employee" ? cleanCompany : undefined,
+          company_role: oRole === "employee" ? cleanDesignation : undefined,
           bio: oBio.trim(),
-          skills: oSkills.trim(),
+          skills: cleanSkills,
           github_url: oGithub.trim(),
           linkedin_url: oLinkedIn.trim(),
           discord_username: oDiscord.trim()
@@ -569,10 +584,20 @@ export default function Header() {
                       type="text"
                       required
                       value={oCollege}
-                      onChange={(e) => setOCollege(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setOCollege(val);
+                        const match = getSpellingSuggestion(val);
+                        setOCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                      }}
                       placeholder="Massachusetts Institute of Technology (MIT)"
                       className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                     />
+                    {oCollegeSuggestion && (
+                      <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
+                        Did you mean: <strong className="underline cursor-pointer" onClick={() => { setOCollege(oCollegeSuggestion); setOCollegeSuggestion(null); }}>{oCollegeSuggestion}</strong>?
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -582,10 +607,20 @@ export default function Header() {
                         type="text"
                         required
                         value={oDepartment}
-                        onChange={(e) => setODepartment(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setODepartment(val);
+                          const match = getSpellingSuggestion(val);
+                          setODeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                        }}
                         placeholder="Computer Science"
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                       />
+                      {oDeptSuggestion && (
+                        <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
+                          Did you mean: <strong className="underline cursor-pointer" onClick={() => { setODepartment(oDeptSuggestion); setODeptSuggestion(null); }}>{oDeptSuggestion}</strong>?
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] text-txt-sub">Grad Year *</label>

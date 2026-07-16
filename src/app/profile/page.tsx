@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList } from "../lib/textNormalization";
 import Header from "../components/Header";
 import { 
   ArrowLeft, 
@@ -78,6 +79,10 @@ export default function ProfilePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [linking, setLinking] = useState(false);
+  
+  // Suggestions
+  const [collegeSuggestion, setCollegeSuggestion] = useState<string | null>(null);
+  const [deptSuggestion, setDeptSuggestion] = useState<string | null>(null);
   
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -188,7 +193,14 @@ export default function ProfilePage() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (!fullName.trim() || !username.trim()) {
+    // Auto-normalize text fields on submit
+    const cleanFullName = normalizeTitleCase(fullName);
+    const cleanUsername = username.trim().toLowerCase();
+    const cleanCollege = normalizeTitleCase(collegeName);
+    const cleanDept = normalizeTitleCase(department);
+    const cleanSkills = normalizeSkillsList(skills);
+
+    if (!cleanFullName || !cleanUsername) {
       setMessage({ text: "Full Name and Username are required.", type: "error" });
       return;
     }
@@ -202,8 +214,8 @@ export default function ProfilePage() {
         .from("profiles")
         .upsert({
           id: user.id,
-          username: username.trim(),
-          full_name: fullName.trim(),
+          username: cleanUsername,
+          full_name: cleanFullName,
           avatar_url: avatarUrl,
           is_profile_public: isPublic,
           updated_at: new Date().toISOString()
@@ -214,18 +226,18 @@ export default function ProfilePage() {
       // 2. Update metadata in Auth users to keep optional fields in sync
       const { error } = await supabase.auth.updateUser({
         data: {
-          full_name: fullName.trim(),
-          username: username.trim(),
+          full_name: cleanFullName,
+          username: cleanUsername,
           avatar_url: avatarUrl,
           bio: bio.trim(),
-          skills: skills.trim(),
+          skills: cleanSkills,
           github_url: githubUrl.trim(),
           linkedin_url: linkedinUrl.trim(),
           discord_username: discordUsername.trim(),
           resume_url: resumeUrl,
           resume_file_name: resumeFileName,
-          college_name: collegeName.trim(),
-          department: department.trim(),
+          college_name: cleanCollege,
+          department: cleanDept,
           graduation_year: gradYear.trim()
         }
       });
@@ -607,10 +619,20 @@ export default function ProfilePage() {
                 <input 
                   type="text" 
                   value={collegeName}
-                  onChange={(e) => setCollegeName(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCollegeName(val);
+                    const match = getSpellingSuggestion(val);
+                    setCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                  }}
                   placeholder="MIT / IIT Delhi / Stanford University"
                   className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
                 />
+                {collegeSuggestion && (
+                  <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
+                    Did you mean: <strong className="underline cursor-pointer" onClick={() => { setCollegeName(collegeSuggestion); setCollegeSuggestion(null); }}>{collegeSuggestion}</strong>?
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -619,10 +641,20 @@ export default function ProfilePage() {
                   <input 
                     type="text" 
                     value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDepartment(val);
+                      const match = getSpellingSuggestion(val);
+                      setDeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                    }}
                     placeholder="Computer Science"
                     className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
                   />
+                  {deptSuggestion && (
+                    <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
+                      Did you mean: <strong className="underline cursor-pointer" onClick={() => { setDepartment(deptSuggestion); setDeptSuggestion(null); }}>{deptSuggestion}</strong>?
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1">
