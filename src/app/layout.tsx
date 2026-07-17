@@ -45,6 +45,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning={true}
     >
       <head>
         <script
