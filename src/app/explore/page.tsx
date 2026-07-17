@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Header from "../components/Header";
+import { useAuth } from "../context/AuthContext";
 import { 
   ArrowLeft, 
   Search, 
@@ -38,7 +39,7 @@ interface HackathonItem {
 }
 
 export default function ExplorePage() {
-
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<"teammate_board" | "directory" | "events">("teammate_board");
   const [searchQuery, setSearchQuery] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
@@ -48,6 +49,8 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
   const [connectionStates, setConnectionStates] = useState<{ [key: string]: "none" | "pending" | "connected" }>({});
   const [invitingStates, setInvitingStates] = useState<{ [key: string]: boolean }>({});
+
+
 
   // Fetch classmates and events
   useEffect(() => {
@@ -160,6 +163,17 @@ export default function ExplorePage() {
     e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     e.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+        <span>Syncing session...</span>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">

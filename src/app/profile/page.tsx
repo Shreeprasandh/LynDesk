@@ -63,7 +63,9 @@ interface BackupProfileData {
 }
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+
   
   // Basic profiles table fields
   const [fullName, setFullName] = useState("");
@@ -526,6 +528,17 @@ export default function ProfilePage() {
       setDeleteLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+        <span>Syncing session...</span>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">

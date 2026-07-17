@@ -25,10 +25,12 @@ interface PlatformStats {
 }
 
 export default function CodingDeckPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+
 
   // Platform usernames
   const [leetcodeUser, setLeetcodeUser] = useState("");
@@ -254,6 +256,17 @@ export default function CodingDeckPage() {
     { platform: "CodeChef", title: "Starters 148", time: "July 24, 2026 - 08:00 PM", url: "https://www.codechef.com/contests" },
     { platform: "Unstop", title: "Uber HackTag 2026 Hackathon", time: "Registration ends in 2 days", url: "https://unstop.com/" },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+        <span>Syncing session...</span>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
