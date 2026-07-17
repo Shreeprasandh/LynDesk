@@ -674,7 +674,7 @@ export default function Home() {
       )}
 
       {/* 3. Footer */}
-      <footer className="h-16 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
+      <footer className="h-12 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
         <div>
           © 2026 LYNDESK NETWORK INC.
         </div>
