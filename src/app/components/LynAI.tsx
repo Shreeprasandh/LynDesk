@@ -179,7 +179,7 @@ As LynAI, I can assist you with:
       {/* Floating AI circular trigger button */}
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-[9999] h-12 w-12 bg-accent-main hover:opacity-90 text-bg-base rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group border border-accent-main/40 cursor-pointer animate-bounce"
+        className="fixed bottom-20 right-6 z-[9999] h-12 w-12 bg-accent-main opacity-60 hover:opacity-100 text-bg-base rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group border border-accent-main/40 cursor-pointer animate-bounce"
         style={{ animationDuration: '3s' }}
         title="Ask LynAI Co-Pilot"
       >
