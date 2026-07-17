@@ -18,7 +18,8 @@ import {
   MapPin,
   ExternalLink,
   X,
-  CheckCircle2
+  CheckCircle2,
+  User
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -88,6 +89,45 @@ export default function Home() {
   const [newEventDeadline, setNewEventDeadline] = useState("");
   const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Active Co-workers live list state
+  const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
+
+  useEffect(() => {
+    if (user) {
+      const fetchCoworkers = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("full_name, department")
+            .limit(3);
+          
+          if (!error && data && data.length > 0) {
+            const list = data.map((p, index) => ({
+              name: p.full_name || "Developer",
+              role: p.department || "Engineer",
+              active: index % 2 === 0
+            }));
+            setCoworkers(list);
+          }
+        } catch (err) {
+          console.error("Failed to load live active coworkers: ", err);
+        }
+      };
+      fetchCoworkers();
+    }
+  }, [user]);
+
+  const fallbackCoworkers = [
+    { name: "Alex Carter", role: "Dev", active: true },
+    { name: "Mira Sen", role: "Designer", active: true },
+    { name: "Prof. Davis", role: "Mentor", active: false }
+  ];
+  const activeCoworkers = coworkers.length > 0 ? coworkers : fallbackCoworkers;
+
+  // Derivations for profile picture and username
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+  const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -468,18 +508,24 @@ export default function Home() {
             
             {/* User profile Summary */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Verified Session</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Verified Session</span>
               <div className="flex items-center gap-3">
-                <Image 
-                  src="/lyndesk-logo.jpg" 
-                  alt="Profile" 
-                  width={40}
-                  height={40}
-                  className="rounded-full border border-border-main/60 object-cover"
-                />
+                {avatarUrl ? (
+                  <Image 
+                    src={avatarUrl} 
+                    alt="Profile" 
+                    width={40}
+                    height={40}
+                    className="rounded-full border border-border-main/60 object-cover"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-full border border-border-main/80 bg-bg-card flex items-center justify-center text-txt-muted flex-shrink-0">
+                    <User size={18} className="stroke-[1.5]" />
+                  </div>
+                )}
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs text-txt-main font-mono truncate font-medium">{user.email}</span>
-                  <span className="text-[10px] text-txt-muted font-light">Student Engineer</span>
+                  <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
+                  <span className="text-[10px] text-txt-muted font-light">{user?.user_metadata?.role === "employee" ? "Employer / Partner" : "Student Engineer"}</span>
                 </div>
               </div>
             </div>
@@ -506,29 +552,17 @@ export default function Home() {
 
             {/* Teammates List */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Co-Workers</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Active Co-Workers</span>
               <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs text-txt-main font-light">Alex Carter</span>
+                {activeCoworkers.map((cw, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${cw.active ? "bg-emerald-500" : "bg-border-main"}`} />
+                      <span className="text-xs text-txt-main font-light">{cw.name}</span>
+                    </div>
+                    <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">{cw.role}</span>
                   </div>
-                  <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">Dev</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs text-txt-main font-light">Mira Sen</span>
-                  </div>
-                  <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">Designer</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-border-main" />
-                    <span className="text-xs text-txt-muted font-light">Prof. Davis</span>
-                  </div>
-                  <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">Mentor</span>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -634,43 +668,100 @@ export default function Home() {
 
           </section>
 
-          {/* C. Right Panel: Leaderboards & Approvals (3 Columns) */}
+          {/* C. Right Panel: Coding Platform Overview (3 Columns) */}
           <section className="lg:col-span-3 flex flex-col gap-6">
             
-            {/* Campus Leaderboard */}
+            {/* Coding Platform Overview */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">College Arena</span>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-txt-main font-medium">1. Stanford University</span>
-                  <span className="text-xs text-txt-muted font-mono">1,420 pts</span>
-                </div>
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-                  <span className="text-xs text-txt-main font-medium">2. MIT</span>
-                  <span className="text-xs text-txt-muted font-mono">1,180 pts</span>
-                </div>
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-txt-main font-bold">24. IIT Delhi</span>
-                  <span className="text-xs text-txt-muted font-mono">310 pts</span>
-                </div>
-              </div>
-            </div>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Coding Platform Overview</span>
+              
+              {(() => {
+                const meta = user?.user_metadata || {};
+                const lcUser = meta.leetcode_username || "";
+                const cfUser = meta.codeforces_username || "";
+                const ccUser = meta.codechef_username || "";
+                const unstopUser = meta.unstop_username || "";
+                const hasAnyLinked = lcUser || cfUser || ccUser || unstopUser;
 
-            {/* Coordinator Verifications Feed */}
-            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Credit Approvals</span>
-              <div className="flex flex-col gap-3.5">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs text-txt-main font-medium">Concept Pitch Verified</span>
-                  <span className="text-[10px] text-txt-muted font-light leading-relaxed">Approved by Coordinator Prof. Davis (+10 pts)</span>
-                  <span className="text-[8px] font-mono text-txt-muted uppercase mt-0.5">12 Hours Ago</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs text-txt-main font-medium">GitHub Repository Synced</span>
-                  <span className="text-[10px] text-txt-muted font-light leading-relaxed">Commit verification validated by LDK:BOT (+5 pts)</span>
-                  <span className="text-[8px] font-mono text-txt-muted uppercase mt-0.5">2 Days Ago</span>
-                </div>
-              </div>
+                if (hasAnyLinked) {
+                  return (
+                    <div className="flex flex-col gap-3">
+                      {lcUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">LeetCode</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{lcUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">342 <span className="text-[9px] text-txt-muted uppercase font-normal">Solved</span></span>
+                            <span className="text-[9px] font-mono text-txt-sub">Top 8.4%</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {cfUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">Codeforces</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{cfUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">1480 <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span></span>
+                            <span className="text-[9px] font-mono text-txt-sub">Specialist</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {ccUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">CodeChef</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{ccUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">1624 <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span></span>
+                            <span className="text-[9px] font-mono text-txt-sub">3★ Star</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {unstopUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">Unstop</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{unstopUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">6 <span className="text-[9px] text-txt-muted uppercase font-normal">Hacks</span></span>
+                            <span className="text-[9px] font-mono text-txt-sub">Rank #145</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <Link 
+                        href="/coding-deck"
+                        className="h-8 bg-accent-main/10 hover:bg-accent-main/20 text-accent-main text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-colors border border-accent-main/30 font-bold"
+                      >
+                        Manage Coding Deck &rarr;
+                      </Link>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col gap-3 text-center py-2">
+                    <p className="text-[10px] text-txt-sub font-light leading-relaxed">
+                      Link LeetCode, Codeforces, CodeChef, and Unstop handles to display stats, ratings, and streaks here.
+                    </p>
+                    <Link 
+                      href="/coding-deck"
+                      className="h-8 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity font-bold"
+                    >
+                      Connect Platforms &rarr;
+                    </Link>
+                  </div>
+                );
+              })()}
             </div>
 
           </section>
