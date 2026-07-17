@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import Link from "next/link";
 import { 
   Sparkles, 
   X, 
@@ -20,6 +21,10 @@ interface Message {
   sender: "user" | "lynai";
   text: string;
   timestamp: string;
+  actionLink?: {
+    label: string;
+    href: string;
+  };
 }
 
 export default function LynAI() {
@@ -63,6 +68,7 @@ export default function LynAI() {
     
     // Process prompts with premium contextual answers
     let aiResponse = "";
+    let actionLink: { label: string; href: string } | undefined = undefined;
     const promptLower = userPrompt.toLowerCase();
 
     // Context variable resolutions
@@ -71,7 +77,51 @@ export default function LynAI() {
     const skills = studentMeta.skills || "React, JavaScript, Node.js";
     const leetcode = studentMeta.leetcode_username || "not linked";
 
-    if (promptLower.includes("audit") || promptLower.includes("portfolio")) {
+    if (promptLower.includes("profile") || promptLower.includes("settings") || promptLower.includes("account") || promptLower.includes("bio") || promptLower.includes("change my name") || promptLower.includes("resume upload") || promptLower.includes("college key") || promptLower.includes("company key")) {
+      aiResponse = `### 👤 LynDesk Profile Settings
+To modify your account profile, change academic details, enter institution registrar validation codes, or upload your verified resume PDF, go to settings:`;
+      actionLink = { label: "Go to Profile Settings", href: "/profile" };
+    } else if (promptLower.includes("leetcode") || promptLower.includes("codeforces") || promptLower.includes("codechef") || promptLower.includes("unstop") || promptLower.includes("hack2skill") || promptLower.includes("coding deck") || promptLower.includes("daily problem") || promptLower.includes("streak") || promptLower.includes("solve")) {
+      aiResponse = `### 💻 Competitive Coding Deck
+Sync your competitive coding handles, inspect solved problems, daily streaks, activity calendars, and access official coding contests:`;
+      actionLink = { label: "Go to Coding Deck", href: "/coding-deck" };
+    } else if (promptLower.includes("explore") || promptLower.includes("teammates") || promptLower.includes("partners") || promptLower.includes("hackathons") || promptLower.includes("events") || promptLower.includes("classmates")) {
+      aiResponse = `### 🔍 Matchmaking & Events Arena
+Search peer directories, coordinate hackathon teams, browse global developer meetups, and find project collaborators:`;
+      actionLink = { label: "Go to Explore Arena", href: "/explore" };
+    } else if (promptLower.includes("faculty") || promptLower.includes("coordinator") || promptLower.includes("approve") || promptLower.includes("claims") || promptLower.includes("verify points")) {
+      aiResponse = `### 🎓 Faculty coordinator desk
+The Faculty Coordinator Console allows college staff or company admins to verify credit applications and audit registry spreadsheets.`;
+      actionLink = { label: "Go to Faculty Console", href: "/coordinator" };
+    } else if (promptLower.includes("leaderboard") || promptLower.includes("ranking") || promptLower.includes("who is top")) {
+      aiResponse = `### 🏆 Global Leaderboard
+Compare scores, LeetCode milestones, and verified extracurricular credit standings with other student engineers across institutions:`;
+      actionLink = { label: "Go to Leaderboard", href: "/leaderboard" };
+    } else if (promptLower.includes("dashboard") || promptLower.includes("workspace") || promptLower.includes("gantt") || promptLower.includes("tasks") || promptLower.includes("create project")) {
+      aiResponse = `### 🗂️ Active Workspace Dashboard
+Manage your active project channels, group chats, kanban lists, calendar plans, and git bot validation tasks:`;
+      actionLink = { label: "Go to Dashboard", href: "/" };
+    } else if (promptLower.includes("bubble sort")) {
+      aiResponse = `### 💡 Bubble Sort Explanation
+Bubble Sort is a simple sorting algorithm that repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order. 
+
+Here is a quick JavaScript sample:
+\`\`\`javascript
+function bubbleSort(arr) {
+  let len = arr.length;
+  for (let i = 0; i < len; i++) {
+    for (let j = 0; j < len - i - 1; j++) {
+      if (arr[j] > arr[j + 1]) {
+        let temp = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
+      }
+    }
+  }
+  return arr;
+}
+\`\`\``;
+    } else if (promptLower.includes("audit") || promptLower.includes("portfolio")) {
       aiResponse = `### 📊 LynAI Portfolio Audit for ${name}
 - **College Link**: \`${college}\`
 - **Technical Skills**: ${skills}
@@ -124,12 +174,9 @@ Copy the structure below to use in your portfolio:
     } else {
       aiResponse = `I received your request: "${userPrompt}". 
 
-As LynAI, I can assist you with:
-1. Generating custom **hackathon project structures**.
-2. Evaluating your **LeetCode/Codeforces handles** for placement readiness.
-3. Creating a standard **resume outline** based on your linked skills.
+As your LynAI Co-pilot, I can assist you with academic roadmaps, code explanations, and direct app navigation! 
 
-*Tell me which topic you would like me to detail further!*`;
+*Pro Tip: Ask me "how do I link my leetcode?" or "where can I change my profile?" to get direct navigation buttons!*`;
     }
 
     // Simulate streaming typing effect
@@ -140,6 +187,7 @@ As LynAI, I can assist you with:
           id: Math.random().toString(),
           sender: "lynai",
           text: aiResponse,
+          actionLink: actionLink,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -243,6 +291,16 @@ As LynAI, I can assist you with:
                           : "bg-bg-base/60 border border-border-main/50 text-txt-sub rounded-tl-none font-light"
                       }`}>
                         {msg.text}
+
+                        {msg.actionLink && (
+                          <Link 
+                            href={msg.actionLink.href}
+                            onClick={() => setIsOpen(false)}
+                            className="mt-3 block w-full text-center h-8 leading-8 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded transition-opacity font-bold"
+                          >
+                            {msg.actionLink.label} &rarr;
+                          </Link>
+                        )}
                       </div>
                       <span className="text-[8px] text-txt-muted font-mono tracking-wider self-end px-1">
                         {msg.timestamp}
