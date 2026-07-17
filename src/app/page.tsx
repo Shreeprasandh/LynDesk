@@ -219,7 +219,12 @@ export default function Home() {
       <Header />
 
       {/* Conditional Layout: Landing VS. Dashboard */}
-      {!user ? (
+      {authLoading ? (
+        <div className="flex-1 bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+          <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+          <span>Syncing session...</span>
+        </div>
+      ) : !user ? (
         /* ==================== LANDING PANEL ==================== */
         <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 lg:py-12 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
           
