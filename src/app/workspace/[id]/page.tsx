@@ -18,7 +18,8 @@ import {
   CheckCircle2, 
   Clock, 
   CloudUpload,
-  Terminal
+  Terminal,
+  Award
 } from "lucide-react";
 
 
@@ -115,6 +116,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Claim Academic Credits State
+  const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
+  const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
+
   // Git Commits (live simulation list)
   const [commits, setCommits] = useState([
     { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
@@ -142,10 +147,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return () => clearInterval(interval);
   }, [inRoom]);
 
-  // Fetch Project Spaces & Chat Messages
+  // Fetch Project Spaces, Chat Messages, Artifacts, and Credit Application Status
   useEffect(() => {
     const fetchWorkspaceDetails = async () => {
       // Setup base/default states matching dynamic IDs
+      const initialLogs: ChatMsg[] = [
+        { id: "c1", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date(Date.now() - 36000000).toISOString(), isSystem: true },
+        { id: "c2", sender_name: "Mira Sen", sender_role: "Designer", content: "I just uploaded the v1 presentation deck. Let me know if you need changes.", created_at: new Date(Date.now() - 18000000).toISOString() },
+        { id: "c3", sender_name: "Alex Carter", sender_role: "Developer", content: "Awesome, starting integration. Repo is linked.", created_at: new Date(Date.now() - 12000000).toISOString() }
+      ];
+
+      const initialArtifacts: Artifact[] = [
+        { id: "art1", file_name: "Pitch_Deck_v1.pdf", file_url: "#", version: 1, is_active: true, uploaded_by: "Mira Sen", created_at: new Date(Date.now() - 18000000).toISOString() }
+      ];
+
       if (id === "e1") {
         setProjectName("HealthVibe Workspace");
         setEventTitle("MIT HackHarvard 2026");
@@ -154,6 +169,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setLiveDemo("healthvibe.vercel.app");
         setTempGit("github.com/shreeprasandh/healthvibe");
         setTempDemo("healthvibe.vercel.app");
+        setChatMessages(initialLogs);
+        setArtifacts(initialArtifacts);
       } else if (id === "e2") {
         setProjectName("CarbonTrace Portal");
         setEventTitle("Google Developer Hackathon");
@@ -162,8 +179,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setLiveDemo("carbontrace.dev");
         setTempGit("github.com/shreeprasandh/carbontrace");
         setTempDemo("carbontrace.dev");
+        setChatMessages(initialLogs);
+        setArtifacts(initialArtifacts);
       } else {
-        // Fetch from Supabase
+        // Fetch workspace details from Supabase
         try {
           const { data, error } = await supabase
             .from("project_spaces")
@@ -192,26 +211,110 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           }
         } catch (e) {
           console.error("Workspace fetch error: ", e);
+          setProjectName("Student Vault Space");
+          setEventTitle("Campus Track Hackathon");
+          setStatus("development");
+        }
+
+        // Fetch real chat messages
+        try {
+          const { data: dbChat, error: chatError } = await supabase
+            .from("chat_messages")
+            .select(`
+              id,
+              content,
+              created_at,
+              profiles ( username, college_key, company_key )
+            `)
+            .eq("project_space_id", id)
+            .order("created_at", { ascending: true });
+
+          if (!chatError && dbChat && dbChat.length > 0) {
+            const loadedChat: ChatMsg[] = dbChat.map(c => {
+              const profile = c.profiles as any;
+              let role = "Developer";
+              if (profile?.college_key) role = "Faculty";
+              else if (profile?.company_key) role = "Recruiter";
+              return {
+                id: c.id,
+                sender_name: profile?.username || "Teammate",
+                sender_role: role,
+                content: c.content,
+                created_at: c.created_at
+              };
+            });
+            setChatMessages([
+              { id: "c0", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date(Date.now() - 36000000).toISOString(), isSystem: true },
+              ...loadedChat
+            ]);
+          } else {
+            setChatMessages(initialLogs);
+          }
+        } catch (e) {
+          console.error("Failed to load chat: ", e);
+          setChatMessages(initialLogs);
+        }
+
+        // Fetch real artifacts
+        try {
+          const { data: dbArtifacts, error: artError } = await supabase
+            .from("project_artifacts")
+            .select(`
+              id,
+              file_name,
+              file_url,
+              version,
+              is_active,
+              created_at,
+              profiles ( username )
+            `)
+            .eq("project_space_id", id)
+            .order("created_at", { ascending: false });
+
+          if (!artError && dbArtifacts && dbArtifacts.length > 0) {
+            const loadedArtifacts: Artifact[] = dbArtifacts.map(a => ({
+              id: a.id,
+              file_name: a.file_name,
+              file_url: a.file_url,
+              version: a.version,
+              is_active: a.is_active,
+              uploaded_by: (a.profiles as any)?.username || "Teammate",
+              created_at: a.created_at
+            }));
+            setArtifacts(loadedArtifacts);
+          } else {
+            setArtifacts(initialArtifacts);
+          }
+        } catch (e) {
+          console.error("Failed to load artifacts: ", e);
+          setArtifacts(initialArtifacts);
+        }
+
+        // Fetch credit application status
+        if (user) {
+          try {
+            const { data: claim, error: claimErr } = await supabase
+              .from("credit_applications")
+              .select("status")
+              .eq("project_space_id", id)
+              .eq("student_id", user.id)
+              .single();
+
+            if (!claimErr && claim) {
+              setClaimStatus(claim.status);
+            } else {
+              setClaimStatus("idle");
+            }
+          } catch (e) {
+            console.error("Failed to load claim status: ", e);
+            setClaimStatus("idle");
+          }
         }
       }
-
-      // Initial chat log load
-      const initialLogs: ChatMsg[] = [
-        { id: "c1", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date(Date.now() - 36000000).toISOString(), isSystem: true },
-        { id: "c2", sender_name: "Mira Sen", sender_role: "Designer", content: "I just uploaded the v1 presentation deck. Let me know if you need changes.", created_at: new Date(Date.now() - 18000000).toISOString() },
-        { id: "c3", sender_name: "Alex Carter", sender_role: "Developer", content: "Awesome, starting integration. Repo is linked.", created_at: new Date(Date.now() - 12000000).toISOString() }
-      ];
-      setChatMessages(initialLogs);
-
-      // Initial artifacts setup
-      const initialArtifacts: Artifact[] = [
-        { id: "art1", file_name: "Pitch_Deck_v1.pdf", file_url: "#", version: 1, is_active: true, uploaded_by: "Mira Sen", created_at: new Date(Date.now() - 18000000).toISOString() }
-      ];
-      setArtifacts(initialArtifacts);
     };
 
     fetchWorkspaceDetails();
-  }, [id]);
+  }, [id, user]);
 
   // Real-time Chat subscription
   useEffect(() => {
@@ -227,6 +330,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           filter: `project_space_id=eq.${id}`,
         },
         async (payload) => {
+          // Skip if this message was sent by the current user (already added optimistically)
+          if (payload.new.profile_id === user?.id) return;
+
           // Fetch sender details
           const { data: profile } = await supabase
             .from("profiles")
@@ -250,7 +356,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [id, user]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -585,55 +691,115 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
 
     setIsUploading(true);
 
-    // Simulate upload delay
-    setTimeout(() => {
-      const myName = user?.email?.split("@")[0] || "You";
-      const currentHighestVersion = artifacts
-        .filter(a => a.file_name.split(".").pop() === file.name.split(".").pop())
-        .reduce((max, a) => Math.max(max, a.version), 0);
+    const myName = user?.email?.split("@")[0] || "You";
+    const currentHighestVersion = artifacts
+      .filter(a => a.file_name.split(".").pop() === file.name.split(".").pop())
+      .reduce((max, a) => Math.max(max, a.version), 0);
 
-      const nextVersion = currentHighestVersion + 1;
+    const nextVersion = currentHighestVersion + 1;
 
-      // Deactivate previous active files of same type
-      setArtifacts(prev => prev.map(art => {
+    let fileUrl = "#";
+
+    // If user logged in and not mock workspace
+    if (user && id !== "e1" && id !== "e2") {
+      try {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${id}/${Date.now()}.${fileExt}`;
+        const filePath = `project_artifacts/${fileName}`;
+        
+        // Try uploading to "project-vaults" bucket
+        const { error: uploadError } = await supabase.storage
+          .from("project-vaults")
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: true,
+          });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from("project-vaults")
+            .getPublicUrl(filePath);
+          if (urlData?.publicUrl) {
+            fileUrl = urlData.publicUrl;
+          }
+
+          // Insert into project_artifacts table
+          const { error: dbError } = await supabase
+            .from("project_artifacts")
+            .insert({
+              project_space_id: id,
+              file_name: file.name,
+              file_url: fileUrl,
+              version: nextVersion,
+              is_active: true,
+              uploaded_by: user.id
+            });
+
+          if (dbError) {
+            console.error("DB Artifact insert error: ", dbError);
+          }
+        } else {
+          console.warn("Storage bucket upload failed, using fallback mock URL: ", uploadError);
+        }
+      } catch (err) {
+        console.error("Supabase Storage error: ", err);
+      }
+    }
+
+    // Update state locally
+    setArtifacts(prev => {
+      const deactivated = prev.map(art => {
         if (art.file_name.split(".").pop() === file.name.split(".").pop()) {
           return { ...art, is_active: false };
         }
         return art;
-      }));
+      });
 
       const newArtifact: Artifact = {
         id: `art_${Date.now()}`,
         file_name: file.name,
-        file_url: "#",
+        file_url: fileUrl,
         version: nextVersion,
         is_active: true,
         uploaded_by: myName,
         created_at: new Date().toISOString()
       };
 
-      setArtifacts(prev => [newArtifact, ...prev]);
-      
-      // Auto-post notification message in chat
-      const systemNotice: ChatMsg = {
-        id: `sys_${Date.now()}`,
-        sender_name: "LDK:BOT",
-        sender_role: "SYSTEM",
-        content: `${myName} uploaded artifact: ${file.name} (v${nextVersion})`,
-        created_at: new Date().toISOString(),
-        isSystem: true
-      };
-      setChatMessages(prev => [...prev, systemNotice]);
+      return [newArtifact, ...deactivated];
+    });
 
-      setIsUploading(false);
-    }, 1500);
+    // Auto-post notification message in chat
+    const systemNotice: ChatMsg = {
+      id: `sys_${Date.now()}`,
+      sender_name: "LDK:BOT",
+      sender_role: "SYSTEM",
+      content: `${myName} uploaded artifact: ${file.name} (v${nextVersion})`,
+      created_at: new Date().toISOString(),
+      isSystem: true
+    };
+    setChatMessages(prev => [...prev, systemNotice]);
+
+    // Save chat message notice to database
+    if (user && id !== "e1" && id !== "e2") {
+      try {
+        await supabase.from("chat_messages").insert({
+          project_space_id: id,
+          profile_id: user.id,
+          content: `Uploaded artifact: ${file.name} (v${nextVersion})`
+        });
+      } catch (chatErr) {
+        console.error("Failed to insert system upload message: ", chatErr);
+      }
+    }
+
+    setIsUploading(false);
   };
 
   const formatUrl = (url: string) => {
@@ -643,6 +809,59 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       clean = `https://${clean}`;
     }
     return clean;
+  };
+
+  const handleClaimCredits = async () => {
+    setIsSubmittingClaim(true);
+    
+    // Default fallback mock response
+    if (!user || id === "e1" || id === "e2") {
+      setTimeout(() => {
+        setClaimStatus("pending");
+        setIsSubmittingClaim(false);
+      }, 1000);
+      return;
+    }
+
+    try {
+      // 1. Submit claim to credit_applications table
+      const { error } = await supabase
+        .from("credit_applications")
+        .insert({
+          project_space_id: id,
+          student_id: user.id,
+          credit_points: 10,
+          status: "pending"
+        });
+
+      if (!error) {
+        setClaimStatus("pending");
+        // Post system message in chat
+        const systemNotice: ChatMsg = {
+          id: `sys_${Date.now()}`,
+          sender_name: "LDK:BOT",
+          sender_role: "SYSTEM",
+          content: `${user.email?.split("@")[0]} submitted an academic credit claim (10 pts).`,
+          created_at: new Date().toISOString(),
+          isSystem: true
+        };
+        setChatMessages(prev => [...prev, systemNotice]);
+
+        // Insert notice into chat_messages table
+        await supabase.from("chat_messages").insert({
+          project_space_id: id,
+          profile_id: user.id,
+          content: `Submitted academic credit claim for this project space.`
+        });
+      } else {
+        console.error("Supabase claim submission error: ", error);
+        alert("Failed to submit claim. Make sure you are registered to this project space.");
+      }
+    } catch (e) {
+      console.error("Claim credits connection error: ", e);
+    } finally {
+      setIsSubmittingClaim(false);
+    }
   };
 
   const saveGitRepo = async () => {
@@ -1212,6 +1431,58 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions.</span>
               )}
             </div>
+          </div>
+
+          {/* Claim Academic Credits Card */}
+          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Academic Verification</span>
+              <Award size={14} className="text-txt-main" />
+            </div>
+            
+            {claimStatus === "idle" && (
+              <button 
+                onClick={handleClaimCredits}
+                disabled={isSubmittingClaim}
+                className="w-full h-9 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[10px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity cursor-pointer font-bold"
+              >
+                {isSubmittingClaim ? "Submitting Claim..." : "Claim Campus Credits"}
+              </button>
+            )}
+
+            {claimStatus === "pending" && (
+              <div className="border border-border-main/60 p-2.5 rounded-sm bg-bg-card/50 flex flex-col gap-1 text-center">
+                <span className="text-[10px] font-semibold text-txt-main">Verification Pending</span>
+                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                  Submitted to department verifier for review.
+                </p>
+              </div>
+            )}
+
+            {claimStatus === "approved" && (
+              <div className="border border-emerald-500/20 p-2.5 rounded-sm bg-emerald-500/5 flex flex-col gap-1 text-center">
+                <span className="text-[10px] font-semibold text-emerald-500">Credits Approved</span>
+                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                  10 academic points credited to profile.
+                </p>
+              </div>
+            )}
+
+            {claimStatus === "rejected" && (
+              <div className="border border-red-500/20 p-2.5 rounded-sm bg-red-500/5 flex flex-col gap-1 text-center font-bold">
+                <span className="text-[10px] font-semibold text-red-500">Claim Rejected</span>
+                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                  Please review files or contact coordinator.
+                </p>
+                <button 
+                  onClick={handleClaimCredits}
+                  disabled={isSubmittingClaim}
+                  className="w-full h-8 mt-1 border border-border-main hover:bg-bg-card text-txt-main text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  Resubmit Claim
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Live Git Commit Ticker */}

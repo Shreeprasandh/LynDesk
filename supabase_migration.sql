@@ -20,6 +20,13 @@ CREATE TABLE public.institutes (
 -- Enable RLS on Institutes
 ALTER TABLE public.institutes ENABLE ROW LEVEL SECURITY;
 
+-- Insert default test institutes for automatic domain matching
+INSERT INTO public.institutes (name, email_domain) VALUES
+    ('Massachusetts Institute of Technology (MIT)', 'mit.edu'),
+    ('Stanford University', 'stanford.edu'),
+    ('Indian Institute of Technology (IIT Delhi)', 'iitd.ac.in')
+ON CONFLICT (email_domain) DO NOTHING;
+
 -- 3. PROFILES TABLE (linked to Supabase auth.users)
 CREATE TABLE public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,

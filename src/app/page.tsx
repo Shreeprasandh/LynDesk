@@ -93,6 +93,7 @@ export default function Home() {
 
   // Active Co-workers live list state
   const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
+  const [collegeName, setCollegeName] = useState("");
 
   // Load events from localStorage on mount
   useEffect(() => {
@@ -120,26 +121,42 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      const fetchCoworkers = async () => {
+      const fetchCoworkersAndCollege = async () => {
         try {
-          const { data, error } = await supabase
+          const { data: cowData, error: cowErr } = await supabase
             .from("profiles")
             .select("full_name, department")
             .limit(3);
           
-          if (!error && data && data.length > 0) {
-            const list = data.map((p, index) => ({
+          if (!cowErr && cowData && cowData.length > 0) {
+            const list = cowData.map((p, index) => ({
               name: p.full_name || "Developer",
               role: p.department || "Engineer",
               active: index % 2 === 0
             }));
             setCoworkers(list);
           }
+
+          const { data: profData, error: profErr } = await supabase
+            .from("profiles")
+            .select(`
+              institute_id,
+              institutes ( name )
+            `)
+            .eq("id", user.id)
+            .single();
+
+          if (!profErr && profData) {
+            const inst = profData.institutes as any;
+            if (inst?.name) {
+              setCollegeName(inst.name);
+            }
+          }
         } catch (err) {
-          console.error("Failed to load live active coworkers: ", err);
+          console.error("Failed to load live active coworkers/college: ", err);
         }
       };
-      fetchCoworkers();
+      fetchCoworkersAndCollege();
     }
   }, [user]);
 
@@ -696,7 +713,7 @@ export default function Home() {
                 )}
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
-                  <span className="text-[10px] text-txt-muted font-light">{user?.user_metadata?.role === "employee" ? "Employer / Partner" : "Student Engineer"}</span>
+                  <span className="text-[10px] text-txt-muted font-light">{user?.user_metadata?.role === "employee" ? "Employer / Partner" : collegeName || "Independent Student"}</span>
                 </div>
               </div>
             </div>

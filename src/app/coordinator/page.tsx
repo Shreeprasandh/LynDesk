@@ -21,6 +21,7 @@ import {
 
 interface CreditClaim {
   id: string;
+  student_id?: string;
   student_name: string;
   student_email: string;
   project_name: string;
@@ -354,7 +355,7 @@ export default function CoordinatorConsole() {
   credit_points: number;
   status: "pending" | "approved" | "rejected";
   created_at: string;
-  profiles: { full_name: string | null; username: string | null } | null;
+  profiles: { id: string; full_name: string | null; username: string | null } | null;
   project_spaces: { project_name: string; github_repo: string | null } | null;
 }
 
@@ -371,7 +372,7 @@ useEffect(() => {
           credit_points,
           status,
           created_at,
-          profiles:student_id ( full_name, username ),
+          profiles:student_id ( id, full_name, username ),
           project_spaces:project_space_id ( project_name, github_repo )
         `)
         .order("created_at", { ascending: false });
@@ -379,6 +380,7 @@ useEffect(() => {
       if (!error && data && data.length > 0) {
         const formatted: CreditClaim[] = (data as unknown as DBClaim[]).map((item) => ({
           id: item.id,
+          student_id: item.profiles?.id,
           student_name: item.profiles?.full_name || "Student Engineer",
           student_email: item.profiles?.username ? `${item.profiles.username}@university.edu` : "student@university.edu",
           project_name: item.project_spaces?.project_name || "Project Vault",
@@ -417,10 +419,33 @@ useEffect(() => {
 
       // 1. Update Supabase if claim exists in DB
       if (id !== "c1" && id !== "c2" && id !== "c3") {
-        await supabase
+        const { error: updateClaimErr } = await supabase
           .from("credit_applications")
-          .update({ status: action })
+          .update({ 
+            status: action,
+            faculty_verifier_id: user?.id 
+          })
           .eq("id", id);
+
+        if (!updateClaimErr && action === "approved" && claim.student_id) {
+          try {
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("academic_credits")
+              .eq("id", claim.student_id)
+              .single();
+
+            const currentCredits = profileData?.academic_credits || 0;
+            const newCredits = currentCredits + claim.points;
+
+            await supabase
+              .from("profiles")
+              .update({ academic_credits: newCredits })
+              .eq("id", claim.student_id);
+          } catch (profileErr) {
+            console.error("Failed to increment student credits: ", profileErr);
+          }
+        }
       }
 
       // 2. Update local UI state
