@@ -580,7 +580,7 @@ export default function CodingDeckPage() {
                   {block.weeks.map((week, wIdx) => (
                     <div key={wIdx} className="flex flex-col gap-1 w-2.5">
                       {week.cells.map((cell, cIdx) => {
-                        let colorClass = "bg-[#ebedf0] dark:bg-[#2c2c2c] border border-[#e1e4e8] dark:border-[#3c3c3c]/60";
+                        let colorClass = "bg-[#f3f4f6] dark:bg-[#2c2c2c] border border-[#e5e7eb] dark:border-[#3c3c3c]/60";
                         if (cell.level === 1) colorClass = "bg-emerald-500/20 border border-emerald-500/10";
                         if (cell.level === 2) colorClass = "bg-emerald-500/50 border border-emerald-500/20";
                         if (cell.level === 3) colorClass = "bg-emerald-500";
@@ -609,7 +609,7 @@ export default function CodingDeckPage() {
         {/* Legend */}
         <div className="flex justify-end items-center gap-1.5 text-[8px] font-mono text-txt-muted uppercase pt-1">
           <span>Less</span>
-          <div className="w-2 h-2 rounded-sm bg-[#ebedf0] dark:bg-[#2c2c2c] border border-[#e1e4e8] dark:border-[#3c3c3c]/60" />
+          <div className="w-2 h-2 rounded-sm bg-[#f3f4f6] dark:bg-[#2c2c2c] border border-[#e5e7eb] dark:border-[#3c3c3c]/60" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500/20 border border-emerald-500/10" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500/50 border border-emerald-500/20" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500" />
