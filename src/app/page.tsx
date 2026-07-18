@@ -94,6 +94,30 @@ export default function Home() {
   // Active Co-workers live list state
   const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
 
+  // Load events from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("ldk_events");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setTimeout(() => {
+            setEvents(parsed);
+          }, 0);
+        } catch (e) {
+          console.error("Failed to parse stored events: ", e);
+        }
+      }
+    }
+  }, []);
+
+  // Sync events to localStorage on modification
+  useEffect(() => {
+    if (events && events.length > 0) {
+      localStorage.setItem("ldk_events", JSON.stringify(events));
+    }
+  }, [events]);
+
   useEffect(() => {
     if (user) {
       const fetchCoworkers = async () => {

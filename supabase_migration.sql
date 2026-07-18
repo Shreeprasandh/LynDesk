@@ -214,6 +214,46 @@ CREATE POLICY "Allow team members to post chat messages"
         )
     );
 
+-- Project Artifacts Policies
+CREATE POLICY "Allow team members to view project artifacts" 
+    ON public.project_artifacts FOR SELECT 
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.project_members 
+            WHERE project_members.project_space_id = project_space_id 
+            AND project_members.profile_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Allow team members to upload project artifacts" 
+    ON public.project_artifacts FOR INSERT 
+    TO authenticated
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.project_members 
+            WHERE project_members.project_space_id = project_space_id 
+            AND project_members.profile_id = auth.uid()
+        )
+    );
+
+-- Credit Applications Policies
+CREATE POLICY "Allow students to view own credit applications" 
+    ON public.credit_applications FOR SELECT 
+    USING (student_id = auth.uid() OR faculty_verifier_id = auth.uid());
+
+CREATE POLICY "Allow students to submit credit applications" 
+    ON public.credit_applications FOR INSERT 
+    TO authenticated
+    WITH CHECK (student_id = auth.uid());
+
+CREATE POLICY "Allow faculty to update credit applications" 
+    ON public.credit_applications FOR UPDATE 
+    USING (faculty_verifier_id = auth.uid() OR EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = auth.uid() 
+        AND college_key IS NOT NULL
+    ));
+
 
 -- =========================================================================
 -- DATABASE TRIGGERS (Automating profile creation on signup)
