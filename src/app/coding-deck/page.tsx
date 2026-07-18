@@ -10,7 +10,6 @@ import {
   ExternalLink, 
   CheckCircle2, 
   AlertCircle, 
-  Calendar, 
   TrendingUp,
   Sparkles
 } from "lucide-react";
@@ -93,42 +92,7 @@ export default function CodingDeckPage() {
   const [unstopUser, setUnstopUser] = useState("");
   const [hack2skillUser, setHack2skillUser] = useState("");
 
-  // Calculate current streak based on calendar activity dynamically
-  const calculateCurrentStreak = () => {
-    const combinedCal: Record<string, number> = {};
-    const addCalendar = (cal?: Record<string, number>) => {
-      if (!cal) return;
-      Object.entries(cal).forEach(([dateKey, count]) => {
-        combinedCal[dateKey] = (combinedCal[dateKey] || 0) + count;
-      });
-    };
-    addCalendar(stats.leetcode?.submissionCalendar);
-    addCalendar(stats.codeforces?.submissionCalendar);
-    addCalendar(stats.codechef?.submissionCalendar);
 
-    let streakVal = 0;
-    const today = new Date();
-    let checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    
-    const getDateStr = (d: Date) => 
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-    // If no submissions today, start checking from yesterday
-    if (!(combinedCal[getDateStr(checkDate)] > 0)) {
-      checkDate.setDate(checkDate.getDate() - 1);
-    }
-    
-    while (true) {
-      const key = getDateStr(checkDate);
-      if (combinedCal[key] > 0) {
-        streakVal++;
-        checkDate.setDate(checkDate.getDate() - 1);
-      } else {
-        break;
-      }
-    }
-    return streakVal;
-  };
 
   // Connection edit states
   const [editLeetcode, setEditLeetcode] = useState(false);
@@ -140,6 +104,7 @@ export default function CodingDeckPage() {
   // LeetCode year filter state
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
   const heatmapScrollRef = useRef<HTMLDivElement>(null);
+  const isFirstLoadRef = useRef(true);
 
   // LeetCode success banner transition and display state
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
@@ -215,7 +180,7 @@ export default function CodingDeckPage() {
         const err = await res.json();
         setAiError(err.error || "Failed to generate AI report");
       }
-    } catch (e) {
+    } catch {
       setAiError("Connection error while calling Gemini API");
     } finally {
       setAiLoading(false);
@@ -247,19 +212,22 @@ export default function CodingDeckPage() {
     return () => clearTimeout(handle);
   }, [stats.leetcode, selectedLcYear]);
 
-  // Handle LeetCode daily challenge success banner timeout (display for 15 seconds on completion transition)
   useEffect(() => {
     const isCompleted = stats.leetcode?.dailyChallenge?.completed;
     if (isCompleted !== undefined && isCompleted !== null) {
       if (prevCompleted === false && isCompleted === true) {
-        setShowSuccessBanner(true);
+        setTimeout(() => {
+          setShowSuccessBanner(true);
+          setPrevCompleted(true);
+        }, 0);
         const timer = setTimeout(() => {
           setShowSuccessBanner(false);
         }, 15000);
-        setPrevCompleted(true);
         return () => clearTimeout(timer);
       } else if (prevCompleted !== isCompleted) {
-        setPrevCompleted(isCompleted);
+        setTimeout(() => {
+          setPrevCompleted(isCompleted);
+        }, 0);
       }
     }
   }, [stats.leetcode?.dailyChallenge?.completed, prevCompleted]);
@@ -270,9 +238,9 @@ export default function CodingDeckPage() {
 
     const loadPlatformData = async () => {
       try {
-        const isFirstLoad = !stats.leetcode && !stats.codeforces && !stats.codechef;
-        if (isFirstLoad) {
+        if (isFirstLoadRef.current) {
           setLoading(true);
+          isFirstLoadRef.current = false;
         }
         const meta = user.user_metadata || {};
         

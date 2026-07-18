@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 interface LynDeskLogoProps {
   className?: string;
@@ -8,7 +9,7 @@ interface LynDeskLogoProps {
 export default function LynDeskLogo({ className = "", size = 24 }: LynDeskLogoProps) {
   const scaledSize = Math.round(size * 1.25);
   return (
-    <img 
+    <Image 
       src="/lyndesk-logo.jpg" 
       alt="LynDesk Logo" 
       width={scaledSize}

@@ -39,6 +39,9 @@ const GithubIcon = ({ size = 14, className = "" }: { size?: number; className?: 
   </svg>
 );
 
+const generateLogId = () => `log_${Date.now()}`;
+const getLogTime = () => new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + " (Live)";
+
 export default function CoordinatorConsole() {
   const { user, loading: authLoading } = useAuth();
   const [claims, setClaims] = useState<CreditClaim[]>([]);
@@ -59,7 +62,9 @@ export default function CoordinatorConsole() {
       if (!raw) {
         window.location.href = "/";
       } else {
-        setCurrentStaff(JSON.parse(raw));
+        setTimeout(() => {
+          setCurrentStaff(JSON.parse(raw));
+        }, 0);
       }
     }
   }, []);
@@ -67,10 +72,14 @@ export default function CoordinatorConsole() {
   // Sync registered staff keys from Supabase college account metadata
   useEffect(() => {
     if (user?.user_metadata?.registered_staff) {
-      setRegisteredStaff(user.user_metadata.registered_staff);
+      setTimeout(() => {
+        setRegisteredStaff(user.user_metadata.registered_staff);
+      }, 0);
     } else {
       const defaultStaff = [{ name: "Main Administrator", key: "ADMIN" }];
-      setRegisteredStaff(defaultStaff);
+      setTimeout(() => {
+        setRegisteredStaff(defaultStaff);
+      }, 0);
     }
   }, [user]);
 
@@ -83,20 +92,22 @@ export default function CoordinatorConsole() {
     ];
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("ldk_audit_logs");
-      if (stored) {
-        setAuditLogs(JSON.parse(stored));
-      } else {
-        setAuditLogs(defaultLogs);
-        localStorage.setItem("ldk_audit_logs", JSON.stringify(defaultLogs));
-      }
+      setTimeout(() => {
+        if (stored) {
+          setAuditLogs(JSON.parse(stored));
+        } else {
+          setAuditLogs(defaultLogs);
+          localStorage.setItem("ldk_audit_logs", JSON.stringify(defaultLogs));
+        }
+      }, 0);
     }
   }, []);
 
   const addAuditLog = (msg: string) => {
     const newLog = {
-      id: `log_${Date.now()}`,
+      id: generateLogId(),
       msg,
-      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + " (Live)"
+      time: getLogTime()
     };
     const updated = [newLog, ...auditLogs];
     setAuditLogs(updated);
@@ -250,7 +261,7 @@ export default function CoordinatorConsole() {
         const err = await res.json();
         setAiError(err.error || "Failed to compile report");
       }
-    } catch (e) {
+    } catch {
       setAiError("Connection error while calling Gemini API");
     } finally {
       setAiLoading(false);
@@ -663,7 +674,7 @@ useEffect(() => {
                 
                 <div className="flex flex-col gap-2">
                   <p className="text-[10px] text-txt-muted font-light leading-relaxed">
-                    Type a natural language prompt to filter, analyze, and compile custom student records into an exportable report (e.g., <span className="italic">"i want to download the leetcode performance of it department from 101 to 102 roll number"</span> or <span className="italic">"find computer science students with more than 300 solves"</span>).
+                    Type a natural language prompt to filter, analyze, and compile custom student records into an exportable report (e.g., <span className="italic">{"'i want to download the leetcode performance of it department from 101 to 102 roll number'"}</span> or <span className="italic">{"'find computer science students with more than 300 solves'"}</span>).
                   </p>
                   
                   <div className="flex gap-2">

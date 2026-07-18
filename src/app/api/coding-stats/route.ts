@@ -2,26 +2,7 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const getDeterministicCalendar = (username: string) => {
-  let hash = 0;
-  for (let i = 0; i < username.length; i++) {
-    hash = username.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  hash = Math.abs(hash);
-  
-  const calendar: Record<string, number> = {};
-  const now = new Date();
-  for (let i = 0; i < 370; i++) {
-    const date = new Date();
-    date.setDate(now.getDate() - i);
-    const daySeed = (hash + i * 17) % 100;
-    if (daySeed < 25) { // 25% active days
-      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      calendar[dateKey] = 1 + ((hash + i * 3) % 4);
-    }
-  }
-  return calendar;
-};
+
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -299,7 +280,7 @@ export async function GET(request: Request) {
             };
 
             // Initialize checkDate with UTC coordinates to align with UTC reset boundaries
-            let checkDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+            const checkDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
             const todayStr = getFormattedDateStr(checkDate);
 
             let streakVal = 0;

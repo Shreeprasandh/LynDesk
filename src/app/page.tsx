@@ -154,7 +154,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setStaffKey("");
+    setTimeout(() => {
+      setStaffKey("");
+    }, 0);
   }, [authStep]);
 
   const handleLogin = async (e: React.FormEvent) => {

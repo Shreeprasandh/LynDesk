@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useState, useEffect, useRef } from "react";
+import React, { use, useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import Link from "next/link";
@@ -21,11 +21,7 @@ import {
   Terminal
 } from "lucide-react";
 
-const GithubIcon = ({ size = 14, className = "" }: { size?: number; className?: string }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
-  </svg>
-);
+
 
 interface TeamMember {
   id: string;
@@ -53,6 +49,8 @@ interface Artifact {
   uploaded_by: string;
   created_at: string;
 }
+
+const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -101,7 +99,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const userSessionIdRef = useRef(Math.random().toString(36).substring(2, 11));
+  const userSessionIdRef = useRef("");
+  useEffect(() => {
+    userSessionIdRef.current = generateSessionId();
+  }, []);
   const signalingChannelRef = useRef<any>(null);
 
   // Chat Feed State
@@ -351,23 +352,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       localStreamRef.current.getAudioTracks().forEach(track => {
         track.enabled = !isMuted;
       });
-      
-      if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: "broadcast",
-          event: "media-state",
-          payload: { 
-            from: userSessionIdRef.current, 
-            isMuted, 
-            isVideoOn 
-          }
-        });
-      }
-    }
-  }, [isMuted]);
-
-  useEffect(() => {
-    if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach(track => {
         track.enabled = isVideoOn;
       });
@@ -384,9 +368,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
       }
     }
-  }, [isVideoOn]);
+  }, [isMuted, isVideoOn]);
 
-  const createPeerConnection = (channel: any, peerSessionId: string, myName: string) => {
+  const createPeerConnection = (channel: any, peerSessionId: string) => {
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
     }
@@ -463,7 +447,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setRemoteIsMuted(payload.isMuted);
             setRemoteIsVideoOn(payload.isVideoOn);
 
-            const pc = createPeerConnection(channel, payload.from, myName);
+            // Add remote participant to local UI list
+            setRoomMembers(prev => {
+              if (prev.some(m => m.id === payload.from)) return prev;
+              return [
+                ...prev,
+                { id: payload.from, name: payload.senderName, role: "Classmate", isOnline: true, isSpeaking: false }
+              ];
+            });
+
+            const pc = createPeerConnection(channel, payload.from);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
@@ -484,7 +477,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
             setRemoteName(payload.senderName);
             
-            const pc = createPeerConnection(channel, payload.from, myName);
+            // Add remote participant to local UI list if not already present
+            setRoomMembers(prev => {
+              if (prev.some(m => m.id === payload.from)) return prev;
+              return [
+                ...prev,
+                { id: payload.from, name: payload.senderName, role: "Classmate", isOnline: true, isSpeaking: false }
+              ];
+            });
+
+            const pc = createPeerConnection(channel, payload.from);
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             
             const answer = await pc.createAnswer();
@@ -536,6 +538,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               peerConnectionRef.current.close();
               peerConnectionRef.current = null;
             }
+            setRoomMembers(prev => prev.filter(m => m.id !== payload.from));
           }
         });
 
@@ -672,7 +675,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   };
 
-  const fetchCommits = async () => {
+  const fetchCommits = useCallback(async () => {
     try {
       const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
       if (githubMatch && githubRepo.trim() !== "github.com/shreeprasandh/carbontrace" && githubRepo.trim() !== "github.com/shreeprasandh/healthvibe") {
@@ -708,13 +711,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     } catch (error) {
       console.error("Error fetching commits: ", error);
     }
-  };
+  }, [githubRepo]);
 
   useEffect(() => {
-    fetchCommits();
+    setTimeout(() => {
+      fetchCommits();
+    }, 0);
     const interval = setInterval(fetchCommits, 10000);
     return () => clearInterval(interval);
-  }, [githubRepo]);
+  }, [fetchCommits]);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">

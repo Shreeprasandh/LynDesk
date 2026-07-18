@@ -47,7 +47,10 @@ export default function Header() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsFaculty(!!localStorage.getItem("faculty_staff_member"));
+      const isStaff = !!localStorage.getItem("faculty_staff_member");
+      setTimeout(() => {
+        setIsFaculty(isStaff);
+      }, 0);
     }
   }, [user, pathname]);
 

@@ -20,7 +20,7 @@ export async function GET() {
     });
 
     return NextResponse.json({ commits });
-  } catch (error: any) {
+  } catch {
     // Fallback static mock commits in case Git is not installed/initialized in workspace environment
     return NextResponse.json({ 
       commits: [
