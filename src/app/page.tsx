@@ -317,15 +317,18 @@ export default function Home() {
 
   const handleAddEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventTitle || !newEventDeadline) return;
+    if (!newEventTitle || !scraperUrl) {
+      setModalError("Event Title and Link are required fields.");
+      return;
+    }
 
     const newObj = {
       id: `e_${Date.now()}`,
       title: newEventTitle,
-      deadline: newEventDeadline,
+      deadline: newEventDeadline.trim() || "TBD",
       location: newEventLocation,
       level: "global" as const,
-      url: scraperUrl || "https://lyndesk.com",
+      url: scraperUrl,
       status: "ideation" as const,
       stages: ["Ideation", "Development", "Final Submission"]
     };
@@ -1045,11 +1048,10 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-txt-sub font-medium">Deadline Date</label>
+                    <label className="text-xs text-txt-sub font-medium">Deadline Date (Optional)</label>
                     <input 
                       type="text"
-                      required
-                      placeholder="Oct 12, 2026"
+                      placeholder="Oct 12, 2026 (Optional)"
                       value={newEventDeadline}
                       onChange={(e) => setNewEventDeadline(e.target.value)}
                       className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
