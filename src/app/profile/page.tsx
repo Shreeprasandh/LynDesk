@@ -672,6 +672,11 @@ export default function ProfilePage() {
                       placeholder="mirasen"
                       className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
                     />
+                    {/* Desk ID: horizontal, small, thin, opacity 60% */}
+                    <div className="flex items-center justify-between border border-border-main/50 bg-bg-card/25 px-2.5 py-1 rounded-sm w-full mt-1.5 opacity-60">
+                      <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">Your Desk ID</span>
+                      <span className="text-[9px] font-mono text-txt-main font-semibold select-all">{user?.id || "Loading..."}</span>
+                    </div>
                   </div>
                 </div>
               </div>

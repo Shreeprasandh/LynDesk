@@ -10,7 +10,6 @@ import {
   Award, 
   ExternalLink,
   Code,
-  Copy,
   Clock
 } from "lucide-react";
 
@@ -41,7 +40,6 @@ interface Friendship {
 export default function FriendsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"friends" | "requests">("friends");
-  const [uidCopied, setUidCopied] = useState(false);
 
   // Search States
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,12 +123,7 @@ export default function FriendsPage() {
     }
   ];
 
-  const copyUidToClipboard = () => {
-    if (!user) return;
-    navigator.clipboard.writeText(user.id);
-    setUidCopied(true);
-    setTimeout(() => setUidCopied(false), 2000);
-  };
+
 
   // Fetch Friends and Requests on mount & tab change
   const triggerFetchList = useCallback(async () => {
@@ -380,22 +373,6 @@ export default function FriendsPage() {
             <div className="flex flex-col gap-0.5">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Social Network</span>
               <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Campus Directory</h1>
-            </div>
-            
-            <div className="flex flex-col text-right items-end bg-bg-card/30 border border-border-main/60 p-2.5 rounded-sm">
-              <span className="text-[10px] font-semibold text-txt-main">Your Desk ID</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[9px] text-txt-muted opacity-80 font-mono select-all">
-                  {user?.id ? `${user.id.substring(0, 8)}...` : "Loading..."}
-                </span>
-                <button 
-                  onClick={copyUidToClipboard}
-                  className="text-txt-muted hover:text-txt-main cursor-pointer"
-                  title="Copy Full UID"
-                >
-                  {uidCopied ? <span className="text-[8px] text-emerald-500 font-mono">Copied</span> : <Copy size={10} />}
-                </button>
-              </div>
             </div>
           </div>
 
