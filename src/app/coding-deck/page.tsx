@@ -725,7 +725,11 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-500 font-bold text-sm">L</span>
+                    <span className="w-8 h-8 rounded-md bg-[#ffa116]/10 border border-[#ffa116]/30 flex items-center justify-center text-[#ffa116]">
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+                        <path d="M13.483 0a1.374 1.374 0 0 0-.961.414L.772 12.164a1.378 1.378 0 0 0 0 1.932l11.75 11.75a1.38 1.38 0 0 0 1.933 0l1.242-1.242a1.378 1.378 0 0 0 0-1.933L5.807 13.064h15.932c.757 0 1.37-.613 1.37-1.37v-1.74a1.37 1.37 0 0 0-1.37-1.37H5.807L15.945 2.164a1.378 1.378 0 0 0 0-1.933L14.703.414a1.374 1.374 0 0 0-.96-.414h-.26Z" />
+                      </svg>
+                    </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">LeetCode Profile</h3>
                       <span className="text-[10px] text-txt-muted">Sync solve tallies & activity heatmap</span>
@@ -864,131 +868,15 @@ export default function CodingDeckPage() {
                 )}
               </div>
 
-              {/* Codeforces Profile Card */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 font-bold text-xs font-mono">CF</span>
-                    <div className="flex flex-col">
-                      <h3 className="text-sm font-semibold text-txt-main">Codeforces Profile</h3>
-                      <span className="text-[10px] text-txt-muted">Track division ratings & solve metrics</span>
-                    </div>
-                  </div>
-
-                  {!editCodeforces && codeforcesUser && (
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => setEditCodeforces(true)}
-                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
-                      >
-                        Update Handle
-                      </button>
-                      <button 
-                        onClick={() => handleDisconnectClick("codeforces")}
-                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {!codeforcesUser || editCodeforces ? (
-                  <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1 w-full">
-                      <label className="text-[10px] text-txt-sub font-semibold">Codeforces Profile Link / Username</label>
-                      <input 
-                        type="text" 
-                        defaultValue={codeforcesUser ? `https://codeforces.com/profile/${codeforcesUser}` : ""}
-                        id="codeforces-username-input"
-                        placeholder="e.g. https://codeforces.com/profile/mirasen_cf"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      {editCodeforces && (
-                        <button 
-                          onClick={() => setEditCodeforces(false)}
-                          className="h-10 px-3 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("codeforces-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("codeforces", rawVal);
-                          setCodeforcesUser(extracted);
-                          handleSavePlatform("codeforces", extracted);
-                        }}
-                        disabled={saving}
-                        className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
-                      >
-                        {saving ? "Saving..." : "Connect"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4 w-full">
-                    {platformErrors.codeforces && (
-                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
-                        <span>{platformErrors.codeforces}</span>
-                        <span className="text-[10px] text-txt-muted font-sans">
-                          Verify that your Codeforces username handle is correct and exists on the platform.
-                        </span>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-2">
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Division Rating</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.rating}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">{stats.codeforces?.rank}</span>
-                    </div>
-
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.solved}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">Unique problems</span>
-                    </div>
-
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">{(stats.codeforces as any)?.totalSubmissions || 0}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">Total runs</span>
-                    </div>
-
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">
-                        {((stats.codeforces as any)?.totalSubmissions 
-                          ? (((stats.codeforces as any)?.acceptedSubmissions / (stats.codeforces as any)?.totalSubmissions) * 100).toFixed(1)
-                          : "0.0")}%
-                      </span>
-                      <span className="text-[9px] text-txt-sub font-mono">Correct runs ratio</span>
-                    </div>
-
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
-                      <a 
-                        href={`https://codeforces.com/profile/${codeforcesUser}`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
-                      >
-                        @{codeforcesUser} <ExternalLink size={10} />
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              )}
-              </div>
-
               {/* CodeChef Profile Card */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-500 font-bold text-xs font-mono">CC</span>
+                    <span className="w-8 h-8 rounded-md bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-[#A87D56]">
+                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="currentColor">
+                        <path d="M11.2574.0039c-.37.0101-.7353.041-1.1003.095C9.6164.153 9.0766.4236 8.482.694c-.757.3244-1.5147.6486-2.2176.7027-1.1896.3785-1.568.919-1.8925 1.3516 0 .054-.054.1079-.054.1079-.4325.865-.4873 1.73-.325 2.5952.1621.5407.3786 1.0282.5408 1.5148.3785 1.0274.7578 2.0007.92 3.1362.1622.3244.3235.7571.4316 1.1897.2704.8651.542 1.8383 1.353 2.5952l.0057-.0028c.0175.0183.0301.0387.0482.0568.0072-.0036.0141-.0063.0213-.0099l-.0213-.5849c.6489-.9733 1.5673-1.6221 2.865-1.8925.5195-.1093 1.081-.1497 1.6625-.1278a8.7733 8.7733 0 0 1 1.7988.2357c1.4599.3785 2.595 1.1358 2.6492 1.7846.0273.3549.0398.6952.0326 1.0364-.001.064-.0046.1285-.007.193l.1362.0682c.075-.0375.1424-.107.2059-.1902.0008-.001.002-.002.0028-.0028.0018-.0023.0039-.0061.0057-.0085.0396-.0536.0747-.1236.1107-.1931.0188-.0377.0372-.0866.0554-.1292.2048-.4622.362-1.1536.538-1.9635.0541-.2703.1092-.4864.1633-.7027.4326-.9733 1.0266-1.8382 1.6213-2.6492.9733-1.3518 1.8928-2.5962 1.7846-4.0561-1.784-3.4608-4.2718-4.0017-5.5695-4.272-.2163-.0541-.3233-.0539-.4856-.108-1.3382-.2433-2.4945-.3953-3.6046-.3648zm5.0428 14.3788a9.8602 9.8602 0 0 0-.0326-.9824c-.0541-.703-1.1892-1.46-2.7032-1.8386-.588-.1336-1.1764-.2142-1.7448-.2356-.539-.0137-1.0657.0248-1.5546.1277-1.2436.2704-2.2162.9193-2.811 1.8925l.0511 1.431c.6672-.3558 1.7326-.8747 3.139-.9994.0662-.0059.1368-.0059.2044-.0099.1177-.013.2667-.044.4444-.044 1.6075 0 3.2682.5336 4.8767 1.6483.039-.2744.0611-.549.071-.8234l.044.0227c.0028-.0622.0143-.1268.0156-.1888zM11.256.0578c.1239-.0034.2538.01.379.0114-.23-.0022-.4588.0026-.6871.0156.103-.0061.2046-.0242.308-.027zm.4983.0156c.6552.014 1.3255.0711 2.0387.1803-.6834-.0987-1.3646-.1671-2.0387-.1803zm-1.3147.0554c-.076.0087-.1527.0133-.2285.0241-.8168.1167-1.7742.7015-2.75 1.045.3545-.1323.7143-.2957 1.0747-.4501C9.0765.4774 9.6705.207 .999z" />
+                      </svg>
+                    </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">CodeChef Profile</h3>
                       <span className="text-[10px] text-txt-muted">Track rating divisions & stars</span>
@@ -1060,32 +948,158 @@ export default function CodingDeckPage() {
                       </div>
                     )}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Star Division</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rank}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">Rating: {stats.codechef?.rating}</span>
-                    </div>
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Star Division</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rank}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">Rating: {stats.codechef?.rating}</span>
+                      </div>
 
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
-                      <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.solved}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">Synced 5m ago</span>
-                    </div>
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.solved}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">Synced 5m ago</span>
+                      </div>
 
-                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
-                      <a 
-                        href={`https://www.codechef.com/users/${codechefUser}`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
-                      >
-                        @{codechefUser} <ExternalLink size={10} />
-                      </a>
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
+                        <a 
+                          href={`https://www.codechef.com/users/${codechefUser}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
+                        >
+                          @{codechefUser} <ExternalLink size={10} />
+                        </a>
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Codeforces Profile Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-md bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="8" width="4" height="13" rx="1.5" fill="#1877F2"/>
+                        <rect x="10" y="3" width="4" height="18" rx="1.5" fill="#EF3F3A"/>
+                        <rect x="17" y="12" width="4" height="9" rx="1.5" fill="#F9A825"/>
+                      </svg>
+                    </span>
+                    <div className="flex flex-col">
+                      <h3 className="text-sm font-semibold text-txt-main">Codeforces Profile</h3>
+                      <span className="text-[10px] text-txt-muted">Track division ratings & solve metrics</span>
+                    </div>
+                  </div>
+
+                  {!editCodeforces && codeforcesUser && (
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setEditCodeforces(true)}
+                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
+                      >
+                        Update Handle
+                      </button>
+                      <button 
+                        onClick={() => handleDisconnectClick("codeforces")}
+                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {!codeforcesUser || editCodeforces ? (
+                  <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
+                    <div className="flex-grow flex flex-col gap-1 w-full">
+                      <label className="text-[10px] text-txt-sub font-semibold">Codeforces Profile Link / Username</label>
+                      <input 
+                        type="text" 
+                        defaultValue={codeforcesUser ? `https://codeforces.com/profile/${codeforcesUser}` : ""}
+                        id="codeforces-username-input"
+                        placeholder="e.g. https://codeforces.com/profile/mirasen_cf"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      {editCodeforces && (
+                        <button 
+                          onClick={() => setEditCodeforces(false)}
+                          className="h-10 px-3 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => {
+                          const rawVal = (document.getElementById("codeforces-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("codeforces", rawVal);
+                          setCodeforcesUser(extracted);
+                          handleSavePlatform("codeforces", extracted);
+                        }}
+                        disabled={saving}
+                        className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        {saving ? "Saving..." : "Connect"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 w-full">
+                    {platformErrors.codeforces && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.codeforces}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Verify that your Codeforces username handle is correct and exists on the platform.
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-2">
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Division Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.rating}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">{stats.codeforces?.rank}</span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.solved}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">Unique problems</span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{(stats.codeforces as any)?.totalSubmissions || 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">Total runs</span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {((stats.codeforces as any)?.totalSubmissions 
+                            ? (((stats.codeforces as any)?.acceptedSubmissions / (stats.codeforces as any)?.totalSubmissions) * 100).toFixed(1)
+                            : "0.0")}%
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono">Correct runs ratio</span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
+                        <a 
+                          href={`https://codeforces.com/profile/${codeforcesUser}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
+                        >
+                          @{codeforcesUser} <ExternalLink size={10} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
