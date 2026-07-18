@@ -941,6 +941,8 @@ export default function Header() {
                   type="button"
                   onClick={async () => {
                     setShowLogoutConfirm(false);
+                    localStorage.removeItem("faculty_staff_member");
+                    localStorage.removeItem("company_recruiter_member");
                     await signOut();
                     router.push("/");
                   }}
