@@ -49,6 +49,7 @@ export default function ExplorePage() {
   const [loading, setLoading] = useState(true);
   const [connectionStates, setConnectionStates] = useState<{ [key: string]: "none" | "pending" | "connected" }>({});
   const [invitingStates, setInvitingStates] = useState<{ [key: string]: boolean }>({});
+  const [modalMessage, setModalMessage] = useState<{ isOpen: boolean; title: string; text: string } | null>(null);
 
 
 
@@ -145,8 +146,11 @@ export default function ExplorePage() {
     setInvitingStates(prev => ({ ...prev, [id]: true }));
     setTimeout(() => {
       setInvitingStates(prev => ({ ...prev, [id]: false }));
-      // Set to connected-like state or connection confirmation
-      alert("Invitation sent successfully! They will receive a notification in their chat deck.");
+      setModalMessage({
+        isOpen: true,
+        title: "Invitation Sent",
+        text: "Invitation sent successfully! They will receive a notification in their chat deck."
+      });
     }, 1200);
   };
 
@@ -471,6 +475,37 @@ export default function ExplorePage() {
         )}
 
       </main>
+
+      {/* Custom Themed Alert Modal */}
+      {modalMessage?.isOpen && (
+        <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+            onClick={() => setModalMessage(null)}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative w-full max-w-sm border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl animate-fade-in flex flex-col gap-5 z-10">
+            <div className="flex flex-col gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">System Notification</span>
+              <h3 className="text-sm font-semibold text-txt-main">{modalMessage.title}</h3>
+              <p className="text-xs text-txt-muted font-light leading-relaxed">
+                {modalMessage.text}
+              </p>
+            </div>
+            
+            <div className="flex justify-end font-mono text-[10px] uppercase tracking-wider">
+              <button
+                onClick={() => setModalMessage(null)}
+                className="px-4 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer"
+              >
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

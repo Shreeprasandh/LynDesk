@@ -17,7 +17,8 @@ import {
   ExternalLink, 
   CheckCircle2, 
   Clock, 
-  CloudUpload
+  CloudUpload,
+  Terminal
 } from "lucide-react";
 
 const GithubIcon = ({ size = 14, className = "" }: { size?: number; className?: string }) => (
@@ -64,6 +65,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [githubRepo, setGithubRepo] = useState("");
   const [liveDemo, setLiveDemo] = useState("");
 
+  // Edit Git & Host state variables
+  const [isEditingGit, setIsEditingGit] = useState(false);
+  const [isEditingDemo, setIsEditingDemo] = useState(false);
+  const [tempGit, setTempGit] = useState("");
+  const [tempDemo, setTempDemo] = useState("");
+
   // Timeline / Stages
   const stages = ["Ideation", "Development", "Testing", "Submitted"];
   const stageDeadlines = [
@@ -82,6 +89,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     { id: "m2", name: "Mira Sen", role: "Designer", isOnline: true, isSpeaking: false },
     { id: "m3", name: "Prof. Davis", role: "Mentor", isOnline: false },
   ]);
+
+  // WebRTC real-time voice and video variables
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [remoteIsVideoOn, setRemoteIsVideoOn] = useState(false);
+  const [remoteIsMuted, setRemoteIsMuted] = useState(false);
+  const [remoteName, setRemoteName] = useState("Classmate");
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const userSessionIdRef = useRef(Math.random().toString(36).substring(2, 11));
+  const signalingChannelRef = useRef<any>(null);
 
   // Chat Feed State
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -130,12 +151,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setStatus("development");
         setGithubRepo("github.com/shreeprasandh/healthvibe");
         setLiveDemo("healthvibe.vercel.app");
+        setTempGit("github.com/shreeprasandh/healthvibe");
+        setTempDemo("healthvibe.vercel.app");
       } else if (id === "e2") {
         setProjectName("CarbonTrace Portal");
         setEventTitle("Google Developer Hackathon");
         setStatus("ideation");
         setGithubRepo("github.com/shreeprasandh/carbontrace");
         setLiveDemo("carbontrace.dev");
+        setTempGit("github.com/shreeprasandh/carbontrace");
+        setTempDemo("carbontrace.dev");
       } else {
         // Fetch from Supabase
         try {
@@ -153,6 +178,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setStatus(data.status);
             setGithubRepo(data.github_repo || "");
             setLiveDemo(data.live_demo_url || "");
+            setTempGit(data.github_repo || "");
+            setTempDemo(data.live_demo_url || "");
             if (data.events) {
               setEventTitle(data.events.title);
             }
@@ -279,20 +306,274 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   };
 
-  const handleJoinRoom = () => {
-    setInRoom(!inRoom);
-    if (!inRoom) {
-      // Add user to speaking list
+  // Bind local/remote streams to video tags
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  // WebRTC Implementation
+  const cleanUpCall = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    setRemoteStream(null);
+
+    if (signalingChannelRef.current) {
+      signalingChannelRef.current.unsubscribe();
+      signalingChannelRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cleanUpCall();
+    };
+  }, []);
+
+  // Sync local tracks with mute/video state changes
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !isMuted;
+      });
+      
+      if (signalingChannelRef.current) {
+        signalingChannelRef.current.send({
+          type: "broadcast",
+          event: "media-state",
+          payload: { 
+            from: userSessionIdRef.current, 
+            isMuted, 
+            isVideoOn 
+          }
+        });
+      }
+    }
+  }, [isMuted]);
+
+  useEffect(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getVideoTracks().forEach(track => {
+        track.enabled = isVideoOn;
+      });
+
+      if (signalingChannelRef.current) {
+        signalingChannelRef.current.send({
+          type: "broadcast",
+          event: "media-state",
+          payload: { 
+            from: userSessionIdRef.current, 
+            isMuted, 
+            isVideoOn 
+          }
+        });
+      }
+    }
+  }, [isVideoOn]);
+
+  const createPeerConnection = (channel: any, peerSessionId: string, myName: string) => {
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+    }
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" }
+      ]
+    });
+
+    peerConnectionRef.current = pc;
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current!);
+      });
+    }
+
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+      }
+    };
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && channel) {
+        channel.send({
+          type: "broadcast",
+          event: "ice-candidate",
+          payload: { 
+            candidate: event.candidate, 
+            from: userSessionIdRef.current,
+            target: peerSessionId
+          }
+        });
+      }
+    };
+
+    return pc;
+  };
+
+  const handleJoinRoom = async () => {
+    const nextInRoom = !inRoom;
+    setInRoom(nextInRoom);
+
+    if (nextInRoom) {
       const myName = user?.email?.split("@")[0] || "You";
+      
       setRoomMembers(prev => [
         ...prev,
         { id: "user-session", name: myName, role: "You", isOnline: true, isSpeaking: false }
       ]);
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true
+        });
+
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+
+        stream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+        stream.getVideoTracks().forEach(t => t.enabled = isVideoOn);
+
+        const channel = supabase.channel(`webrtc-call-${id}`);
+        signalingChannelRef.current = channel;
+
+        channel.on("broadcast", { event: "join" }, async ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current) {
+            setRemoteName(payload.senderName);
+            setRemoteIsMuted(payload.isMuted);
+            setRemoteIsVideoOn(payload.isVideoOn);
+
+            const pc = createPeerConnection(channel, payload.from, myName);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            channel.send({
+              type: "broadcast",
+              event: "offer",
+              payload: { 
+                sdp: offer, 
+                from: userSessionIdRef.current, 
+                senderName: myName,
+                target: payload.from
+              }
+            });
+          }
+        });
+
+        channel.on("broadcast", { event: "offer" }, async ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
+            setRemoteName(payload.senderName);
+            
+            const pc = createPeerConnection(channel, payload.from, myName);
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            channel.send({
+              type: "broadcast",
+              event: "answer",
+              payload: { 
+                sdp: answer, 
+                from: userSessionIdRef.current,
+                target: payload.from
+              }
+            });
+          }
+        });
+
+        channel.on("broadcast", { event: "answer" }, async ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
+            if (peerConnectionRef.current) {
+              await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            }
+          }
+        });
+
+        channel.on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
+            if (peerConnectionRef.current) {
+              try {
+                await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
+              } catch (e) {
+                console.error("Error adding ice candidate: ", e);
+              }
+            }
+          }
+        });
+
+        channel.on("broadcast", { event: "media-state" }, ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current) {
+            setRemoteIsMuted(payload.isMuted);
+            setRemoteIsVideoOn(payload.isVideoOn);
+          }
+        });
+
+        channel.on("broadcast", { event: "leave" }, ({ payload }) => {
+          if (payload.from !== userSessionIdRef.current) {
+            setRemoteStream(null);
+            if (peerConnectionRef.current) {
+              peerConnectionRef.current.close();
+              peerConnectionRef.current = null;
+            }
+          }
+        });
+
+        channel.subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            channel.send({
+              type: "broadcast",
+              event: "join",
+              payload: { 
+                from: userSessionIdRef.current, 
+                senderName: myName,
+                isMuted,
+                isVideoOn
+              }
+            });
+          }
+        });
+
+      } catch (err) {
+        console.error("WebRTC getUserMedia / setup error: ", err);
+        setInRoom(false);
+        setRoomMembers(prev => prev.filter(m => m.id !== "user-session"));
+      }
     } else {
-      // Remove user from speaking list
+      if (signalingChannelRef.current) {
+        signalingChannelRef.current.send({
+          type: "broadcast",
+          event: "leave",
+          payload: { from: userSessionIdRef.current }
+        });
+      }
+
+      cleanUpCall();
       setRoomMembers(prev => prev.filter(member => member.id !== "user-session"));
       setIsMuted(false);
       setIsVideoOn(false);
+      setRemoteIsVideoOn(false);
+      setRemoteIsMuted(false);
     }
   };
 
@@ -352,19 +633,88 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }, 1500);
   };
 
-  const updateGitRepository = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setGithubRepo(e.target.value);
-    // Add mock commit to list when repository updates
-    if (e.target.value.includes("github.com/")) {
-      const newCommit = {
-        hash: Math.random().toString(16).substring(2, 9),
-        author: user?.email?.split("@")[0] || "You",
-        message: "chore: sync workflow configuration",
-        time: "Just now"
-      };
-      setCommits(prev => [newCommit, ...prev]);
+  const formatUrl = (url: string) => {
+    if (!url) return "";
+    let clean = url.trim();
+    if (!/^https?:\/\//i.test(clean)) {
+      clean = `https://${clean}`;
+    }
+    return clean;
+  };
+
+  const saveGitRepo = async () => {
+    setGithubRepo(tempGit);
+    setIsEditingGit(false);
+    if (id !== "mock") {
+      try {
+        await supabase
+          .from("project_spaces")
+          .update({ github_repo: tempGit })
+          .eq("id", id);
+      } catch (e) {
+        console.error("Failed to save git repo: ", e);
+      }
     }
   };
+
+  const saveLiveDemo = async () => {
+    setLiveDemo(tempDemo);
+    setIsEditingDemo(false);
+    if (id !== "mock") {
+      try {
+        await supabase
+          .from("project_spaces")
+          .update({ live_demo_url: tempDemo })
+          .eq("id", id);
+      } catch (e) {
+        console.error("Failed to save live demo: ", e);
+      }
+    }
+  };
+
+  const fetchCommits = async () => {
+    try {
+      const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
+      if (githubMatch && githubRepo.trim() !== "github.com/shreeprasandh/carbontrace" && githubRepo.trim() !== "github.com/shreeprasandh/healthvibe") {
+        const owner = githubMatch[1];
+        const repo = githubMatch[2].replace(/\.git$/, "");
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=5`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const parsed = data.map((item: any) => {
+              const dateObj = new Date(item.commit.author.date);
+              const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+              return {
+                hash: item.sha.substring(0, 7),
+                author: item.commit.author.name || "GitHub Dev",
+                message: item.commit.message.split("\n")[0],
+                time: relative
+              };
+            });
+            setCommits(parsed);
+            return;
+          }
+        }
+      }
+      
+      const res = await fetch("/api/git/commits");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.commits) {
+          setCommits(data.commits);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching commits: ", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCommits();
+    const interval = setInterval(fetchCommits, 10000);
+    return () => clearInterval(interval);
+  }, [githubRepo]);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
@@ -418,15 +768,37 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             })}
           </div>
 
-          {/* Institutional verification trigger details */}
-          <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-2.5 mt-auto">
-            <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted">University Verification</span>
-            <p className="text-[10px] text-txt-sub leading-relaxed font-light">
-              Once project milestones are completed, click to export cryptographic record summaries to coordinate university credits.
-            </p>
-            <button className="w-full h-8 bg-accent-main text-bg-base text-[10px] font-mono tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity">
-              Export Credit Claim
-            </button>
+          {/* Project Specification & Tech Stack Panel */}
+          <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+              <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted">Project Specification</span>
+              <Terminal size={11} className="text-accent-main animate-pulse" />
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Tech Stack</span>
+              <div className="flex flex-wrap gap-1">
+                {["Next.js 16", "Supabase", "TailwindCSS", "Google Gemini"].map((tech) => (
+                  <span key={tech} className="text-[8px] font-mono uppercase bg-bg-base border border-border-main/50 px-1.5 py-0.5 rounded text-txt-main">
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 border-t border-border-main/30 pt-2.5">
+              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Workspace Health</span>
+              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
+                <span>Milestones</span>
+                <span className="text-emerald-500 font-bold">3 / 5 Complete</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
+                <span>Repository</span>
+                <span className={githubRepo ? "text-emerald-500" : "text-coral font-bold text-red-500"}>
+                  {githubRepo ? "Connected" : "Not Linked"}
+                </span>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -492,6 +864,64 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 >
                   {isVideoOn ? <Video size={12} /> : <VideoOff size={12} />}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* WebRTC Video Streaming Grid */}
+          {inRoom && (
+            <div className="border-b border-border-main/50 bg-bg-surface/10 p-4 flex flex-col sm:flex-row gap-4 flex-shrink-0 animate-fade-in">
+              {/* Local Video Frame */}
+              <div className="flex-1 aspect-video relative border border-border-main/60 bg-bg-surface rounded overflow-hidden flex items-center justify-center">
+                <video 
+                  ref={localVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${isVideoOn ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
+                />
+                
+                {!isVideoOn && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/80">
+                    <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/50 flex items-center justify-center font-mono font-bold text-sm text-txt-main">
+                      {(user?.email?.split("@")[0] || "Y").toUpperCase().charAt(0)}
+                    </div>
+                    <span className="text-[9px] font-mono text-txt-muted uppercase">Camera Disabled</span>
+                  </div>
+                )}
+                
+                {/* Labels overlay */}
+                <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[8px] font-mono text-white flex items-center gap-1.5 select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>You {isMuted && "(Muted)"}</span>
+                </div>
+              </div>
+
+              {/* Remote Video Frame */}
+              <div className="flex-1 aspect-video relative border border-border-main/60 bg-bg-surface rounded overflow-hidden flex items-center justify-center">
+                <video 
+                  ref={remoteVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  className={`w-full h-full object-cover transition-opacity duration-300 ${remoteStream && remoteIsVideoOn ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
+                />
+
+                {(!remoteStream || !remoteIsVideoOn) && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/80">
+                    <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/50 flex items-center justify-center font-mono font-bold text-sm text-txt-main">
+                      {remoteName.toUpperCase().charAt(0)}
+                    </div>
+                    <span className="text-[9px] font-mono text-txt-muted uppercase">
+                      {!remoteStream ? "Awaiting peer..." : "Peer Camera Off"}
+                    </span>
+                  </div>
+                )}
+
+                {/* Labels overlay */}
+                <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[8px] font-mono text-white flex items-center gap-1.5 select-none">
+                  <span className={`w-1.5 h-1.5 rounded-full ${remoteStream ? "bg-emerald-500 animate-pulse" : "bg-txt-muted"}`} />
+                  <span>{remoteName} {remoteIsMuted && "(Muted)"}</span>
+                </div>
               </div>
             </div>
           )}
@@ -574,53 +1004,129 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
           {/* GitHub Repo Integration Card */}
           <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
-              <GithubIcon size={14} className="text-txt-main" />
-            </div>
-            <input 
-              type="text"
-              placeholder="github.com/username/project"
-              value={githubRepo}
-              onChange={updateGitRepository}
-              className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
-            />
-            {githubRepo && (
-              <a 
-                href={`https://${githubRepo}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-              >
-                Open Codebase
-                <ExternalLink size={10} />
-              </a>
+            {!isEditingGit ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
+                  <button 
+                    onClick={() => {
+                      setTempGit(githubRepo);
+                      setIsEditingGit(true);
+                    }}
+                    className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <span className="text-xs font-mono text-txt-main truncate select-all">
+                  {githubRepo || "Not linked"}
+                </span>
+                {githubRepo && (
+                  <a 
+                    href={formatUrl(githubRepo)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
+                  >
+                    Open Codebase
+                    <ExternalLink size={10} />
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsEditingGit(false)}
+                      className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={saveGitRepo}
+                      className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+                <input 
+                  type="text"
+                  placeholder="github.com/username/project"
+                  value={tempGit}
+                  onChange={(e) => setTempGit(e.target.value)}
+                  className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveGitRepo();
+                  }}
+                />
+              </>
             )}
           </div>
 
           {/* Prototype Demo Card */}
           <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
-              <ExternalLink size={14} className="text-txt-main" />
-            </div>
-            <input 
-              type="text"
-              placeholder="project-demo.vercel.app"
-              value={liveDemo}
-              onChange={(e) => setLiveDemo(e.target.value)}
-              className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
-            />
-            {liveDemo && (
-              <a 
-                href={`https://${liveDemo}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-              >
-                Launch Prototype
-                <ExternalLink size={10} />
-              </a>
+            {!isEditingDemo ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
+                  <button 
+                    onClick={() => {
+                      setTempDemo(liveDemo);
+                      setIsEditingDemo(true);
+                    }}
+                    className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <span className="text-xs font-mono text-txt-main truncate select-all">
+                  {liveDemo || "Not hosted"}
+                </span>
+                {liveDemo && (
+                  <a 
+                    href={formatUrl(liveDemo)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
+                  >
+                    Launch Prototype
+                    <ExternalLink size={10} />
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsEditingDemo(false)}
+                      className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={saveLiveDemo}
+                      className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+                <input 
+                  type="text"
+                  placeholder="project-demo.vercel.app"
+                  value={tempDemo}
+                  onChange={(e) => setTempDemo(e.target.value)}
+                  className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveLiveDemo();
+                  }}
+                />
+              </>
             )}
           </div>
 

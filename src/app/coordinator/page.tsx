@@ -15,7 +15,8 @@ import {
   FileText, 
   Users, 
   FolderLock,
-  Download
+  Download,
+  Sparkles
 } from "lucide-react";
 
 interface CreditClaim {
@@ -118,44 +119,71 @@ export default function CoordinatorConsole() {
     });
 
     if (error) {
-      alert("Failed to register staff: " + error.message);
+      setModalMessage({
+        isOpen: true,
+        title: "Registration Failed",
+        text: "Failed to register staff: " + error.message
+      });
     } else {
       setRegisteredStaff(updated);
       addAuditLog(`${currentStaff?.name || "Administrator"} registered new staff key: ${newStaffKey.trim()}`);
       setNewStaffName("");
       setNewStaffKey("");
-      alert(`Staff member "${newStaffName}" successfully registered.`);
+      setModalMessage({
+        isOpen: true,
+        title: "Registration Success",
+        text: `Staff member "${newStaffName}" successfully registered.`
+      });
     }
   };
 
   const handleRemoveStaff = async (keyToRemove: string) => {
     if (keyToRemove === "ADMIN") {
-      alert("Cannot remove primary administrator.");
+      setModalMessage({
+        isOpen: true,
+        title: "Revocation Prohibited",
+        text: "Cannot remove primary administrator."
+      });
       return;
     }
-    if (!confirm("Are you sure you want to revoke access for this staff key?")) return;
 
-    const updated = registeredStaff.filter(s => s.key !== keyToRemove);
+    setModalMessage({
+      isOpen: true,
+      title: "Revoke Staff Key?",
+      text: `Are you sure you want to revoke access for staff key "${keyToRemove}"?`,
+      onConfirm: async () => {
+        const updated = registeredStaff.filter(s => s.key !== keyToRemove);
 
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        registered_staff: updated
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            registered_staff: updated
+          }
+        });
+
+        if (error) {
+          setModalMessage({
+            isOpen: true,
+            title: "Revocation Failed",
+            text: "Failed to update staff keys: " + error.message
+          });
+        } else {
+          setRegisteredStaff(updated);
+          addAuditLog(`${currentStaff?.name || "Administrator"} revoked staff key: ${keyToRemove}`);
+          setModalMessage({
+            isOpen: true,
+            title: "Access Revoked",
+            text: `Staff key "${keyToRemove}" has been successfully revoked.`
+          });
+        }
       }
     });
-
-    if (error) {
-      alert("Failed to update staff keys: " + error.message);
-    } else {
-      setRegisteredStaff(updated);
-      addAuditLog(`${currentStaff?.name || "Administrator"} revoked staff key: ${keyToRemove}`);
-    }
   };
 
   const registryStudents = [
-    { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", department: "Computer Science", batchCode: "Batch A", gradYear: "2026", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6, authorized: true },
-    { id: "s2", name: "Mira Sen", email: "mirasen@mit.edu", department: "Information Technology", batchCode: "Batch A", gradYear: "2027", leetcode: "mirasen_code", leetcodeSolved: 412, leetcodeEasy: 200, leetcodeMedium: 160, leetcodeHard: 52, leetcodeRank: "Top 5.2%", codeforces: "mira_cf", codeforcesRating: 1590, codeforcesRank: "Specialist", codechef: "mira_cc", codechefStars: "4★", unstop: "mira_unstop", hackathons: 4, authorized: true },
-    { id: "s3", name: "David Chen", email: "dchen@mit.edu", department: "Electrical Engineering", batchCode: "Batch B", gradYear: "2026", leetcode: "dchen_dev", leetcodeSolved: 184, leetcodeEasy: 80, leetcodeMedium: 84, leetcodeHard: 20, leetcodeRank: "Top 22%", codeforces: "david_cf", codeforcesRating: 1240, codeforcesRank: "Pupil", codechef: "david_cc", codechefStars: "2★", unstop: "david_un", hackathons: 3, authorized: true },
-    { id: "s4", name: "Sofia Rodriguez", email: "srodriguez@mit.edu", department: "Computer Science", batchCode: "Batch B", gradYear: "2027", leetcode: "sofia_algo", leetcodeSolved: 289, leetcodeEasy: 120, leetcodeMedium: 130, leetcodeHard: 39, leetcodeRank: "Top 12%", codeforces: "sofia_r", codeforcesRating: 1410, codeforcesRank: "Specialist", codechef: "sofia_cc", codechefStars: "3★", unstop: "sofia_un", hackathons: 5, authorized: false },
+    { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", rollNo: "101", department: "Computer Science", batchCode: "Batch A", gradYear: "2026", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6, authorized: true },
+    { id: "s2", name: "Mira Sen", email: "mirasen@mit.edu", rollNo: "102", department: "Information Technology", batchCode: "Batch A", gradYear: "2027", leetcode: "mirasen_code", leetcodeSolved: 412, leetcodeEasy: 200, leetcodeMedium: 160, leetcodeHard: 52, leetcodeRank: "Top 5.2%", codeforces: "mira_cf", codeforcesRating: 1590, codeforcesRank: "Specialist", codechef: "mira_cc", codechefStars: "4★", unstop: "mira_unstop", hackathons: 4, authorized: true },
+    { id: "s3", name: "David Chen", email: "dchen@mit.edu", rollNo: "103", department: "Electrical Engineering", batchCode: "Batch B", gradYear: "2026", leetcode: "dchen_dev", leetcodeSolved: 184, leetcodeEasy: 80, leetcodeMedium: 84, leetcodeHard: 20, leetcodeRank: "Top 22%", codeforces: "david_cf", codeforcesRating: 1240, codeforcesRank: "Pupil", codechef: "david_cc", codechefStars: "2★", unstop: "david_un", hackathons: 3, authorized: true },
+    { id: "s4", name: "Sofia Rodriguez", email: "srodriguez@mit.edu", rollNo: "104", department: "Computer Science", batchCode: "Batch B", gradYear: "2027", leetcode: "sofia_algo", leetcodeSolved: 289, leetcodeEasy: 120, leetcodeMedium: 130, leetcodeHard: 39, leetcodeRank: "Top 12%", codeforces: "sofia_r", codeforcesRating: 1410, codeforcesRank: "Specialist", codechef: "sofia_cc", codechefStars: "3★", unstop: "sofia_un", hackathons: 5, authorized: false },
   ];
 
   const [selectedStudent, setSelectedStudent] = useState<typeof registryStudents[0] | null>(registryStudents[0]);
@@ -167,6 +195,89 @@ export default function CoordinatorConsole() {
   const [filterBatch, setFilterBatch] = useState("");
   const [filterYear, setFilterYear] = useState("");
   const [filterSolvedThreshold, setFilterSolvedThreshold] = useState(0);
+
+  // AI Coordinator Assistant states
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResult, setAiResult] = useState<{
+    explanation: string;
+    header: string[];
+    rows: string[][];
+    isMock?: boolean;
+  } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStage, setAiStage] = useState("");
+  const [aiError, setAiError] = useState("");
+
+  // Unified Alert and Confirmation Modal state
+  const [modalMessage, setModalMessage] = useState<{
+    isOpen: boolean;
+    title: string;
+    text: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const handleAiQuery = async () => {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    setAiError("");
+    setAiResult(null);
+
+    const stages = [
+      "Parsing query filters...",
+      "Analyzing student registry data...",
+      "Compiling statistics report..."
+    ];
+
+    for (let i = 0; i < stages.length; i++) {
+      setAiStage(stages[i]);
+      await new Promise(r => setTimeout(r, 600));
+    }
+
+    try {
+      const res = await fetch("/api/ai/coordinator-query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: aiQuery,
+          students: registryStudents
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiResult(data);
+      } else {
+        const err = await res.json();
+        setAiError(err.error || "Failed to compile report");
+      }
+    } catch (e) {
+      setAiError("Connection error while calling Gemini API");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const downloadAiReportCsv = () => {
+    if (!aiResult) return;
+    const headers = Array.isArray(aiResult.header) ? aiResult.header : [];
+    const rows = Array.isArray(aiResult.rows) ? aiResult.rows : [];
+
+    const headerLine = headers.join(",");
+    const rowLines = rows.map(r => 
+      (Array.isArray(r) ? r : []).map(cell => `"${(cell || "").toString().replace(/"/g, '""')}"`).join(",")
+    );
+    const csvContent = [headerLine, ...rowLines].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `ai_compiled_report.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const filteredStudents = registryStudents.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -315,7 +426,11 @@ useEffect(() => {
       }
 
       addAuditLog(`${currentStaff?.name || "Administrator"} ${action === "approved" ? "approved" : "declined"} ${claim.student_name}'s credit claim`);
-      alert(`Activity point claim has been successfully ${action === "approved" ? "verified" : "declined"} by ${currentStaff?.name || "Administrator"}.`);
+      setModalMessage({
+        isOpen: true,
+        title: action === "approved" ? "Claim Verified" : "Claim Declined",
+        text: `Activity point claim has been successfully ${action === "approved" ? "verified" : "declined"} by ${currentStaff?.name || "Administrator"}.`
+      });
     } catch (err) {
       console.error("Failed to update credit application: ", err);
     }
@@ -539,6 +654,88 @@ useEffect(() => {
                 </select>
               </div>
 
+              {/* AI Report Assistant Panel */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                <div className="flex items-center gap-2 border-b border-border-main/40 pb-2">
+                  <Sparkles size={13} className="text-amber-500 animate-pulse" />
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">AI Report Generator (Gemini 1.5 Flash)</span>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <p className="text-[10px] text-txt-muted font-light leading-relaxed">
+                    Type a natural language prompt to filter, analyze, and compile custom student records into an exportable report (e.g., <span className="italic">"i want to download the leetcode performance of it department from 101 to 102 roll number"</span> or <span className="italic">"find computer science students with more than 300 solves"</span>).
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={aiQuery}
+                      onChange={(e) => setAiQuery(e.target.value)}
+                      placeholder="Ask AI to filter or export reports..."
+                      className="h-9 flex-grow px-3 border border-border-main bg-bg-base text-xs text-txt-main focus:outline-none focus:border-txt-main rounded"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && aiQuery.trim()) {
+                          handleAiQuery();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleAiQuery}
+                      disabled={aiLoading || !aiQuery.trim()}
+                      className="h-9 px-4 bg-bg-card hover:bg-bg-card/80 border border-border-main text-txt-main text-[10px] uppercase font-mono tracking-wider font-bold transition-all duration-150 rounded flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {aiLoading ? (
+                        <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Sparkles size={11} className="text-amber-500" />
+                      )}
+                      Compile
+                    </button>
+                  </div>
+                </div>
+
+                {/* Staging / Loading state */}
+                {aiLoading && (
+                  <div className="py-2 flex items-center gap-2">
+                    <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider animate-pulse">{aiStage}</span>
+                  </div>
+                )}
+
+                {/* Error state */}
+                {!aiLoading && aiError && (
+                  <div className="p-2 bg-red-500/10 border border-red-500/20 rounded">
+                    <p className="text-[10px] text-red-500 leading-relaxed font-light">{aiError}</p>
+                  </div>
+                )}
+
+                {/* Result state */}
+                {!aiLoading && !aiError && aiResult && (
+                  <div className="mt-1 p-3 bg-bg-base/30 border border-border-main/50 rounded flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-mono text-txt-muted uppercase font-bold">AI Analysis Overview</span>
+                      <p className="text-[11px] text-txt-main font-light leading-relaxed">
+                        {aiResult.explanation}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-border-main/30">
+                      <button
+                        onClick={downloadAiReportCsv}
+                        className="h-7 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-mono tracking-wider uppercase rounded flex items-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Download size={10} /> Download AI CSV Report
+                      </button>
+                      
+                      {aiResult.isMock && (
+                        <span className="text-[8px] font-sans text-txt-muted italic bg-yellow-500/10 text-yellow-600 border border-yellow-500/20 px-2 py-0.5 rounded">
+                          Mock mode active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-between items-center">
                 <span className="text-[10px] font-mono uppercase text-txt-muted">Filtered Students: {filteredStudents.length}</span>
                 <button 
@@ -561,7 +758,7 @@ useEffect(() => {
                     >
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs text-txt-main font-semibold">{student.name}</span>
-                        <span className="text-[9px] text-txt-muted font-mono">{student.email} • {student.department}</span>
+                        <span className="text-[9px] text-txt-muted font-mono">Roll: {student.rollNo} • {student.email} • {student.department}</span>
                         <div className="flex items-center gap-2 mt-1 text-[9px] text-txt-sub">
                           <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">{student.batchCode} • Class {student.gradYear}</span>
                           <span className="font-mono text-[8px] bg-bg-card px-1 py-0.5 rounded border border-border-main/50">LC: {student.leetcodeSolved}</span>
@@ -813,7 +1010,7 @@ useEffect(() => {
                   <div className="flex flex-col">
                     <span className="text-sm text-txt-main font-semibold">{selectedStudent.name}</span>
                     <span className="text-xs text-txt-muted font-mono">{selectedStudent.email}</span>
-                    <span className="text-[10px] text-txt-sub mt-1">{selectedStudent.department} • {selectedStudent.batchCode} (Class of {selectedStudent.gradYear})</span>
+                    <span className="text-[10px] text-txt-sub mt-1">Roll: {selectedStudent.rollNo} • {selectedStudent.department} • {selectedStudent.batchCode} (Class of {selectedStudent.gradYear})</span>
                   </div>
                 </div>
 
@@ -905,6 +1102,57 @@ useEffect(() => {
         </section>
 
       </main>
+
+      {/* Custom Themed Alert & Confirmation Modal */}
+      {modalMessage?.isOpen && (
+        <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+            onClick={() => setModalMessage(null)}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative w-full max-w-sm border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl animate-fade-in flex flex-col gap-5 z-10">
+            <div className="flex flex-col gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Faculty Console Notification</span>
+              <h3 className="text-sm font-semibold text-txt-main">{modalMessage.title}</h3>
+              <p className="text-xs text-txt-muted font-light leading-relaxed">
+                {modalMessage.text}
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider">
+              {modalMessage.onConfirm ? (
+                <>
+                  <button
+                    onClick={() => setModalMessage(null)}
+                    className="px-4 py-2 border border-border-main hover:bg-bg-card text-txt-main rounded-sm transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (modalMessage.onConfirm) modalMessage.onConfirm();
+                      setModalMessage(null);
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-sm transition-colors cursor-pointer"
+                  >
+                    Confirm
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setModalMessage(null)}
+                  className="px-4 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer"
+                >
+                  Acknowledge
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
