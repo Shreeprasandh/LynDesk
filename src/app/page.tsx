@@ -157,6 +157,57 @@ export default function Home() {
               setCollegeName(inst.name);
             }
           }
+
+          // Fetch database workspaces/events user is a member of
+          const { data: memberData, error: memberErr } = await supabase
+            .from("project_members")
+            .select(`
+              project_space_id,
+              project_spaces (
+                id,
+                project_name,
+                status,
+                github_repo,
+                events (
+                  id,
+                  title,
+                  source_url,
+                  registration_deadline,
+                  location,
+                  level
+                )
+              )
+            `)
+            .eq("profile_id", user.id);
+
+          if (!memberErr && memberData && memberData.length > 0) {
+            const dbEvents = memberData.map((m: any) => {
+              const space = m.project_spaces;
+              const ev = space?.events;
+              return {
+                id: space?.id || m.project_space_id,
+                title: space?.project_name || ev?.title || "Project Space",
+                deadline: ev?.registration_deadline 
+                  ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) 
+                  : "TBD",
+                location: ev?.location || "online",
+                level: ev?.level || "global",
+                url: ev?.source_url || space?.github_repo || "https://lyndesk.com",
+                status: space?.status || "ideation",
+                stages: ["Ideation", "Development", "Final Submission"]
+              };
+            });
+
+            setEvents(prev => {
+              const merged = [...dbEvents];
+              prev.forEach(p => {
+                if (!merged.some(m => m.id === p.id)) {
+                  merged.push(p);
+                }
+              });
+              return merged;
+            });
+          }
         } catch (err) {
           console.error("Failed to load live active coworkers/college: ", err);
         }
@@ -343,15 +394,73 @@ export default function Home() {
     }
   };
 
-  const handleAddEvent = (e: React.FormEvent) => {
+  const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEventTitle || !scraperUrl) {
       setModalError("Event Title and Link are required fields.");
       return;
     }
 
+    let eventId = `e_${Date.now()}`;
+    let spaceId = eventId;
+
+    if (user) {
+      try {
+        let formattedDeadline = null;
+        if (newEventDeadline.trim()) {
+          const parsedDate = new Date(newEventDeadline.trim());
+          if (!isNaN(parsedDate.getTime())) {
+            formattedDeadline = parsedDate.toISOString();
+          }
+        }
+
+        // 1. Insert into events table
+        const { data: eventData, error: eventErr } = await supabase
+          .from("events")
+          .insert({
+            title: newEventTitle,
+            source_url: scraperUrl,
+            registration_deadline: formattedDeadline,
+            location: newEventLocation,
+            level: "global"
+          })
+          .select()
+          .single();
+
+        if (!eventErr && eventData) {
+          eventId = eventData.id;
+          
+          // 2. Insert into project_spaces table
+          const { data: spaceData, error: spaceErr } = await supabase
+            .from("project_spaces")
+            .insert({
+              event_id: eventId,
+              project_name: `${newEventTitle} Workspace`,
+              status: "ideation"
+            })
+            .select()
+            .single();
+
+          if (!spaceErr && spaceData) {
+            spaceId = spaceData.id;
+
+            // 3. Register user as Leader in project_members
+            await supabase
+              .from("project_members")
+              .insert({
+                project_space_id: spaceId,
+                profile_id: user.id,
+                role: "leader"
+              });
+          }
+        }
+      } catch (err) {
+        console.error("DB Event sync error: ", err);
+      }
+    }
+
     const newObj = {
-      id: `e_${Date.now()}`,
+      id: spaceId,
       title: newEventTitle,
       deadline: newEventDeadline.trim() || "TBD",
       location: newEventLocation,
