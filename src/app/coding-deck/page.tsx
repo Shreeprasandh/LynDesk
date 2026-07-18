@@ -190,7 +190,10 @@ export default function CodingDeckPage() {
 
     const loadPlatformData = async () => {
       try {
-        setLoading(true);
+        const isFirstLoad = !stats.leetcode && !stats.codeforces && !stats.codechef;
+        if (isFirstLoad) {
+          setLoading(true);
+        }
         const meta = user.user_metadata || {};
         
         const lc = meta.leetcode_username || "";
@@ -568,7 +571,7 @@ export default function CodingDeckPage() {
         )}
 
         {/* Heatmap Grid with bottom Month Labels and no day labels */}
-        <div className="overflow-x-auto w-full py-2">
+        <div className="overflow-x-auto w-full py-2 scroll-smooth [webkit-overflow-scrolling:touch] select-none scrollbar-thin scrollbar-thumb-border-main/40 scrollbar-track-transparent">
           <div className="flex gap-2 items-start select-none min-w-max pb-1">
             {monthBlocks.map((block, bIdx) => (
               <div key={bIdx} className="flex flex-col gap-2">
@@ -585,7 +588,7 @@ export default function CodingDeckPage() {
                         return (
                           <div 
                             key={cIdx} 
-                            className={`w-2.5 h-2.5 rounded-sm transition-all hover:scale-125 ${colorClass}`}
+                            className={`w-2.5 h-2.5 rounded-sm transition-transform duration-100 ease-out hover:scale-125 cursor-pointer [will-change:transform] ${colorClass}`}
                             title={cell.dateLabel}
                           />
                         );
