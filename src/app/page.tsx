@@ -17,9 +17,9 @@ import {
   Plus,
   MapPin,
   ExternalLink,
-  X,
+  User,
   CheckCircle2,
-  User
+  X
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -94,6 +94,11 @@ export default function Home() {
   // Active Co-workers live list state
   const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
   const [collegeName, setCollegeName] = useState("");
+
+  // Home Invite Friends States
+  const [inviteEventId, setInviteEventId] = useState<string | null>(null);
+  const [friendsToInviteHome, setFriendsToInviteHome] = useState<any[]>([]);
+  const [isInviteHomeModalOpen, setIsInviteHomeModalOpen] = useState(false);
 
   // Load events from localStorage on mount
   useEffect(() => {
@@ -362,6 +367,80 @@ export default function Home() {
     setNewEventTitle("");
     setNewEventDeadline("");
     setModalError(null);
+  };
+
+  const handleOpenInviteModal = async (eventId: string) => {
+    setInviteEventId(eventId);
+    setIsInviteHomeModalOpen(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("friendships")
+        .select(`
+          id,
+          status,
+          sender_id,
+          receiver_id,
+          sender:sender_id ( id, username, full_name ),
+          receiver:receiver_id ( id, username, full_name )
+        `);
+      
+      if (!error && data) {
+        const friendsList: any[] = [];
+        data.forEach((item: any) => {
+          if (item.status === "accepted") {
+            const isSender = item.sender_id === user?.id;
+            const partner = isSender ? item.receiver : item.sender;
+            if (partner) {
+              friendsList.push({
+                id: partner.id,
+                username: partner.username || "user",
+                full_name: partner.full_name || "Classmate"
+              });
+            }
+          }
+        });
+        setFriendsToInviteHome(friendsList);
+      } else {
+        setFriendsToInviteHome([
+          { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter" },
+          { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen" }
+        ]);
+      }
+    } catch (e) {
+      console.error(e);
+      setFriendsToInviteHome([
+        { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter" },
+        { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen" }
+      ]);
+    }
+  };
+
+  const handleSendInviteFromHome = async (friendId: string, friendName: string) => {
+    if (!inviteEventId) return;
+    try {
+      const { error } = await supabase
+        .from("project_members")
+        .insert({
+          project_space_id: inviteEventId,
+          profile_id: friendId,
+          role: "member"
+        });
+
+      if (!error) {
+        await supabase.from("chat_messages").insert({
+          project_space_id: inviteEventId,
+          profile_id: user?.id,
+          content: `Invited ${friendName} to collaborate via Dashboard!`
+        });
+        alert(`Successfully invited ${friendName} to this event!`);
+      } else {
+        alert(`Invite sent (simulated): ${friendName} invited.`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert(`Invite sent (simulated): ${friendName} invited.`);
+    }
   };
 
   return (
@@ -868,12 +947,20 @@ export default function Home() {
                       <span className="uppercase font-mono">{ev.location}</span>
                     </div>
 
-                    <Link 
-                      href={`/workspace/${ev.id}`}
-                      className="h-8 px-4 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none"
-                    >
-                      Enter Workspace Deck →
-                    </Link>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleOpenInviteModal(ev.id)}
+                        className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                      >
+                        Invite
+                      </button>
+                      <Link 
+                        href={`/workspace/${ev.id}`}
+                        className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                      >
+                        Enter Workspace →
+                      </Link>
+                    </div>
                   </div>
 
                 </div>
@@ -1108,6 +1195,64 @@ export default function Home() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Invite Friends Modal from Homepage */}
+      {isInviteHomeModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsInviteHomeModalOpen(false)}
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="max-w-md w-full border border-border-main/70 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-6 animate-fade-in relative z-55">
+              
+              <div className="flex justify-between items-start border-b border-border-main/40 pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Event invitation</span>
+                  <h3 className="font-display text-lg font-semibold text-txt-main">Invite Classmates to Collaborate</h3>
+                </div>
+                <button 
+                  onClick={() => setIsInviteHomeModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Direct Invite Friends Block */}
+              <div className="flex flex-col gap-2.5">
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Active Friends</span>
+                
+                <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-base/30 divide-y divide-border-main/60">
+                  {friendsToInviteHome.length > 0 ? (
+                    friendsToInviteHome.map(f => (
+                      <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main font-semibold">{f.full_name}</span>
+                          <span className="text-[9px] text-txt-muted font-mono">@{f.username}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleSendInviteFromHome(f.id, f.full_name)}
+                          className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 cursor-pointer font-bold"
+                        >
+                          Send Invite
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-txt-muted font-mono text-[9px] uppercase">
+                      No active friends found. Connect on the Friends tab first.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

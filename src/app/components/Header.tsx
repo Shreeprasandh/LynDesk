@@ -41,6 +41,7 @@ export default function Header() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
   const [isFaculty, setIsFaculty] = useState(false);
+  const [isRecruiter, setIsRecruiter] = useState(false);
 
   const pathname = usePathname();
   const router = useRouter();
@@ -48,8 +49,10 @@ export default function Header() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const isStaff = !!localStorage.getItem("faculty_staff_member");
+      const isRec = !!localStorage.getItem("company_recruiter_member") || (user && (user.user_metadata?.role === "employee" || !!user.user_metadata?.company_key));
       setTimeout(() => {
         setIsFaculty(isStaff);
+        setIsRecruiter(!!isRec);
       }, 0);
     }
   }, [user, pathname]);
@@ -369,6 +372,11 @@ export default function Header() {
                 <>
                   <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
                   <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Faculty Console</Link>
+                </>
+              ) : isRecruiter ? (
+                <>
+                  <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
+                  <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Recruiter Console</Link>
                 </>
               ) : (
                 <>
