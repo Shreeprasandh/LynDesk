@@ -376,7 +376,7 @@ export default function Header() {
                   <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
                   <Link href="/coding-deck" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Deck</Link>
                   <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Leaderboard</Link>
-                  <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Recruiter Console</Link>
+                  <Link href="/friends" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Friends</Link>
                 </>
               )}
             </nav>

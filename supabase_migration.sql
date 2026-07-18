@@ -323,3 +323,33 @@ CREATE POLICY "Allow public insert to support_inquiries"
     ON public.support_inquiries FOR INSERT 
     WITH CHECK (true);
 
+
+-- 11. FRIENDSHIPS TABLE
+CREATE TABLE public.friendships (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(sender_id, receiver_id)
+);
+
+-- Enable RLS on Friendships
+ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to select friendships they are a part of
+CREATE POLICY "Allow users to view their own friendships" ON public.friendships
+    FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+-- Allow users to insert friendships where they are the sender
+CREATE POLICY "Allow users to send friend requests" ON public.friendships
+    FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+-- Allow users to update friendships they are a part of (e.g. accept/reject)
+CREATE POLICY "Allow users to update their friendships" ON public.friendships
+    FOR UPDATE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+-- Allow users to delete friendships they are a part of
+CREATE POLICY "Allow users to delete their friendships" ON public.friendships
+    FOR DELETE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+

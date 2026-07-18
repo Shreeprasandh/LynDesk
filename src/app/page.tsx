@@ -219,6 +219,29 @@ export default function Home() {
     setLoading(true);
     setError(null);
 
+    // Check recruiter key first
+    if (staffKey.trim().toLowerCase() === "recruit2026") {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        localStorage.setItem("company_recruiter_member", JSON.stringify({ name: "Corporate Recruiter", key: "recruit2026" }));
+        await supabase.auth.updateUser({
+          data: { company_key: "recruit2026", role: "employee" }
+        });
+        window.location.href = "/recruiter";
+        return;
+      }
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

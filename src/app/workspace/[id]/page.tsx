@@ -19,10 +19,24 @@ import {
   Clock, 
   CloudUpload,
   Terminal,
-  Award
+  Award,
+  X
 } from "lucide-react";
 
 
+
+let globalIdCounter = 0;
+const getUniqueId = (prefix: string = "id") => {
+  globalIdCounter++;
+  return `${prefix}_${globalIdCounter}`;
+};
+
+interface FriendProfile {
+  id: string;
+  username: string;
+  full_name: string;
+  academic_credits?: number;
+}
 
 interface TeamMember {
   id: string;
@@ -120,6 +134,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
 
+  // Invite Classmates Modal States
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [friendsToInvite, setFriendsToInvite] = useState<FriendProfile[]>([]);
+  const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
+
   // Git Commits (live simulation list)
   const [commits, setCommits] = useState([
     { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
@@ -146,6 +166,94 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     return () => clearInterval(interval);
   }, [inRoom]);
+
+  // Join workspace check on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && user && id !== "e1" && id !== "e2") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.has("join")) {
+        const autoJoin = async () => {
+          try {
+            const { data } = await supabase
+              .from("project_members")
+              .select("id")
+              .eq("project_space_id", id)
+              .eq("profile_id", user.id);
+            
+            if (!data || data.length === 0) {
+              await supabase
+                .from("project_members")
+                .insert({
+                  project_space_id: id,
+                  profile_id: user.id,
+                  role: "member"
+                });
+
+              await supabase.from("chat_messages").insert({
+                project_space_id: id,
+                profile_id: user.id,
+                content: `Joined the workspace via share link!`
+              });
+            }
+          } catch (e) {
+            console.error("Auto join failure: ", e);
+          }
+        };
+        autoJoin();
+      }
+    }
+  }, [user, id]);
+
+  // Fetch classmates to invite
+  useEffect(() => {
+    if (user && isInviteModalOpen) {
+      const fetchFriendsForInvite = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("friendships")
+            .select(`
+              id,
+              status,
+              sender_id,
+              receiver_id,
+              sender:sender_id ( id, username, full_name ),
+              receiver:receiver_id ( id, username, full_name )
+            `);
+          
+          if (!error && data) {
+            const friendsList: FriendProfile[] = [];
+            data.forEach((item: any) => {
+              if (item.status === "accepted") {
+                const isSender = item.sender_id === user.id;
+                const partner = isSender ? item.receiver : item.sender;
+                if (partner) {
+                  friendsList.push({
+                    id: partner.id,
+                    username: partner.username || "user",
+                    full_name: partner.full_name || "Classmate",
+                    academic_credits: 0
+                  });
+                }
+              }
+            });
+            setFriendsToInvite(friendsList);
+          } else {
+            setFriendsToInvite([
+              { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter", academic_credits: 0 },
+              { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen", academic_credits: 0 }
+            ]);
+          }
+        } catch (e) {
+          console.error(e);
+          setFriendsToInvite([
+            { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter", academic_credits: 0 },
+            { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen", academic_credits: 0 }
+          ]);
+        }
+      };
+      fetchFriendsForInvite();
+    }
+  }, [user, isInviteModalOpen]);
 
   // Fetch Project Spaces, Chat Messages, Artifacts, and Credit Application Status
   useEffect(() => {
@@ -369,7 +477,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     const myName = user?.email?.split("@")[0] || "You";
     const localMsg: ChatMsg = {
-      id: `local_${Date.now()}`,
+      id: getUniqueId("local"),
       sender_name: myName,
       sender_role: "Collaborator",
       content: newMsg.trim(),
@@ -402,7 +510,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         ];
         const randomResp = responses[Math.floor(Math.random() * responses.length)];
         const systemResp: ChatMsg = {
-          id: `bot_${Date.now()}`,
+          id: getUniqueId("bot"),
           sender_name: "Alex Carter",
           sender_role: "Developer",
           content: randomResp,
@@ -711,7 +819,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (user && id !== "e1" && id !== "e2") {
       try {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${id}/${Date.now()}.${fileExt}`;
+        const fileName = `${id}/${getUniqueId("file")}.${fileExt}`;
         const filePath = `project_artifacts/${fileName}`;
         
         // Try uploading to "project-vaults" bucket
@@ -763,7 +871,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       });
 
       const newArtifact: Artifact = {
-        id: `art_${Date.now()}`,
+        id: getUniqueId("art"),
         file_name: file.name,
         file_url: fileUrl,
         version: nextVersion,
@@ -777,7 +885,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     // Auto-post notification message in chat
     const systemNotice: ChatMsg = {
-      id: `sys_${Date.now()}`,
+      id: getUniqueId("sys"),
       sender_name: "LDK:BOT",
       sender_role: "SYSTEM",
       content: `${myName} uploaded artifact: ${file.name} (v${nextVersion})`,
@@ -838,7 +946,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setClaimStatus("pending");
         // Post system message in chat
         const systemNotice: ChatMsg = {
-          id: `sys_${Date.now()}`,
+          id: getUniqueId("sys"),
           sender_name: "LDK:BOT",
           sender_role: "SYSTEM",
           content: `${user.email?.split("@")[0]} submitted an academic credit claim (10 pts).`,
@@ -862,6 +970,53 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     } finally {
       setIsSubmittingClaim(false);
     }
+  };
+
+  const handleSendDirectInvite = async (friendId: string, friendName: string) => {
+    setInvitingFriendId(friendId);
+    try {
+      const { error } = await supabase
+        .from("project_members")
+        .insert({
+          project_space_id: id,
+          profile_id: friendId,
+          role: "member"
+        });
+
+      if (!error) {
+        await supabase.from("chat_messages").insert({
+          project_space_id: id,
+          profile_id: user?.id,
+          content: `Invited ${friendName} to collaborate in this workspace!`
+        });
+        
+        const systemNotice: ChatMsg = {
+          id: getUniqueId("sys"),
+          sender_name: "LDK:BOT",
+          sender_role: "SYSTEM",
+          content: `Direct invite sent: ${friendName} added to project space.`,
+          created_at: new Date().toISOString(),
+          isSystem: true
+        };
+        setChatMessages(prev => [...prev, systemNotice]);
+        alert(`Successfully invited ${friendName}! They are now added to this workspace.`);
+      } else {
+        console.warn("Direct invite DB insert error: ", error);
+        alert(`Invite sent (simulated): ${friendName} invited.`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert(`Invite sent (simulated): ${friendName} invited.`);
+    } finally {
+      setInvitingFriendId(null);
+    }
+  };
+
+  const copyInviteLink = () => {
+    const inviteUrl = `${window.location.origin}/workspace/${id}?join=true`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const saveGitRepo = async () => {
@@ -1042,6 +1197,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 }`}
               >
                 {inRoom ? "Leave Call" : "Join Call"}
+              </button>
+              <button 
+                onClick={() => setIsInviteModalOpen(true)}
+                className="h-7 px-3 rounded-sm border border-border-main/85 text-txt-main hover:bg-bg-card font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer font-bold"
+              >
+                Invite
               </button>
             </div>
 
@@ -1508,6 +1669,84 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         </section>
 
       </main>
+
+      {/* Invite Friends Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-[100] overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsInviteModalOpen(false)}
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="max-w-md w-full border border-border-main/70 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-6 animate-fade-in relative z-[110]">
+              
+              <div className="flex justify-between items-start border-b border-border-main/40 pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Workspace invite</span>
+                  <h3 className="font-display text-lg font-semibold text-txt-main">Invite Classmates to Collaborate</h3>
+                </div>
+                <button 
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Shareable Link Block */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Shareable Invite Link</span>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    readOnly
+                    value={typeof window !== "undefined" ? `${window.location.origin}/workspace/${id}?join=true` : ""}
+                    className="flex-1 h-9 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none font-mono text-ellipsis overflow-hidden"
+                  />
+                  <button 
+                    onClick={copyInviteLink}
+                    className="h-9 px-3 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer font-bold flex items-center gap-1"
+                  >
+                    {copiedLink ? "Copied" : "Copy Link"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Direct Invite Friends Block */}
+              <div className="flex flex-col gap-2.5">
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Direct Invite Friends</span>
+                
+                <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-base/30 divide-y divide-border-main/60">
+                  {friendsToInvite.length > 0 ? (
+                    friendsToInvite.map(f => (
+                      <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main font-semibold">{f.full_name}</span>
+                          <span className="text-[9px] text-txt-muted font-mono">@{f.username}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleSendDirectInvite(f.id, f.full_name)}
+                          disabled={invitingFriendId === f.id}
+                          className="h-7 px-3 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1"
+                        >
+                          {invitingFriendId === f.id ? "Inviting..." : "Send Invite"}
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-txt-muted font-mono text-[9px] uppercase">
+                      No active friends found. Connect on the Friends tab first.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -28,15 +28,11 @@ export async function POST(request: Request) {
       try {
         const parsedUrl = new URL(url);
         const namePart = parsedUrl.hostname.replace("www.", "").split(".")[0];
-        const formattedTitle = `${namePart.charAt(0).toUpperCase() + namePart.slice(1)} Event`;
+        const formattedTitle = `${namePart.charAt(0).toUpperCase() + namePart.slice(1)}`;
         return NextResponse.json({
           title: formattedTitle,
-          description: "Details from " + parsedUrl.hostname,
-          deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          }),
+          description: "",
+          deadline: "",
         });
       } catch {
         return NextResponse.json({ error: "Invalid URL provided" }, { status: 400 });
@@ -80,16 +76,11 @@ export async function POST(request: Request) {
       const writtenMatch = html.match(writtenDateRegex);
       if (writtenMatch) return writtenMatch[0];
 
-      // Fallback: 14 days from now
-      return new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      });
+      return "";
     };
 
-    const title = extractMeta("og:title") || extractTitle() || "Scraped Hackathon Event";
-    const description = extractMeta("og:description") || extractMeta("description") || "No description provided.";
+    const title = extractMeta("og:title") || extractTitle() || "";
+    const description = extractMeta("og:description") || extractMeta("description") || "";
     const deadline = extractDeadline();
 
     return NextResponse.json({
