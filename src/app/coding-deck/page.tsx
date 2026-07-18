@@ -22,7 +22,60 @@ interface PlatformStats {
   rank: string;
   rating: number;
   globalRank: number;
+  submissionCalendar?: Record<string, number>;
+  submissionCalendarPrivate?: boolean;
+  acceptedSubmissions?: number;
+  dailyChallenge?: {
+    title: string;
+    link: string;
+    difficulty: string;
+    date: string;
+    completed: boolean;
+  } | null;
+  leetcodeStreak?: number;
+  activeYears?: number[];
 }
+
+const extractUsername = (platform: string, input: string): string => {
+  let val = input.trim();
+  if (!val) return "";
+  
+  // Remove trailing slashes
+  val = val.replace(/\/+$/, "");
+  
+  try {
+    // If it's a URL
+    if (val.startsWith("http://") || val.startsWith("https://") || val.includes(".com/")) {
+      const urlString = val.startsWith("http") ? val : `https://${val}`;
+      const url = new URL(urlString);
+      const pathname = url.pathname;
+      const segments = pathname.split("/").filter(Boolean);
+      
+      if (platform === "leetcode") {
+        if (segments[0] === "u" && segments[1]) return segments[1];
+        if (segments[0]) return segments[0];
+      } else if (platform === "codeforces") {
+        if (segments[0] === "profile" && segments[1]) return segments[1];
+        if (segments[0]) return segments[0];
+      } else if (platform === "codechef") {
+        if (segments[0] === "users" && segments[1]) return segments[1];
+        if (segments[0]) return segments[0];
+      } else if (platform === "unstop" || platform === "hack2skill") {
+        if (segments[0] === "u" && segments[1]) return segments[1];
+        if (segments[0]) return segments[0];
+      }
+    }
+  } catch (e) {
+    console.warn("URL parsing failed", e);
+  }
+  
+  if (val.includes("/")) {
+    const parts = val.split("/");
+    return parts[parts.length - 1] || val;
+  }
+  
+  return val;
+};
 
 export default function CodingDeckPage() {
   const { user, loading: authLoading } = useAuth();
@@ -39,9 +92,42 @@ export default function CodingDeckPage() {
   const [unstopUser, setUnstopUser] = useState("");
   const [hack2skillUser, setHack2skillUser] = useState("");
 
-  // Daily Challenge completed state
-  const [dailyCompleted, setDailyCompleted] = useState(false);
-  const [streak, setStreak] = useState(12); // Mock current streak
+  // Calculate current streak based on calendar activity dynamically
+  const calculateCurrentStreak = () => {
+    const combinedCal: Record<string, number> = {};
+    const addCalendar = (cal?: Record<string, number>) => {
+      if (!cal) return;
+      Object.entries(cal).forEach(([dateKey, count]) => {
+        combinedCal[dateKey] = (combinedCal[dateKey] || 0) + count;
+      });
+    };
+    addCalendar(stats.leetcode?.submissionCalendar);
+    addCalendar(stats.codeforces?.submissionCalendar);
+    addCalendar(stats.codechef?.submissionCalendar);
+
+    let streakVal = 0;
+    const today = new Date();
+    let checkDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    const getDateStr = (d: Date) => 
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+    // If no submissions today, start checking from yesterday
+    if (!(combinedCal[getDateStr(checkDate)] > 0)) {
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+    
+    while (true) {
+      const key = getDateStr(checkDate);
+      if (combinedCal[key] > 0) {
+        streakVal++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return streakVal;
+  };
 
   // Connection edit states
   const [editLeetcode, setEditLeetcode] = useState(false);
@@ -49,6 +135,18 @@ export default function CodingDeckPage() {
   const [editCodechef, setEditCodechef] = useState(false);
   const [editUnstop, setEditUnstop] = useState(false);
   const [editHack2skill, setEditHack2skill] = useState(false);
+
+  // LeetCode year filter state
+  const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
+
+  // Custom disconnect confirmation modal state
+  const [disconnectModal, setDisconnectModal] = useState<{
+    isOpen: boolean;
+    platform: string;
+  }>({ isOpen: false, platform: "" });
+
+  // Error messages for failed API fetches
+  const [platformErrors, setPlatformErrors] = useState<Record<string, string>>({});
 
   // Mock platforms stats based on username presence
   const [stats, setStats] = useState<{
@@ -69,57 +167,55 @@ export default function CodingDeckPage() {
   useEffect(() => {
     if (!user) return;
 
-    const loadPlatformData = () => {
+    const loadPlatformData = async () => {
       try {
         setLoading(true);
         const meta = user.user_metadata || {};
         
-        setLeetcodeUser(meta.leetcode_username || "");
-        setCodeforcesUser(meta.codeforces_username || "");
-        setCodechefUser(meta.codechef_username || "");
-        setUnstopUser(meta.unstop_username || "");
-        setHack2skillUser(meta.hack2skill_username || "");
-        setDailyCompleted(!!meta.leetcode_daily_completed);
+        const lc = meta.leetcode_username || "";
+        const cf = meta.codeforces_username || "";
+        const cc = meta.codechef_username || "";
+        const un = meta.unstop_username || "";
+        const h2s = meta.hack2skill_username || "";
+
+        setLeetcodeUser(lc);
+        setCodeforcesUser(cf);
+        setCodechefUser(cc);
+        setUnstopUser(un);
+        setHack2skillUser(h2s);
+
         
-        // Populate stats if usernames exist
+        const fetchStats = async (platform: string, username: string, year?: number | null) => {
+          if (!username) return null;
+          try {
+            const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}`);
+            if (res.ok) {
+              setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
+              return await res.json();
+            } else {
+              const err = await res.json();
+              setPlatformErrors(prev => ({ ...prev, [platform]: err.error || `Failed to fetch ${platform} stats` }));
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch stats for ${platform}`, e);
+            setPlatformErrors(prev => ({ ...prev, [platform]: "Connection error while syncing profile" }));
+          }
+          return null;
+        };
+
+        const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+          fetchStats("leetcode", lc, selectedLcYear),
+          fetchStats("codeforces", cf),
+          fetchStats("codechef", cc)
+        ]);
+
         setStats({
-          leetcode: meta.leetcode_username ? {
-            solved: 342,
-            solvedEasy: 154,
-            solvedMedium: 148,
-            solvedHard: 40,
-            rank: "Top 8.4%",
-            rating: 1782,
-            globalRank: 125430
-          } : null,
-          codeforces: meta.codeforces_username ? {
-            solved: 215,
-            solvedEasy: 0,
-            solvedMedium: 0,
-            solvedHard: 0,
-            rank: "Specialist",
-            rating: 1480,
-            globalRank: 8540
-          } : null,
-          codechef: meta.codechef_username ? {
-            solved: 129,
-            solvedEasy: 0,
-            solvedMedium: 0,
-            solvedHard: 0,
-            rank: "3★",
-            rating: 1624,
-            globalRank: 4120
-          } : null,
-          unstop: meta.unstop_username ? {
-            registered: 6,
-            completed: 4,
-            rank: 42
-          } : null,
-          hack2skill: meta.hack2skill_username ? {
-            registered: 3,
-            completed: 3,
-            rank: 12
-          } : null,
+          leetcode: leetcodeStats,
+          codeforces: codeforcesStats,
+          codechef: codechefStats,
+          unstop: un ? { registered: 6, completed: 4, rank: 42 } : null,
+          hack2skill: h2s ? { registered: 3, completed: 3, rank: 12 } : null,
         });
 
       } catch (err) {
@@ -130,7 +226,53 @@ export default function CodingDeckPage() {
     };
 
     loadPlatformData();
-  }, [user]);
+  }, [user, selectedLcYear]);
+
+  // Poll statistics every 15 seconds in the background for live auto-detection
+  useEffect(() => {
+    if (!user) return;
+    
+    const interval = setInterval(() => {
+      const pollStats = async () => {
+        const lc = leetcodeUser;
+        const cf = codeforcesUser;
+        const cc = codechefUser;
+        
+        if (!lc && !cf && !cc) return;
+        
+        const fetchStats = async (platform: string, username: string, year?: number | null) => {
+          if (!username) return null;
+          try {
+            const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}`);
+            if (res.ok) {
+              return await res.json();
+            }
+          } catch (e) {
+            console.warn(`Polling failed for ${platform}`, e);
+          }
+          return null;
+        };
+
+        const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+          lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
+          cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
+          cc ? fetchStats("codechef", cc) : Promise.resolve(null)
+        ]);
+
+        setStats(prev => ({
+          ...prev,
+          leetcode: leetcodeStats || prev.leetcode,
+          codeforces: codeforcesStats || prev.codeforces,
+          codechef: codechefStats || prev.codechef,
+        }));
+      };
+      
+      pollStats();
+    }, 15000); // 15 seconds
+    
+    return () => clearInterval(interval);
+  }, [user, leetcodeUser, codeforcesUser, codechefUser, selectedLcYear]);
 
   // Save specific platform handle
   const handleSavePlatform = async (platform: string, username: string) => {
@@ -163,16 +305,36 @@ export default function CodingDeckPage() {
 
       if (error) throw error;
 
+      // Fetch stats for the newly connected platform dynamically
+      let platformStats = null;
+      if (username.trim()) {
+        if (platform === "leetcode" || platform === "codeforces" || platform === "codechef") {
+          try {
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}`);
+            if (res.ok) {
+              setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
+              platformStats = await res.json();
+            } else {
+              const err = await res.json();
+              setPlatformErrors(prev => ({ ...prev, [platform]: err.error || `Failed to link ${platform}` }));
+            }
+          } catch (e) {
+            console.warn("Error fetching dynamic connected stats", e);
+            setPlatformErrors(prev => ({ ...prev, [platform]: "Connection error while linking profile" }));
+          }
+        } else if (platform === "unstop") {
+          platformStats = { registered: 6, completed: 4, rank: 42 };
+        } else {
+          platformStats = { registered: 3, completed: 3, rank: 12 };
+        }
+      } else {
+        setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
+      }
+
       // Update local state metrics dynamically
       setStats(prev => ({
         ...prev,
-        [platform]: username.trim() ? (
-          platform === "leetcode" ? { solved: 342, solvedEasy: 154, solvedMedium: 148, solvedHard: 40, rank: "Top 8.4%", rating: 1782, globalRank: 125430 } :
-          platform === "codeforces" ? { solved: 215, solvedEasy: 0, solvedMedium: 0, solvedHard: 0, rank: "Specialist", rating: 1480, globalRank: 8540 } :
-          platform === "codechef" ? { solved: 129, solvedEasy: 0, solvedMedium: 0, solvedHard: 0, rank: "3★", rating: 1624, globalRank: 4120 } :
-          platform === "unstop" ? { registered: 6, completed: 4, rank: 42 } :
-          { registered: 3, completed: 3, rank: 12 }
-        ) : null
+        [platform]: platformStats
       }));
 
       // Close editing
@@ -191,60 +353,244 @@ export default function CodingDeckPage() {
     }
   };
 
-  // Toggle LeetCode Daily Challenge Completion
-  const handleToggleDailyChallenge = async () => {
-    if (!user) return;
-    const newState = !dailyCompleted;
-    setDailyCompleted(newState);
-    setStreak(prev => (newState ? prev + 1 : prev - 1));
-
-    try {
-      try {
-        await supabase
-          .from("profiles")
-          .upsert({
-            id: user.id,
-            leetcode_daily_completed: newState
-          });
-      } catch (dbErr) {
-        console.warn("Profiles daily status upsert skipped.", dbErr);
-      }
-
-      await supabase.auth.updateUser({
-        data: {
-          leetcode_daily_completed: newState
-        }
-      });
-    } catch (err) {
-      console.warn("Could not save daily completed state.", err);
-    }
+  // Trigger disconnect modal
+  const handleDisconnectClick = (platform: string) => {
+    setDisconnectModal({ isOpen: true, platform });
   };
 
-  // Heatmap helper: Generate 53 columns x 7 rows (deterministic mock generation)
+  // Perform actual disconnect action
+  const confirmDisconnect = async () => {
+    const platform = disconnectModal.platform;
+    if (!platform || !user) return;
+    
+    // Reset state locally
+    if (platform === "leetcode") setLeetcodeUser("");
+    if (platform === "codeforces") setCodeforcesUser("");
+    if (platform === "codechef") setCodechefUser("");
+    if (platform === "unstop") setUnstopUser("");
+    if (platform === "hack2skill") setHack2skillUser("");
+
+    setDisconnectModal({ isOpen: false, platform: "" });
+    await handleSavePlatform(platform, "");
+  };
+
+
+
+  // Heatmap helper: Generate 53 columns x 7 rows mapping to actual calendar dates
   const renderHeatmap = () => {
-    const days = [];
-    for (let i = 0; i < 371; i++) {
-      // Pure deterministic algorithm: generates a recurring aesthetic calendar pattern
-      const level = (i * 3 + 7) % 5 > 2 ? ((i * 13 + 5) % 4) : 0;
-      days.push(level);
+    // 1. Build a combined calendar map of YYYY-MM-DD: count from active platforms
+    const combinedCal: Record<string, number> = {};
+    const addCalendar = (cal?: Record<string, number>) => {
+      if (!cal) return;
+      Object.entries(cal).forEach(([dateKey, count]) => {
+        combinedCal[dateKey] = (combinedCal[dateKey] || 0) + count;
+      });
+    };
+
+    addCalendar(stats.leetcode?.submissionCalendar);
+    addCalendar(stats.codeforces?.submissionCalendar);
+    addCalendar(stats.codechef?.submissionCalendar);
+
+    // 2. Generate 371 days based on selected year (full calendar year) or current date (last 12 months)
+    const cells: { dateStr: string; level: number; dateLabel: string }[] = [];
+    let startDate: Date;
+    let endDate: Date;
+
+    if (selectedLcYear) {
+      // Show calendar year of selectedLcYear
+      const yearStart = new Date(selectedLcYear, 0, 1);
+      const startDay = yearStart.getDay();
+      startDate = new Date(yearStart.getTime());
+      startDate.setDate(yearStart.getDate() - startDay); // Sunday of the week containing Jan 1
+
+      endDate = new Date(startDate.getTime());
+      endDate.setDate(startDate.getDate() + (53 * 7 - 1)); // Saturday of 53 weeks later
+    } else {
+      // Show last 12 months ending today
+      const now = new Date();
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endDay = endDate.getDay();
+      endDate.setDate(endDate.getDate() + (6 - endDay)); // Saturday of the current week
+
+      startDate = new Date(endDate.getTime());
+      startDate.setDate(endDate.getDate() - (53 * 7 - 1)); // Sunday of 53 weeks ago
     }
 
-    return (
-      <div className="grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto py-2">
-        {days.map((level, idx) => {
-          let colorClass = "bg-bg-card border border-border-main/20";
-          if (level === 1) colorClass = "bg-emerald-500/20";
-          if (level === 2) colorClass = "bg-emerald-500/50";
-          if (level === 3) colorClass = "bg-emerald-500";
+    let totalActiveDays = 0;
+    let maxStreak = 0;
+    let currentStreak = 0;
 
-          return (
-            <div 
-              key={idx} 
-              className={`w-2.5 h-2.5 rounded-sm transition-all hover:scale-125 ${colorClass}`}
-              title={`Contribution Level: ${level}`}
-            />
-          );
-        })}
+    for (let i = 0; i < 371; i++) {
+      const cellDate = new Date(startDate.getTime());
+      cellDate.setDate(startDate.getDate() + i);
+      
+      const dateKey = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, "0")}-${String(cellDate.getDate()).padStart(2, "0")}`;
+      const count = combinedCal[dateKey] || 0;
+      
+      // Calculate streaks
+      if (count > 0) {
+        totalActiveDays++;
+        currentStreak++;
+        if (currentStreak > maxStreak) {
+          maxStreak = currentStreak;
+        }
+      } else {
+        currentStreak = 0;
+      }
+
+      let level = 0;
+      if (count > 0 && count <= 2) level = 1;
+      else if (count > 2 && count <= 5) level = 2;
+      else if (count > 5) level = 3;
+
+      const dateLabel = cellDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+
+      cells.push({
+        dateStr: dateKey,
+        level,
+        dateLabel: `${dateLabel}: ${count} submission${count !== 1 ? "s" : ""}`
+      });
+    }
+
+    // Group the 371 cells into chronological month blocks
+    interface Week {
+      cells: {
+        dateStr: string;
+        level: number;
+        dateLabel: string;
+      }[];
+    }
+
+    interface MonthBlock {
+      monthName: string;
+      monthYearKey: string;
+      weeks: Week[];
+    }
+
+    const monthBlocks: MonthBlock[] = [];
+    let currentBlock: MonthBlock | null = null;
+
+    for (let w = 0; w < 53; w++) {
+      const weekCells = [];
+      for (let d = 0; d < 7; d++) {
+        const cellIdx = w * 7 + d;
+        weekCells.push(cells[cellIdx]);
+      }
+
+      // Determine which month this week belongs to based on the middle day (Wednesday)
+      const weekDate = new Date(startDate.getTime());
+      weekDate.setDate(startDate.getDate() + w * 7 + 3);
+      
+      const monthName = weekDate.toLocaleDateString("en-US", { month: "short" });
+      const monthYearKey = `${weekDate.getFullYear()}-${weekDate.getMonth()}`;
+
+      if (!currentBlock || currentBlock.monthYearKey !== monthYearKey) {
+        currentBlock = {
+          monthName,
+          monthYearKey,
+          weeks: []
+        };
+        monthBlocks.push(currentBlock);
+      }
+
+      currentBlock.weeks.push({ cells: weekCells });
+    }
+
+    const isLeetcodePrivate = stats.leetcode?.submissionCalendarPrivate;
+    const totalSubmissionsInCalendar = Object.values(combinedCal).reduce((sum, val) => sum + val, 0);
+
+    return (
+      <div className="border border-border-main/60 bg-bg-base/30 p-5 rounded flex flex-col gap-3 w-full overflow-hidden">
+        {/* Heatmap header box matching LeetCode's layout */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border-main/40 pb-3 gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-txt-main">
+              <strong className="text-lg font-semibold text-txt-main font-sans mr-1">{totalSubmissionsInCalendar}</strong> 
+              {selectedLcYear ? `submissions in ${selectedLcYear}` : "submissions in the past one year"}
+            </span>
+            <span className="text-txt-muted text-xs cursor-pointer select-none" title="Information">ⓘ</span>
+          </div>
+          <div className="flex items-center gap-4 font-mono text-[10px] text-txt-muted">
+            <span>Total active days: <strong className="text-txt-main font-bold">{totalActiveDays}</strong></span>
+            <span>Max streak: <strong className="text-txt-main font-bold">{maxStreak}</strong></span>
+            
+            {/* Year Dropdown Filter matching LeetCode ref image layout */}
+            {stats.leetcode?.activeYears && stats.leetcode.activeYears.length > 0 && (
+              <div className="relative bg-[#2c2c2c] hover:bg-[#3c3c3c] text-txt-main px-2.5 py-1 rounded border border-border-main/20 cursor-pointer transition-all select-none text-[9px] font-sans flex items-center gap-1">
+                <select
+                  value={selectedLcYear || ""}
+                  onChange={(e) => setSelectedLcYear(e.target.value ? parseInt(e.target.value) : null)}
+                  className="bg-transparent border-none outline-none cursor-pointer text-txt-main font-semibold pr-1 appearance-none"
+                >
+                  <option value="" className="bg-[#2c2c2c] text-txt-main">Current</option>
+                  {stats.leetcode.activeYears.map((y) => (
+                    <option key={y} value={y} className="bg-[#2c2c2c] text-[#dfdfdf]">{y}</option>
+                  ))}
+                </select>
+                <span className="text-[7px] pointer-events-none">▼</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isLeetcodePrivate && (
+          <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs font-mono text-yellow-500 flex flex-col gap-1.5 mt-1">
+            <span className="font-bold flex items-center gap-1">🔒 LeetCode Submission Calendar is Private:</span>
+            <span className="text-[10px] text-txt-muted font-sans leading-relaxed">
+              To fetch and display your live contribution heatmap and calculate streaks correctly, you must log in to your LeetCode Account settings (https://leetcode.com/profile/settings/), look for the Privacy section, and turn off &quot;Make my submission calendar private&quot;.
+            </span>
+          </div>
+        )}
+
+        {/* Heatmap Grid with bottom Month Labels and no day labels */}
+        <div className="overflow-x-auto w-full py-2">
+          <div className="flex gap-2 items-start select-none min-w-max pb-1">
+            {monthBlocks.map((block, bIdx) => (
+              <div key={bIdx} className="flex flex-col gap-2">
+                {/* Cells for this month */}
+                <div className="flex gap-1">
+                  {block.weeks.map((week, wIdx) => (
+                    <div key={wIdx} className="flex flex-col gap-1 w-2.5">
+                      {week.cells.map((cell, cIdx) => {
+                        let colorClass = "bg-[#2c2c2c] border border-[#3c3c3c]/60";
+                        if (cell.level === 1) colorClass = "bg-emerald-500/20 border border-emerald-500/10";
+                        if (cell.level === 2) colorClass = "bg-emerald-500/50 border border-emerald-500/20";
+                        if (cell.level === 3) colorClass = "bg-emerald-500";
+
+                        return (
+                          <div 
+                            key={cIdx} 
+                            className={`w-2.5 h-2.5 rounded-sm transition-all hover:scale-125 ${colorClass}`}
+                            title={cell.dateLabel}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Month Label centered under this month's weeks */}
+                <div className="text-[9px] font-mono text-txt-muted text-center h-3 select-none">
+                  {block.monthName}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex justify-end items-center gap-1.5 text-[8px] font-mono text-txt-muted uppercase pt-1">
+          <span>Less</span>
+          <div className="w-2 h-2 rounded-sm bg-[#2c2c2c] border border-[#3c3c3c]/60" />
+          <div className="w-2 h-2 rounded-sm bg-emerald-500/20 border border-emerald-500/10" />
+          <div className="w-2 h-2 rounded-sm bg-emerald-500/50 border border-emerald-500/20" />
+          <div className="w-2 h-2 rounded-sm bg-emerald-500" />
+          <span>More</span>
+        </div>
       </div>
     );
   };
@@ -293,49 +639,44 @@ export default function CodingDeckPage() {
         </div>
 
         {/* Banner Alert for outstanding daily problem */}
-        {!dailyCompleted && leetcodeUser && (
+        {leetcodeUser && stats.leetcode?.dailyChallenge && !stats.leetcode.dailyChallenge.completed && (
           <div className="border border-yellow-500/40 bg-yellow-500/10 p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
             <div className="flex items-center gap-3">
               <AlertCircle className="text-yellow-500 flex-shrink-0" size={18} />
               <div className="flex flex-col">
                 <span className="text-xs font-semibold text-txt-main">LeetCode Daily Challenge Pending</span>
-                <span className="text-[10px] text-txt-sub">Today&apos;s daily challenge is outstanding. Solve now to maintain your {streak}-day streak!</span>
+                <span className="text-[10px] text-txt-sub">
+                  Today&apos;s daily challenge <strong className="text-yellow-500 font-mono font-bold">“{stats.leetcode.dailyChallenge.title}”</strong> ({stats.leetcode.dailyChallenge.difficulty}) is pending. {stats.leetcode?.leetcodeStreak && stats.leetcode.leetcodeStreak > 0 ? `Solve now to maintain your ${stats.leetcode.leetcodeStreak}-day streak!` : "Solve now to start your daily challenge streak!"}
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <a 
-                href="https://leetcode.com/problemset/all/" 
+                href={stats.leetcode.dailyChallenge.link} 
                 target="_blank" 
                 rel="noreferrer"
-                className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center gap-1.5 transition-all"
+                className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit"
               >
                 Solve on LeetCode <ExternalLink size={10} />
               </a>
-              <button 
-                onClick={handleToggleDailyChallenge}
-                className="h-8 px-4 bg-yellow-500 hover:opacity-90 text-bg-base text-[10px] font-mono uppercase tracking-wider font-semibold rounded-sm transition-opacity"
-              >
-                Mark Completed
-              </button>
             </div>
           </div>
         )}
 
-        {dailyCompleted && leetcodeUser && (
+        {leetcodeUser && stats.leetcode?.dailyChallenge?.completed && (
           <div className="border border-emerald-500/40 bg-emerald-500/10 p-4 rounded-md flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
               <div className="flex flex-col">
-                <span className="text-xs font-semibold text-txt-main">Daily Streak Secure!</span>
-                <span className="text-[10px] text-txt-sub">LeetCode daily challenge marked completed. Active Streak: {streak} days.</span>
+                <span className="text-xs font-semibold text-txt-main">Daily Challenge Completed!</span>
+                <span className="text-[10px] text-txt-sub">
+                  Awesome! You solved <strong className="text-emerald-400 font-semibold font-mono">“{stats.leetcode.dailyChallenge.title}”</strong> today. Active Streak: {stats.leetcode?.leetcodeStreak || 0} days!
+                </span>
               </div>
             </div>
-            <button 
-              onClick={handleToggleDailyChallenge}
-              className="text-[10px] text-txt-muted hover:text-txt-main font-mono underline uppercase"
-            >
-              Undo
-            </button>
+            <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-wider font-semibold border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 rounded-sm">
+              Verified Live
+            </span>
           </div>
         )}
 
@@ -371,25 +712,33 @@ export default function CodingDeckPage() {
                   </div>
 
                   {!editLeetcode && leetcodeUser && (
-                    <button 
-                      onClick={() => setEditLeetcode(true)}
-                      className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline"
-                    >
-                      Update Handle
-                    </button>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setEditLeetcode(true)}
+                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
+                      >
+                        Update Handle
+                      </button>
+                      <button 
+                        onClick={() => handleDisconnectClick("leetcode")}
+                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
                   )}
                 </div>
 
                 {!leetcodeUser || editLeetcode ? (
                   <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub font-semibold">LeetCode Username</label>
+                    <div className="flex-grow flex flex-col gap-1 w-full">
+                      <label className="text-[10px] text-txt-sub font-semibold">LeetCode Profile Link / Username</label>
                       <input 
                         type="text" 
-                        defaultValue={leetcodeUser}
+                        defaultValue={leetcodeUser ? `https://leetcode.com/${leetcodeUser}` : ""}
                         id="leetcode-username-input"
-                        placeholder="e.g. mirasen_code"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                        placeholder="e.g. https://leetcode.com/mirasen_code"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
                       />
                     </div>
                     <div className="flex gap-2">
@@ -403,9 +752,10 @@ export default function CodingDeckPage() {
                       )}
                       <button 
                         onClick={() => {
-                          const val = (document.getElementById("leetcode-username-input") as HTMLInputElement)?.value;
-                          setLeetcodeUser(val);
-                          handleSavePlatform("leetcode", val);
+                          const rawVal = (document.getElementById("leetcode-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("leetcode", rawVal);
+                          setLeetcodeUser(extracted);
+                          handleSavePlatform("leetcode", extracted);
                         }}
                         disabled={saving}
                         className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
@@ -416,54 +766,78 @@ export default function CodingDeckPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6 pt-2">
-                    {/* Stats stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {platformErrors.leetcode && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.leetcode}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Please verify that your LeetCode handle is spelled correctly and your profile is public. If it is private, change your privacy settings on LeetCode.
+                        </span>
+                      </div>
+                    )}
+                     {/* Stats stats */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                       
                       <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                         <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.solved}</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.solved ?? 0}</span>
                         <span className="text-[9px] text-txt-sub font-mono">
-                          E: {stats.leetcode?.solvedEasy} | M: {stats.leetcode?.solvedMedium} | H: {stats.leetcode?.solvedHard}
+                          {stats.leetcode 
+                            ? `E: ${stats.leetcode.solvedEasy} | M: ${stats.leetcode.solvedMedium} | H: ${stats.leetcode.solvedHard}`
+                            : "E: 0 | M: 0 | H: 0"}
                         </span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{(stats.leetcode as any)?.totalSubmissions ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">
+                          {stats.leetcode 
+                            ? `E: ${(stats.leetcode as any).totalEasySubmissions ?? 0} | M: ${(stats.leetcode as any).totalMediumSubmissions ?? 0} | H: ${(stats.leetcode as any).totalHardSubmissions ?? 0}`
+                            : "E: 0 | M: 0 | H: 0"}
+                        </span>
+                      </div>
+
+                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                        <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {((stats.leetcode as any)?.totalSubmissions 
+                            ? (((stats.leetcode as any)?.acceptedSubmissions / (stats.leetcode as any)?.totalSubmissions) * 100).toFixed(1)
+                            : "0.0")}%
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono">Correct solves ratio</span>
                       </div>
 
                       <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                         <span className="text-[10px] font-mono text-txt-muted uppercase">Global Rank</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">#{stats.leetcode?.globalRank.toLocaleString()}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">{stats.leetcode?.rank}</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {stats.leetcode?.globalRank ? `#${stats.leetcode.globalRank.toLocaleString()}` : "N/A"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono">{stats.leetcode?.rank || "N/A"}</span>
                       </div>
 
                       <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                         <span className="text-[10px] font-mono text-txt-muted uppercase">Contest Rating</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.rating}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Knight Tier</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.rating ?? "N/A"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono">Active Tier</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Leetcode Handle</span>
-                        <a 
-                          href={`https://leetcode.com/${leetcodeUser}/`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
-                        >
-                          @{leetcodeUser} <ExternalLink size={10} />
-                        </a>
-                      </div>
+                    </div>
 
+                    <div className="flex justify-between items-center bg-bg-base/30 border border-border-main/60 p-3 rounded-md">
+                      <span className="text-[10px] font-mono text-txt-muted uppercase">Leetcode Profile</span>
+                      <a 
+                        href={`https://leetcode.com/${leetcodeUser}/`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono"
+                      >
+                        @{leetcodeUser} <ExternalLink size={10} />
+                      </a>
                     </div>
 
                     {/* Contribution Calendar Graph */}
-                    <div className="border border-border-main/60 bg-bg-base/30 p-4 rounded flex flex-col gap-2">
-                      <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase flex items-center gap-1.5">
-                          <Calendar size={12} /> Activity Heatmap (Last 12 Months)
-                        </span>
-                        <span className="text-[8px] font-mono text-txt-muted uppercase">Less • Gray to Green • More</span>
-                      </div>
-                      
-                      {renderHeatmap()}
-                    </div>
+                    {renderHeatmap()}
 
                   </div>
                 )}
@@ -481,25 +855,33 @@ export default function CodingDeckPage() {
                   </div>
 
                   {!editCodeforces && codeforcesUser && (
-                    <button 
-                      onClick={() => setEditCodeforces(true)}
-                      className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline"
-                    >
-                      Update Handle
-                    </button>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setEditCodeforces(true)}
+                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
+                      >
+                        Update Handle
+                      </button>
+                      <button 
+                        onClick={() => handleDisconnectClick("codeforces")}
+                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
                   )}
                 </div>
 
                 {!codeforcesUser || editCodeforces ? (
                   <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub font-semibold">Codeforces Username</label>
+                    <div className="flex-grow flex flex-col gap-1 w-full">
+                      <label className="text-[10px] text-txt-sub font-semibold">Codeforces Profile Link / Username</label>
                       <input 
                         type="text" 
-                        defaultValue={codeforcesUser}
+                        defaultValue={codeforcesUser ? `https://codeforces.com/profile/${codeforcesUser}` : ""}
                         id="codeforces-username-input"
-                        placeholder="e.g. mirasen_cf"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                        placeholder="e.g. https://codeforces.com/profile/mirasen_cf"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
                       />
                     </div>
                     <div className="flex gap-2">
@@ -513,9 +895,10 @@ export default function CodingDeckPage() {
                       )}
                       <button 
                         onClick={() => {
-                          const val = (document.getElementById("codeforces-username-input") as HTMLInputElement)?.value;
-                          setCodeforcesUser(val);
-                          handleSavePlatform("codeforces", val);
+                          const rawVal = (document.getElementById("codeforces-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("codeforces", rawVal);
+                          setCodeforcesUser(extracted);
+                          handleSavePlatform("codeforces", extracted);
                         }}
                         disabled={saving}
                         className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
@@ -525,7 +908,17 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+                  <div className="flex flex-col gap-4 w-full">
+                    {platformErrors.codeforces && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.codeforces}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Verify that your Codeforces username handle is correct and exists on the platform.
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-2">
                     <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-txt-muted uppercase">Division Rating</span>
                       <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.rating}</span>
@@ -535,7 +928,23 @@ export default function CodingDeckPage() {
                     <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
                       <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.solved}</span>
-                      <span className="text-[9px] text-txt-sub font-mono">Synced 5m ago</span>
+                      <span className="text-[9px] text-txt-sub font-mono">Unique problems</span>
+                    </div>
+
+                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                      <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
+                      <span className="text-xl font-semibold text-txt-main font-display">{(stats.codeforces as any)?.totalSubmissions || 0}</span>
+                      <span className="text-[9px] text-txt-sub font-mono">Total runs</span>
+                    </div>
+
+                    <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
+                      <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
+                      <span className="text-xl font-semibold text-txt-main font-display">
+                        {((stats.codeforces as any)?.totalSubmissions 
+                          ? (((stats.codeforces as any)?.acceptedSubmissions / (stats.codeforces as any)?.totalSubmissions) * 100).toFixed(1)
+                          : "0.0")}%
+                      </span>
+                      <span className="text-[9px] text-txt-sub font-mono">Correct runs ratio</span>
                     </div>
 
                     <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
@@ -550,7 +959,8 @@ export default function CodingDeckPage() {
                       </a>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
               </div>
 
               {/* CodeChef Profile Card */}
@@ -565,25 +975,33 @@ export default function CodingDeckPage() {
                   </div>
 
                   {!editCodechef && codechefUser && (
-                    <button 
-                      onClick={() => setEditCodechef(true)}
-                      className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline"
-                    >
-                      Update Handle
-                    </button>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => setEditCodechef(true)}
+                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
+                      >
+                        Update Handle
+                      </button>
+                      <button 
+                        onClick={() => handleDisconnectClick("codechef")}
+                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
                   )}
                 </div>
 
                 {!codechefUser || editCodechef ? (
                   <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub font-semibold">CodeChef Username</label>
+                    <div className="flex-grow flex flex-col gap-1 w-full">
+                      <label className="text-[10px] text-txt-sub font-semibold">CodeChef Profile Link / Username</label>
                       <input 
                         type="text" 
-                        defaultValue={codechefUser}
+                        defaultValue={codechefUser ? `https://www.codechef.com/users/${codechefUser}` : ""}
                         id="codechef-username-input"
-                        placeholder="e.g. mirasen_cc"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                        placeholder="e.g. https://www.codechef.com/users/mirasen_cc"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
                       />
                     </div>
                     <div className="flex gap-2">
@@ -597,9 +1015,10 @@ export default function CodingDeckPage() {
                       )}
                       <button 
                         onClick={() => {
-                          const val = (document.getElementById("codechef-username-input") as HTMLInputElement)?.value;
-                          setCodechefUser(val);
-                          handleSavePlatform("codechef", val);
+                          const rawVal = (document.getElementById("codechef-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("codechef", rawVal);
+                          setCodechefUser(extracted);
+                          handleSavePlatform("codechef", extracted);
                         }}
                         disabled={saving}
                         className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
@@ -609,7 +1028,17 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+                  <div className="flex flex-col gap-4 w-full">
+                    {platformErrors.codechef && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.codechef}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Verify that your CodeChef username is spelled correctly and the account exists.
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
                     <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
                       <span className="text-[10px] font-mono text-txt-muted uppercase">Star Division</span>
                       <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rank}</span>
@@ -634,7 +1063,8 @@ export default function CodingDeckPage() {
                       </a>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
               </div>
 
             </div>
@@ -657,23 +1087,44 @@ export default function CodingDeckPage() {
 
                   {unstopUser && !editUnstop ? (
                     <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                      <span>@{unstopUser}</span>
+                      <div className="flex items-center gap-2">
+                        <span>@{unstopUser}</span>
+                        <button
+                          onClick={() => setEditUnstop(true)}
+                          className="text-[8px] text-txt-muted hover:text-txt-main underline cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDisconnectClick("unstop")}
+                          className="text-[8px] text-red-500 hover:text-red-600 underline cursor-pointer"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
                       <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.unstop?.registered} Applied</span>
                     </div>
                   ) : editUnstop ? (
                     <div className="flex gap-2 items-center">
                       <input 
                         type="text" 
-                        defaultValue={unstopUser}
+                        defaultValue={unstopUser ? `https://unstop.com/u/${unstopUser}` : ""}
                         id="unstop-username-input"
-                        placeholder="Unstop Handle"
+                        placeholder="Unstop Link / Handle"
                         className="h-8 flex-1 px-2 border border-border-main bg-bg-base text-xs font-mono text-txt-main focus:outline-none"
                       />
+                      <button
+                        onClick={() => setEditUnstop(false)}
+                        className="h-8 px-2 border border-border-main text-txt-main text-[10px] uppercase font-mono cursor-pointer hover:bg-bg-card"
+                      >
+                        X
+                      </button>
                       <button 
                         onClick={() => {
-                          const val = (document.getElementById("unstop-username-input") as HTMLInputElement)?.value;
-                          setUnstopUser(val);
-                          handleSavePlatform("unstop", val);
+                          const rawVal = (document.getElementById("unstop-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("unstop", rawVal);
+                          setUnstopUser(extracted);
+                          handleSavePlatform("unstop", extracted);
                         }}
                         className="h-8 px-3 bg-accent-main text-bg-base text-[10px] uppercase font-mono font-bold cursor-pointer"
                       >
@@ -696,23 +1147,44 @@ export default function CodingDeckPage() {
 
                   {hack2skillUser && !editHack2skill ? (
                     <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                      <span>@{hack2skillUser}</span>
+                      <div className="flex items-center gap-2">
+                        <span>@{hack2skillUser}</span>
+                        <button
+                          onClick={() => setEditHack2skill(true)}
+                          className="text-[8px] text-txt-muted hover:text-txt-main underline cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDisconnectClick("hack2skill")}
+                          className="text-[8px] text-red-500 hover:text-red-600 underline cursor-pointer"
+                        >
+                          Disconnect
+                        </button>
+                      </div>
                       <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.hack2skill?.registered} Applied</span>
                     </div>
                   ) : editHack2skill ? (
                     <div className="flex gap-2 items-center">
                       <input 
                         type="text" 
-                        defaultValue={hack2skillUser}
+                        defaultValue={hack2skillUser ? `https://hack2skill.com/u/${hack2skillUser}` : ""}
                         id="hack2skill-username-input"
-                        placeholder="Hack2Skill Handle"
+                        placeholder="Hack2Skill Link / Handle"
                         className="h-8 flex-1 px-2 border border-border-main bg-bg-base text-xs font-mono text-txt-main focus:outline-none"
                       />
+                      <button
+                        onClick={() => setEditHack2skill(false)}
+                        className="h-8 px-2 border border-border-main text-txt-main text-[10px] uppercase font-mono cursor-pointer hover:bg-bg-card"
+                      >
+                        X
+                      </button>
                       <button 
                         onClick={() => {
-                          const val = (document.getElementById("hack2skill-username-input") as HTMLInputElement)?.value;
-                          setHack2skillUser(val);
-                          handleSavePlatform("hack2skill", val);
+                          const rawVal = (document.getElementById("hack2skill-username-input") as HTMLInputElement)?.value || "";
+                          const extracted = extractUsername("hack2skill", rawVal);
+                          setHack2skillUser(extracted);
+                          handleSavePlatform("hack2skill", extracted);
                         }}
                         className="h-8 px-3 bg-accent-main text-bg-base text-[10px] uppercase font-mono font-bold cursor-pointer"
                       >
@@ -757,6 +1229,43 @@ export default function CodingDeckPage() {
         )}
 
       </main>
+
+      {/* Custom Disconnect Confirmation Modal */}
+      {disconnectModal.isOpen && (
+        <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+            onClick={() => setDisconnectModal({ isOpen: false, platform: "" })}
+          />
+          
+          {/* Modal Container */}
+          <div className="relative w-full max-w-sm border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl animate-fade-in flex flex-col gap-5 z-10">
+            <div className="flex flex-col gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-red-500 font-bold">Revoke Connection</span>
+              <h3 className="text-sm font-semibold text-txt-main">Disconnect Profile?</h3>
+              <p className="text-xs text-txt-muted font-light leading-relaxed">
+                Are you sure you want to disconnect your <span className="font-mono font-semibold text-txt-main">{disconnectModal.platform.toUpperCase()}</span> handle? You will lose immediate access to synced metrics and scoreboards.
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider">
+              <button
+                onClick={() => setDisconnectModal({ isOpen: false, platform: "" })}
+                className="px-4 py-2.5 border border-border-main hover:bg-bg-card text-txt-main rounded-sm transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDisconnect}
+                className="px-4 py-2.5 bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors cursor-pointer font-bold"
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

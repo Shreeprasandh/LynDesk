@@ -27,13 +27,32 @@ interface Message {
   };
 }
 
+// Global in-memory cache for AI messages
+let cachedMessages: Message[] = [];
+let cachedUserId: string | null = null;
+
 export default function LynAI() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    // Clear cache if user logged out or changed
+    if (user && cachedUserId !== user.id) {
+      cachedMessages = [];
+      cachedUserId = user.id;
+    } else if (!user) {
+      cachedMessages = [];
+      cachedUserId = null;
+    }
+    return cachedMessages;
+  });
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Sync state with global cache
+  useEffect(() => {
+    cachedMessages = messages;
+  }, [messages]);
 
   // User details for personalized AI context
   const [studentMeta, setStudentMeta] = useState<Record<string, string | boolean | number>>({});
@@ -42,16 +61,18 @@ export default function LynAI() {
     if (user) {
       const handle = setTimeout(() => {
         setStudentMeta(user.user_metadata || {});
-        // Welcome message
+        // Welcome message - only initialize if there are no cached messages
         const name = user.user_metadata?.full_name || "Engineer";
-        setMessages([
-          {
+        if (cachedMessages.length === 0) {
+          const welcomeMsg: Message = {
             id: "welcome",
             sender: "lynai",
-            text: `Greetings, ${name}! I am LynAI, your academic and talent co-pilot. I have synchronized with your LynDesk profile.\n\nHow can I accelerate your portfolio today? Choose a quick action below or ask me anything!`,
+            text: `Hello ${name}. I am LynAI, your portfolio co-pilot. How can I assist you today?`,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }
-        ]);
+          };
+          setMessages([welcomeMsg]);
+          cachedMessages = [welcomeMsg];
+        }
       }, 0);
       return () => clearTimeout(handle);
     }
@@ -78,34 +99,34 @@ export default function LynAI() {
     const leetcode = studentMeta.leetcode_username || "not linked";
 
     if (promptLower.includes("profile") || promptLower.includes("settings") || promptLower.includes("account") || promptLower.includes("bio") || promptLower.includes("change my name") || promptLower.includes("resume upload") || promptLower.includes("college key") || promptLower.includes("company key")) {
-      aiResponse = `### 👤 LynDesk Profile Settings
-To modify your account profile, change academic details, enter institution registrar validation codes, or upload your verified resume PDF, go to settings:`;
+      aiResponse = `### 👤 Profile Settings
+Update your profile details, academic records, and resume directly in Settings:`;
       actionLink = { label: "Go to Profile Settings", href: "/profile" };
     } else if (promptLower.includes("leetcode") || promptLower.includes("codeforces") || promptLower.includes("codechef") || promptLower.includes("unstop") || promptLower.includes("hack2skill") || promptLower.includes("coding deck") || promptLower.includes("daily problem") || promptLower.includes("streak") || promptLower.includes("solve")) {
-      aiResponse = `### 💻 Competitive Coding Deck
-Sync your competitive coding handles, inspect solved problems, daily streaks, activity calendars, and access official coding contests:`;
+      aiResponse = `### 💻 Coding Deck
+Sync your coding handles and view problem metrics directly in the coding deck:`;
       actionLink = { label: "Go to Coding Deck", href: "/coding-deck" };
     } else if (promptLower.includes("explore") || promptLower.includes("teammates") || promptLower.includes("partners") || promptLower.includes("hackathons") || promptLower.includes("events") || promptLower.includes("classmates")) {
-      aiResponse = `### 🔍 Matchmaking & Events Arena
-Search peer directories, coordinate hackathon teams, browse global developer meetups, and find project collaborators:`;
+      aiResponse = `### 🔍 Matchmaking & Events
+Browse peer directories and connect with event collaborators:`;
       actionLink = { label: "Go to Explore Arena", href: "/explore" };
     } else if (promptLower.includes("faculty") || promptLower.includes("coordinator") || promptLower.includes("approve") || promptLower.includes("claims") || promptLower.includes("verify points")) {
-      aiResponse = `### 🎓 Faculty coordinator desk
-The Faculty Coordinator Console allows college staff or company admins to verify credit applications and audit registry spreadsheets.`;
+      aiResponse = `### 🎓 Faculty Desk
+The Faculty Coordinator Console allows staff to verify credit applications:`;
       actionLink = { label: "Go to Faculty Console", href: "/coordinator" };
     } else if (promptLower.includes("leaderboard") || promptLower.includes("ranking") || promptLower.includes("who is top")) {
-      aiResponse = `### 🏆 Global Leaderboard
-Compare scores, LeetCode milestones, and verified extracurricular credit standings with other student engineers across institutions:`;
+      aiResponse = `### 🏆 Leaderboard
+Compare standings and coding milestones with other student engineers:`;
       actionLink = { label: "Go to Leaderboard", href: "/leaderboard" };
     } else if (promptLower.includes("dashboard") || promptLower.includes("workspace") || promptLower.includes("gantt") || promptLower.includes("tasks") || promptLower.includes("create project")) {
-      aiResponse = `### 🗂️ Active Workspace Dashboard
-Manage your active project channels, group chats, kanban lists, calendar plans, and git bot validation tasks:`;
+      aiResponse = `### 🗂️ Workspace Dashboard
+Manage project channels, tasks, and team timelines:`;
       actionLink = { label: "Go to Dashboard", href: "/" };
     } else if (promptLower.includes("bubble sort")) {
-      aiResponse = `### 💡 Bubble Sort Explanation
-Bubble Sort is a simple sorting algorithm that repeatedly steps through the list, compares adjacent elements, and swaps them if they are in the wrong order. 
+      aiResponse = `### 💡 Bubble Sort
+A simple sorting algorithm that repeatedly compares and swaps adjacent elements in the wrong order.
 
-Here is a quick JavaScript sample:
+JavaScript implementation:
 \`\`\`javascript
 function bubbleSort(arr) {
   let len = arr.length;
@@ -122,61 +143,44 @@ function bubbleSort(arr) {
 }
 \`\`\``;
     } else if (promptLower.includes("audit") || promptLower.includes("portfolio")) {
-      aiResponse = `### 📊 LynAI Portfolio Audit for ${name}
-- **College Link**: \`${college}\`
-- **Technical Skills**: ${skills}
-- **LeetCode Integration**: \`@${leetcode}\`
+      aiResponse = `### 📊 Portfolio Audit: ${name}
+* **Institution**: \`${college}\`
+* **Skills**: ${skills}
+* **LeetCode**: \`@${leetcode}\`
 
-#### 🔍 Analysis:
-1. **Competitive Edge**: Your linked profile demonstrates core competencies in **Frontend Web Design** and **Algorithmic Solves**.
-2. **Next Steps**:
-   - Link your **Codeforces** handle to show active contest participation.
-   - Boost your skill index by solving 2 medium problems on arrays daily to build consistency.
-   - Your profile is currently **Public** - this means verified recruiters on LynDesk can see your metrics!`;
+**Recommendations**:
+* Profile is public to recruiters.
+* Add Codeforces handle to complete active profile syncing.
+* Maintain consistency by solving coding tasks daily.`;
     } else if (promptLower.includes("placement") || promptLower.includes("job") || promptLower.includes("career")) {
-      aiResponse = `### 🎯 Placement Readiness Roadmap
-Based on your skillset (${skills}) and college association, here is your career recommendation:
-
-1. **Target Roles**: Full-Stack Engineer, Associate Software Engineer, Systems Architect.
-2. **Key Employers Matching**: Google, Microsoft, TCS, Goldman Sachs.
-3. **LynDesk Placement Checklist**:
-   - [ ] Sync your **Portfolio URL** in settings to show live demos of your projects.
-   - [ ] Apply for **Verification Credits** on your hackathon codes so recruiters know your codebase is authenticated.
-   - [ ] Complete the upcoming **TCS Mock Challenge** under the Explore tab next week.`;
+      aiResponse = `### 🎯 Placement Roadmap
+* **Target Roles**: Full-Stack / Systems Engineer matching (${skills}).
+* **Checklist**:
+  1. Add verified portfolio URL in settings.
+  2. Request verification credits for codebases.
+  3. Register for upcoming corporate challenges.`;
     } else if (promptLower.includes("idea") || promptLower.includes("hackathon")) {
-      aiResponse = `### 💡 Custom Hackathon Project Idea: "EduBlock Portal"
-*Perfect fit for: ${skills}*
-
-* **Concept**: A decentralized, tamper-proof transcript and credentials wallet where colleges issue graduation credits directly to student addresses (using smart contracts).
-* **Tech Stack**: Next.js (frontend), Supabase (Auth/JSON databases), Ethers.js/Solidity (Web3 integration).
-* **MVP Roadmap**:
-  1. Build a credential registration page.
-  2. Implement verification workflow (similar to the LynDesk Coordinator desk).
-  3. Hook up Metamask/wallet authentication.`;
+      aiResponse = `### 💡 Hackathon Idea: "EduBlock"
+* **Concept**: Tamper-proof academic credential wallet using smart contracts.
+* **Tech**: Next.js, Supabase, Solidity.
+* **Roadmap**: Build registrar verification flow, and link user wallets for credential claims.`;
     } else if (promptLower.includes("resume") || promptLower.includes("cv")) {
-      aiResponse = `### 📝 Optimized Resume Layout (Markdown Format)
-Copy the structure below to use in your portfolio:
+      aiResponse = `### 📝 Resume Layout
+Copy this schema for your portfolio:
 
 \`\`\`markdown
 # ${name}
-*Email: ${user?.email} | College: ${college}*
+*Email: ${user?.email} | ${college}*
 
 ## TECHNICAL SKILLS
-* Languages: JavaScript, Python, TypeScript
-* Frameworks: React, Next.js, CSS Grid
-* Tools & Databases: Git, GitHub, Supabase
+* ${skills}
 
-## HACKATHON PROJECTS
-### Project Space Claim on LynDesk
-* Built a collaborative workspace featuring real-time chat and milestone tracking.
-* Synced active GitHub commits verified by LDK:BOT.
+## PROJECTS
+### Verified Project on LynDesk
+* Collaborative workspace with real-time tracking.
 \`\`\``;
     } else {
-      aiResponse = `I received your request: "${userPrompt}". 
-
-As your LynAI Co-pilot, I can assist you with academic roadmaps, code explanations, and direct app navigation! 
-
-*Pro Tip: Ask me "how do I link my leetcode?" or "where can I change my profile?" to get direct navigation buttons!*`;
+      aiResponse = `I can assist you with navigation, profile audits, and hackathon project roadmaps. Please ask about settings, the coding deck, leaderboards, or portfolios.`;
     }
 
     // Simulate streaming typing effect
@@ -227,11 +231,11 @@ As your LynAI Co-pilot, I can assist you with academic roadmaps, code explanatio
       {/* Floating AI circular trigger button */}
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-6 z-[9999] h-12 w-12 bg-accent-main opacity-60 hover:opacity-100 text-bg-base rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group border border-accent-main/40 cursor-pointer animate-bounce"
+        className="fixed bottom-20 right-6 z-[9999] h-9 w-9 bg-accent-main opacity-45 hover:opacity-100 text-bg-base rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group border border-accent-main/40 cursor-pointer animate-bounce"
         style={{ animationDuration: '3s' }}
         title="Ask LynAI Co-Pilot"
       >
-        <Sparkles size={20} className="animate-pulse stroke-[2]" />
+        <Sparkles size={15} className="animate-pulse stroke-[2]" />
       </button>
 
       {/* Floating Chat Drawer Overlay */}
