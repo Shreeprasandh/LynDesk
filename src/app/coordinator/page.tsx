@@ -44,7 +44,112 @@ export default function CoordinatorConsole() {
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<CreditClaim | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"verifications" | "talent_registry">("verifications");
+  const [activeTab, setActiveTab] = useState<"verifications" | "talent_registry" | "staff_access">("verifications");
+  const [currentStaff, setCurrentStaff] = useState<{ name: string; key: string } | null>(null);
+  const [registeredStaff, setRegisteredStaff] = useState<{ name: string; key: string }[]>([]);
+  const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffKey, setNewStaffKey] = useState("");
+  const [auditLogs, setAuditLogs] = useState<{ id: string; msg: string; time: string }[]>([]);
+
+  // Guard route for non-faculty users
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("faculty_staff_member");
+      if (!raw) {
+        window.location.href = "/";
+      } else {
+        setCurrentStaff(JSON.parse(raw));
+      }
+    }
+  }, []);
+
+  // Sync registered staff keys from Supabase college account metadata
+  useEffect(() => {
+    if (user?.user_metadata?.registered_staff) {
+      setRegisteredStaff(user.user_metadata.registered_staff);
+    } else {
+      const defaultStaff = [{ name: "Main Administrator", key: "ADMIN" }];
+      setRegisteredStaff(defaultStaff);
+    }
+  }, [user]);
+
+  // Load audit logs from localStorage
+  useEffect(() => {
+    const defaultLogs = [
+      { id: "log-1", msg: "Dr. Sarah Jenkins authenticated session with key JENKINS555", time: "Today, 09:02 AM" },
+      { id: "log-2", msg: "Main Administrator approved CarbonTrace Portal claim", time: "Yesterday, 04:12 PM" },
+      { id: "log-3", msg: "Main Administrator registered staff key: DAVIS987", time: "2 days ago" }
+    ];
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("ldk_audit_logs");
+      if (stored) {
+        setAuditLogs(JSON.parse(stored));
+      } else {
+        setAuditLogs(defaultLogs);
+        localStorage.setItem("ldk_audit_logs", JSON.stringify(defaultLogs));
+      }
+    }
+  }, []);
+
+  const addAuditLog = (msg: string) => {
+    const newLog = {
+      id: `log_${Date.now()}`,
+      msg,
+      time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + " (Live)"
+    };
+    const updated = [newLog, ...auditLogs];
+    setAuditLogs(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_audit_logs", JSON.stringify(updated));
+    }
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim() || !newStaffKey.trim()) return;
+
+    const updated = [...registeredStaff, { name: newStaffName.trim(), key: newStaffKey.trim() }];
+    
+    // Save to Supabase User Metadata
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        registered_staff: updated
+      }
+    });
+
+    if (error) {
+      alert("Failed to register staff: " + error.message);
+    } else {
+      setRegisteredStaff(updated);
+      addAuditLog(`${currentStaff?.name || "Administrator"} registered new staff key: ${newStaffKey.trim()}`);
+      setNewStaffName("");
+      setNewStaffKey("");
+      alert(`Staff member "${newStaffName}" successfully registered.`);
+    }
+  };
+
+  const handleRemoveStaff = async (keyToRemove: string) => {
+    if (keyToRemove === "ADMIN") {
+      alert("Cannot remove primary administrator.");
+      return;
+    }
+    if (!confirm("Are you sure you want to revoke access for this staff key?")) return;
+
+    const updated = registeredStaff.filter(s => s.key !== keyToRemove);
+
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        registered_staff: updated
+      }
+    });
+
+    if (error) {
+      alert("Failed to update staff keys: " + error.message);
+    } else {
+      setRegisteredStaff(updated);
+      addAuditLog(`${currentStaff?.name || "Administrator"} revoked staff key: ${keyToRemove}`);
+    }
+  };
 
   const registryStudents = [
     { id: "s1", name: "Alex Carter", email: "alexcarter@mit.edu", department: "Computer Science", batchCode: "Batch A", gradYear: "2026", leetcode: "alexcarter", leetcodeSolved: 342, leetcodeEasy: 154, leetcodeMedium: 148, leetcodeHard: 40, leetcodeRank: "Top 8.4%", codeforces: "alex_cf", codeforcesRating: 1480, codeforcesRank: "Specialist", codechef: "alex_cc", codechefStars: "3★", unstop: "alex_unstop", hackathons: 6, authorized: true },
@@ -209,7 +314,8 @@ useEffect(() => {
         setSelectedClaim(prev => prev ? { ...prev, status: action } : null);
       }
 
-      alert(`Activity point claim has been successfully ${action === "approved" ? "verified" : "declined"}.`);
+      addAuditLog(`${currentStaff?.name || "Administrator"} ${action === "approved" ? "approved" : "declined"} ${claim.student_name}'s credit claim`);
+      alert(`Activity point claim has been successfully ${action === "approved" ? "verified" : "declined"} by ${currentStaff?.name || "Administrator"}.`);
     } catch (err) {
       console.error("Failed to update credit application: ", err);
     }
@@ -252,13 +358,24 @@ useEffect(() => {
             <div className="flex flex-col gap-1">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Registrar Desk</span>
               <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">
-                {activeTab === "verifications" ? "Academic Credit Claims" : "Student Talent Registry"}
+                {activeTab === "verifications" 
+                  ? "Academic Credit Claims" 
+                  : activeTab === "talent_registry"
+                  ? "Student Talent Registry"
+                  : "Staff Console Access Keys"}
               </h1>
               <p className="text-xs text-txt-sub">
                 {activeTab === "verifications" 
                   ? "Verify student hackathon portfolios and award extracurricular graduation credits." 
-                  : "Track student performance registry across LeetCode, Codeforces, and Hackathon platforms."}
+                  : activeTab === "talent_registry"
+                  ? "Track student performance registry across LeetCode, Codeforces, and Hackathon platforms."
+                  : "Manage credentials and track unique login keys for your department staff."}
               </p>
+              {currentStaff && (
+                <div className="text-[10px] font-mono text-emerald-500 mt-1">
+                  Active Session Staff: <strong className="font-bold uppercase">{currentStaff.name} ({currentStaff.key})</strong>
+                </div>
+              )}
             </div>
             
             <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start sm:self-center font-mono text-[9px] tracking-wider uppercase">
@@ -277,6 +394,14 @@ useEffect(() => {
                 }`}
               >
                 Talent Registry
+              </button>
+              <button 
+                onClick={() => setActiveTab("staff_access")}
+                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                  activeTab === "staff_access" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                Staff Access
               </button>
             </div>
           </div>
@@ -307,7 +432,7 @@ useEffect(() => {
           </div>
 
           {/* Active Tab contents */}
-          {activeTab === "verifications" ? (
+          {activeTab === "verifications" && (
             <div className="flex-grow flex flex-col min-h-0 gap-4">
               {/* Claims List Table */}
               <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
@@ -367,7 +492,9 @@ useEffect(() => {
                 )}
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === "talent_registry" && (
             <div className="flex-grow flex flex-col min-h-0 gap-4">
               
               {/* Dynamic Filter Controls */}
@@ -457,6 +584,82 @@ useEffect(() => {
               </div>
             </div>
           )}
+
+          {activeTab === "staff_access" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-6">
+              
+              {/* Form to Register Staff */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Register New Staff Console Access</span>
+                  <p className="text-xs text-txt-sub">Admins registered here can log in using their unique key and college email.</p>
+                </div>
+                
+                <form onSubmit={handleAddStaff} className="flex flex-col sm:flex-row gap-3 items-end">
+                  <div className="flex-grow flex flex-col gap-1 w-full">
+                    <label className="text-[9px] text-txt-sub font-mono uppercase tracking-wider">Staff Member Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newStaffName}
+                      onChange={(e) => setNewStaffName(e.target.value)}
+                      placeholder="e.g. Prof. Davis"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-sans w-full"
+                    />
+                  </div>
+                  
+                  <div className="flex-grow flex flex-col gap-1 w-full">
+                    <label className="text-[9px] text-txt-sub font-mono uppercase tracking-wider">Unique Staff Key / ID</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newStaffKey}
+                      onChange={(e) => setNewStaffKey(e.target.value)}
+                      placeholder="e.g. DAVIS987"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
+                    />
+                  </div>
+                  
+                  <button 
+                    type="submit"
+                    className="h-9 px-4 bg-accent-main text-bg-base text-xs font-mono uppercase tracking-wider font-semibold rounded-sm hover:opacity-90 transition-opacity flex-shrink-0 cursor-pointer w-full sm:w-auto"
+                  >
+                    Add Staff
+                  </button>
+                </form>
+              </div>
+
+              {/* List of Registered Staff */}
+              <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
+                <div className="p-4 border-b border-border-main/40 font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                  Registered Access Keys ({registeredStaff.length})
+                </div>
+                <div className="flex flex-col divide-y divide-border-main/40">
+                  {registeredStaff.map((staff) => (
+                    <div key={staff.key} className="p-4 flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-txt-main font-semibold">{staff.name}</span>
+                        <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider mt-0.5">Key: {staff.key}</span>
+                      </div>
+                      
+                      {staff.key !== "ADMIN" ? (
+                        <button 
+                          onClick={() => handleRemoveStaff(staff.key)}
+                          className="h-7 px-3 border border-red-500/40 text-red-500 hover:bg-red-500/10 text-[9px] font-mono uppercase tracking-wider rounded-sm transition-all cursor-pointer"
+                        >
+                          Revoke Access
+                        </button>
+                      ) : (
+                        <span className="text-[8px] font-mono tracking-wider bg-bg-card border border-border-main/80 text-txt-muted px-2 py-1 rounded uppercase">
+                          Primary Admin
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ================= RIGHT PANEL: INSPECTOR (5 Columns) ================= */}
@@ -464,14 +667,22 @@ useEffect(() => {
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-              {activeTab === "verifications" ? "Security Audit" : "Skills Analytics"}
+              {activeTab === "verifications" 
+                ? "Security Audit" 
+                : activeTab === "talent_registry"
+                ? "Skills Analytics"
+                : "Security Ledger"}
             </span>
             <h2 className="font-display text-lg font-light text-txt-main">
-              {activeTab === "verifications" ? "Portfolio Inspector" : "Talent Dossier"}
+              {activeTab === "verifications" 
+                ? "Portfolio Inspector" 
+                : activeTab === "talent_registry"
+                ? "Talent Dossier"
+                : "Console Session Log"}
             </h2>
           </div>
 
-          {activeTab === "verifications" ? (
+          {activeTab === "verifications" && (
             selectedClaim ? (
               <div className="flex flex-col gap-6 animate-fade-in">
                 
@@ -579,7 +790,9 @@ useEffect(() => {
                 <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
               </div>
             )
-          ) : (
+          )}
+
+          {activeTab === "talent_registry" && (
             selectedStudent ? (
               <div className="flex flex-col gap-6 animate-fade-in">
                 
@@ -668,6 +881,25 @@ useEffect(() => {
                 <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student from the registry list to audit their complete coding and hackathon performance profile.</p>
               </div>
             )
+          )}
+
+          {activeTab === "staff_access" && (
+            <div className="flex flex-col gap-4 animate-fade-in">
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Live Activity Ledger</span>
+                <p className="text-[10px] text-txt-sub leading-relaxed font-light">Interactions across the faculty console are stamped below with unique keys for compliance tracking.</p>
+              </div>
+
+              {/* Logs list */}
+              <div className="border border-border-main/70 bg-bg-surface rounded-sm flex flex-col h-[400px] overflow-y-auto divide-y divide-border-main/40">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-3.5 flex flex-col gap-1 text-xs">
+                    <span className="font-mono text-[9px] text-txt-muted">{log.time}</span>
+                    <p className="text-txt-main font-mono text-[10px] leading-relaxed break-all">{log.msg}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
         </section>

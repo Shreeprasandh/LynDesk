@@ -40,6 +40,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     setLoading(true);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("faculty_staff_member");
+    }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

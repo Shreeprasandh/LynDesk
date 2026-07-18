@@ -74,9 +74,10 @@ const INITIAL_EVENTS: EventItem[] = [
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
-  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success">("idle");
+  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success" | "faculty_login">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [staffKey, setStaffKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,6 +153,10 @@ export default function Home() {
     return () => window.removeEventListener("pageshow", handlePageShow);
   }, []);
 
+  useEffect(() => {
+    setStaffKey("");
+  }, [authStep]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -162,6 +167,44 @@ export default function Home() {
     });
     if (error) {
       setError(error.message);
+      setLoading(false);
+    }
+  };
+
+  const handleFacultyLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!data.user) {
+      setError("Authentication failed.");
+      setLoading(false);
+      return;
+    }
+
+    const staffList = data.user.user_metadata?.registered_staff || [];
+    if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
+      staffList.push({ name: "Main Administrator", key: "ADMIN" });
+    }
+
+    const matched = staffList.find((s: any) => s.key === staffKey.trim());
+    if (matched) {
+      localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
+      window.location.href = "/coordinator";
+    } else {
+      await supabase.auth.signOut();
+      setError("Invalid Staff Key. Access denied.");
       setLoading(false);
     }
   };
@@ -400,6 +443,18 @@ export default function Home() {
                     <p className="text-[10px] text-center text-txt-muted leading-relaxed font-light mt-1">
                       Using Google Auth automatically routes you into your local campus network.
                     </p>
+
+                    <div className="border-t border-border-main/40 pt-4 text-center mt-1">
+                      <button
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep("faculty_login");
+                        }}
+                        className="text-[9px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase underline cursor-pointer"
+                      >
+                        Faculty / Company Portal Login
+                      </button>
+                    </div>
                   </motion.div>
                 )}
 
@@ -493,6 +548,96 @@ export default function Home() {
                         {authStep === "login" ? "Need a new desk? Create an account" : "Already registered? Sign in"}
                       </button>
                     </div>
+                  </motion.form>
+                )}
+
+                {authStep === "faculty_login" && (
+                  <motion.form 
+                    key="faculty_login"
+                    onSubmit={handleFacultyLogin}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col gap-5"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep("idle");
+                        }}
+                        className="text-[10px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main mt-2">
+                        Faculty & Company Portal
+                      </h2>
+                      <p className="text-xs text-txt-muted font-light">
+                        Log in using your shared institutional email and unique staff key.
+                      </p>
+                    </div>
+
+                    {error && (
+                      <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-3.5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Shared Portal Email</label>
+                        <input 
+                          type="email" 
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="e.g. coordinator@college.edu"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-light"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Portal Password</label>
+                        <input 
+                          type="password" 
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Unique Staff Key / ID</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={staffKey}
+                          onChange={(e) => setStaffKey(e.target.value)}
+                          placeholder="e.g. DAVIS987"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    >
+                      {loading ? (
+                        <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                      ) : (
+                        <>
+                          Authenticate Staff Session
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
                   </motion.form>
                 )}
               </AnimatePresence>
