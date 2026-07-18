@@ -38,9 +38,9 @@
   --text-primary: 0 0% 6%;         /* #0F0F0F - Deep Obsidian */
   --text-secondary: 37 6% 39%;     /* #6B665E - Muted Stone Gray */
   --text-muted: 37 5% 60%;         /* #9E9991 - Warm Muted Gray */
-  --accent: 0 0% 11%;              /* #1B1B1B - Charcoal Accent */
+  --accent: 215 35% 32%;          /* #344A66 - Polished Slate-Navy Accent */
   --border-line: 37 20% 86%;       /* #E2DDD5 - Soft Sand Border */
-  --ring-line: 0 0% 6%;
+  --ring-line: 215 35% 32%;
 }
 
 /* Dark Theme */

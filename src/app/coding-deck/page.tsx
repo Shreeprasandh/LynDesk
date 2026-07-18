@@ -544,18 +544,18 @@ export default function CodingDeckPage() {
             
             {/* Year Dropdown Filter matching LeetCode ref image layout */}
             {stats.leetcode?.activeYears && stats.leetcode.activeYears.length > 0 && (
-              <div className="relative bg-[#2c2c2c] hover:bg-[#3c3c3c] text-txt-main px-2.5 py-1 rounded border border-border-main/20 cursor-pointer transition-all select-none text-[9px] font-sans flex items-center gap-1">
+              <div className="relative bg-bg-card hover:bg-bg-card/80 text-txt-main px-2.5 py-1 rounded border border-border-main/60 cursor-pointer transition-all select-none text-[9px] font-sans flex items-center pr-5">
                 <select
                   value={selectedLcYear || ""}
                   onChange={(e) => setSelectedLcYear(e.target.value ? parseInt(e.target.value) : null)}
-                  className="bg-transparent border-none outline-none cursor-pointer text-txt-main font-semibold pr-1 appearance-none"
+                  className="bg-transparent border-none outline-none cursor-pointer text-txt-main font-semibold appearance-none w-full py-0.5 [&::-ms-expand]:hidden pr-1"
                 >
-                  <option value="" className="bg-[#2c2c2c] text-txt-main">Current</option>
+                  <option value="" className="bg-bg-surface text-txt-main">Current</option>
                   {stats.leetcode.activeYears.map((y) => (
-                    <option key={y} value={y} className="bg-[#2c2c2c] text-[#dfdfdf]">{y}</option>
+                    <option key={y} value={y} className="bg-bg-surface text-txt-main">{y}</option>
                   ))}
                 </select>
-                <span className="text-[7px] pointer-events-none">▼</span>
+                <span className="text-[7px] pointer-events-none absolute right-2">▼</span>
               </div>
             )}
           </div>
@@ -580,7 +580,7 @@ export default function CodingDeckPage() {
                   {block.weeks.map((week, wIdx) => (
                     <div key={wIdx} className="flex flex-col gap-1 w-2.5">
                       {week.cells.map((cell, cIdx) => {
-                        let colorClass = "bg-[#2c2c2c] border border-[#3c3c3c]/60";
+                        let colorClass = "bg-[#ebedf0] dark:bg-[#2c2c2c] border border-[#e1e4e8] dark:border-[#3c3c3c]/60";
                         if (cell.level === 1) colorClass = "bg-emerald-500/20 border border-emerald-500/10";
                         if (cell.level === 2) colorClass = "bg-emerald-500/50 border border-emerald-500/20";
                         if (cell.level === 3) colorClass = "bg-emerald-500";
@@ -609,7 +609,7 @@ export default function CodingDeckPage() {
         {/* Legend */}
         <div className="flex justify-end items-center gap-1.5 text-[8px] font-mono text-txt-muted uppercase pt-1">
           <span>Less</span>
-          <div className="w-2 h-2 rounded-sm bg-[#2c2c2c] border border-[#3c3c3c]/60" />
+          <div className="w-2 h-2 rounded-sm bg-[#ebedf0] dark:bg-[#2c2c2c] border border-[#e1e4e8] dark:border-[#3c3c3c]/60" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500/20 border border-emerald-500/10" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500/50 border border-emerald-500/20" />
           <div className="w-2 h-2 rounded-sm bg-emerald-500" />
@@ -730,7 +730,7 @@ export default function CodingDeckPage() {
                   <div className="flex items-center gap-2.5">
                     <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center text-[#ffa116]">
                       <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-                        <path d="M13.483 0a1.374 1.374 0 0 0-.961.414L.772 12.164a1.378 1.378 0 0 0 0 1.932l11.75 11.75a1.38 1.38 0 0 0 1.933 0l1.242-1.242a1.378 1.378 0 0 0 0-1.933L5.807 13.064h15.932c.757 0 1.37-.613 1.37-1.37v-1.74a1.37 1.37 0 0 0-1.37-1.37H5.807L15.945 2.164a1.378 1.378 0 0 0 0-1.933L14.703.414a1.374 1.374 0 0 0-.96-.414h-.26Z" />
+                        <path d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.35 5.35 0 0 0-.125.513 5.527 5.527 0 0 0 .062 2.362 5.83 5.83 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.955-.003l-2.388 2.385c-2.278 2.183-5.83 2.211-8.122.062l-.004-.004L4.35 13.559a4.444 4.444 0 0 1 .135-2.091 4.364 4.364 0 0 1 1.023-1.78l3.853-4.126 5.406-5.788a1.374 1.374 0 0 0-.961-.438 1.374 1.374 0 0 0-.323.04z" />
                       </svg>
                     </span>
                     <div className="flex flex-col">

@@ -13,7 +13,7 @@ export default function LynDeskLogo({ className = "", size = 24 }: LynDeskLogoPr
       alt="LynDesk Logo" 
       width={scaledSize}
       height={scaledSize}
-      className={`object-contain rounded-full border border-border-main/60 filter grayscale dark:invert transition-all duration-150 ${className}`}
+      className={`object-contain rounded-full border border-border-main/60 filter grayscale invert dark:invert-0 transition-all duration-150 ${className}`}
     />
   );
 }
