@@ -139,6 +139,10 @@ export default function CodingDeckPage() {
   // LeetCode year filter state
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
 
+  // LeetCode success banner transition and display state
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [prevCompleted, setPrevCompleted] = useState<boolean | null>(null);
+
   // Custom disconnect confirmation modal state
   const [disconnectModal, setDisconnectModal] = useState<{
     isOpen: boolean;
@@ -162,6 +166,23 @@ export default function CodingDeckPage() {
     unstop: null,
     hack2skill: null,
   });
+
+  // Handle LeetCode daily challenge success banner timeout (display for 15 seconds on completion transition)
+  useEffect(() => {
+    const isCompleted = stats.leetcode?.dailyChallenge?.completed;
+    if (isCompleted !== undefined && isCompleted !== null) {
+      if (prevCompleted === false && isCompleted === true) {
+        setShowSuccessBanner(true);
+        const timer = setTimeout(() => {
+          setShowSuccessBanner(false);
+        }, 15000);
+        setPrevCompleted(true);
+        return () => clearTimeout(timer);
+      } else if (prevCompleted !== isCompleted) {
+        setPrevCompleted(isCompleted);
+      }
+    }
+  }, [stats.leetcode?.dailyChallenge?.completed, prevCompleted]);
 
   // Load platform details from Supabase Auth user metadata
   useEffect(() => {
@@ -663,7 +684,7 @@ export default function CodingDeckPage() {
           </div>
         )}
 
-        {leetcodeUser && stats.leetcode?.dailyChallenge?.completed && (
+        {leetcodeUser && showSuccessBanner && stats.leetcode?.dailyChallenge?.completed && (
           <div className="border border-emerald-500/40 bg-emerald-500/10 p-4 rounded-md flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
