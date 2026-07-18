@@ -139,6 +139,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [copiedLink, setCopiedLink] = useState(false);
   const [friendsToInvite, setFriendsToInvite] = useState<FriendProfile[]>([]);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
+  const [workspaceTrigger, setWorkspaceTrigger] = useState(0);
 
   // Git Commits (live simulation list)
   const [commits, setCommits] = useState([
@@ -194,6 +195,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 profile_id: user.id,
                 content: `Joined the workspace via share link!`
               });
+
+              setWorkspaceTrigger(prev => prev + 1);
             }
           } catch (e) {
             console.error("Auto join failure: ", e);
@@ -422,7 +425,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
 
     fetchWorkspaceDetails();
-  }, [id, user]);
+  }, [id, user, workspaceTrigger]);
 
   // Real-time Chat subscription
   useEffect(() => {
