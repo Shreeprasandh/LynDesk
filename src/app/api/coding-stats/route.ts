@@ -442,7 +442,7 @@ export async function GET(request: Request) {
       const starsMatch = html.match(/rating[^>]*>.*?(\d+)★/) || html.match(/(\d)★/);
       const rank = starsMatch ? `${starsMatch[1]}★` : "1★";
 
-      const solvedMatch = html.match(/Fully Solved.*?\((\d+)\)/s) || html.match(/Fully Solved.*?(\d+)/s);
+      const solvedMatch = html.match(/Fully Solved[\s\S]*?\((\d+)\)/) || html.match(/Fully Solved[\s\S]*?(\d+)/);
       const solved = solvedMatch ? parseInt(solvedMatch[1]) : 0;
 
       return NextResponse.json({
