@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
@@ -138,6 +138,7 @@ export default function CodingDeckPage() {
 
   // LeetCode year filter state
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
+  const heatmapScrollRef = useRef<HTMLDivElement>(null);
 
   // LeetCode success banner transition and display state
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
@@ -166,6 +167,16 @@ export default function CodingDeckPage() {
     unstop: null,
     hack2skill: null,
   });
+
+  // Auto-scroll the heatmap to the far right (current month/latest submissions)
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (heatmapScrollRef.current) {
+        heatmapScrollRef.current.scrollLeft = heatmapScrollRef.current.scrollWidth;
+      }
+    }, 120);
+    return () => clearTimeout(handle);
+  }, [stats.leetcode, selectedLcYear]);
 
   // Handle LeetCode daily challenge success banner timeout (display for 15 seconds on completion transition)
   useEffect(() => {
@@ -571,8 +582,11 @@ export default function CodingDeckPage() {
         )}
 
         {/* Heatmap Grid with bottom Month Labels and no day labels */}
-        <div className="overflow-x-auto w-full py-2 scroll-smooth [webkit-overflow-scrolling:touch] select-none scrollbar-thin scrollbar-thumb-border-main/40 scrollbar-track-transparent">
-          <div className="flex gap-2 items-start select-none min-w-max pb-1">
+        <div 
+          ref={heatmapScrollRef}
+          className="overflow-x-auto w-full py-2 scroll-smooth [webkit-overflow-scrolling:touch] select-none scrollbar-thin scrollbar-thumb-border-main/40 scrollbar-track-transparent"
+        >
+          <div className="flex gap-2 items-start select-none min-w-max pb-1 px-4">
             {monthBlocks.map((block, bIdx) => (
               <div key={bIdx} className="flex flex-col gap-2">
                 {/* Cells for this month */}
