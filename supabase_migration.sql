@@ -43,6 +43,11 @@ CREATE TABLE public.profiles (
     hack2skill_username TEXT,
     college_key TEXT,
     company_key TEXT,
+    department TEXT,
+    graduation_year TEXT,
+    github_url TEXT,
+    linkedin_url TEXT,
+    portfolio_url TEXT,
     leetcode_daily_completed BOOLEAN DEFAULT false NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -352,4 +357,12 @@ CREATE POLICY "Allow users to update their friendships" ON public.friendships
 -- Allow users to delete friendships they are a part of
 CREATE POLICY "Allow users to delete their friendships" ON public.friendships
     FOR DELETE USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
+
+
+-- Safe alter commands to add classmate directory profile columns if tables are pre-created
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS graduation_year TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS github_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS portfolio_url TEXT;
 
