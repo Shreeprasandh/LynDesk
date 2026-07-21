@@ -490,9 +490,13 @@ export default function Home() {
 
       if (data.user) {
         localStorage.setItem("company_recruiter_member", JSON.stringify({ name: "Corporate Recruiter", key: "recruit2026" }));
-        await supabase.auth.updateUser({
-          data: { company_key: "recruit2026", role: "employee" }
-        });
+        try {
+          await supabase.auth.updateUser({
+            data: { company_key: "recruit2026", role: "employee" }
+          });
+        } catch (updateErr) {
+          console.error("Failed updating user metadata:", updateErr);
+        }
         window.location.href = "/recruiter";
         return;
       }
@@ -525,7 +529,11 @@ export default function Home() {
       localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
       window.location.href = "/coordinator";
     } else {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutErr) {
+        console.error("Sign out error:", signOutErr);
+      }
       setError("Invalid Staff Key. Access denied.");
       setLoading(false);
     }

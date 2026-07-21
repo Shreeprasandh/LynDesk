@@ -17,11 +17,11 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-const supabaseUrl = envConfig.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey = envConfig.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || envConfig.NEXT_PUBLIC_SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || envConfig.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceKey) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local");
+  console.error("Missing process.env.NEXT_PUBLIC_SUPABASE_URL or process.env.SUPABASE_SERVICE_ROLE_KEY in environment or .env.local");
   process.exit(1);
 }
 
@@ -71,7 +71,11 @@ async function seed() {
 
   console.log(`Found ${seedUsersToDelete.length} seed users to delete.`);
   for (const u of seedUsersToDelete) {
-    await supabase.auth.admin.deleteUser(u.id);
+    try {
+      await supabase.auth.admin.deleteUser(u.id);
+    } catch (delErr) {
+      console.error(`Failed deleting user ${u.id}:`, delErr);
+    }
   }
   console.log("✅ Cleanup complete.");
 

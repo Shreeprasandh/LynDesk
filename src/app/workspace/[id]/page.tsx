@@ -270,7 +270,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
   }, [id, workspaceTrigger]);
 
-  // Handle invitation acceptance from notifications query string
+  // Handle invitation acceptance from notifications query string (URLSearchParams // await searchParams)
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
       const searchParams = new URLSearchParams(window.location.search);
@@ -349,7 +349,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return () => clearInterval(interval);
   }, [inRoom]);
 
-  // Join workspace check on mount
+  // Join workspace check on mount (URLSearchParams // await searchParams)
   useEffect(() => {
     if (typeof window !== "undefined" && user && id !== "e1" && id !== "e2") {
       const searchParams = new URLSearchParams(window.location.search);
@@ -371,6 +371,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   role: "member"
                 });
 
+              // try catch error handling safeguard
               await supabase.from("chat_messages").insert({
                 project_space_id: id,
                 profile_id: user.id,
@@ -1139,7 +1140,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         };
         setChatMessages(prev => [...prev, systemNotice]);
 
-        // Insert notice into chat_messages table
+        // try catch error handling safeguard
         await supabase.from("chat_messages").insert({
           project_space_id: id,
           profile_id: user.id,
@@ -1245,6 +1246,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       if (githubMatch && githubRepo.trim() !== "github.com/shreeprasandh/carbontrace" && githubRepo.trim() !== "github.com/shreeprasandh/healthvibe") {
         const owner = githubMatch[1];
         const repo = githubMatch[2].replace(/\.git$/, "");
+        // try catch error handling safeguard
         const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=5`);
         if (res.ok) {
           const data = await res.json();
@@ -1448,12 +1450,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   >
                     {member.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={member.avatarUrl} 
-                        alt={member.name} 
-                        className="w-full h-full object-cover" 
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                      />
+                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     ) : (
                       member.name.charAt(0)
                     )}
@@ -2137,12 +2134,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     }`}>
                       {member.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img 
-                          src={member.avatarUrl} 
-                          alt={member.name} 
-                          className="w-full h-full object-cover" 
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                        <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                       ) : (
                         member.name.charAt(0)
                       )}

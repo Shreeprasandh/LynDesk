@@ -344,13 +344,17 @@ export default function ProfilePage() {
             (finalBatchCode && finalBatchCode !== metaBatchCode)
           ) {
             // Update auth metadata
-            await supabase.auth.updateUser({
-              data: {
-                college_linked_status: newCollegeStatus || metaCollegeStatus,
-                college_key: finalCollegeKey || metaCollegeKey,
-                batch_code: finalBatchCode || metaBatchCode
-              }
-            });
+            try {
+              await supabase.auth.updateUser({
+                data: {
+                  college_linked_status: newCollegeStatus || metaCollegeStatus,
+                  college_key: finalCollegeKey || metaCollegeKey,
+                  batch_code: finalBatchCode || metaBatchCode
+                }
+              });
+            } catch (authErr) {
+              console.error("Auth metadata update failed:", authErr);
+            }
             
             // Also write to profiles table
             await supabase
@@ -455,13 +459,17 @@ export default function ProfilePage() {
     localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
     setCollegeLinkedStatus("pending");
     
-    await supabase.auth.updateUser({
-      data: {
-        college_key: collegeKey.trim(),
-        batch_code: batchCode.trim(),
-        college_linked_status: "pending"
-      }
-    });
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          college_key: collegeKey.trim(),
+          batch_code: batchCode.trim(),
+          college_linked_status: "pending"
+        }
+      });
+    } catch (updateErr) {
+      console.error("Failed updating user metadata:", updateErr);
+    }
     
     const notifStored = localStorage.getItem("ldk_global_notifications");
     const notifList = notifStored ? JSON.parse(notifStored) : [];
@@ -526,13 +534,17 @@ export default function ProfilePage() {
     setCollegeLinkedStatus("none");
     setCollegeKey("");
     setBatchCode("");
-    await supabase.auth.updateUser({
-      data: {
-        college_key: "",
-        batch_code: "",
-        college_linked_status: "none"
-      }
-    });
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          college_key: "",
+          batch_code: "",
+          college_linked_status: "none"
+        }
+      });
+    } catch (updateErr) {
+      console.error("Failed updating user metadata:", updateErr);
+    }
     
     const notifStored = localStorage.getItem("ldk_global_notifications");
     const notifList = notifStored ? JSON.parse(notifStored) : [];
@@ -1018,7 +1030,7 @@ export default function ProfilePage() {
         )}
 
         {/* Profile Completeness Progress Card (hides automatically at 100%) */}
-        {completenessScore < 100 && (
+        {!loading && !authLoading && completenessScore < 100 && (
           <div className="border border-border-main/80 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">

@@ -87,155 +87,52 @@ export default function LynAI() {
   const simulateAISponse = async (userPrompt: string) => {
     setIsTyping(true);
     
-    // Process prompts with premium contextual answers
-    let aiResponse = "";
-    let actionLink: { label: string; href: string } | undefined = undefined;
-    const promptLower = userPrompt.toLowerCase();
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: messages.slice(-10), // Send last 10 messages for conversation context
+          userPrompt: userPrompt,
+          profileContext: {
+            name: studentMeta.full_name,
+            college: studentMeta.college_name,
+            department: studentMeta.department,
+            skills: studentMeta.skills,
+            leetcodeSolved: studentMeta.leetcode_solved,
+            codeforcesRating: studentMeta.codeforces_rating
+          }
+        })
+      });
 
-    // Context variable resolutions
-    const name = studentMeta.full_name || "Student Developer";
-    const college = studentMeta.college_name || "your college";
-    const skills = studentMeta.skills || "React, JavaScript, Node.js";
-    const leetcode = studentMeta.leetcode_username || "not linked";
-
-    if (promptLower.includes("profile") || promptLower.includes("settings") || promptLower.includes("account") || promptLower.includes("bio") || promptLower.includes("change my name") || promptLower.includes("resume upload") || promptLower.includes("college key") || promptLower.includes("company key")) {
-      aiResponse = `### 👤 Profile Settings
-Update your profile details, academic records, and resume directly in Settings:`;
-      actionLink = { label: "Go to Profile Settings", href: "/profile" };
-    } else if (promptLower.includes("leetcode") || promptLower.includes("codeforces") || promptLower.includes("codechef") || promptLower.includes("unstop") || promptLower.includes("hack2skill") || promptLower.includes("coding deck") || promptLower.includes("daily problem") || promptLower.includes("streak") || promptLower.includes("solve")) {
-      aiResponse = `### 💻 Coding Deck
-Sync your coding handles and view problem metrics directly in the coding deck:`;
-      actionLink = { label: "Go to Coding Deck", href: "/coding-deck" };
-    } else if (promptLower.includes("explore") || promptLower.includes("teammates") || promptLower.includes("partners") || promptLower.includes("hackathons") || promptLower.includes("events") || promptLower.includes("classmates")) {
-      aiResponse = `### 🔍 Matchmaking & Events
-Browse peer directories and connect with event collaborators:`;
-      actionLink = { label: "Go to Explore Arena", href: "/explore" };
-    } else if (promptLower.includes("faculty") || promptLower.includes("coordinator") || promptLower.includes("approve") || promptLower.includes("claims") || promptLower.includes("verify points")) {
-      aiResponse = `### 🎓 Faculty Desk
-The Faculty Coordinator Console allows staff to verify credit applications:`;
-      actionLink = { label: "Go to Faculty Console", href: "/coordinator" };
-    } else if (promptLower.includes("leaderboard") || promptLower.includes("ranking") || promptLower.includes("who is top")) {
-      aiResponse = `### 🏆 Leaderboard
-Compare standings and coding milestones with other student engineers:`;
-      actionLink = { label: "Go to Leaderboard", href: "/leaderboard" };
-    } else if (promptLower.includes("dashboard") || promptLower.includes("workspace") || promptLower.includes("gantt") || promptLower.includes("tasks") || promptLower.includes("create project")) {
-      aiResponse = `### 🗂️ Workspace Dashboard
-Manage project channels, tasks, and team timelines:`;
-      actionLink = { label: "Go to Dashboard", href: "/" };
-    } else if (promptLower.includes("bubble sort")) {
-      aiResponse = `### 💡 Bubble Sort
-A simple sorting algorithm that repeatedly compares and swaps adjacent elements in the wrong order.
-
-JavaScript implementation:
-\`\`\`javascript
-function bubbleSort(arr) {
-  let len = arr.length;
-  for (let i = 0; i < len; i++) {
-    for (let j = 0; j < len - i - 1; j++) {
-      if (arr[j] > arr[j + 1]) {
-        let temp = arr[j];
-        arr[j] = arr[j + 1];
-        arr[j + 1] = temp;
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Math.random().toString(),
+            sender: "lynai",
+            text: data.response,
+            actionLink: data.actionLink,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      } else {
+        throw new Error("Chat API failed");
       }
-    }
-  }
-  return arr;
-}
-\`\`\``;
-    } else if (promptLower.includes("audit") || promptLower.includes("portfolio") || promptLower.includes("summary")) {
-      try {
-        const res = await fetch("/api/ai/portfolio-summary", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            leetcode: { solved: Number(studentMeta.leetcode_solved) || 28, leetcodeStreak: 5 },
-            codeforces: { rating: 1320, solved: 42 },
-            codechef: { rating: 1450 }
-          })
-        });
-        if (res.ok) {
-          const aiData = await res.json();
-          const insightList = Array.isArray(aiData.insights) && aiData.insights.length > 0
-            ? aiData.insights.map((ins: string) => `* ${ins}`).join("\n")
-            : "* Maintain daily streak discipline across platforms.\n* Request verification credits for completed codebases.";
-          const skillList = Array.isArray(aiData.skills) && aiData.skills.length > 0 
-            ? aiData.skills.join(", ") 
-            : String(skills);
-            
-          aiResponse = `### 📊 AI Portfolio Audit: ${name}
-${aiData.summary || "Solid technical foundation across algorithm solving and full-stack development."}
-
-* **Target Institution**: \`${college}\`
-* **Core Strengths**: \`${skillList}\`
-* **Competitive Index**: \`${aiData.score || 85}/100\`
-
-**Actionable Insights**:
-${insightList}`;
-        } else {
-          aiResponse = `### 📊 Portfolio Audit: ${name}
-* **Institution**: \`${college}\`
-* **Skills**: ${skills}
-* **LeetCode**: \`@${leetcode}\`
-
-**Recommendations**:
-* Profile is public to recruiters.
-* Add Codeforces handle to complete active profile syncing.
-* Maintain consistency by solving coding tasks daily.`;
-        }
-      } catch {
-        aiResponse = `### 📊 Portfolio Audit: ${name}
-* **Institution**: \`${college}\`
-* **Skills**: ${skills}
-* **LeetCode**: \`@${leetcode}\`
-
-**Recommendations**:
-* Maintain consistency by solving coding tasks daily.`;
-      }
-    } else if (promptLower.includes("placement") || promptLower.includes("job") || promptLower.includes("career")) {
-      aiResponse = `### 🎯 Placement Roadmap
-* **Target Roles**: Full-Stack / Systems Engineer matching (${skills}).
-* **Checklist**:
-  1. Add verified portfolio URL in settings.
-  2. Request verification credits for codebases.
-  3. Register for upcoming corporate challenges.`;
-    } else if (promptLower.includes("idea") || promptLower.includes("hackathon")) {
-      aiResponse = `### 💡 Hackathon Idea: "EduBlock"
-* **Concept**: Tamper-proof academic credential wallet using smart contracts.
-* **Tech**: Next.js, Supabase, Solidity.
-* **Roadmap**: Build registrar verification flow, and link user wallets for credential claims.`;
-    } else if (promptLower.includes("resume") || promptLower.includes("cv")) {
-      aiResponse = `### 📝 Resume Layout
-Copy this schema for your portfolio:
-
-\`\`\`markdown
-# ${name}
-*Email: ${user?.email} | ${college}*
-
-## TECHNICAL SKILLS
-* ${skills}
-
-## PROJECTS
-### Verified Project on LynDesk
-* Collaborative workspace with real-time tracking.
-\`\`\``;
-    } else {
-      aiResponse = `I can assist you with navigation, profile audits, and hackathon project roadmaps. Please ask about settings, the coding deck, leaderboards, or portfolios.`;
-    }
-
-    // Simulate streaming typing effect
-    setTimeout(() => {
+    } catch {
       setMessages(prev => [
         ...prev,
         {
           id: Math.random().toString(),
           sender: "lynai",
-          text: aiResponse,
-          actionLink: actionLink,
+          text: "I am having trouble connecting to the Generative AI engine right now. Please verify your connection or retry shortly.",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleSend = (e: React.FormEvent) => {

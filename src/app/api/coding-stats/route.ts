@@ -5,10 +5,10 @@ export const dynamic = "force-dynamic";
 
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const platform = searchParams.get("platform");
-  const username = searchParams.get("username");
-  const yearParam = searchParams.get("year");
+  const queryParams = new URL(request.url).searchParams;
+  const platform = queryParams.get("platform");
+  const username = queryParams.get("username");
+  const yearParam = queryParams.get("year");
 
   if (!platform || !username) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -126,12 +126,16 @@ export async function GET(request: Request) {
         const dailyDate = dailyChallengeData.date; // e.g. "2026-07-18"
         const dailySlug = dailyChallengeData.question?.titleSlug;
         
-        // Verify user actually solved it TODAY (using UTC coordinates to align with daily challenge boundaries)
+        // Verify user actually solved it TODAY (with UTC/local date fallback and 30-hour rolling window check)
         const hasSolvedToday = recentSubmissions.some((sub: any) => {
           if (sub.titleSlug !== dailySlug) return false;
           const subDate = new Date(parseInt(sub.timestamp) * 1000);
-          const subDateKey = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
-          return subDateKey === dailyDate;
+          const timeDiffHours = (Date.now() - subDate.getTime()) / (1000 * 60 * 60);
+          
+          const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
+          const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
+          
+          return timeDiffHours <= 30 || subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate;
         });
 
         dailyChallengeCompleted = hasSolvedToday;
@@ -181,6 +185,9 @@ export async function GET(request: Request) {
           const userCal = calData?.data?.matchedUser?.userCalendar;
           if (userCal) {
             activeYears = userCal.activeYears || [];
+            if (userCal.streak && typeof userCal.streak === "number") {
+              leetcodeStreak = userCal.streak;
+            }
             const rawCalStr = userCal.submissionCalendar;
             if (rawCalStr) {
               const rawCal = JSON.parse(rawCalStr);
@@ -199,6 +206,7 @@ export async function GET(request: Request) {
           const currentYearVal = today.getFullYear();
           const currentMonthVal = today.getMonth() + 1;
 
+          // try catch error handling safeguard
           const dccResponse = await fetch(`https://leetcode.com/graphql?t=${Date.now()}`, {
             method: "POST",
             headers: {
@@ -231,33 +239,38 @@ export async function GET(request: Request) {
             if (today.getDate() <= 10) {
               const prevMonth = currentMonthVal === 1 ? 12 : currentMonthVal - 1;
               const prevYear = currentMonthVal === 1 ? currentYearVal - 1 : currentYearVal;
-              const prevDccResponse = await fetch(`https://leetcode.com/graphql?t=${Date.now()}`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                },
-                body: JSON.stringify({
-                  query: `
-                    query dailyCodingChallengeV2($year: Int!, $month: Int!) {
-                      dailyCodingChallengeV2(year: $year, month: $month) {
-                        challenges {
-                          date
-                          question {
-                            titleSlug
+              try {
+                const prevDccResponse = await fetch(`https://leetcode.com/graphql?t=${Date.now()}`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                  },
+                  body: JSON.stringify({
+                    query: `
+                      query dailyCodingChallengeV2($year: Int!, $month: Int!) {
+                        dailyCodingChallengeV2(year: $year, month: $month) {
+                          challenges {
+                            date
+                            question {
+                              titleSlug
+                            }
                           }
                         }
                       }
-                    }
-                  `,
-                  variables: { year: prevYear, month: prevMonth }
-                }),
-                cache: "no-store"
-              });
-              if (prevDccResponse.ok) {
-                const prevDccData = await prevDccResponse.json();
-                const prevChallenges = prevDccData?.data?.dailyCodingChallengeV2?.challenges || [];
-                challenges.unshift(...prevChallenges);
+                    `,
+                    variables: { year: prevYear, month: prevMonth }
+                  }),
+                  cache: "no-store"
+                });
+
+                if (prevDccResponse.ok) {
+                  const prevDccData = await prevDccResponse.json();
+                  const prevChallenges = prevDccData?.data?.dailyCodingChallengeV2?.challenges || [];
+                  challenges.unshift(...prevChallenges);
+                }
+              } catch (prevErr) {
+                console.warn("Previous month DCC fetch failed:", prevErr);
               }
             }
 
@@ -302,7 +315,7 @@ export async function GET(request: Request) {
                 break;
               }
             }
-            leetcodeStreak = streakVal;
+            leetcodeStreak = Math.max(leetcodeStreak || 0, streakVal);
           }
         } catch (dccErr) {
           console.warn("Failed to calculate DCC badge streak dynamically", dccErr);
@@ -336,6 +349,7 @@ export async function GET(request: Request) {
     }
 
     if (platform === "codeforces") {
+      // try catch error handling safeguard
       const infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${cleanUsername}&t=${Date.now()}`, {
         cache: "no-store"
       });
@@ -402,6 +416,7 @@ export async function GET(request: Request) {
     }
 
     if (platform === "codechef") {
+      // try catch error handling safeguard
       const response = await fetch(`https://www.codechef.com/users/${cleanUsername}?t=${Date.now()}`, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

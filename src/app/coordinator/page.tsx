@@ -115,7 +115,7 @@ function CoordinatorConsoleContent() {
 
   const [activeTab, setActiveTab] = useState<"overview" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
 
-  // Sync activeTab with search parameter updates
+  // Sync activeTab with search parameter updates (client component useSearchParams hook, // await searchParams)
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     if (tabParam && ["overview", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
