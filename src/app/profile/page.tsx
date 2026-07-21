@@ -1019,7 +1019,9 @@ export default function ProfilePage() {
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
                     disabled={!isEditing || uploadingAvatar}
-                    className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold disabled:pointer-events-none"
+                    className={`absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold disabled:pointer-events-none ${
+                      isEditing ? "opacity-0 group-hover:opacity-100 cursor-pointer" : "hidden"
+                    }`}
                   >
                     {uploadingAvatar ? "..." : "Edit"}
                   </button>

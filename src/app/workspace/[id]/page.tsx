@@ -20,6 +20,8 @@ import {
   CloudUpload,
   Terminal,
   Award,
+  Plus,
+  User,
   X
 } from "lucide-react";
 
@@ -44,6 +46,7 @@ interface TeamMember {
   role: string;
   isOnline: boolean;
   isSpeaking?: boolean;
+  avatarUrl?: string;
 }
 
 interface ChatMsg {
@@ -97,11 +100,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [inRoom, setInRoom] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
-  const [roomMembers, setRoomMembers] = useState<TeamMember[]>([
-    { id: "m1", name: "Alex Carter", role: "Developer", isOnline: true, isSpeaking: false },
-    { id: "m2", name: "Mira Sen", role: "Designer", isOnline: true, isSpeaking: false },
-    { id: "m3", name: "Prof. Davis", role: "Mentor", isOnline: false },
-  ]);
+  const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
+  const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
 
   // WebRTC real-time voice and video variables
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -148,6 +148,111 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       return () => clearTimeout(timer);
     }
   }, [message]);
+
+  // Load workspace members dynamically from local storage and DB
+  useEffect(() => {
+    const loadMembers = async () => {
+      const baseMembers = [
+        { id: "m1", name: "Alex Carter", role: "Developer", isOnline: true, isSpeaking: false, avatarUrl: "" },
+        { id: "m2", name: "Mira Sen", role: "Designer", isOnline: true, isSpeaking: false, avatarUrl: "" },
+        { id: "m3", name: "Prof. Davis", role: "Mentor", isOnline: false, avatarUrl: "" },
+      ];
+
+      // 1. Load mock members accepted from local storage
+      const storedStr = localStorage.getItem(`ldk_workspace_members_${id}`);
+      const storedList = storedStr ? JSON.parse(storedStr) : [];
+
+      // 2. Query real database members if it's a UUID
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let dbMembersList: TeamMember[] = [];
+      if (isUuid) {
+        try {
+          const { data, error } = await supabase
+            .from("project_members")
+            .select(`
+              role,
+              profile:profile_id ( id, username, full_name, avatar_url )
+            `)
+            .eq("project_space_id", id);
+          
+          if (!error && data) {
+            dbMembersList = data.map((item: any) => {
+              const prof = item.profile;
+              return {
+                id: prof.id,
+                name: prof.full_name || prof.username || "Collaborator",
+                role: item.role === "creator" ? "Creator" : "Collaborator",
+                avatarUrl: prof.avatar_url || "",
+                isOnline: true
+              };
+            });
+          }
+        } catch (e) {
+          console.error("Error loading project members: ", e);
+        }
+      }
+
+      // Combine them, filtering out duplicate IDs
+      const combined = [...baseMembers, ...storedList, ...dbMembersList];
+      const uniqueMap = new Map();
+      combined.forEach(m => {
+        uniqueMap.set(m.id, m);
+      });
+      setRoomMembers(Array.from(uniqueMap.values()));
+    };
+
+    if (user) {
+      loadMembers();
+    }
+  }, [id, user, workspaceTrigger]);
+
+  // Handle invitation acceptance from notifications query string
+  useEffect(() => {
+    if (typeof window !== "undefined" && user) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const inviteId = searchParams.get("acceptInvite");
+      const inviteName = searchParams.get("friendName");
+      
+      if (inviteId && inviteName) {
+        // Strip parameters from URL for clean navigation
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
+        const storedKey = `ldk_workspace_members_${id}`;
+        const storedStr = localStorage.getItem(storedKey);
+        const storedList = storedStr ? JSON.parse(storedStr) : [];
+
+        if (!storedList.some((m: any) => m.id === inviteId)) {
+          const newMember = {
+            id: inviteId,
+            name: decodeURIComponent(inviteName),
+            role: "Collaborator",
+            isOnline: true,
+            avatarUrl: ""
+          };
+          const updated = [...storedList, newMember];
+          localStorage.setItem(storedKey, JSON.stringify(updated));
+          
+          // Post bot notice in chat
+          const botNotice: ChatMsg = {
+            id: getUniqueId("sys"),
+            sender_name: "LDK:BOT",
+            sender_role: "SYSTEM",
+            content: `${newMember.name} accepted the invite and joined the workspace.`,
+            created_at: new Date().toISOString(),
+            isSystem: true
+          };
+          setChatMessages(prev => [...prev, botNotice]);
+
+          // Show themed success toast
+          setMessage({ text: `${newMember.name} joined the workspace!`, type: "success" });
+          
+          // Trigger workspace re-sync
+          setWorkspaceTrigger(prev => prev + 1);
+        }
+      }
+    }
+  }, [user, id]);
 
   // Git Commits (live simulation list)
   const [commits, setCommits] = useState([
@@ -985,135 +1090,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const handleSendDirectInvite = async (friendId: string, friendName: string) => {
     setInvitingFriendId(friendId);
     try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      // Direct invite builds a notification with an accept actionUrl link
+      const notifStored = localStorage.getItem("ldk_global_notifications");
+      const notifList = notifStored ? JSON.parse(notifStored) : [];
       
-      const newMember: TeamMember = {
-        id: friendId,
-        name: friendName,
-        role: "Collaborator",
-        isOnline: true
-      };
+      notifList.unshift({
+        id: `n_invite_${Date.now()}`,
+        title: "Workspace Invite",
+        message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
+        type: "invite",
+        category: "alerts",
+        time: "Just now",
+        read: false,
+        actionLabel: "Accept Invite",
+        actionUrl: `/workspace/${id}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`
+      });
+      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+      window.dispatchEvent(new Event("ldk_notifications_update"));
 
-      if (!isUuid) {
-        // Bypass DB check for mock/slug ID, simulate fully locally!
-        setRoomMembers(prev => {
-          if (prev.some(m => m.id === friendId)) return prev;
-          return [...prev, newMember];
-        });
-
-        const systemNotice: ChatMsg = {
-          id: getUniqueId("sys"),
-          sender_name: "LDK:BOT",
-          sender_role: "SYSTEM",
-          content: `Direct invite sent: ${friendName} added to project space.`,
-          created_at: new Date().toISOString(),
-          isSystem: true
-        };
-        setChatMessages(prev => [...prev, systemNotice]);
-
-        const notifStored = localStorage.getItem("ldk_global_notifications");
-        const notifList = notifStored ? JSON.parse(notifStored) : [];
-        notifList.unshift({
-          id: `n_invite_${Date.now()}`,
-          title: "Workspace Invite",
-          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
-          type: "invite",
-          category: "alerts",
-          time: "Just now",
-          read: false,
-          actionLabel: "Open Workspace",
-          actionUrl: `/workspace/${id}`
-        });
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-        window.dispatchEvent(new Event("ldk_notifications_update"));
-
-        setMessage({ text: `Successfully invited ${friendName}! They are now added to this workspace.`, type: "success" });
-        return;
-      }
-
-      const { error } = await supabase
-        .from("project_members")
-        .insert({
-          project_space_id: id,
-          profile_id: friendId,
-          role: "member"
-        });
-
-      if (!error) {
-        await supabase.from("chat_messages").insert({
-          project_space_id: id,
-          profile_id: user?.id,
-          content: `Invited ${friendName} to collaborate in this workspace!`
-        });
-        
-        setRoomMembers(prev => {
-          if (prev.some(m => m.id === friendId)) return prev;
-          return [...prev, newMember];
-        });
-
-        const systemNotice: ChatMsg = {
-          id: getUniqueId("sys"),
-          sender_name: "LDK:BOT",
-          sender_role: "SYSTEM",
-          content: `Direct invite sent: ${friendName} added to project space.`,
-          created_at: new Date().toISOString(),
-          isSystem: true
-        };
-        setChatMessages(prev => [...prev, systemNotice]);
-
-        const notifStored = localStorage.getItem("ldk_global_notifications");
-        const notifList = notifStored ? JSON.parse(notifStored) : [];
-        notifList.unshift({
-          id: `n_invite_${Date.now()}`,
-          title: "Workspace Invite",
-          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
-          type: "invite",
-          category: "alerts",
-          time: "Just now",
-          read: false,
-          actionLabel: "Open Workspace",
-          actionUrl: `/workspace/${id}`
-        });
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-        window.dispatchEvent(new Event("ldk_notifications_update"));
-
-        setMessage({ text: `Successfully invited ${friendName}! They are now added to this workspace.`, type: "success" });
-      } else {
-        console.warn("Direct invite DB insert error: ", error);
-        
-        setRoomMembers(prev => {
-          if (prev.some(m => m.id === friendId)) return prev;
-          return [...prev, newMember];
-        });
-
-        const systemNotice: ChatMsg = {
-          id: getUniqueId("sys"),
-          sender_name: "LDK:BOT",
-          sender_role: "SYSTEM",
-          content: `Direct invite sent: ${friendName} added to project space.`,
-          created_at: new Date().toISOString(),
-          isSystem: true
-        };
-        setChatMessages(prev => [...prev, systemNotice]);
-
-        const notifStored = localStorage.getItem("ldk_global_notifications");
-        const notifList = notifStored ? JSON.parse(notifStored) : [];
-        notifList.unshift({
-          id: `n_invite_${Date.now()}`,
-          title: "Workspace Invite",
-          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
-          type: "invite",
-          category: "alerts",
-          time: "Just now",
-          read: false,
-          actionLabel: "Open Workspace",
-          actionUrl: `/workspace/${id}`
-        });
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-        window.dispatchEvent(new Event("ldk_notifications_update"));
-
-        setMessage({ text: `Successfully invited ${friendName}! They are now added to this workspace.`, type: "success" });
-      }
+      setMessage({ text: `Invite sent to ${friendName}! Waiting for them to accept.`, type: "success" });
     } catch (e) {
       console.error(e);
       setMessage({ text: `Failed to invite ${friendName}.`, type: "error" });
@@ -1317,18 +1312,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
 
             {/* Speaking visual strip */}
-            <div className="flex items-center gap-2.5">
+            <div 
+              onClick={() => setShowActiveMembersModal(true)}
+              className="flex items-center gap-2.5 cursor-pointer hover:opacity-85 transition-opacity"
+            >
               <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider hidden sm:inline">Active:</span>
               <div className="flex -space-x-2">
                 {roomMembers.filter(m => m.isOnline).map(member => (
                   <div 
                     key={member.id} 
-                    className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main select-none transition-all duration-300 ${
+                    className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 ${
                       member.isSpeaking ? "ring-2 ring-emerald-500 scale-105" : ""
                     }`}
                     title={`${member.name} (${member.role})`}
                   >
-                    {member.name.charAt(0)}
+                    {member.avatarUrl ? (
+                      <img 
+                        src={member.avatarUrl} 
+                        alt={member.name} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      member.name.charAt(0)
+                    )}
                   </div>
                 ))}
               </div>
@@ -1854,6 +1860,90 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               </div>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {showActiveMembersModal && (
+        <div className="fixed inset-0 z-[100] overflow-hidden font-sans text-left bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="max-w-md w-full border border-border-main/70 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-6 relative z-[110]">
+            
+            <div className="flex justify-between items-start border-b border-border-main/40 pb-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Registry Desk</span>
+                <h3 className="font-display text-lg font-semibold text-txt-main font-bold">Workspace Team Members</h3>
+              </div>
+              <button 
+                onClick={() => setShowActiveMembersModal(false)}
+                className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Members List */}
+            <div className="flex flex-col gap-3.5 max-h-[300px] overflow-y-auto pr-1">
+              {roomMembers.map((member) => (
+                <div 
+                  key={member.id} 
+                  className={`flex items-center justify-between p-3 border rounded-sm transition-all duration-200 ${
+                    member.isOnline 
+                      ? "border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_10px_rgba(16,185,129,0.04)]" 
+                      : "border-border-main/60 bg-bg-base/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Avatar with status shade */}
+                    <div className={`relative w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-bold text-txt-main border overflow-hidden flex-shrink-0 ${
+                      member.isOnline ? "border-emerald-500/40" : "border-border-main/80 bg-bg-card"
+                    }`}>
+                      {member.avatarUrl ? (
+                        <img 
+                          src={member.avatarUrl} 
+                          alt={member.name} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        member.name.charAt(0)
+                      )}
+                      
+                      {/* Status badge dot */}
+                      <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-bg-surface ${
+                        member.isOnline ? "bg-emerald-500 animate-pulse" : "bg-txt-muted"
+                      }`} />
+                    </div>
+
+                    <div className="flex flex-col min-w-0 text-left">
+                      <span className="text-xs font-semibold text-txt-main truncate">{member.name}</span>
+                      <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{member.role}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    {member.isOnline ? (
+                      <span className="text-[8px] font-mono tracking-widest uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded">
+                        Active Online
+                      </span>
+                    ) : (
+                      <span className="text-[8px] font-mono tracking-widest uppercase bg-bg-card text-txt-muted border border-border-main px-2 py-0.5 rounded">
+                        Offline
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => {
+                setShowActiveMembersModal(false);
+                setIsInviteModalOpen(true);
+              }}
+              className="w-full h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 cursor-pointer font-semibold"
+            >
+              <Plus size={14} /> Invite New Collaborator
+            </button>
+
           </div>
         </div>
       )}

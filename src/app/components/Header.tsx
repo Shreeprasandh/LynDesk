@@ -364,7 +364,7 @@ export default function Header() {
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
   };
 
-  const handleNotificationAction = (id: string) => {
+  const handleNotificationAction = (id: string, actionUrl?: string) => {
     const updated = notifications.map(n => {
       if (n.id === id) {
         return { ...n, read: true, message: "Invitation accepted. Workspace link activated." };
@@ -373,6 +373,10 @@ export default function Header() {
     });
     setNotifications(updated);
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    if (actionUrl) {
+      router.push(actionUrl);
+      setIsOpen(false);
+    }
   };
 
   const triggerCronNudge = () => {
@@ -690,7 +694,7 @@ export default function Header() {
                       {item.actionLabel && !item.read && (
                         <div className="flex gap-2 justify-end pt-1">
                           <button
-                            onClick={() => handleNotificationAction(item.id)}
+                            onClick={() => handleNotificationAction(item.id, item.actionUrl)}
                             className="h-6 px-3 bg-accent-main text-bg-base font-mono text-[8px] tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
                           >
                             <Check size={8} /> {item.actionLabel}
