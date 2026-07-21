@@ -102,6 +102,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
+  const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
 
   // WebRTC real-time voice and video variables
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -206,6 +207,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   }, [id, user, workspaceTrigger]);
 
+  // Load sent invites from local storage
+  useEffect(() => {
+    const storedStr = localStorage.getItem(`ldk_sent_invites_${id}`);
+    if (storedStr) {
+      setSentInviteIds(JSON.parse(storedStr));
+    } else {
+      setSentInviteIds([]);
+    }
+  }, [id, workspaceTrigger]);
+
   // Handle invitation acceptance from notifications query string
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
@@ -232,6 +243,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           };
           const updated = [...storedList, newMember];
           localStorage.setItem(storedKey, JSON.stringify(updated));
+
+          // Remove accepted friend from sent invites list
+          setSentInviteIds(prev => {
+            const cleanList = prev.filter(fid => fid !== inviteId);
+            localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
+            return cleanList;
+          });
           
           // Post bot notice in chat
           const botNotice: ChatMsg = {
@@ -1108,6 +1126,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
       window.dispatchEvent(new Event("ldk_notifications_update"));
 
+      // Update sent invites state and persist to local storage
+      setSentInviteIds(prev => {
+        const updated = [...prev, friendId];
+        localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(updated));
+        return updated;
+      });
+
       setMessage({ text: `Invite sent to ${friendName}! Waiting for them to accept.`, type: "success" });
     } catch (e) {
       console.error(e);
@@ -1835,22 +1860,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Direct Invite Friends</span>
                 
                 <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-base/30 divide-y divide-border-main/60">
-                  {friendsToInvite.length > 0 ? (
-                    friendsToInvite.map(f => (
-                      <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-txt-main font-semibold">{f.full_name}</span>
-                          <span className="text-[9px] text-txt-muted font-mono">@{f.username}</span>
+                  {friendsToInvite.filter(f => !roomMembers.some(m => m.id === f.id)).length > 0 ? (
+                    friendsToInvite.filter(f => !roomMembers.some(m => m.id === f.id)).map(f => {
+                      const isAlreadyInvited = sentInviteIds.includes(f.id);
+                      return (
+                        <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">
+                          <div className="flex flex-col text-left">
+                            <span className="text-xs text-txt-main font-semibold">{f.full_name}</span>
+                            <span className="text-[9px] text-txt-muted font-mono">@{f.username}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleSendDirectInvite(f.id, f.full_name)}
+                            disabled={invitingFriendId === f.id || isAlreadyInvited}
+                            className={`h-7 px-3 text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 transition-all ${
+                              isAlreadyInvited 
+                                ? "bg-bg-card border border-border-main/50 text-txt-muted opacity-60 cursor-not-allowed" 
+                                : "bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base cursor-pointer"
+                            }`}
+                          >
+                            {invitingFriendId === f.id ? "Inviting..." : isAlreadyInvited ? "Invite Sent" : "Send Invite"}
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => handleSendDirectInvite(f.id, f.full_name)}
-                          disabled={invitingFriendId === f.id}
-                          className="h-7 px-3 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1"
-                        >
-                          {invitingFriendId === f.id ? "Inviting..." : "Send Invite"}
-                        </button>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="p-6 text-center text-txt-muted font-mono text-[9px] uppercase">
                       No active friends found. Connect on the Friends tab first.
