@@ -1043,9 +1043,16 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
                 <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Suggested Actions:</span>
                 {missingItems.map((item, idx) => (
-                  <span key={idx} className="text-[9px] font-mono px-2 py-0.5 rounded bg-accent-main/10 text-txt-main border border-accent-main/20">
+                  <button 
+                    key={idx} 
+                    type="button"
+                    onClick={() => {
+                      document.getElementById("profile-form")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="text-[9px] font-mono px-2 py-0.5 rounded bg-accent-main/10 text-txt-main border border-accent-main/20 hover:bg-accent-main/20 cursor-pointer transition-colors"
+                  >
                     {item}
-                  </span>
+                  </button>
                 ))}
               </div>
             )}

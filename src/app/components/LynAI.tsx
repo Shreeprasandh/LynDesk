@@ -142,8 +142,37 @@ function bubbleSort(arr) {
   return arr;
 }
 \`\`\``;
-    } else if (promptLower.includes("audit") || promptLower.includes("portfolio")) {
-      aiResponse = `### 📊 Portfolio Audit: ${name}
+    } else if (promptLower.includes("audit") || promptLower.includes("portfolio") || promptLower.includes("summary")) {
+      try {
+        const res = await fetch("/api/ai/portfolio-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            leetcode: { solved: Number(studentMeta.leetcode_solved) || 28, leetcodeStreak: 5 },
+            codeforces: { rating: 1320, solved: 42 },
+            codechef: { rating: 1450 }
+          })
+        });
+        if (res.ok) {
+          const aiData = await res.json();
+          const insightList = Array.isArray(aiData.insights) && aiData.insights.length > 0
+            ? aiData.insights.map((ins: string) => `* ${ins}`).join("\n")
+            : "* Maintain daily streak discipline across platforms.\n* Request verification credits for completed codebases.";
+          const skillList = Array.isArray(aiData.skills) && aiData.skills.length > 0 
+            ? aiData.skills.join(", ") 
+            : String(skills);
+            
+          aiResponse = `### 📊 AI Portfolio Audit: ${name}
+${aiData.summary || "Solid technical foundation across algorithm solving and full-stack development."}
+
+* **Target Institution**: \`${college}\`
+* **Core Strengths**: \`${skillList}\`
+* **Competitive Index**: \`${aiData.score || 85}/100\`
+
+**Actionable Insights**:
+${insightList}`;
+        } else {
+          aiResponse = `### 📊 Portfolio Audit: ${name}
 * **Institution**: \`${college}\`
 * **Skills**: ${skills}
 * **LeetCode**: \`@${leetcode}\`
@@ -152,6 +181,16 @@ function bubbleSort(arr) {
 * Profile is public to recruiters.
 * Add Codeforces handle to complete active profile syncing.
 * Maintain consistency by solving coding tasks daily.`;
+        }
+      } catch {
+        aiResponse = `### 📊 Portfolio Audit: ${name}
+* **Institution**: \`${college}\`
+* **Skills**: ${skills}
+* **LeetCode**: \`@${leetcode}\`
+
+**Recommendations**:
+* Maintain consistency by solving coding tasks daily.`;
+      }
     } else if (promptLower.includes("placement") || promptLower.includes("job") || promptLower.includes("career")) {
       aiResponse = `### 🎯 Placement Roadmap
 * **Target Roles**: Full-Stack / Systems Engineer matching (${skills}).
