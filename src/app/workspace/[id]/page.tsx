@@ -21,7 +21,6 @@ import {
   Terminal,
   Award,
   Plus,
-  User,
   X
 } from "lucide-react";
 
@@ -217,12 +216,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   // Load sent invites from local storage
   useEffect(() => {
-    const storedStr = localStorage.getItem(`ldk_sent_invites_${id}`);
-    if (storedStr) {
-      setSentInviteIds(JSON.parse(storedStr));
-    } else {
-      setSentInviteIds([]);
-    }
+    const loadSentInvites = () => {
+      const storedStr = localStorage.getItem(`ldk_sent_invites_${id}`);
+      if (storedStr) {
+        setSentInviteIds(JSON.parse(storedStr));
+      } else {
+        setSentInviteIds([]);
+      }
+    };
+
+    loadSentInvites();
+
+    window.addEventListener("ldk_notifications_update", loadSentInvites);
+    window.addEventListener("storage", loadSentInvites);
+    return () => {
+      window.removeEventListener("ldk_notifications_update", loadSentInvites);
+      window.removeEventListener("storage", loadSentInvites);
+    };
   }, [id, workspaceTrigger]);
 
   // Handle invitation acceptance from notifications query string
@@ -252,14 +262,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const updated = [...storedList, newMember];
           localStorage.setItem(storedKey, JSON.stringify(updated));
 
-          // Remove accepted friend from sent invites list
-          setSentInviteIds(prev => {
-            const cleanList = prev.filter(fid => fid !== inviteId);
-            localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
-            return cleanList;
-          });
-          
-          // Post bot notice in chat
+          // Update state and post bot notice in chat
           const botNotice: ChatMsg = {
             id: getUniqueId("sys"),
             sender_name: "LDK:BOT",
@@ -268,13 +271,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             created_at: new Date().toISOString(),
             isSystem: true
           };
-          setChatMessages(prev => [...prev, botNotice]);
 
-          // Show themed success toast
-          setMessage({ text: `${newMember.name} joined the workspace!`, type: "success" });
-          
-          // Trigger workspace re-sync
-          setWorkspaceTrigger(prev => prev + 1);
+          queueMicrotask(() => {
+            setSentInviteIds(prev => {
+              const cleanList = prev.filter(fid => fid !== inviteId);
+              localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
+              return cleanList;
+            });
+            setChatMessages(prev => [...prev, botNotice]);
+            setMessage({ text: `${newMember.name} joined the workspace!`, type: "success" });
+            setWorkspaceTrigger(prev => prev + 1);
+          });
         }
       }
     }
@@ -1117,22 +1124,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setInvitingFriendId(friendId);
     try {
       // Direct invite builds a notification with an accept actionUrl link
+      const targetUrl = `/workspace/${id}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`;
       const notifStored = localStorage.getItem("ldk_global_notifications");
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       
-      notifList.unshift({
-        id: `n_invite_${Date.now()}`,
-        title: "Workspace Invite",
-        message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
-        type: "invite",
-        category: "alerts",
-        time: "Just now",
-        read: false,
-        actionLabel: "Accept Invite",
-        actionUrl: `/workspace/${id}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`
-      });
-      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-      window.dispatchEvent(new Event("ldk_notifications_update"));
+      const alreadyInvited = notifList.some(
+        (n: any) => n.actionUrl === targetUrl && !n.read
+      );
+
+      if (!alreadyInvited) {
+        notifList.unshift({
+          id: getUniqueId("n_invite"),
+          title: "Workspace Invite",
+          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
+          type: "invite",
+          category: "alerts",
+          time: "Just now",
+          read: false,
+          actionLabel: "Accept Invite",
+          actionUrl: targetUrl
+        });
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        window.dispatchEvent(new Event("ldk_notifications_update"));
+      }
 
       // Update sent invites state and persist to local storage
       setSentInviteIds(prev => {

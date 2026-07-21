@@ -153,7 +153,9 @@ export default function Home() {
     if (typeof window !== "undefined") {
       const keys = Object.keys(localStorage);
       const hasToken = keys.some(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
-      setLikelyHasSession(hasToken);
+      queueMicrotask(() => {
+        setLikelyHasSession(hasToken);
+      });
     }
   }, []);
 

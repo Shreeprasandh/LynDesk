@@ -134,8 +134,10 @@ export default function ProfilePage() {
     if (typeof window !== "undefined") {
       const staff = !!localStorage.getItem("faculty_staff_member");
       const rec = !!localStorage.getItem("company_recruiter_member") || (user && (user.user_metadata?.role === "employee" || !!user.user_metadata?.company_key));
-      setIsStaff(staff);
-      setIsRec(!!rec);
+      queueMicrotask(() => {
+        setIsStaff(staff);
+        setIsRec(!!rec);
+      });
     }
   }, [user]);
   

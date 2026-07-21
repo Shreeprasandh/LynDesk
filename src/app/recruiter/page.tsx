@@ -6,15 +6,10 @@ import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
 import { 
   ExternalLink, 
-  Building2, 
-  ShieldCheck, 
   Users,
   Download,
   Lock,
   Unlock,
-  Award,
-  BookOpen,
-  LineChart,
   LogOut
 } from "lucide-react";
 
@@ -36,7 +31,7 @@ interface StudentRegistryEntry {
 }
 
 export default function RecruiterConsole() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [authorized, setAuthorized] = useState(false);
   const [activeCompany, setActiveCompany] = useState("");
   const [accessPin, setAccessPin] = useState("");
@@ -44,7 +39,6 @@ export default function RecruiterConsole() {
   const [students, setStudents] = useState<StudentRegistryEntry[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
-  // Filter States
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDept, setFilterDept] = useState("");
   const [filterGradYear, setFilterGradYear] = useState("");
@@ -59,8 +53,10 @@ export default function RecruiterConsole() {
       if (session) {
         try {
           const parsed = JSON.parse(session);
-          setAuthorized(true);
-          setActiveCompany(parsed.company);
+          queueMicrotask(() => {
+            setAuthorized(true);
+            setActiveCompany(parsed.company);
+          });
         } catch (e) {
           console.error("Failed to parse recruiter session", e);
         }

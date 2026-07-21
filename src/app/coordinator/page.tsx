@@ -35,6 +35,12 @@ interface CreditClaim {
   created_at: string;
 }
 
+let coordinatorIdCounter = 0;
+const getCoordinatorId = (prefix: string = "id") => {
+  coordinatorIdCounter++;
+  return `${prefix}_${coordinatorIdCounter}`;
+};
+
 // Local Custom Icons for missing/problematic lucide ones
 const GithubIcon = ({ size = 14, className = "" }: { size?: number; className?: string }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -994,7 +1000,7 @@ useEffect(() => {
       const notifStored = localStorage.getItem("ldk_global_notifications");
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       notifList.unshift({
-        id: `notif_link_${Date.now()}`,
+        id: getCoordinatorId("notif_link"),
         title: action === "approved" ? "College Link Approved ✓" : "College Link Declined ✗",
         message: action === "approved" 
           ? `Coordinator approved linking your profile to College using key: ${key}.`
@@ -1051,7 +1057,7 @@ useEffect(() => {
     if (!newOppTitle.trim()) return;
     
     const newOpp = {
-      id: `opp_${Date.now()}`,
+      id: getCoordinatorId("opp"),
       title: newOppTitle.trim(),
       category: newOppCategory,
       deadline: newOppDeadline || "No Deadline",

@@ -340,7 +340,34 @@ export default function Header() {
     const loadNotifications = () => {
       const stored = localStorage.getItem("ldk_global_notifications");
       if (stored) {
-        setNotifications(JSON.parse(stored));
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const seen = new Set<string>();
+            const cleaned = parsed.map((n: any) => {
+              if (n.type === "invite" && (n.actionLabel === "Open Workspace" || !n.actionLabel)) {
+                return { ...n, actionLabel: "Accept Invite" };
+              }
+              return n;
+            }).filter((n: any) => {
+              const key = `${n.type || ""}_${n.title || ""}_${n.message || ""}_${n.actionUrl || ""}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            
+            if (cleaned.length !== parsed.length || JSON.stringify(cleaned) !== JSON.stringify(parsed)) {
+              localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+            }
+            
+            setNotifications(cleaned);
+          } else {
+            setNotifications(parsed);
+          }
+        } catch (e) {
+          console.error("Error cleaning notifications: ", e);
+          setNotifications(JSON.parse(stored));
+        }
       } else {
         setNotifications(defaultNotifications);
         localStorage.setItem("ldk_global_notifications", JSON.stringify(defaultNotifications));
@@ -353,15 +380,15 @@ export default function Header() {
     return () => window.removeEventListener("ldk_notifications_update", loadNotifications);
   }, []);
 
-  const handleMarkAllRead = () => {
-    const updated = notifications.map(n => {
-      if (n.category === drawerTab) {
-        return { ...n, read: true };
-      }
-      return n;
+  const handleClearTab = () => {
+    const updated = notifications.filter(n => {
+      if (n.category !== drawerTab) return true;
+      if (n.actionLabel && !n.read) return true;
+      return false;
     });
     setNotifications(updated);
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_notifications_update"));
   };
 
   const handleNotificationAction = (id: string, actionUrl?: string) => {
@@ -377,6 +404,43 @@ export default function Header() {
       router.push(actionUrl);
       setIsOpen(false);
     }
+  };
+
+  const handleNotificationReject = (id: string, actionUrl?: string) => {
+    const updated = notifications.map(n => {
+      if (n.id === id) {
+        return { ...n, read: true, message: "Invitation declined." };
+      }
+      return n;
+    });
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+
+    if (actionUrl) {
+      try {
+        const urlParts = actionUrl.split("?");
+        if (urlParts.length > 1) {
+          const workspacePath = urlParts[0];
+          const workspaceId = workspacePath.split("/").pop();
+          const params = new URLSearchParams(urlParts[1]);
+          const friendId = params.get("acceptInvite");
+
+          if (workspaceId && friendId) {
+            const storedKey = `ldk_sent_invites_${workspaceId}`;
+            const storedStr = localStorage.getItem(storedKey);
+            if (storedStr) {
+              const list: string[] = JSON.parse(storedStr);
+              const cleaned = list.filter(fid => fid !== friendId);
+              localStorage.setItem(storedKey, JSON.stringify(cleaned));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error clearing sent invite on reject: ", e);
+      }
+    }
+    
+    window.dispatchEvent(new Event("ldk_notifications_update"));
   };
 
   const triggerCronNudge = () => {
@@ -601,8 +665,8 @@ export default function Header() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button 
-                    onClick={handleMarkAllRead}
-                    className="text-[9px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main cursor-pointer"
+                    onClick={handleClearTab}
+                    className="text-[9px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main cursor-pointer font-semibold"
                   >
                     Clear Tab
                   </button>
@@ -693,9 +757,17 @@ export default function Header() {
 
                       {item.actionLabel && !item.read && (
                         <div className="flex gap-2 justify-end pt-1">
+                          {item.type === "invite" && (
+                            <button
+                              onClick={() => handleNotificationReject(item.id, item.actionUrl)}
+                              className="h-6 px-3 border border-border-main hover:bg-bg-card text-txt-main font-mono text-[8px] tracking-wider uppercase rounded-sm transition-colors cursor-pointer flex items-center gap-1 font-bold"
+                            >
+                              <X size={8} /> Reject
+                            </button>
+                          )}
                           <button
                             onClick={() => handleNotificationAction(item.id, item.actionUrl)}
-                            className="h-6 px-3 bg-accent-main text-bg-base font-mono text-[8px] tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                            className="h-6 px-3 bg-accent-main text-bg-base font-mono text-[8px] tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1 font-bold"
                           >
                             <Check size={8} /> {item.actionLabel}
                           </button>
