@@ -123,22 +123,38 @@ export async function GET(request: Request) {
       let dailyChallengeInfo = null;
       
       if (dailyChallengeData) {
-        const dailyDate = dailyChallengeData.date; // e.g. "2026-07-18"
+        const dailyDate = dailyChallengeData.date; // e.g. "2026-07-21"
         const dailySlug = dailyChallengeData.question?.titleSlug;
+        const dailyTitle = dailyChallengeData.question?.title;
         
-        // Verify user actually solved it TODAY (with UTC/local date fallback and 30-hour rolling window check)
-        const hasSolvedToday = recentSubmissions.some((sub: any) => {
-          if (sub.titleSlug !== dailySlug) return false;
+        // Check if exact daily challenge problem was solved
+        const hasSolvedExactDaily = recentSubmissions.some((sub: any) => {
+          const matchSlug = sub.titleSlug && dailySlug && sub.titleSlug.toLowerCase() === dailySlug.toLowerCase();
+          const matchTitle = sub.title && dailyTitle && sub.title.toLowerCase() === dailyTitle.toLowerCase();
+          if (!matchSlug && !matchTitle) return false;
+          
           const subDate = new Date(parseInt(sub.timestamp) * 1000);
-          const timeDiffHours = (Date.now() - subDate.getTime()) / (1000 * 60 * 60);
+          const timeDiffHours = Math.abs(Date.now() - subDate.getTime()) / (1000 * 60 * 60);
           
           const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
           const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
           
-          return timeDiffHours <= 30 || subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate;
+          return timeDiffHours <= 48 || subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate;
         });
 
-        dailyChallengeCompleted = hasSolvedToday;
+        // Also check if ANY problem was solved on LeetCode today
+        const hasSolvedAnyToday = recentSubmissions.some((sub: any) => {
+          const subDate = new Date(parseInt(sub.timestamp) * 1000);
+          const timeDiffHours = Math.abs(Date.now() - subDate.getTime()) / (1000 * 60 * 60);
+          const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
+          const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
+          const todayUTC = new Date().toISOString().split("T")[0];
+          const todayLocal = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+
+          return timeDiffHours <= 30 || subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
+        });
+
+        dailyChallengeCompleted = hasSolvedExactDaily || hasSolvedAnyToday;
         dailyChallengeInfo = {
           title: dailyChallengeData.question?.title,
           link: `https://leetcode.com${dailyChallengeData.link}`,
@@ -196,6 +212,26 @@ export async function GET(request: Request) {
                 const dateKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
                 submissionCalendar[dateKey] = (submissionCalendar[dateKey] || 0) + (count as number);
               });
+
+              // Dynamic consecutive streak calculation
+              let dynamicStreak = 0;
+              let checkDate = new Date();
+              const todayKey = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}-${String(checkDate.getUTCDate()).padStart(2, "0")}`;
+              if (!submissionCalendar[todayKey]) {
+                checkDate.setDate(checkDate.getDate() - 1);
+              }
+              while (true) {
+                const key = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}-${String(checkDate.getUTCDate()).padStart(2, "0")}`;
+                if (submissionCalendar[key] && submissionCalendar[key] > 0) {
+                  dynamicStreak++;
+                  checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                  break;
+                }
+              }
+              if (dynamicStreak > 0) {
+                leetcodeStreak = dynamicStreak;
+              }
             }
           }
         }

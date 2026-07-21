@@ -327,17 +327,26 @@ export default function Home() {
     if (user) {
       const fetchCoworkersAndCollege = async () => {
         try {
+          const currentUserName = user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split("@")[0] || "";
           const { data: cowData, error: cowErr } = await supabase
             .from("profiles")
-            .select("full_name, department")
-            .limit(3);
+            .select("id, full_name, department")
+            .limit(10);
           
           if (!cowErr && cowData && cowData.length > 0) {
-            const list = cowData.map((p, index) => ({
-              name: p.full_name || "Developer",
-              role: p.department || "Engineer",
-              active: index % 2 === 0
-            }));
+            const list = cowData
+              .filter((p: any) => {
+                if (p.id && p.id === user.id) return false;
+                if (p.full_name && currentUserName && p.full_name.toLowerCase() === currentUserName.toLowerCase()) return false;
+                if (p.full_name && p.full_name.toLowerCase() === "kaizzcer") return false;
+                return true;
+              })
+              .slice(0, 3)
+              .map((p, index) => ({
+                name: p.full_name || "Developer",
+                role: p.department || "Engineer",
+                active: index % 2 === 0
+              }));
             setCoworkers(list);
           }
 
@@ -420,11 +429,14 @@ export default function Home() {
     { name: "Mira Sen", role: "Designer", active: true },
     { name: "Prof. Davis", role: "Mentor", active: false }
   ];
-  const activeCoworkers = coworkers.length > 0 ? coworkers : fallbackCoworkers;
 
   // Derivations for profile picture and username
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
   const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+
+  const activeCoworkers = (coworkers.length > 0 ? coworkers : fallbackCoworkers).filter(
+    cw => cw.name.toLowerCase() !== username.toLowerCase() && cw.name.toLowerCase() !== "kaizzcer"
+  );
 
   useEffect(() => {
     const handle = setTimeout(() => {

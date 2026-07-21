@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   AlertCircle, 
   TrendingUp,
-  Sparkles
+  Sparkles,
+  RotateCw
 } from "lucide-react";
 
 interface PlatformStats {
@@ -215,7 +216,10 @@ export default function CodingDeckPage() {
           if (!username) return null;
           try {
             const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
-            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}`);
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}&t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" }
+            });
             if (res.ok) {
               setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
               return await res.json();
@@ -254,7 +258,50 @@ export default function CodingDeckPage() {
     loadPlatformData();
   }, [user, selectedLcYear]);
 
-  // Poll statistics every 15 seconds in the background for live auto-detection
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+
+  const handleManualSync = async () => {
+    if (!user || isManualSyncing) return;
+    setIsManualSyncing(true);
+    try {
+      const lc = leetcodeUser;
+      const cf = codeforcesUser;
+      const cc = codechefUser;
+
+      const fetchStats = async (platform: string, username: string, year?: number | null) => {
+        if (!username) return null;
+        try {
+          const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
+          const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}&t=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache" }
+          });
+          if (res.ok) return await res.json();
+        } catch (e) {
+          console.warn(`Sync failed for ${platform}`, e);
+        }
+        return null;
+      };
+
+      const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+        lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
+        cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
+        cc ? fetchStats("codechef", cc) : Promise.resolve(null)
+      ]);
+
+      setStats(prev => ({
+        ...prev,
+        leetcode: leetcodeStats || prev.leetcode,
+        codeforces: codeforcesStats || prev.codeforces,
+        codechef: codechefStats || prev.codechef,
+      }));
+      setMessage({ text: "Live coding platform stats synced!", type: "success" });
+    } finally {
+      setIsManualSyncing(false);
+    }
+  };
+
+  // Poll statistics every 5 seconds in the background for instant live auto-detection
   useEffect(() => {
     if (!user) return;
     
@@ -270,7 +317,10 @@ export default function CodingDeckPage() {
           if (!username) return null;
           try {
             const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
-            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}`);
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}&t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" }
+            });
             if (res.ok) {
               return await res.json();
             }
@@ -295,7 +345,7 @@ export default function CodingDeckPage() {
       };
       
       pollStats();
-    }, 15000); // 15 seconds
+    }, 5000); // 5 seconds live auto-poll
     
     return () => clearInterval(interval);
   }, [user, leetcodeUser, codeforcesUser, codechefUser, selectedLcYear]);
@@ -609,10 +659,21 @@ export default function CodingDeckPage() {
         </Link>
 
         {/* Title Header */}
-        <div className="flex flex-col gap-2 border-b border-border-main/40 pb-4">
-          <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
-          <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Deck & Platforms</h1>
-          <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Deck & Platforms</h1>
+            <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
+          </div>
+          <button
+            onClick={handleManualSync}
+            disabled={isManualSyncing}
+            className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit"
+            title="Force immediate live sync with coding platforms"
+          >
+            <RotateCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
+            {isManualSyncing ? "Syncing Live..." : "Sync Live Stats"}
+          </button>
         </div>
 
         {/* Banner Alert for outstanding daily problem */}
