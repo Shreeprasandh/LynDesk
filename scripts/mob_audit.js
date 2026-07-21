@@ -6,6 +6,16 @@ function runPerfectedMob() {
   const rootDir = process.cwd();
   const disabledFlagPath = path.join(rootDir, '.mob_disabled');
 
+  // 🔒 Execution Lock: Mob audit only runs on `git commit` (--commit) or explicit manual request (--manual)
+  const args = process.argv.slice(2);
+  const isCommitTrigger = args.includes('--commit') || !!process.env.GIT_DIR || !!process.env.GIT_PREFIX;
+  const isManualTrigger = args.includes('--manual') || args.includes('--force') || process.env.MOB_ALLOW_RUN === 'true';
+
+  if (!isCommitTrigger && !isManualTrigger) {
+    console.log('\n🔒 [MOB EXECUTION LOCK ACTIVE] Mob audit is locked and only executes during `git commit` or explicit commands like "run mob" / "run the mob". Execution halted.\n');
+    return;
+  }
+
   // Check if The Mob is currently halted/disabled
   if (fs.existsSync(disabledFlagPath)) {
     console.log('⚡ [THE MOB IS ASLEEP] Mob auditing is currently disabled. Say "wake up the mob" to re-enable.\n');

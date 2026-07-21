@@ -36,8 +36,10 @@ Saying **ANY** of these phrases will pause pre-commit auditing until re-awakened
 
 ## ⚙️ Rules & Contracts
 
-- **Execution Trigger**: **`git commit`** ONLY (when Mob is active).
+- **Execution Trigger**: **`git commit`** (pre-commit hook with `--commit`) OR explicit user commands like **`"run mob"`** / **`"run the mob"`** ONLY.
+- **Strict Execution Lock**: `scripts/mob_audit.js` will automatically halt and abort if executed without `--commit` or `--manual` authorization flags.
 - **Report Location**: Single master file [`mob_audit_report.md`](file:///C:/Users/shree/shree_projects/eventtracker/mob_audit_report.md).
 - **Strict Read-Only**: Subagents NEVER modify project code.
 - **Fixing Command**: **`"Fix mob report"`** (Main agent applies approved fixes).
 - **Mandatory Approval for Large Changes**: If fixing an issue requires touching >3 files, refactoring core architecture, or altering data schemas, the agent MUST present a plan and ask for explicit user permission first.
+

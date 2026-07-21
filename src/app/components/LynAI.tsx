@@ -13,7 +13,8 @@ import {
   Cpu, 
   Award, 
   Compass, 
-  BookOpen 
+  BookOpen,
+  Trash2
 } from "lucide-react";
 
 interface Message {
@@ -77,6 +78,18 @@ export default function LynAI() {
       return () => clearTimeout(handle);
     }
   }, [user]);
+
+  const handleClearChat = () => {
+    const name = user?.user_metadata?.full_name || "Engineer";
+    const welcomeMsg: Message = {
+      id: "welcome-" + Date.now(),
+      sender: "lynai",
+      text: `Chat cleared. Hello ${name}, how can I assist you now?`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages([welcomeMsg]);
+    cachedMessages = [welcomeMsg];
+  };
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -197,12 +210,22 @@ export default function LynAI() {
                     <h2 className="text-sm font-semibold text-txt-main">LynAI Assistant</h2>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer transition-colors"
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleClearChat}
+                    title="Clear Chat History"
+                    className="px-2 py-1 rounded text-[9px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main hover:bg-bg-card border border-border-main/50 cursor-pointer transition-colors flex items-center gap-1 font-bold"
+                  >
+                    <Trash2 size={11} />
+                    Clear Chat
+                  </button>
+                  <button 
+                    onClick={() => setIsOpen(false)}
+                    className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Chat messages viewport */}

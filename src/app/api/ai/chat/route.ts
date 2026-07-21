@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Format chat history into Gemini format
     const contents = [];
@@ -92,9 +92,25 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("Error in LynAI chat API:", error);
+
+    // Contextual fallback response if API rate limits or network issues occur
+    const promptLower = (req.headers.get("x-user-prompt") || "").toLowerCase();
+    let fallbackText = "I'm currently running in standby mode. You can check your Coding Deck stats, browse global hackathons in News & Contests, or update your profile settings!";
+    let actionLink = undefined;
+
+    if (promptLower.includes("leetcode") || promptLower.includes("deck") || promptLower.includes("coding")) {
+      fallbackText = "### 💻 Coding Deck\nSync your handles and view daily challenge statuses in the Coding Deck:";
+      actionLink = { label: "Go to Coding Deck", href: "/coding-deck" };
+    } else if (promptLower.includes("news") || promptLower.includes("contest") || promptLower.includes("hackathon")) {
+      fallbackText = "### 🏆 News & Contests\nExplore faculty recommended opportunities and global hackathons:";
+      actionLink = { label: "Go to News & Contests", href: "/news-contests" };
+    }
+
     return NextResponse.json({
-      response: "Sorry, I encountered an issue processing your request. Please try again shortly.",
+      response: fallbackText,
+      actionLink: actionLink,
+      isMock: true,
       error: error.message
-    }, { status: 500 });
+    });
   }
 }

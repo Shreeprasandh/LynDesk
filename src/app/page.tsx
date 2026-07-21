@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  RotateCw
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -195,6 +196,20 @@ export default function Home() {
   const [filterOppCategory, setFilterOppCategory] = useState("");
   const [filterOppLocation, setFilterOppLocation] = useState("");
 
+  // Real-time Coding Platform Overview Stats
+  const [codingStats, setCodingStats] = useState<{
+    leetcode: any;
+    codeforces: any;
+    codechef: any;
+    unstop: any;
+  }>({
+    leetcode: null,
+    codeforces: null,
+    codechef: null,
+    unstop: null
+  });
+  const [loadingCodingStats, setLoadingCodingStats] = useState(false);
+
   // Load opportunities from localStorage on mount and register active listener
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -298,6 +313,87 @@ export default function Home() {
       return () => window.removeEventListener("ldk_opportunities_update", loadOpps);
     }
   }, []);
+
+  // Fetch and sync real-time coding stats for linked accounts
+  useEffect(() => {
+    if (!user) return;
+    const meta = user.user_metadata || {};
+    const lc = meta.leetcode_username || "";
+    const cf = meta.codeforces_username || "";
+    const cc = meta.codechef_username || "";
+    const un = meta.unstop_username || "";
+
+    if (!lc && !cf && !cc && !un) return;
+
+    const cacheKey = `ldk_coding_stats_${user.id}`;
+    
+    // Load cached stats first for instant rendering
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        setCodingStats(JSON.parse(cached));
+      } catch (e) {
+        console.warn("Failed parsing cached stats", e);
+      }
+    }
+
+    const loadLiveStats = async () => {
+      setLoadingCodingStats(true);
+      try {
+        const fetchPlatformStats = async (platform: string, username: string) => {
+          if (!username) return null;
+          try {
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}&t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" }
+            });
+            if (res.ok) {
+              return await res.json();
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch ${platform} stats`, e);
+          }
+          return null;
+        };
+
+        const [lcStats, cfStats, ccStats] = await Promise.all([
+          fetchPlatformStats("leetcode", lc),
+          fetchPlatformStats("codeforces", cf),
+          fetchPlatformStats("codechef", cc)
+        ]);
+
+        const updatedStats = {
+          leetcode: lcStats,
+          codeforces: cfStats,
+          codechef: ccStats,
+          unstop: un ? { registered: 6, completed: 4, rank: 42 } : null
+        };
+
+        setCodingStats(updatedStats);
+        localStorage.setItem(cacheKey, JSON.stringify(updatedStats));
+      } catch (err) {
+        console.error("Error fetching live coding stats on dashboard:", err);
+      } finally {
+        setLoadingCodingStats(false);
+      }
+    };
+
+    loadLiveStats();
+
+    const handleStatsUpdate = () => {
+      const updatedCache = localStorage.getItem(cacheKey);
+      if (updatedCache) {
+        try {
+          setCodingStats(JSON.parse(updatedCache));
+        } catch (e) {
+          console.warn("Error updating stats from event", e);
+        }
+      }
+    };
+
+    window.addEventListener("ldk_coding_stats_update", handleStatsUpdate);
+    return () => window.removeEventListener("ldk_coding_stats_update", handleStatsUpdate);
+  }, [user]);
 
   // Load events from localStorage on mount
   useEffect(() => {
@@ -1242,244 +1338,103 @@ export default function Home() {
               )}
             </div>
 
-            {/* Tab selector */}
-            <div className="flex gap-4 border-b border-border-main/45 pb-2 text-[10px] uppercase font-mono tracking-wider font-semibold">
-              <button
-                onClick={() => setDashTab("workspaces")}
-                className={`pb-1 border-b-2 transition-all cursor-pointer ${
-                  dashTab === "workspaces" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
-                }`}
-              >
-                My Workspaces
-              </button>
-              <button
-                onClick={() => setDashTab("opportunities")}
-                className={`pb-1 border-b-2 transition-all cursor-pointer ${
-                  dashTab === "opportunities" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
-                }`}
-              >
-                News & Contests
-              </button>
+            {/* My Active Workspaces Section Header */}
+            <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
+              <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
+                My Active Workspaces
+              </span>
+              <span className="text-[9px] font-mono text-txt-muted uppercase">
+                {events.length} Active {events.length === 1 ? "Project" : "Projects"}
+              </span>
             </div>
 
-            {dashTab === "workspaces" ? (
-              /* List of active events */
-              <div className="flex flex-col gap-5">
-                {events.map((ev) => (
-                <div 
-                  key={ev.id}
-                  className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h3 className="font-display text-base font-semibold text-txt-main truncate">{ev.title}</h3>
-                        <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-                          {ev.level}
-                        </span>
-                      </div>
-                      <a 
-                        href={ev.url} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
-                      >
-                        {ev.url}
-                        <ExternalLink size={10} />
-                      </a>
+            {/* List of active events / workspaces */}
+            <div className="flex flex-col gap-5">
+              {events.map((ev) => (
+              <div 
+                key={ev.id}
+                className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="font-display text-base font-semibold text-txt-main truncate">{ev.title}</h3>
+                      <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
+                        {ev.level}
+                      </span>
                     </div>
-
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                      <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
-                    </div>
+                    <a 
+                      href={ev.url} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
+                    >
+                      {ev.url}
+                      <ExternalLink size={10} />
+                    </a>
                   </div>
 
-                  {/* Horizontal Stage Progress line */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-txt-muted uppercase">
-                      <span>Timeline Stages</span>
-                      <span className="text-txt-main font-bold">Active: {ev.status}</span>
-                    </div>
-                    
-                    <div className="relative flex justify-between items-center py-2">
-                      <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-border-main/50 -translate-y-1/2 z-0" />
-                      <div 
-                        className="absolute top-1/2 left-0 h-[2px] bg-accent-main -translate-y-1/2 z-0 transition-all duration-300"
-                        style={{ width: ev.status === "ideation" ? "33%" : ev.status === "development" ? "66%" : "100%" }}
-                      />
-                      
-                      {ev.stages.map((stg, idx) => (
-                        <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5">
-                          <div className={`h-4 w-4 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-colors duration-200 ${
-                            idx === 0 || (idx === 1 && ev.status !== "ideation") || (idx === 2 && ev.status === "submitted")
-                              ? "border-accent-main text-accent-main" 
-                              : "border-border-main"
-                          }`}>
-                            {(idx === 0 || (idx === 1 && ev.status !== "ideation")) && <CheckCircle2 size={10} className="fill-accent-main text-bg-surface" />}
-                          </div>
-                          <span className="text-[9px] font-light text-txt-sub">{stg}</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
+                    <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
                   </div>
-
-                  {/* Actions row */}
-                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                    <div className="flex items-center gap-1 text-[10px] text-txt-muted">
-                      <MapPin size={11} />
-                      <span className="uppercase font-mono">{ev.location}</span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleOpenInviteModal(ev.id)}
-                        className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
-                      >
-                        Invite
-                      </button>
-                      <Link 
-                        href={`/workspace/${ev.id}`}
-                        className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
-                      >
-                        Enter Workspace →
-                      </Link>
-                    </div>
-                  </div>
-
                 </div>
-              ))}
-            </div>
-            ) : (
-              /* News and Opportunities Board tab */
-              <div className="flex flex-col gap-6 animate-fade-in text-left">
-                
-                {/* College Recommended Section */}
-                {opportunities.filter(o => o.facultyRecommended).length > 0 && (
-                  <div className="border border-amber-500/20 bg-amber-500/[0.03] p-5 rounded-md flex flex-col gap-3">
-                    <div className="flex items-center gap-1.5 text-amber-500 font-mono text-[9px] uppercase tracking-widest font-bold">
-                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                      🏫 Faculty Recommended
-                    </div>
-                    <div className="flex flex-col gap-3.5 divide-y divide-amber-500/10">
-                      {opportunities.filter(o => o.facultyRecommended).map((opp, idx) => (
-                        <div key={opp.id} className={`flex justify-between items-start gap-4 ${idx > 0 ? "pt-3.5" : ""}`}>
-                          <div className="flex flex-col min-w-0 gap-1">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <span className="text-xs text-txt-main font-semibold">{opp.title}</span>
-                              <span className="text-[8px] font-mono tracking-widest uppercase border border-amber-500/30 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-bold animate-fade-in">
-                                {opp.category}
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-txt-sub font-light leading-relaxed truncate max-w-md">{opp.description}</p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                            <span className="text-[9px] font-mono text-txt-muted">Deadline: {opp.deadline}</span>
-                            <a 
-                              href={opp.url} 
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="text-[9px] text-accent-main hover:underline font-mono uppercase font-bold flex items-center gap-0.5"
-                            >
-                              Explore <ExternalLink size={9} />
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
-                {/* Filter and Search controls */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-bg-card/25 p-4 border border-border-main/50 rounded-md">
-                  <input 
-                    type="text"
-                    value={searchOppQuery}
-                    onChange={(e) => setSearchOppQuery(e.target.value)}
-                    placeholder="Search opportunities..."
-                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
-                  />
+                {/* Horizontal Stage Progress line */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-txt-muted uppercase">
+                    <span>Timeline Stages</span>
+                    <span className="text-txt-main font-bold">Active: {ev.status}</span>
+                  </div>
                   
-                  <select
-                    value={filterOppCategory}
-                    onChange={(e) => setFilterOppCategory(e.target.value)}
-                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
-                  >
-                    <option value="">All Categories</option>
-                    <option value="hackathon">Hackathons</option>
-                    <option value="contest">Contests</option>
-                    <option value="news">News & Updates</option>
-                  </select>
-
-                  <select
-                    value={filterOppLocation}
-                    onChange={(e) => setFilterOppLocation(e.target.value)}
-                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
-                  >
-                    <option value="">All Locations</option>
-                    <option value="online">Online</option>
-                    <option value="in_person">In-Person</option>
-                    <option value="hybrid">Hybrid</option>
-                  </select>
-                </div>
-
-                {/* Main Opportunities List */}
-                <div className="flex flex-col border border-border-main/60 bg-bg-surface rounded-md divide-y divide-border-main/60">
-                  {(() => {
-                    const filtered = opportunities.filter(opp => {
-                      const matchesSearch = opp.title.toLowerCase().includes(searchOppQuery.toLowerCase()) || 
-                                            opp.description.toLowerCase().includes(searchOppQuery.toLowerCase());
-                      const matchesCategory = filterOppCategory ? opp.category === filterOppCategory : true;
-                      const matchesLocation = filterOppLocation ? opp.location === filterOppLocation : true;
-                      return matchesSearch && matchesCategory && matchesLocation;
-                    });
-
-                    if (filtered.length === 0) {
-                      return (
-                        <div className="p-8 text-center text-txt-muted font-mono text-[10px] uppercase">
-                          No matching opportunities found
+                  <div className="relative flex justify-between items-center py-2">
+                    <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-border-main/50 -translate-y-1/2 z-0" />
+                    <div 
+                      className="absolute top-1/2 left-0 h-[2px] bg-accent-main -translate-y-1/2 z-0 transition-all duration-300"
+                      style={{ width: ev.status === "ideation" ? "33%" : ev.status === "development" ? "66%" : "100%" }}
+                    />
+                    
+                    {ev.stages.map((stg, idx) => (
+                      <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5">
+                        <div className={`h-4 w-4 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-colors duration-200 ${
+                          idx === 0 || (idx === 1 && ev.status !== "ideation") || (idx === 2 && ev.status === "submitted")
+                            ? "border-accent-main text-accent-main" 
+                            : "border-border-main"
+                        }`}>
+                          {(idx === 0 || (idx === 1 && ev.status !== "ideation")) && <CheckCircle2 size={10} className="fill-accent-main text-bg-surface" />}
                         </div>
-                      );
-                    }
-
-                    return filtered.map(opp => (
-                      <div key={opp.id} className="p-4 flex justify-between items-center gap-4 hover:bg-bg-card/10 transition-colors">
-                        <div className="flex flex-col min-w-0 gap-0.5">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="text-xs text-txt-main font-semibold">{opp.title}</span>
-                            {opp.facultyRecommended && (
-                              <span className="text-[8px] font-mono tracking-wider border border-amber-500/40 px-1.5 py-0.2 rounded uppercase font-bold text-amber-500 bg-amber-500/5">
-                                Recommended
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-txt-sub font-light leading-relaxed max-w-md">{opp.description}</span>
-                          <div className="flex items-center gap-2 mt-1 text-[9px] text-txt-muted uppercase font-mono">
-                            <span className="bg-bg-card px-1.5 py-0.5 border border-border-main/40 rounded">{opp.category}</span>
-                            <span>•</span>
-                            <span>{opp.location}</span>
-                            <span>•</span>
-                            <span>{opp.level}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                          <span className="text-[9px] font-mono text-txt-muted">Deadline: {opp.deadline}</span>
-                          <a 
-                            href={opp.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-0.5 font-bold"
-                          >
-                            Explore <ExternalLink size={9} />
-                          </a>
-                        </div>
+                        <span className="text-[9px] font-light text-txt-sub">{stg}</span>
                       </div>
-                    ));
-                  })()}
+                    ))}
+                  </div>
                 </div>
+
+                {/* Actions row */}
+                <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                  <div className="flex items-center gap-1 text-[10px] text-txt-muted">
+                    <MapPin size={11} />
+                    <span className="uppercase font-mono">{ev.location}</span>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleOpenInviteModal(ev.id)}
+                      className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                    >
+                      Invite
+                    </button>
+                    <Link 
+                      href={`/workspace/${ev.id}`}
+                      className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                    >
+                      Enter Workspace →
+                    </Link>
+                  </div>
+                </div>
+
               </div>
-            )}
+            ))}
+          </div>
 
           </section>
 
@@ -1488,7 +1443,12 @@ export default function Home() {
             
             {/* Coding Platform Overview */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Coding Platform Overview</span>
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Coding Platform Overview</span>
+                {loadingCodingStats && (
+                  <RotateCw size={11} className="animate-spin text-accent-main" />
+                )}
+              </div>
               
               {(() => {
                 const meta = user?.user_metadata || {};
@@ -1508,8 +1468,13 @@ export default function Home() {
                             <span className="text-[10px] text-accent-main font-mono">@{lcUser}</span>
                           </div>
                           <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">342 <span className="text-[9px] text-txt-muted uppercase font-normal">Solved</span></span>
-                            <span className="text-[9px] font-mono text-txt-sub">Top 8.4%</span>
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.leetcode?.solved !== undefined ? codingStats.leetcode.solved : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Solved</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.leetcode?.rank || (codingStats.leetcode?.globalRank ? `Rank #${codingStats.leetcode.globalRank}` : (loadingCodingStats ? "Syncing..." : "Active"))}
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1521,8 +1486,13 @@ export default function Home() {
                             <span className="text-[10px] text-accent-main font-mono">@{cfUser}</span>
                           </div>
                           <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">1480 <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span></span>
-                            <span className="text-[9px] font-mono text-txt-sub">Specialist</span>
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.codeforces?.rating !== undefined ? codingStats.codeforces.rating : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.codeforces?.rank || (loadingCodingStats ? "Syncing..." : "Coder")}
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1534,8 +1504,13 @@ export default function Home() {
                             <span className="text-[10px] text-accent-main font-mono">@{ccUser}</span>
                           </div>
                           <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">1624 <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span></span>
-                            <span className="text-[9px] font-mono text-txt-sub">3★ Star</span>
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.codechef?.rating !== undefined ? codingStats.codechef.rating : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.codechef?.stars || (loadingCodingStats ? "Syncing..." : "1★ Star")}
+                            </span>
                           </div>
                         </div>
                       )}

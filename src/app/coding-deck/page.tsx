@@ -240,13 +240,19 @@ export default function CodingDeckPage() {
           fetchStats("codechef", cc)
         ]);
 
-        setStats({
+        const updatedStats = {
           leetcode: leetcodeStats,
           codeforces: codeforcesStats,
           codechef: codechefStats,
           unstop: un ? { registered: 6, completed: 4, rank: 42 } : null,
           hack2skill: h2s ? { registered: 3, completed: 3, rank: 12 } : null,
-        });
+        };
+
+        setStats(updatedStats);
+        if (typeof window !== "undefined" && user?.id) {
+          localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(updatedStats));
+          window.dispatchEvent(new Event("ldk_coding_stats_update"));
+        }
 
       } catch (err) {
         console.error("Error loading coding platform details:", err);
