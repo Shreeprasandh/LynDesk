@@ -1099,16 +1099,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   }, [fetchCommits]);
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
 
       {/* Main split workspace grid */}
-      <main className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+      <main className="flex-1 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
         
         {/* ================= COLUMN 1: STAGE TRACKER (3 Columns) ================= */}
-        <section className="lg:col-span-3 border-r border-border-main/50 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-border-main/50 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           <Link 
             href="/"
             className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase"
@@ -1185,7 +1185,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         </section>
 
         {/* ================= COLUMN 2: COLLABORATIVE CHAT & AUDIO (6 Columns) ================= */}
-        <section className="lg:col-span-6 border-r border-border-main/50 flex flex-col h-full bg-bg-base overflow-hidden">
+        <section className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden">
           
           {/* Header strip: Voice channels & members */}
           <div className="h-14 border-b border-border-main/50 bg-bg-surface/50 backdrop-blur px-5 flex items-center justify-between flex-shrink-0">
@@ -1383,7 +1383,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         </section>
 
         {/* ================= COLUMN 3: ARTIFACT DECK & VERIFICATIONS (3 Columns) ================= */}
-        <section className="lg:col-span-3 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-3 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Decks & Codebases</span>

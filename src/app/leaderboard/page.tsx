@@ -101,10 +101,10 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base bg-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base bg-bg-base">
       <Header />
 
-      <main className="flex-1 overflow-hidden max-w-5xl w-full mx-auto px-6 md:px-12 py-6 flex flex-col gap-6">
+      <main className="flex-1 overflow-y-auto lg:overflow-hidden max-w-5xl w-full mx-auto px-6 md:px-12 py-6 flex flex-col gap-6">
         
         <Link 
           href="/"

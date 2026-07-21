@@ -17,6 +17,7 @@
   --color-ring-main: hsl(var(--ring-line));
   
   --animate-fade-in: fade-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-right: slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fade-in {
@@ -27,6 +28,15 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 

@@ -592,7 +592,7 @@ export default function CodingDeckPage() {
   if (!user) return null;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header component */}
       <Header />

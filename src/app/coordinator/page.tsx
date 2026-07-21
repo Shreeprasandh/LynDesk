@@ -62,6 +62,51 @@ function CoordinatorConsoleContent() {
   const [linkRequests, setLinkRequests] = useState<any[]>([]);
   const [selectedLinkRequest, setSelectedLinkRequest] = useState<any | null>(null);
 
+  // Recruiter PINs & Opportunities States
+  const [recruiterPins, setRecruiterPins] = useState<any[]>([]);
+  const [newCompanyRecruiter, setNewCompanyRecruiter] = useState("");
+  const [oppSubTab, setOppSubTab] = useState<"broadcasts" | "opportunities">("broadcasts");
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+
+  // Create Opp form states
+  const [newOppTitle, setNewOppTitle] = useState("");
+  const [newOppCategory, setNewOppCategory] = useState("hackathon");
+  const [newOppLocation, setNewOppLocation] = useState("online");
+  const [newOppLevel, setNewOppLevel] = useState("local");
+  const [newOppDeadline, setNewOppDeadline] = useState("");
+  const [newOppUrl, setNewOppUrl] = useState("");
+  const [newOppDesc, setNewOppDesc] = useState("");
+
+  // Seed and load recruiter PINs & opportunities
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const loadPins = () => {
+        const stored = localStorage.getItem("ldk_recruiter_pins");
+        if (stored) {
+          setRecruiterPins(JSON.parse(stored));
+        } else {
+          const defaultPins = [
+            { id: "pin_1", company: "Google India", pin: "847291", date: "Oct 14" },
+            { id: "pin_2", company: "Microsoft", pin: "301984", date: "Oct 14" }
+          ];
+          setRecruiterPins(defaultPins);
+          localStorage.setItem("ldk_recruiter_pins", JSON.stringify(defaultPins));
+        }
+      };
+      loadPins();
+      
+      const loadOpps = () => {
+        const stored = localStorage.getItem("ldk_opportunities");
+        if (stored) {
+          setOpportunities(JSON.parse(stored));
+        }
+      };
+      loadOpps();
+      window.addEventListener("ldk_opportunities_update", loadOpps);
+      return () => window.removeEventListener("ldk_opportunities_update", loadOpps);
+    }
+  }, []);
+
   const [activeTab, setActiveTab] = useState<"overview" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
 
   // Sync activeTab with search parameter updates
@@ -909,7 +954,6 @@ useEffect(() => {
       
       let studentId = "";
       let studentName = "";
-      let type: "college" | "company" = "college";
       let key = "";
       let batchCode = "";
       
@@ -917,7 +961,6 @@ useEffect(() => {
         if (r.id === reqId) {
           studentId = r.studentId;
           studentName = r.studentName;
-          type = r.type;
           key = r.key;
           batchCode = r.batchCode || "";
           return { ...r, status: action };
@@ -936,7 +979,7 @@ useEffect(() => {
       const linksStored = localStorage.getItem("ldk_student_links");
       const linksMap = linksStored ? JSON.parse(linksStored) : {};
       
-      const mapKey = `${studentId}_${type}`;
+      const mapKey = `${studentId}_college`;
       if (action === "approved") {
         linksMap[mapKey] = { status: "linked", key, batchCode };
       } else {
@@ -952,10 +995,10 @@ useEffect(() => {
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       notifList.unshift({
         id: `notif_link_${Date.now()}`,
-        title: action === "approved" ? "Institutional Link Approved ✓" : "Institutional Link Declined ✗",
+        title: action === "approved" ? "College Link Approved ✓" : "College Link Declined ✗",
         message: action === "approved" 
-          ? `Coordinator approved linking your profile to ${type === "college" ? "College" : "Company"} using key: ${key}.`
-          : `Coordinator declined your linking request for ${type === "college" ? "College" : "Company"} key: ${key}.`,
+          ? `Coordinator approved linking your profile to College using key: ${key}.`
+          : `Coordinator declined your linking request for College key: ${key}.`,
         type: "system",
         category: "alerts",
         role: "student",
@@ -965,16 +1008,102 @@ useEffect(() => {
       localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
       window.dispatchEvent(new Event("ldk_notifications_update"));
       
-      addAuditLog(`Coordinator ${action} institutional link request for ${studentName} (${type}: ${key})`);
+      addAuditLog(`Coordinator ${action} college link request for ${studentName} (key: ${key})`);
       
       setModalMessage({
         isOpen: true,
         title: action === "approved" ? "Link Approved" : "Link Declined",
-        text: `The linking request from ${studentName} has been ${action}.`
+        text: `The college linking request from ${studentName} has been ${action}.`
       });
     } catch (err) {
       console.error("Failed to verify link request:", err);
     }
+  };
+
+  const handleGenerateRecruiterPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCompanyRecruiter.trim()) return;
+    
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const newPinObj = {
+      id: `pin_${Date.now()}`,
+      company: newCompanyRecruiter.trim(),
+      pin,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    };
+    
+    const updated = [newPinObj, ...recruiterPins];
+    setRecruiterPins(updated);
+    localStorage.setItem("ldk_recruiter_pins", JSON.stringify(updated));
+    setNewCompanyRecruiter("");
+    addAuditLog(`Generated Recruiter Access PIN for ${newPinObj.company}: ${pin}`);
+  };
+
+  const handleRevokePin = (pinId: string, companyName: string) => {
+    const updated = recruiterPins.filter(p => p.id !== pinId);
+    setRecruiterPins(updated);
+    localStorage.setItem("ldk_recruiter_pins", JSON.stringify(updated));
+    addAuditLog(`Revoked Recruiter Access PIN for ${companyName}`);
+  };
+
+  const handleCreateOpportunity = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOppTitle.trim()) return;
+    
+    const newOpp = {
+      id: `opp_${Date.now()}`,
+      title: newOppTitle.trim(),
+      category: newOppCategory,
+      deadline: newOppDeadline || "No Deadline",
+      location: newOppLocation,
+      level: newOppLevel,
+      url: newOppUrl.trim() || "https://lyndesk.com",
+      description: newOppDesc.trim() || "Official campus opportunity with credit eligibility.",
+      facultyRecommended: false,
+      createdDate: "Just now"
+    };
+    
+    const stored = localStorage.getItem("ldk_opportunities");
+    const oppsList = stored ? JSON.parse(stored) : [];
+    const updated = [newOpp, ...oppsList];
+    
+    setOpportunities(updated);
+    localStorage.setItem("ldk_opportunities", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_opportunities_update"));
+    
+    // Reset fields
+    setNewOppTitle("");
+    setNewOppDeadline("");
+    setNewOppUrl("");
+    setNewOppDesc("");
+    
+    addAuditLog(`Created new opportunity: ${newOpp.title}`);
+    
+    setModalMessage({
+      isOpen: true,
+      title: "Opportunity Published",
+      text: `Opportunity "${newOpp.title}" has been successfully published.`
+    });
+  };
+
+  const handleToggleRecommendOpportunity = (oppId: string, title: string) => {
+    const stored = localStorage.getItem("ldk_opportunities");
+    const oppsList = stored ? JSON.parse(stored) : [];
+    
+    let isRecommended = false;
+    const updated = oppsList.map((opp: any) => {
+      if (opp.id === oppId) {
+        isRecommended = !opp.facultyRecommended;
+        return { ...opp, facultyRecommended: isRecommended };
+      }
+      return opp;
+    });
+    
+    setOpportunities(updated);
+    localStorage.setItem("ldk_opportunities", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_opportunities_update"));
+    
+    addAuditLog(`${isRecommended ? "Recommended" : "Unrecommended"} opportunity: ${title}`);
   };
 
   const pendingCount = claims.filter(c => c.status === "pending").length;
@@ -992,16 +1121,16 @@ useEffect(() => {
   if (!user) return null;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
 
       {/* Main split grid */}
-      <main className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+       <main className="flex-1 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
         
         {/* ================= LEFT CONSOLE: APPLICATION LIST (7 Columns) ================= */}
-        <section className="lg:col-span-8 border-r border-border-main/50 flex flex-col h-full bg-bg-base overflow-hidden p-6 gap-6">
+        <section className="lg:col-span-8 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden p-6 gap-6">
           <Link 
             href="/"
             className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase self-start"
@@ -1222,104 +1351,271 @@ useEffect(() => {
 
           {activeTab === "broadcasts" && (
             <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
-              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Draft New Announcement</span>
-                
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Broadcast Title</label>
-                  <input 
-                    type="text" 
-                    value={broadcastTitle}
-                    onChange={(e) => setBroadcastTitle(e.target.value)}
-                    placeholder="e.g. Hackathon Project Registration Nudge"
-                    className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
-                  />
-                </div>
+              
+              {/* Opportunities Subtab Selector */}
+              <div className="flex gap-4 border-b border-border-main/45 pb-2 text-[10px] uppercase font-mono tracking-wider font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setOppSubTab("broadcasts")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    oppSubTab === "broadcasts" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  System Announcements
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOppSubTab("opportunities")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    oppSubTab === "opportunities" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  Manage Opportunities & News
+                </button>
+              </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Announcement Body</label>
-                  <textarea 
-                    rows={3}
-                    value={broadcastMessage}
-                    onChange={(e) => setBroadcastMessage(e.target.value)}
-                    placeholder="Type announcement contents here..."
-                    className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans font-light"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              {oppSubTab === "broadcasts" ? (
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Draft New Announcement</span>
+                  
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Alert Category</label>
-                    <select
-                      value={broadcastType}
-                      onChange={(e) => setBroadcastType(e.target.value as any)}
-                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
-                    >
-                      <option value="system">System Notification</option>
-                      <option value="deadline">Deadline Nudge</option>
-                      <option value="credit">Credit Verified Alert</option>
-                      <option value="invite">Team Invite Alert</option>
-                    </select>
+                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Broadcast Title</label>
+                    <input 
+                      type="text" 
+                      value={broadcastTitle}
+                      onChange={(e) => setBroadcastTitle(e.target.value)}
+                      placeholder="e.g. Hackathon Project Registration Nudge"
+                      className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                    />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Target Audience</label>
-                    <select
-                      value={broadcastTarget}
-                      onChange={(e) => setBroadcastTarget(e.target.value as any)}
-                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
-                    >
-                      <option value="all">All Tracked Students</option>
-                      <option value="cs">Computer Science Department</option>
-                      <option value="it">Information Technology</option>
-                      <option value="ee">Electrical Engineering</option>
-                    </select>
+                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Announcement Body</label>
+                    <textarea 
+                      rows={3}
+                      value={broadcastMessage}
+                      onChange={(e) => setBroadcastMessage(e.target.value)}
+                      placeholder="Type announcement contents here..."
+                      className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans font-light"
+                    />
                   </div>
-                </div>
 
-                <div className="border-t border-border-main/55 pt-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-3">Scheduling Options (Optional)</span>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[9px] text-txt-sub font-mono uppercase">Release Date</label>
-                      <input 
-                        type="date"
-                        value={scheduledDate}
-                        onChange={(e) => setScheduledDate(e.target.value)}
-                        className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
-                      />
+                      <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Alert Category</label>
+                      <select
+                        value={broadcastType}
+                        onChange={(e) => setBroadcastType(e.target.value as any)}
+                        className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                      >
+                        <option value="system">System Notification</option>
+                        <option value="deadline">Deadline Nudge</option>
+                        <option value="credit">Credit Verified Alert</option>
+                        <option value="invite">Team Invite Alert</option>
+                      </select>
                     </div>
+
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[9px] text-txt-sub font-mono uppercase">Release Time</label>
-                      <input 
-                        type="time"
-                        value={scheduledTime}
-                        onChange={(e) => setScheduledTime(e.target.value)}
-                        className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
-                      />
+                      <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Target Audience</label>
+                      <select
+                        value={broadcastTarget}
+                        onChange={(e) => setBroadcastTarget(e.target.value as any)}
+                        className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                      >
+                        <option value="all">All Tracked Students</option>
+                        <option value="cs">Computer Science Department</option>
+                        <option value="it">Information Technology</option>
+                        <option value="ee">Electrical Engineering</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border-main/55 pt-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-3">Scheduling Options (Optional)</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] text-txt-sub font-mono uppercase">Release Date</label>
+                        <input 
+                          type="date"
+                          value={scheduledDate}
+                          onChange={(e) => setScheduledDate(e.target.value)}
+                          className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[9px] text-txt-sub font-mono uppercase">Release Time</label>
+                        <input 
+                          type="time"
+                          value={scheduledTime}
+                          onChange={(e) => setScheduledTime(e.target.value)}
+                          className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button 
+                      type="button"
+                      onClick={handleScheduleBroadcast}
+                      disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || !scheduledDate || !scheduledTime}
+                      className="h-9 px-4 border border-border-main text-txt-main text-xs font-mono uppercase rounded-sm hover:bg-bg-card disabled:opacity-50 cursor-pointer font-semibold transition-all"
+                    >
+                      Schedule Alert
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleSendBroadcast}
+                      disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || (!!scheduledDate && !!scheduledTime)}
+                      className="h-9 px-5 bg-accent-main text-bg-base text-xs font-mono uppercase rounded-sm hover:bg-accent-main/80 disabled:opacity-50 cursor-pointer font-bold transition-all"
+                    >
+                      Send Instantly
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Manage Opportunities and Recommendations view */
+                <div className="flex flex-col gap-5 animate-fade-in text-left">
+                  {/* Draft new Opportunity Form */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Publish New Opportunity</span>
+                    
+                    <form onSubmit={handleCreateOpportunity} className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Opportunity Title</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={newOppTitle}
+                            onChange={(e) => setNewOppTitle(e.target.value)}
+                            placeholder="e.g. ACM ICPC Regionals 2026"
+                            className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Registration Deadline</label>
+                          <input 
+                            type="text" 
+                            value={newOppDeadline}
+                            onChange={(e) => setNewOppDeadline(e.target.value)}
+                            placeholder="e.g. Oct 12, 2026"
+                            className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Category</label>
+                          <select
+                            value={newOppCategory}
+                            onChange={(e) => setNewOppCategory(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="hackathon">Hackathon</option>
+                            <option value="contest">Programming Contest</option>
+                            <option value="news">News & Update</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Location Mode</label>
+                          <select
+                            value={newOppLocation}
+                            onChange={(e) => setNewOppLocation(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="online">Online</option>
+                            <option value="in_person">In-Person</option>
+                            <option value="hybrid">Hybrid</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Scope / Level</label>
+                          <select
+                            value={newOppLevel}
+                            onChange={(e) => setNewOppLevel(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="local">Local Campus</option>
+                            <option value="national">National</option>
+                            <option value="global">Global International</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">External URL</label>
+                        <input 
+                          type="text" 
+                          value={newOppUrl}
+                          onChange={(e) => setNewOppUrl(e.target.value)}
+                          placeholder="https://contest-portal.com"
+                          className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Brief Description</label>
+                        <textarea 
+                          rows={2}
+                          value={newOppDesc}
+                          onChange={(e) => setNewOppDesc(e.target.value)}
+                          placeholder="Type details, eligibility, or prizes..."
+                          className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans font-light"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <button 
+                          type="submit"
+                          className="h-9 px-5 bg-accent-main text-bg-base text-xs font-mono uppercase rounded-sm hover:opacity-90 font-bold cursor-pointer"
+                        >
+                          Publish Opportunity
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Active Opportunities list */}
+                  <div className="border border-border-main/60 bg-bg-surface rounded-md">
+                    <div className="p-4 border-b border-border-main/40 font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                      Active Opportunities Registry ({opportunities.length})
+                    </div>
+                    <div className="flex flex-col divide-y divide-border-main/40 max-h-96 overflow-y-auto">
+                      {opportunities.length === 0 ? (
+                        <div className="p-8 text-center text-txt-muted font-mono text-[10px] uppercase">
+                          No opportunities published.
+                        </div>
+                      ) : (
+                        opportunities.map((opp) => (
+                          <div key={opp.id} className="p-4 flex justify-between items-center gap-4 hover:bg-bg-card/10 transition-colors">
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs text-txt-main font-semibold">{opp.title}</span>
+                              <span className="text-[9px] text-txt-muted font-mono mt-0.5">Category: {opp.category.toUpperCase()} • Level: {opp.level.toUpperCase()}</span>
+                            </div>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleToggleRecommendOpportunity(opp.id, opp.title)}
+                              className={`h-7 px-3 text-[9px] font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer border ${
+                                opp.facultyRecommended 
+                                  ? "bg-amber-500/10 border-amber-500/40 text-amber-600 font-bold" 
+                                  : "border-border-main text-txt-sub hover:bg-bg-card"
+                              }`}
+                            >
+                              {opp.facultyRecommended ? "Recommended ★" : "Recommend"}
+                            </button>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
-
-                <div className="flex gap-3 justify-end pt-2">
-                  <button 
-                    type="button"
-                    onClick={handleScheduleBroadcast}
-                    disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || !scheduledDate || !scheduledTime}
-                    className="h-9 px-4 border border-border-main text-txt-main text-xs font-mono uppercase rounded-sm hover:bg-bg-card disabled:opacity-50 cursor-pointer font-semibold transition-all"
-                  >
-                    Schedule Alert
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleSendBroadcast}
-                    disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || (!!scheduledDate && !!scheduledTime)}
-                    className="h-9 px-5 bg-accent-main text-bg-base text-xs font-mono uppercase rounded-sm hover:bg-accent-main/80 disabled:opacity-50 cursor-pointer font-bold transition-all"
-                  >
-                    Send Instantly
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1767,11 +2063,11 @@ useEffect(() => {
               </div>
 
               {/* List of Registered Staff */}
-              <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
+              <div className="overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
                 <div className="p-4 border-b border-border-main/40 font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
                   Registered Access Keys ({registeredStaff.length})
                 </div>
-                <div className="flex flex-col divide-y divide-border-main/40">
+                <div className="flex flex-col divide-y divide-border-main/40 max-h-48 overflow-y-auto">
                   {registeredStaff.map((staff) => (
                     <div key={staff.key} className="p-4 flex items-center justify-between gap-4">
                       <div className="flex flex-col">
@@ -1795,12 +2091,66 @@ useEffect(() => {
                   ))}
                 </div>
               </div>
+
+              {/* Recruiter Access PINs Generation Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Recruiter Access Controls</span>
+                  <p className="text-xs text-txt-sub">Generate 6-digit access PINs for corporate recruitment partners to view student portfolios.</p>
+                </div>
+                
+                <form onSubmit={handleGenerateRecruiterPin} className="flex flex-col sm:flex-row gap-3 items-end">
+                  <div className="flex-grow flex flex-col gap-1 w-full">
+                    <label className="text-[9px] text-txt-sub font-mono uppercase tracking-wider">Company / Recruiter Partner Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newCompanyRecruiter}
+                      onChange={(e) => setNewCompanyRecruiter(e.target.value)}
+                      placeholder="e.g. Google India"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-sans w-full"
+                    />
+                  </div>
+                  
+                  <button 
+                    type="submit"
+                    className="h-9 px-4 bg-accent-main text-bg-base text-xs font-mono uppercase tracking-wider font-semibold rounded-sm hover:opacity-90 transition-opacity flex-shrink-0 cursor-pointer w-full sm:w-auto"
+                  >
+                    Generate PIN
+                  </button>
+                </form>
+
+                {/* List of active PINs */}
+                {recruiterPins.length > 0 && (
+                  <div className="mt-2 flex flex-col divide-y divide-border-main/45 border-t border-border-main/40 pt-2 text-xs">
+                    {recruiterPins.map((pinObj) => (
+                      <div key={pinObj.id} className="p-2.5 flex justify-between items-center gap-3">
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs text-txt-main font-semibold">{pinObj.company}</span>
+                          <span className="text-[9px] text-txt-muted font-mono">Issued: {pinObj.date}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-xs font-bold text-accent-main bg-bg-base border border-border-main/60 px-2 py-0.5 rounded select-all">
+                            {pinObj.pin}
+                          </span>
+                          <button
+                            onClick={() => handleRevokePin(pinObj.id, pinObj.company)}
+                            className="text-[9px] font-mono text-red-500 hover:underline uppercase"
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>
 
         {/* ================= RIGHT PANEL: INSPECTOR (5 Columns) ================= */}
-        <section className="lg:col-span-4 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-4 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">

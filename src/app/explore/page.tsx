@@ -59,23 +59,23 @@ export default function ExplorePage() {
       try {
         setLoading(true);
         
-        // 1. Fetch profiles from database
+        // 1. Fetch profiles from database with Joined Institute Name
         const { data: profiles, error } = await supabase
           .from("profiles")
-          .select("*")
+          .select("*, institutes(name)")
           .limit(20);
 
         if (!error && profiles) {
-          const formatted: ProfileItem[] = profiles.map(p => ({
+          const formatted: ProfileItem[] = profiles.map((p: any) => ({
             id: p.id,
             full_name: p.full_name || "Student Engineer",
             username: p.username || "student",
             avatar_url: p.avatar_url || "",
-            skills: "React, Next.js, TypeScript, UI/UX", // Fallback skills
-            bio: "Building clean codebases and minimal interfaces. Open to hackathons.",
-            college_name: "MIT",
-            department: "Computer Science",
-            isOpenToTeam: Math.random() > 0.4 // Mock availability
+            skills: p.skills || (p.department?.toLowerCase().includes("design") ? "Figma, React, Tailwind, UI/UX" : "React, Next.js, TypeScript, Node.js"),
+            bio: p.bio || "Building clean codebases and minimal interfaces. Open to hackathons.",
+            college_name: p.institutes?.name || p.college_name || "Independent University",
+            department: p.department || "Computer Science",
+            isOpenToTeam: p.is_profile_public ?? true
           }));
           setClassmates(formatted);
         } else {
@@ -103,7 +103,7 @@ export default function ExplorePage() {
             location: e.location as "online" | "in_person" | "hybrid",
             level: e.level as "local" | "national" | "global",
             url: e.source_url || "https://lyndesk.com",
-            description: "Official campus hackathon with university credit approval."
+            description: e.description || "Official campus hackathon with university credit approval."
           }));
           setEvents(formattedEvents);
         } else {
@@ -180,13 +180,13 @@ export default function ExplorePage() {
   if (!user) return null;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
 
       {/* Main content grid */}
-      <main className="flex-1 overflow-hidden max-w-7xl w-full mx-auto px-6 md:px-12 py-6 flex flex-col gap-6">
+      <main className="flex-1 overflow-y-auto lg:overflow-hidden max-w-7xl w-full mx-auto px-6 md:px-12 py-6 flex flex-col gap-6">
         
         <Link 
           href="/"

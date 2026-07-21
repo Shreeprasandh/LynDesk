@@ -18,7 +18,8 @@ import {
   X, 
   Clock, 
   Check, 
-  Sparkles
+  Sparkles,
+  Menu
 } from "lucide-react";
 
 interface NotificationItem {
@@ -39,6 +40,7 @@ export default function Header() {
   const { user, loading, signOut } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
   const [isFaculty, setIsFaculty] = useState(false);
@@ -428,10 +430,8 @@ export default function Header() {
                 </>
               ) : isRecruiter ? (
                 <>
-                  <Link href="/coordinator?tab=overview" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Overview</Link>
-                  <Link href="/coordinator?tab=talent_registry" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Talent Pipeline</Link>
-                  <Link href="/coordinator?tab=broadcasts" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Job Openings</Link>
-                  <Link href="/coordinator?tab=verifications" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Resume Vault</Link>
+                  <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">HR Console</Link>
+                  <Link href="/profile" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">My Profile</Link>
                 </>
               ) : (
                 <>
@@ -448,7 +448,7 @@ export default function Header() {
           {/* Separator Line */}
           <div className="hidden lg:block w-[1px] h-4 bg-border-main/60" />
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* Notification Bell (Only visible when user is logged in) */}
             {user && (
               <button 
@@ -488,11 +488,93 @@ export default function Header() {
                 >
                   <LogOut size={14} />
                 </button>
+                
+                {/* Hamburger menu button for mobile navigation */}
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="lg:hidden p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
+                  title="Toggle Menu"
+                >
+                  <Menu size={14} />
+                </button>
               </>
             )}
           </div>
         </div>
       </header>
+
+      {/* Slide-over Mobile Navigation Drawer Overlay */}
+      {mobileMenuOpen && user && (
+        <div className="lg:hidden fixed inset-0 z-50 overflow-hidden font-sans text-left">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs transition-opacity" 
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          <div className="absolute inset-y-0 left-0 max-w-full flex pr-16 animate-slide-in-right">
+            <div className="w-64 border-r border-border-main/70 bg-bg-surface flex flex-col h-full shadow-2xl text-left">
+              
+              {/* Drawer Header */}
+              <div className="px-6 py-5 border-b border-border-main/40 flex items-center justify-between">
+                <span className="font-display text-sm font-semibold tracking-wider text-txt-main">
+                  Navigation Menu
+                </span>
+                <button 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Navigation Links inside Drawer */}
+              <nav className="flex flex-col p-6 gap-5 font-mono text-xs uppercase tracking-wider">
+                {isFaculty ? (
+                  <>
+                    <Link href="/coordinator?tab=overview" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Overview</Link>
+                    <Link href="/coordinator?tab=talent_registry" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Talent Registry</Link>
+                    <Link href="/coordinator?tab=broadcasts" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Broadcasts</Link>
+                    <Link href="/coordinator?tab=verifications" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Claims Queue</Link>
+                    <Link href="/coordinator?tab=staff_access" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Staff Access</Link>
+                  </>
+                ) : isRecruiter ? (
+                  <>
+                    <Link href="/recruiter" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">HR Console</Link>
+                    <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">My Profile</Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Dashboard</Link>
+                    <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
+                    <Link href="/coding-deck" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Coding Deck</Link>
+                    <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Leaderboard</Link>
+                    <Link href="/friends" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Friends</Link>
+                  </>
+                )}
+              </nav>
+
+              {/* Bottom profile links */}
+              <div className="mt-auto p-6 border-t border-border-main/40 flex flex-col gap-3 font-mono text-[10px] uppercase">
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-txt-sub hover:text-txt-main">
+                  <User size={14} /> My Profile
+                </Link>
+                <button 
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowLogoutConfirm(true);
+                  }}
+                  className="flex items-center gap-2 text-txt-sub hover:text-red-500 text-left w-full cursor-pointer"
+                >
+                  <LogOut size={14} /> Sign Out
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
       {user && <LynAI />}
 
       {/* Slide-over Notification Drawer Overlay */}

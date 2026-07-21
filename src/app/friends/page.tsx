@@ -748,13 +748,13 @@ export default function FriendsPage() {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base bg-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base bg-bg-base">
       <Header />
 
-      <main className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+      <main className="flex-1 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
         
         {/* ================= LEFT SECTION: FRIENDS MANAGER (7 Columns) ================= */}
-        <section className="lg:col-span-7 border-r border-border-main/50 flex flex-col h-full bg-bg-base overflow-hidden p-6 gap-6">
+        <section className="lg:col-span-7 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden p-6 gap-6">
           <div className="flex justify-between items-center border-b border-border-main/40 pb-4">
             <div className="flex flex-col gap-0.5">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Social Network</span>
@@ -1017,7 +1017,7 @@ export default function FriendsPage() {
         </section>
 
         {/* ================= RIGHT SECTION: FRIEND OVERVIEW (5 Columns) ================= */}
-        <section className="lg:col-span-5 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-5 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Classmate Portfolio</span>
             <h2 className="font-display text-lg font-light text-txt-main">Overview Profile</h2>

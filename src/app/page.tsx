@@ -105,6 +105,117 @@ export default function Home() {
   const [friendsToInviteHome, setFriendsToInviteHome] = useState<any[]>([]);
   const [isInviteHomeModalOpen, setIsInviteHomeModalOpen] = useState(false);
 
+  // News and Opportunities States
+  const [dashTab, setDashTab] = useState<"workspaces" | "opportunities">("workspaces");
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [searchOppQuery, setSearchOppQuery] = useState("");
+  const [filterOppCategory, setFilterOppCategory] = useState("");
+  const [filterOppLocation, setFilterOppLocation] = useState("");
+
+  // Load opportunities from localStorage on mount and register active listener
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const loadOpps = () => {
+        const stored = localStorage.getItem("ldk_opportunities");
+        if (stored) {
+          setOpportunities(JSON.parse(stored));
+        } else {
+          const defaultOpps = [
+            {
+              id: "opp_1",
+              title: "MIT HackHarvard 2026",
+              category: "hackathon",
+              deadline: "Oct 12, 2026",
+              location: "hybrid",
+              level: "global",
+              url: "https://hackharvard.org",
+              description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_2",
+              title: "Google Developer Hackathon India",
+              category: "hackathon",
+              deadline: "Nov 02, 2026",
+              location: "online",
+              level: "national",
+              url: "https://build.google.com",
+              description: "National developer jam leveraging Google Cloud and AI agents.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_3",
+              title: "Stanford TreeHacks 2026",
+              category: "hackathon",
+              deadline: "Feb 18, 2026",
+              location: "in_person",
+              level: "global",
+              url: "https://treehacks.com",
+              description: "Stanford's landmark hackathon focusing on engineering solutions for social good.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_4",
+              title: "Codeforces Round 990 (Div. 2)",
+              category: "contest",
+              deadline: "July 28, 2026",
+              location: "online",
+              level: "global",
+              url: "https://codeforces.com",
+              description: "Official Div. 2 programming contest with rating updates.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_5",
+              title: "LeetCode Weekly Contest 410",
+              category: "contest",
+              deadline: "July 26, 2026",
+              location: "online",
+              level: "global",
+              url: "https://leetcode.com",
+              description: "Weekly algorithmic challenge with globally ranked leaderboard.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_6",
+              title: "Smart India Hackathon (SIH) 2026",
+              category: "hackathon",
+              deadline: "Sept 15, 2026",
+              location: "hybrid",
+              level: "national",
+              url: "https://sih.gov.in",
+              description: "Nationwide initiative to provide students with a platform to solve pressing problems.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_7",
+              title: "Next.js 16 Conference Keynote Details",
+              category: "news",
+              deadline: "Oct 25, 2026",
+              location: "online",
+              level: "global",
+              url: "https://nextjs.org/conf",
+              description: "Vercel announces Next.js 16 featuring compiler optimizations and Server Component refinements.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            }
+          ];
+          setOpportunities(defaultOpps);
+          localStorage.setItem("ldk_opportunities", JSON.stringify(defaultOpps));
+        }
+      };
+      loadOpps();
+      window.addEventListener("ldk_opportunities_update", loadOpps);
+      return () => window.removeEventListener("ldk_opportunities_update", loadOpps);
+    }
+  }, []);
+
   // Load events from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -561,7 +672,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* 1. Header (Unified Navigation & Notifications Drawer) */}
       <Header />
@@ -959,7 +1070,7 @@ export default function Home() {
                 )}
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
-                  <span className="text-[10px] text-txt-muted font-light">{user?.user_metadata?.role === "employee" ? "Employer / Partner" : collegeName || "Independent Student"}</span>
+                  <span className="text-[10px] text-txt-muted font-light">{collegeName || "Independent Student"}</span>
                   <span className="text-[8px] text-txt-muted opacity-60 font-mono select-all mt-0.5">Desk ID: {user?.id}</span>
                 </div>
               </div>
@@ -1009,21 +1120,48 @@ export default function Home() {
             {/* Header + Add button */}
             <div className="flex items-center justify-between border-b border-border-main/50 pb-4">
               <div className="flex flex-col gap-0.5">
-                <h2 className="font-display text-xl font-light text-txt-main">Event Registry</h2>
-                <p className="text-[10px] text-txt-muted font-light">Tracked project desks and submission stages.</p>
+                <h2 className="font-display text-xl font-light text-txt-main">
+                  {dashTab === "workspaces" ? "Event Registry" : "Opportunities Board"}
+                </h2>
+                <p className="text-[10px] text-txt-muted font-light">
+                  {dashTab === "workspaces" ? "Tracked project desks and submission stages." : "Faculty-recommended contests, hackathons, and news."}
+                </p>
               </div>
-              <button 
-                onClick={() => setIsModalOpen(true)}
-                className="h-9 px-3.5 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-opacity duration-150 cursor-pointer"
+              {dashTab === "workspaces" && (
+                <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="h-9 px-3.5 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-opacity duration-150 cursor-pointer"
+                >
+                  <Plus size={13} />
+                  Track Link
+                </button>
+              )}
+            </div>
+
+            {/* Tab selector */}
+            <div className="flex gap-4 border-b border-border-main/45 pb-2 text-[10px] uppercase font-mono tracking-wider font-semibold">
+              <button
+                onClick={() => setDashTab("workspaces")}
+                className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                  dashTab === "workspaces" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                }`}
               >
-                <Plus size={13} />
-                Track Link
+                My Workspaces
+              </button>
+              <button
+                onClick={() => setDashTab("opportunities")}
+                className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                  dashTab === "opportunities" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                }`}
+              >
+                News & Contests
               </button>
             </div>
 
-            {/* List of active events */}
-            <div className="flex flex-col gap-5">
-              {events.map((ev) => (
+            {dashTab === "workspaces" ? (
+              /* List of active events */
+              <div className="flex flex-col gap-5">
+                {events.map((ev) => (
                 <div 
                   key={ev.id}
                   className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
@@ -1108,6 +1246,136 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            ) : (
+              /* News and Opportunities Board tab */
+              <div className="flex flex-col gap-6 animate-fade-in text-left">
+                
+                {/* College Recommended Section */}
+                {opportunities.filter(o => o.facultyRecommended).length > 0 && (
+                  <div className="border border-amber-500/20 bg-amber-500/[0.03] p-5 rounded-md flex flex-col gap-3">
+                    <div className="flex items-center gap-1.5 text-amber-500 font-mono text-[9px] uppercase tracking-widest font-bold">
+                      <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                      🏫 Faculty Recommended
+                    </div>
+                    <div className="flex flex-col gap-3.5 divide-y divide-amber-500/10">
+                      {opportunities.filter(o => o.facultyRecommended).map((opp, idx) => (
+                        <div key={opp.id} className={`flex justify-between items-start gap-4 ${idx > 0 ? "pt-3.5" : ""}`}>
+                          <div className="flex flex-col min-w-0 gap-1">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="text-xs text-txt-main font-semibold">{opp.title}</span>
+                              <span className="text-[8px] font-mono tracking-widest uppercase border border-amber-500/30 px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-bold animate-fade-in">
+                                {opp.category}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-txt-sub font-light leading-relaxed truncate max-w-md">{opp.description}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                            <span className="text-[9px] font-mono text-txt-muted">Deadline: {opp.deadline}</span>
+                            <a 
+                              href={opp.url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-[9px] text-accent-main hover:underline font-mono uppercase font-bold flex items-center gap-0.5"
+                            >
+                              Explore <ExternalLink size={9} />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter and Search controls */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-bg-card/25 p-4 border border-border-main/50 rounded-md">
+                  <input 
+                    type="text"
+                    value={searchOppQuery}
+                    onChange={(e) => setSearchOppQuery(e.target.value)}
+                    placeholder="Search opportunities..."
+                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                  />
+                  
+                  <select
+                    value={filterOppCategory}
+                    onChange={(e) => setFilterOppCategory(e.target.value)}
+                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
+                  >
+                    <option value="">All Categories</option>
+                    <option value="hackathon">Hackathons</option>
+                    <option value="contest">Contests</option>
+                    <option value="news">News & Updates</option>
+                  </select>
+
+                  <select
+                    value={filterOppLocation}
+                    onChange={(e) => setFilterOppLocation(e.target.value)}
+                    className="h-8 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer"
+                  >
+                    <option value="">All Locations</option>
+                    <option value="online">Online</option>
+                    <option value="in_person">In-Person</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </div>
+
+                {/* Main Opportunities List */}
+                <div className="flex flex-col border border-border-main/60 bg-bg-surface rounded-md divide-y divide-border-main/60">
+                  {(() => {
+                    const filtered = opportunities.filter(opp => {
+                      const matchesSearch = opp.title.toLowerCase().includes(searchOppQuery.toLowerCase()) || 
+                                            opp.description.toLowerCase().includes(searchOppQuery.toLowerCase());
+                      const matchesCategory = filterOppCategory ? opp.category === filterOppCategory : true;
+                      const matchesLocation = filterOppLocation ? opp.location === filterOppLocation : true;
+                      return matchesSearch && matchesCategory && matchesLocation;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-txt-muted font-mono text-[10px] uppercase">
+                          No matching opportunities found
+                        </div>
+                      );
+                    }
+
+                    return filtered.map(opp => (
+                      <div key={opp.id} className="p-4 flex justify-between items-center gap-4 hover:bg-bg-card/10 transition-colors">
+                        <div className="flex flex-col min-w-0 gap-0.5">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <span className="text-xs text-txt-main font-semibold">{opp.title}</span>
+                            {opp.facultyRecommended && (
+                              <span className="text-[8px] font-mono tracking-wider border border-amber-500/40 px-1.5 py-0.2 rounded uppercase font-bold text-amber-500 bg-amber-500/5">
+                                Recommended
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-txt-sub font-light leading-relaxed max-w-md">{opp.description}</span>
+                          <div className="flex items-center gap-2 mt-1 text-[9px] text-txt-muted uppercase font-mono">
+                            <span className="bg-bg-card px-1.5 py-0.5 border border-border-main/40 rounded">{opp.category}</span>
+                            <span>•</span>
+                            <span>{opp.location}</span>
+                            <span>•</span>
+                            <span>{opp.level}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                          <span className="text-[9px] font-mono text-txt-muted">Deadline: {opp.deadline}</span>
+                          <a 
+                            href={opp.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-0.5 font-bold"
+                          >
+                            Explore <ExternalLink size={9} />
+                          </a>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
 
           </section>
 

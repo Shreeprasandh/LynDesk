@@ -57,7 +57,6 @@ interface BackupProfileData {
   isPublic: boolean;
   portfolioUrl: string;
   collegeKey: string;
-  companyKey: string;
   batchCode: string;
   grantSharePermission: boolean;
 }
@@ -88,7 +87,6 @@ export default function ProfilePage() {
   const [department, setDepartment] = useState("");
   const [gradYear, setGradYear] = useState("");
   const [collegeKey, setCollegeKey] = useState("");
-  const [companyKey, setCompanyKey] = useState("");
   const [batchCode, setBatchCode] = useState("");
   const [grantSharePermission, setGrantSharePermission] = useState(false);
   const [academicCredits, setAcademicCredits] = useState(0);
@@ -114,7 +112,6 @@ export default function ProfilePage() {
   
   // Link status states
   const [collegeLinkedStatus, setCollegeLinkedStatus] = useState<"none" | "pending" | "linked">("none");
-  const [companyLinkedStatus, setCompanyLinkedStatus] = useState<"none" | "pending" | "linked">("none");
   
   // Interface states
   const [loading, setLoading] = useState(true);
@@ -169,7 +166,6 @@ export default function ProfilePage() {
       gradYear,
       isPublic,
       collegeKey,
-      companyKey,
       batchCode,
       grantSharePermission
     });
@@ -191,7 +187,6 @@ export default function ProfilePage() {
       setGradYear(backupData.gradYear);
       setIsPublic(backupData.isPublic);
       setCollegeKey(backupData.collegeKey);
-      setCompanyKey(backupData.companyKey);
       setBatchCode(backupData.batchCode);
       setGrantSharePermission(backupData.grantSharePermission);
     }
@@ -231,7 +226,6 @@ export default function ProfilePage() {
           setDepartment(profile.department || "");
           setGradYear(profile.graduation_year || "");
           setCollegeKey(profile.college_key || "");
-          setCompanyKey(profile.company_key || "");
           setAcademicCredits(profile.academic_credits || 0);
           setCollegeName(profile.college_name || "");
           setLeetcodeUsername(profile.leetcode_username || "");
@@ -239,7 +233,7 @@ export default function ProfilePage() {
           setCodechefUsername(profile.codechef_username || "");
           setUnstopUsername(profile.unstop_username || "");
           setHack2skillUsername(profile.hack2skill_username || "");
-          const hasKeys = (profile.college_key || "").trim() !== "" || (profile.company_key || "").trim() !== "";
+          const hasKeys = (profile.college_key || "").trim() !== "";
           setLeetcodeVerified(hasKeys ? !!profile.leetcode_verified : true);
           setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
           setCodechefVerified(hasKeys ? !!profile.codechef_verified : true);
@@ -278,11 +272,9 @@ export default function ProfilePage() {
         setDepartment(meta.department || "");
         setGradYear(meta.graduation_year || "");
         setCollegeKey(meta.college_key || "");
-        setCompanyKey(meta.company_key || "");
         setBatchCode(meta.batch_code || "");
         setGrantSharePermission(!!meta.grant_share_permission);
         setCollegeLinkedStatus(meta.college_linked_status || "none");
-        setCompanyLinkedStatus(meta.company_linked_status || "none");
         
       } catch (err) {
         console.error("Error loading user profile: ", err);
@@ -302,12 +294,9 @@ export default function ProfilePage() {
         if (linksStored) {
           const linksMap = JSON.parse(linksStored);
           const collegeKeyMap = `${user.id}_college`;
-          const companyKeyMap = `${user.id}_company`;
           
           let newCollegeStatus = "";
-          let newCompanyStatus = "";
           let finalCollegeKey = "";
-          let finalCompanyKey = "";
           let finalBatchCode = "";
           
           if (linksMap[collegeKeyMap]) {
@@ -322,38 +311,22 @@ export default function ProfilePage() {
             }
           }
           
-          if (linksMap[companyKeyMap]) {
-            const mappedStatus = linksMap[companyKeyMap].status;
-            newCompanyStatus = mappedStatus;
-            setCompanyLinkedStatus(mappedStatus);
-            if (mappedStatus === "linked") {
-              finalCompanyKey = linksMap[companyKeyMap].key;
-              setCompanyKey(linksMap[companyKeyMap].key);
-            }
-          }
-          
           // Compare with current Auth User metadata to see if changes occurred
           const currentMeta = user.user_metadata || {};
           const metaCollegeStatus = currentMeta.college_linked_status || "none";
-          const metaCompanyStatus = currentMeta.company_linked_status || "none";
           const metaCollegeKey = currentMeta.college_key || "";
-          const metaCompanyKey = currentMeta.company_key || "";
           const metaBatchCode = currentMeta.batch_code || "";
           
           if (
             (newCollegeStatus && newCollegeStatus !== metaCollegeStatus) ||
-            (newCompanyStatus && newCompanyStatus !== metaCompanyStatus) ||
             (finalCollegeKey && finalCollegeKey !== metaCollegeKey) ||
-            (finalCompanyKey && finalCompanyKey !== metaCompanyKey) ||
             (finalBatchCode && finalBatchCode !== metaBatchCode)
           ) {
             // Update auth metadata
             await supabase.auth.updateUser({
               data: {
                 college_linked_status: newCollegeStatus || metaCollegeStatus,
-                company_linked_status: newCompanyStatus || metaCompanyStatus,
                 college_key: finalCollegeKey || metaCollegeKey,
-                company_key: finalCompanyKey || metaCompanyKey,
                 batch_code: finalBatchCode || metaBatchCode
               }
             });
@@ -362,8 +335,7 @@ export default function ProfilePage() {
             await supabase
               .from("profiles")
               .update({
-                college_key: finalCollegeKey || metaCollegeKey,
-                company_key: finalCompanyKey || metaCompanyKey
+                college_key: finalCollegeKey || metaCollegeKey
               })
               .eq("id", user.id);
           }
@@ -501,94 +473,22 @@ export default function ProfilePage() {
     setMessage({ text: "College linking request submitted successfully.", type: "success" });
   };
 
-  const handleRequestCompanyLink = async () => {
-    if (!user) return;
-    if (!companyKey.trim()) {
-      setMessage({ text: "Please enter a valid Corporate Access Key.", type: "error" });
-      return;
-    }
-    
-    const requestStored = localStorage.getItem("ldk_institutional_verifications");
-    const requestList = requestStored ? JSON.parse(requestStored) : [];
-    const previouslyUnlinked = requestList.some((r: any) => r.studentId === user.id && r.type === "company" && r.status === "unlinked");
-    
-    const newReq = {
-      id: `link_req_${Date.now()}`,
-      studentId: user.id,
-      studentName: fullName || username || "Anonymous Student",
-      studentEmail: user.email || "",
-      type: "company" as const,
-      key: companyKey.trim(),
-      batchCode: "",
-      status: "pending" as const,
-      previouslyUnlinked,
-      date: "Just now"
-    };
-    
-    const updatedList = [newReq, ...requestList.filter((r: any) => !(r.studentId === user.id && r.type === "company" && r.status === "pending"))];
-    localStorage.setItem("ldk_institutional_verifications", JSON.stringify(updatedList));
-    window.dispatchEvent(new Event("ldk_link_requests_update"));
-    
-    const linksStored = localStorage.getItem("ldk_student_links");
-    const linksMap = linksStored ? JSON.parse(linksStored) : {};
-    linksMap[`${user.id}_company`] = { status: "pending", key: companyKey.trim(), batchCode: "" };
-    localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
-    setCompanyLinkedStatus("pending");
-    
-    await supabase.auth.updateUser({
-      data: {
-        company_key: companyKey.trim(),
-        company_linked_status: "pending"
-      }
-    });
-    
-    const notifStored = localStorage.getItem("ldk_global_notifications");
-    const notifList = notifStored ? JSON.parse(notifStored) : [];
-    
-    notifList.unshift({
-      id: `notif_link_sent_comp_${Date.now()}`,
-      title: "Employer Link Request Sent",
-      message: `Your request to link with company key '${companyKey.trim()}' has been sent to the employer for manual approval.`,
-      type: "system",
-      category: "alerts",
-      role: "student",
-      time: "Just now",
-      read: false
-    });
-    
-    notifList.unshift({
-      id: `notif_link_rec_${Date.now()}`,
-      title: "New Employer Link Request",
-      message: `${fullName || username || 'A user'} has requested to link their profile to your company with key: ${companyKey.trim()}.`,
-      type: "system",
-      category: "alerts",
-      role: "recruiter",
-      time: "Just now",
-      read: false
-    });
-    
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-    window.dispatchEvent(new Event("ldk_notifications_update"));
-    
-    setMessage({ text: "Company linking request submitted successfully.", type: "success" });
-  };
-
-  const handleUnlink = async (type: 'college' | 'company') => {
+  const handleUnlink = async () => {
     if (!user) return;
     
     const requestStored = localStorage.getItem("ldk_institutional_verifications");
     const requestList = requestStored ? JSON.parse(requestStored) : [];
     
     const updatedList = [
-      ...requestList.filter((r: any) => !(r.studentId === user.id && r.type === type)),
+      ...requestList.filter((r: any) => !(r.studentId === user.id && r.type === "college")),
       {
         id: `link_req_${Date.now()}`,
         studentId: user.id,
         studentName: fullName || username || "Anonymous Student",
         studentEmail: user.email || "",
-        type: type,
-        key: type === "college" ? collegeKey : companyKey,
-        batchCode: type === "college" ? batchCode : "",
+        type: "college" as const,
+        key: collegeKey,
+        batchCode: batchCode,
         status: "unlinked" as const,
         previouslyUnlinked: true,
         date: "Just now"
@@ -599,38 +499,27 @@ export default function ProfilePage() {
     
     const linksStored = localStorage.getItem("ldk_student_links");
     const linksMap = linksStored ? JSON.parse(linksStored) : {};
-    linksMap[`${user.id}_${type}`] = { status: "none", key: "", batchCode: "" };
+    linksMap[`${user.id}_college`] = { status: "none", key: "", batchCode: "" };
     localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
     
-    if (type === "college") {
-      setCollegeLinkedStatus("none");
-      setCollegeKey("");
-      setBatchCode("");
-      await supabase.auth.updateUser({
-        data: {
-          college_key: "",
-          batch_code: "",
-          college_linked_status: "none"
-        }
-      });
-    } else {
-      setCompanyLinkedStatus("none");
-      setCompanyKey("");
-      await supabase.auth.updateUser({
-        data: {
-          company_key: "",
-          company_linked_status: "none"
-        }
-      });
-    }
+    setCollegeLinkedStatus("none");
+    setCollegeKey("");
+    setBatchCode("");
+    await supabase.auth.updateUser({
+      data: {
+        college_key: "",
+        batch_code: "",
+        college_linked_status: "none"
+      }
+    });
     
     const notifStored = localStorage.getItem("ldk_global_notifications");
     const notifList = notifStored ? JSON.parse(notifStored) : [];
     
     notifList.unshift({
       id: `notif_unlink_${Date.now()}`,
-      title: type === "college" ? "College Unlinked" : "Company Unlinked",
-      message: `You successfully unlinked from your ${type === "college" ? "college" : "employer"}.`,
+      title: "College Unlinked",
+      message: "You successfully unlinked from your college.",
       type: "system",
       category: "alerts",
       role: "student",
@@ -641,10 +530,10 @@ export default function ProfilePage() {
     notifList.unshift({
       id: `notif_unlink_fac_${Date.now()}`,
       title: "Student Unlinked",
-      message: `${fullName || username} has unlinked from your ${type === "college" ? "college" : "company"}.`,
+      message: `${fullName || username} has unlinked from your college.`,
       type: "system",
       category: "alerts",
-      role: type === "college" ? "faculty" : "recruiter",
+      role: "faculty",
       time: "Just now",
       read: false
     });
@@ -652,7 +541,7 @@ export default function ProfilePage() {
     localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
     window.dispatchEvent(new Event("ldk_notifications_update"));
     
-    setMessage({ text: `Successfully unlinked your ${type === "college" ? "college" : "company"}.`, type: "success" });
+    setMessage({ text: "Successfully unlinked your college.", type: "success" });
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -738,10 +627,9 @@ export default function ProfilePage() {
           .eq("id", user.id)
           .single();
 
-        const hasCollegeOrCompany = collegeKey.trim() !== "" || companyKey.trim() !== "";
+        const hasCollege = collegeKey.trim() !== "";
         const joinedOrChangedInstitution = 
-          (collegeKey.trim() !== "" && collegeKey.trim() !== (currentDbProfile?.college_key || "").trim()) ||
-          (companyKey.trim() !== "" && companyKey.trim() !== (currentDbProfile?.company_key || "").trim());
+          collegeKey.trim() !== "" && collegeKey.trim() !== (currentDbProfile?.college_key || "").trim();
 
         let nextLcVerified = leetcodeVerified;
         let nextCfVerified = codeforcesVerified;
@@ -749,7 +637,7 @@ export default function ProfilePage() {
         let nextUsVerified = unstopVerified;
         let nextH2sVerified = hack2skillVerified;
 
-        if (hasCollegeOrCompany) {
+        if (hasCollege) {
           if (joinedOrChangedInstitution) {
             nextLcVerified = false;
             nextCfVerified = false;
@@ -801,7 +689,6 @@ export default function ProfilePage() {
             linkedin_url: linkedinUrl.trim(),
             portfolio_url: portfolioUrl.trim(),
             college_key: collegeKey.trim(),
-            company_key: companyKey.trim(),
             college_name: cleanCollege,
             leetcode_username: leetcodeUsername.trim(),
             codeforces_username: codeforcesUsername.trim(),
@@ -842,7 +729,6 @@ export default function ProfilePage() {
           department: cleanDept,
           graduation_year: gradYear.trim(),
           college_key: collegeKey.trim(),
-          company_key: companyKey.trim(),
           batch_code: batchCode.trim(),
           grant_share_permission: grantSharePermission,
           leetcode_username: leetcodeUsername.trim(),
@@ -854,6 +740,13 @@ export default function ProfilePage() {
       });
 
       if (error) throw error;
+
+      if (typeof window !== "undefined") {
+        const sharingPermissions = localStorage.getItem("ldk_student_sharing_permissions");
+        const sharingMap = sharingPermissions ? JSON.parse(sharingPermissions) : {};
+        sharingMap[user.id] = grantSharePermission;
+        localStorage.setItem("ldk_student_sharing_permissions", JSON.stringify(sharingMap));
+      }
 
       setMessage({ text: "Profile details updated successfully.", type: "success" });
       setIsEditing(false); // Disable editing mode after successful save
@@ -1034,7 +927,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
@@ -1329,7 +1222,7 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">LeetCode</label>
                         {leetcodeUsername.trim() && (
-                          (leetcodeVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                          (leetcodeVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
@@ -1359,7 +1252,7 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
                         {codeforcesUsername.trim() && (
-                          (codeforcesVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                          (codeforcesVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
@@ -1391,7 +1284,7 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">CodeChef</label>
                         {codechefUsername.trim() && (
-                          (codechefVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                          (codechefVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
@@ -1421,7 +1314,7 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Unstop</label>
                         {unstopUsername.trim() && (
-                          (unstopVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                          (unstopVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
@@ -1451,7 +1344,7 @@ export default function ProfilePage() {
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Hack2Skill</label>
                         {hack2skillUsername.trim() && (
-                          (hack2skillVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                          (hack2skillVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
@@ -1601,18 +1494,18 @@ export default function ProfilePage() {
           {/* ================= RIGHT COLUMN: ACCOUNT CONNECTIONS & VERIFIED STATS (5 Columns) ================= */}
           <section className="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24">
             
-            {isStaff || isRec ? (
+            {isStaff ? (
               <div className="flex flex-col gap-6">
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-3 text-left">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Session Context</span>
                   <div className="flex flex-col gap-1 border-b border-border-main/45 pb-3">
                     <h3 className="font-display text-sm font-semibold text-txt-main">Administrative Desk</h3>
                     <p className="text-[10px] text-txt-muted leading-relaxed font-light">
-                      You are logged in as a {isStaff ? "Faculty Coordinator" : "Company Partner Recruiter"}. Student-specific features like handle integrations, enrollment keys, and academic credit claims are disabled.
+                      You are logged in as a Faculty Coordinator. Student-specific features like handle integrations, enrollment keys, and academic credit claims are disabled.
                     </p>
                   </div>
                   <div className="text-[10.5px] font-mono text-txt-sub">
-                    Authorized Role: <strong className="text-emerald-500 uppercase font-bold">{isStaff ? "Faculty Staff" : "Corporate Recruiter"}</strong>
+                    Authorized Role: <strong className="text-emerald-500 uppercase font-bold font-semibold">Faculty Staff</strong>
                   </div>
                 </div>
 
@@ -1620,48 +1513,28 @@ export default function ProfilePage() {
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-3 text-left">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Institutional Access Keys</span>
                   <div className="flex flex-col gap-1 border-b border-border-main/45 pb-3">
-                    <h3 className="font-display text-sm font-semibold text-txt-main">Share with Students/Employees</h3>
+                    <h3 className="font-display text-sm font-semibold text-txt-main">Share with Students</h3>
                     <p className="text-[10px] text-txt-muted leading-relaxed font-light">
-                      Send these verification keys to your students or team members so they can link their profiles to your institution.
+                      Send these verification keys to your students so they can link their profiles to your college.
                     </p>
                   </div>
                   <div className="flex flex-col gap-3">
-                    {isStaff && (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9.5px] font-mono text-txt-sub">COLLEGE REGISTRAR KEY:</span>
-                        <div className="flex items-center justify-between bg-bg-base border border-border-main/60 rounded px-2.5 py-1.5 font-mono text-[11px] text-txt-main">
-                          <span>{(collegeKey || "COLLEGE_SRM_FACULTY").replace("_FACULTY", "")}</span>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText((collegeKey || "COLLEGE_SRM_FACULTY").replace("_FACULTY", ""));
-                              setMessage({ text: "College Registrar Key copied to clipboard.", type: "success" });
-                            }}
-                            className="text-[9px] uppercase tracking-wider text-accent-main hover:opacity-80 font-bold cursor-pointer font-mono"
-                          >
-                            Copy
-                          </button>
-                        </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9.5px] font-mono text-txt-sub">COLLEGE REGISTRAR KEY:</span>
+                      <div className="flex items-center justify-between bg-bg-base border border-border-main/60 rounded px-2.5 py-1.5 font-mono text-[11px] text-txt-main">
+                        <span>{(collegeKey || "COLLEGE_SRM_FACULTY").replace("_FACULTY", "")}</span>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText((collegeKey || "COLLEGE_SRM_FACULTY").replace("_FACULTY", ""));
+                            setMessage({ text: "College Registrar Key copied to clipboard.", type: "success" });
+                          }}
+                          className="text-[9px] uppercase tracking-wider text-accent-main hover:opacity-80 font-bold cursor-pointer font-mono"
+                        >
+                          Copy
+                        </button>
                       </div>
-                    )}
-                    {isRec && (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[9.5px] font-mono text-txt-sub">CORPORATE ACCESS KEY:</span>
-                        <div className="flex items-center justify-between bg-bg-base border border-border-main/60 rounded px-2.5 py-1.5 font-mono text-[11px] text-txt-main">
-                          <span>{(companyKey || "COMPANY_GOOGLE_ADMIN").replace("_ADMIN", "")}</span>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText((companyKey || "COMPANY_GOOGLE_ADMIN").replace("_ADMIN", ""));
-                              setMessage({ text: "Corporate Access Key copied to clipboard.", type: "success" });
-                            }}
-                            className="text-[9px] uppercase tracking-wider text-accent-main hover:opacity-80 font-bold cursor-pointer font-mono"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1800,9 +1673,9 @@ export default function ProfilePage() {
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
                   <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-2.5">
-                    <span className="text-xs font-semibold text-txt-main">Link College or Employer</span>
+                    <span className="text-xs font-semibold text-txt-main">Link College</span>
                     <span className="text-[10px] text-txt-sub font-light leading-relaxed">
-                      Enter verification codes provided by your institution or coordinator to share your accomplishments.
+                      Enter verification codes provided by your institution to share accomplishments.
                     </span>
                   </div>
                   
@@ -1852,7 +1725,7 @@ export default function ProfilePage() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => handleUnlink("college")}
+                              onClick={handleUnlink}
                               className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
                             >
                               Cancel Request & Unlink
@@ -1866,67 +1739,10 @@ export default function ProfilePage() {
                             </span>
                             <button
                               type="button"
-                              onClick={() => handleUnlink("college")}
+                              onClick={handleUnlink}
                               className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
                             >
                               Unlink College
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Company Link Segment */}
-                    <div className="flex flex-col gap-3 p-3 bg-bg-base/30 border border-border-main/50 rounded-sm">
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-txt-sub">Corporate Enrollment</span>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] text-txt-sub font-semibold">Company Access Key</label>
-                        <input 
-                          type="password"
-                          value={companyKey}
-                          onChange={(e) => setCompanyKey(e.target.value)}
-                          disabled={!isEditing || companyLinkedStatus === "pending" || companyLinkedStatus === "linked"}
-                          placeholder="Enter Corporate Access Key"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                        />
-                      </div>
-
-                      {/* Company Status Display & Buttons */}
-                      <div className="flex flex-col gap-2 mt-1">
-                        {companyLinkedStatus === "none" && (
-                          <button
-                            type="button"
-                            onClick={handleRequestCompanyLink}
-                            className="h-8 w-full bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono uppercase tracking-wider rounded-sm transition-opacity"
-                          >
-                            Verify & Link Employer
-                          </button>
-                        )}
-                        {companyLinkedStatus === "pending" && (
-                          <div className="flex flex-col gap-1 text-left">
-                            <span className="text-[9.5px] text-amber-500 font-mono flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" /> Pending Employer Verification
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUnlink("company")}
-                              className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
-                            >
-                              Cancel Request & Unlink
-                            </button>
-                          </div>
-                        )}
-                        {companyLinkedStatus === "linked" && (
-                          <div className="flex flex-col gap-1 text-left">
-                            <span className="text-[9.5px] text-emerald-500 font-mono flex items-center gap-1">
-                              <CheckCircle2 size={11} /> Connected & Verified by Employer
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUnlink("company")}
-                              className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
-                            >
-                              Unlink Employer
                             </button>
                           </div>
                         )}
@@ -1943,7 +1759,7 @@ export default function ProfilePage() {
                         className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
                       />
                       <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
-                        <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College/Company coordinators to view, audit, and export my milestones, competitive scores, and code verification statuses.
+                        <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College coordinators and recruitment partners to view, audit, and export my milestones, competitive scores, and code verification statuses.
                       </label>
                     </div>
                   </div>
