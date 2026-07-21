@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import { 
   ArrowLeft, 
@@ -22,7 +23,8 @@ import {
   Terminal,
   Award,
   Plus,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 
 
@@ -126,6 +128,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
+  const router = useRouter();
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
 
   // WebRTC real-time voice and video variables
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -1418,13 +1422,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         
         {/* ================= COLUMN 1: STAGE TRACKER (3 Columns) ================= */}
         <section className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-border-main/50 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
-          <Link 
-            href="/"
-            className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase"
-          >
-            <ArrowLeft size={12} />
-            Back to Registry
-          </Link>
+          <div className="flex items-center justify-between gap-2">
+            <Link 
+              href="/"
+              className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase"
+            >
+              <ArrowLeft size={12} />
+              Back to Registry
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => setShowLeaveConfirmModal(true)}
+              className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/50 hover:text-red-400 opacity-40 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer font-bold px-1.5 py-0.5 rounded hover:bg-red-500/10"
+              title="Leave Workspace"
+            >
+              <LogOut size={10} />
+              <span>Leave</span>
+            </button>
+          </div>
 
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">{eventTitle}</span>
@@ -2308,6 +2324,59 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         </div>
       )}
 
+      {/* Custom Leave Workspace Confirmation Modal */}
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 z-[150] overflow-hidden font-sans text-left bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="max-w-xs w-full border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 relative z-[160]">
+            <div className="flex flex-col gap-1.5 text-center">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-red-400 font-bold">Leave Workspace</span>
+              <h3 className="font-display text-base font-semibold text-txt-main font-bold">Leave this workspace?</h3>
+              <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                You will be removed from the active member roster for <strong className="text-txt-main font-medium">{projectName}</strong>.
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirmModal(false)}
+                className="flex-1 h-8 rounded bg-bg-card border border-border-main/80 text-txt-muted hover:text-txt-main text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowLeaveConfirmModal(false);
+                  try {
+                    if (user && id !== "e1" && id !== "e2") {
+                      await supabase
+                        .from("project_members")
+                        .delete()
+                        .eq("project_space_id", id)
+                        .eq("profile_id", user.id);
+                    }
+                    const storedKey = `ldk_workspace_members_${id}`;
+                    const storedStr = localStorage.getItem(storedKey);
+                    if (storedStr) {
+                      const storedList = JSON.parse(storedStr);
+                      const updated = storedList.filter((m: any) => m.id !== user?.id);
+                      localStorage.setItem(storedKey, JSON.stringify(updated));
+                    }
+                    router.push("/");
+                  } catch (err) {
+                    console.error("Error leaving workspace: ", err);
+                    router.push("/");
+                  }
+                }}
+                className="flex-1 h-8 rounded bg-red-500/90 hover:bg-red-500 text-white text-xs font-mono uppercase tracking-wider font-bold transition-opacity cursor-pointer shadow-sm"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
