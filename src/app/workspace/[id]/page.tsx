@@ -1597,6 +1597,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
+          {/* Live Git Commit Ticker */}
+          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Commit Feed</span>
+              <Clock size={11} className="text-txt-main animate-pulse" />
+            </div>
+            <div className="flex flex-col gap-3">
+              {commits.map((c, idx) => (
+                <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
+                  <div className="flex justify-between items-center text-txt-main font-semibold">
+                    <span className="text-txt-muted font-normal">[{c.hash}]</span>
+                    <span>{c.author}</span>
+                  </div>
+                  <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
+                  <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Claim Academic Credits Card */}
           <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
@@ -1647,26 +1667,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Live Git Commit Ticker */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Commit Feed</span>
-              <Clock size={11} className="text-txt-main animate-pulse" />
-            </div>
-            <div className="flex flex-col gap-3">
-              {commits.map((c, idx) => (
-                <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
-                  <div className="flex justify-between items-center text-txt-main font-semibold">
-                    <span className="text-txt-muted font-normal">[{c.hash}]</span>
-                    <span>{c.author}</span>
-                  </div>
-                  <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
-                  <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
-                </div>
-              ))}
-            </div>
           </div>
 
         </section>
