@@ -140,6 +140,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [friendsToInvite, setFriendsToInvite] = useState<FriendProfile[]>([]);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
   const [workspaceTrigger, setWorkspaceTrigger] = useState(0);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   // Git Commits (live simulation list)
   const [commits, setCommits] = useState([
@@ -964,9 +972,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           profile_id: user.id,
           content: `Submitted academic credit claim for this project space.`
         });
-      } else {
         console.error("Supabase claim submission error: ", error);
-        alert("Failed to submit claim. Make sure you are registered to this project space.");
+        setMessage({ text: "Failed to submit claim. Make sure you are registered to this project space.", type: "error" });
       }
     } catch (e) {
       console.error("Claim credits connection error: ", e);
@@ -1002,14 +1009,50 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           isSystem: true
         };
         setChatMessages(prev => [...prev, systemNotice]);
-        alert(`Successfully invited ${friendName}! They are now added to this workspace.`);
+
+        // Push invite to global notification list so they receive it
+        const notifStored = localStorage.getItem("ldk_global_notifications");
+        const notifList = notifStored ? JSON.parse(notifStored) : [];
+        notifList.unshift({
+          id: `n_invite_${Date.now()}`,
+          title: "Workspace Invite",
+          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${id}".`,
+          type: "invite",
+          category: "alerts",
+          time: "Just now",
+          read: false,
+          actionLabel: "Open Workspace",
+          actionUrl: `/workspace/${id}`
+        });
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        window.dispatchEvent(new Event("ldk_notifications_update"));
+
+        setMessage({ text: `Successfully invited ${friendName}! They are now added to this workspace.`, type: "success" });
       } else {
         console.warn("Direct invite DB insert error: ", error);
-        alert(`Invite sent (simulated): ${friendName} invited.`);
+        
+        // Also simulate notification for offline/unconnected profiles
+        const notifStored = localStorage.getItem("ldk_global_notifications");
+        const notifList = notifStored ? JSON.parse(notifStored) : [];
+        notifList.unshift({
+          id: `n_invite_${Date.now()}`,
+          title: "Workspace Invite (Simulated)",
+          message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${id}".`,
+          type: "invite",
+          category: "alerts",
+          time: "Just now",
+          read: false,
+          actionLabel: "Open Workspace",
+          actionUrl: `/workspace/${id}`
+        });
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        window.dispatchEvent(new Event("ldk_notifications_update"));
+
+        setMessage({ text: `Invite sent (simulated): ${friendName} invited.`, type: "success" });
       }
     } catch (e) {
       console.error(e);
-      alert(`Invite sent (simulated): ${friendName} invited.`);
+      setMessage({ text: `Invite sent (simulated): ${friendName} invited.`, type: "success" });
     } finally {
       setInvitingFriendId(null);
     }
@@ -1747,6 +1790,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               </div>
 
             </div>
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-fade-in text-left">
+          <div className={`px-4 py-3 rounded border text-xs font-mono tracking-wide shadow-2xl flex items-center gap-2 ${
+            message.type === "success" 
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500" 
+              : "bg-red-500/10 border-red-500/30 text-red-500"
+          }`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+            {message.text}
           </div>
         </div>
       )}
