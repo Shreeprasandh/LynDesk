@@ -39,6 +39,77 @@ const GithubIcon = ({ size = 14 }: { size?: number }) => (
 
 
 
+function DashboardSkeleton() {
+  return (
+    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-pulse">
+      {/* Left Sidebar Skeleton (3 columns) */}
+      <div className="lg:col-span-3 flex flex-col gap-6">
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-16 bg-border-main/60 rounded" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-border-main/60" />
+            <div className="flex flex-col gap-2 flex-grow">
+              <div className="h-3 w-24 bg-border-main/60 rounded" />
+              <div className="h-2 w-32 bg-border-main/60 rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-20 bg-border-main/60 rounded" />
+          <div className="h-8 w-24 bg-border-main/60 rounded mt-1" />
+          <div className="h-1 w-full bg-border-main/60 rounded" />
+          <div className="h-2 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+
+      {/* Center Column Skeleton (6 columns) */}
+      <div className="lg:col-span-6 flex flex-col gap-6">
+        <div className="flex gap-4 border-b border-border-main/40 pb-2">
+          <div className="h-4 w-20 bg-border-main/60 rounded" />
+          <div className="h-4 w-20 bg-border-main/40 rounded" />
+          <div className="h-4 w-20 bg-border-main/40 rounded" />
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
+          <div className="h-4 w-40 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+          <div className="h-3 w-5/6 bg-border-main/40 rounded" />
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
+          <div className="h-4 w-32 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+
+      {/* Right Column Skeleton (3 columns) */}
+      <div className="lg:col-span-3 flex flex-col gap-6">
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-24 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LandingSkeleton() {
+  return (
+    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-pulse">
+      <div className="lg:col-span-7 flex flex-col gap-6">
+        <div className="h-3 w-32 bg-border-main/60 rounded" />
+        <div className="h-12 w-4/5 bg-border-main/60 rounded" />
+        <div className="h-4 w-full bg-border-main/40 rounded" />
+        <div className="h-4 w-2/3 bg-border-main/40 rounded" />
+      </div>
+      <div className="lg:col-span-5 border border-border-main/40 bg-bg-surface/50 p-8 rounded-md flex flex-col gap-4">
+        <div className="h-6 w-32 bg-border-main/60 rounded" />
+        <div className="h-10 w-full bg-border-main/40 rounded" />
+        <div className="h-10 w-full bg-border-main/40 rounded" />
+      </div>
+    </div>
+  );
+}
+
 interface EventItem {
   id: string;
   title: string;
@@ -76,6 +147,16 @@ const INITIAL_EVENTS: EventItem[] = [
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
+  const [likelyHasSession, setLikelyHasSession] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const keys = Object.keys(localStorage);
+      const hasToken = keys.some(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
+      setLikelyHasSession(hasToken);
+    }
+  }, []);
+
   const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success" | "faculty_login">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -679,10 +760,11 @@ export default function Home() {
 
       {/* Conditional Layout: Landing VS. Dashboard */}
       {authLoading ? (
-        <div className="flex-1 bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
-          <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
-          <span>Syncing session...</span>
-        </div>
+        likelyHasSession ? (
+          <DashboardSkeleton />
+        ) : (
+          <LandingSkeleton />
+        )
       ) : !user ? (
         /* ==================== LANDING PANEL ==================== */
         <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 lg:py-12 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
