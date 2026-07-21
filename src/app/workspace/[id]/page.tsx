@@ -1374,10 +1374,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     title={member.name}
                   >
                     {member.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img 
                         src={member.avatarUrl} 
                         alt={member.name} 
                         className="w-full h-full object-cover" 
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : (
                       member.name.charAt(0)
@@ -1952,10 +1954,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       member.isOnline ? "border-emerald-500/40" : "border-border-main/80 bg-bg-card"
                     }`}>
                       {member.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img 
                           src={member.avatarUrl} 
                           alt={member.name} 
                           className="w-full h-full object-cover" 
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                         />
                       ) : (
                         member.name.charAt(0)
