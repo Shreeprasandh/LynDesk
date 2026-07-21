@@ -948,7 +948,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                        <GithubIcon size={12} /> GitHub URL
+                        <GithubIcon size={12} /> GitHub
                       </label>
                       <input 
                         type="url" 
@@ -962,7 +962,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                        <LinkedinIcon size={12} /> LinkedIn URL
+                        <LinkedinIcon size={12} /> LinkedIn
                       </label>
                       <input 
                         type="url" 
@@ -978,7 +978,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                        <DiscordIcon size={12} /> Discord Username
+                        <DiscordIcon size={12} /> Discord
                       </label>
                       <input 
                         type="text" 
@@ -992,7 +992,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                        <Globe size={12} /> Personal Portfolio URL
+                        <Globe size={12} /> Personal Portfolio
                       </label>
                       <input 
                         type="url" 
@@ -1013,7 +1013,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">LeetCode Username</label>
+                        <label className="text-xs text-txt-sub font-semibold">LeetCode</label>
                         {leetcodeUsername.trim() && (
                           (leetcodeVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
@@ -1043,7 +1043,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">Codeforces Handle</label>
+                        <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
                         {codeforcesUsername.trim() && (
                           (codeforcesVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
@@ -1075,7 +1075,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">CodeChef Username</label>
+                        <label className="text-xs text-txt-sub font-semibold">CodeChef</label>
                         {codechefUsername.trim() && (
                           (codechefVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
@@ -1105,7 +1105,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">Unstop Username</label>
+                        <label className="text-xs text-txt-sub font-semibold">Unstop</label>
                         {unstopUsername.trim() && (
                           (unstopVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
@@ -1135,7 +1135,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">Hack2Skill Username</label>
+                        <label className="text-xs text-txt-sub font-semibold">Hack2Skill</label>
                         {hack2skillUsername.trim() && (
                           (hack2skillVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
