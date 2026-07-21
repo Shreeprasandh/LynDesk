@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "postgres-inspector": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "${DATABASE_URL}"
+      ],
+      "disabled": true,
+      "description": "PostgreSQL & Supabase direct schema inspector MCP server. Set DATABASE_URL and set disabled to false to activate."
+    }
+  }
+}
