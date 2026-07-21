@@ -337,41 +337,80 @@ export default function Header() {
       }
     ];
 
-    const loadNotifications = () => {
+    const loadNotifications = async () => {
       const stored = localStorage.getItem("ldk_global_notifications");
+      let localList: NotificationItem[] = [];
+
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
             const seen = new Set<string>();
-            const cleaned = parsed.map((n: any) => {
+            localList = parsed.map((n: any) => {
               if (n.type === "invite" && (n.actionLabel === "Open Workspace" || !n.actionLabel)) {
                 return { ...n, actionLabel: "Accept Invite" };
               }
               return n;
             }).filter((n: any) => {
+              // Exclude outgoing invites sent by this user to someone else
+              if (user?.id && n.senderId === user.id && n.recipientId && n.recipientId !== user.id) {
+                return false;
+              }
+              if (user?.id && n.recipientId && n.recipientId !== user.id) {
+                return false;
+              }
               const key = `${n.type || ""}_${n.title || ""}_${n.message || ""}_${n.actionUrl || ""}`;
               if (seen.has(key)) return false;
               seen.add(key);
               return true;
             });
-            
-            if (cleaned.length !== parsed.length || JSON.stringify(cleaned) !== JSON.stringify(parsed)) {
-              localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
-            }
-            
-            setNotifications(cleaned);
-          } else {
-            setNotifications(parsed);
           }
         } catch (e) {
           console.error("Error cleaning notifications: ", e);
-          setNotifications(JSON.parse(stored));
         }
       } else {
-        setNotifications(defaultNotifications);
+        localList = defaultNotifications;
         localStorage.setItem("ldk_global_notifications", JSON.stringify(defaultNotifications));
       }
+
+      // Fetch real database notifications for recipient if logged in
+      let dbNotifs: NotificationItem[] = [];
+      if (user?.id) {
+        try {
+          const { data: dbData } = await supabase
+            .from("notifications")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+
+          if (dbData && dbData.length > 0) {
+            dbNotifs = dbData.map((d: any) => ({
+              id: d.id,
+              title: d.title || "Notification",
+              message: d.content || d.message || "",
+              type: d.type || "invite",
+              category: "alerts",
+              time: "Just now",
+              read: d.is_read ?? false,
+              actionLabel: "Accept Invite",
+              actionUrl: d.link_url || "/explore"
+            }));
+          }
+        } catch (e) {
+          console.warn("DB notification fetch fallback:", e);
+        }
+      }
+
+      const combined = [...dbNotifs, ...localList];
+      const uniqueSet = new Set<string>();
+      const finalNotifs = combined.filter((n: any) => {
+        const k = `${n.title}_${n.message}`;
+        if (uniqueSet.has(k)) return false;
+        uniqueSet.add(k);
+        return true;
+      });
+
+      setNotifications(finalNotifs);
     };
 
     loadNotifications();

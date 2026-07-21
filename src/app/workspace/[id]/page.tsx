@@ -1215,6 +1215,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     try {
       // Direct invite builds a notification with an accept actionUrl link
       const targetUrl = `/workspace/${id}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`;
+      
+      if (user?.id) {
+        await supabase.from("notifications").insert({
+          user_id: friendId,
+          sender_id: user.id,
+          type: "invite",
+          title: "Workspace Invite",
+          content: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
+          link_url: targetUrl
+        });
+      }
+
       const notifStored = localStorage.getItem("ldk_global_notifications");
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       
@@ -1225,6 +1237,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       if (!alreadyInvited) {
         notifList.unshift({
           id: getUniqueId("n_invite"),
+          recipientId: friendId,
+          senderId: user?.id,
           title: "Workspace Invite",
           message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
           type: "invite",

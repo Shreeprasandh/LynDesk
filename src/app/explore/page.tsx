@@ -149,27 +149,41 @@ export default function ExplorePage() {
     }
   };
 
-  const handleInviteToTeam = (id: string) => {
+  const handleInviteToTeam = async (id: string) => {
     setInvitingStates(prev => ({ ...prev, [id]: true }));
-    setTimeout(() => {
+    setTimeout(async () => {
       setInvitingStates(prev => ({ ...prev, [id]: false }));
       
       const targetClassmate = classmates.find(c => c.id === id);
       const name = targetClassmate ? targetClassmate.full_name : "Teammate";
+      const senderName = user?.user_metadata?.full_name || "A classmate";
       
       try {
+        if (user?.id) {
+          await supabase.from("notifications").insert({
+            user_id: id,
+            sender_id: user.id,
+            type: "invite",
+            title: "Teammate Match Invite",
+            content: `${senderName} invited you to join their project team!`,
+            link_url: "/workspace/e1"
+          });
+        }
+
         const notifStored = localStorage.getItem("ldk_global_notifications");
         const notifList = notifStored ? JSON.parse(notifStored) : [];
         notifList.unshift({
           id: `n_explore_invite_${Date.now()}`,
+          recipientId: id,
+          senderId: user?.id,
           title: "Teammate Match Invite",
-          message: `You sent a team match invitation to ${name}.`,
+          message: `${senderName} invited you to join their project team!`,
           type: "invite",
           category: "alerts",
           time: "Just now",
           read: false,
-          actionLabel: "View Workspace",
-          actionUrl: "/workspace/w1"
+          actionLabel: "Accept Invite",
+          actionUrl: "/workspace/e1"
         });
         localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
         window.dispatchEvent(new Event("ldk_notifications_update"));
