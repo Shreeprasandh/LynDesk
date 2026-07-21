@@ -1236,7 +1236,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
       if (!alreadyInvited) {
         notifList.unshift({
-          id: getUniqueId("n_invite"),
+          id: `n_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           recipientId: friendId,
           senderId: user?.id,
           title: "Workspace Invite",

@@ -404,9 +404,11 @@ export default function Header() {
       const combined = [...dbNotifs, ...localList];
       const uniqueSet = new Set<string>();
       const finalNotifs = combined.filter((n: any) => {
-        const k = `${n.title}_${n.message}`;
-        if (uniqueSet.has(k)) return false;
-        uniqueSet.add(k);
+        const idKey = n.id || `${n.title}_${n.message}`;
+        const contentKey = `${n.title}_${n.message}`;
+        if (uniqueSet.has(idKey) || uniqueSet.has(contentKey)) return false;
+        uniqueSet.add(idKey);
+        uniqueSet.add(contentKey);
         return true;
       });
 
@@ -767,9 +769,9 @@ export default function Header() {
               {/* Notification Items List */}
               <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
                 {filteredNotifications.filter(n => n.category === drawerTab).length > 0 ? (
-                  filteredNotifications.filter(n => n.category === drawerTab).map((item) => (
+                  filteredNotifications.filter(n => n.category === drawerTab).map((item, idx) => (
                     <div 
-                      key={item.id} 
+                      key={`${item.id}_${idx}`} 
                       className={`p-4 border rounded-sm flex flex-col gap-3 transition-colors ${
                         item.read 
                           ? "bg-bg-base/30 border-border-main/40 opacity-75" 
