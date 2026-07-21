@@ -43,7 +43,6 @@ interface FriendProfile {
 interface TeamMember {
   id: string;
   name: string;
-  role: string;
   isOnline: boolean;
   isSpeaking?: boolean;
   avatarUrl?: string;
@@ -154,10 +153,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   useEffect(() => {
     const loadMembers = async () => {
       const baseMembers = [
-        { id: "m1", name: "Alex Carter", role: "Developer", isOnline: true, isSpeaking: false, avatarUrl: "" },
-        { id: "m2", name: "Mira Sen", role: "Designer", isOnline: true, isSpeaking: false, avatarUrl: "" },
-        { id: "m3", name: "Prof. Davis", role: "Mentor", isOnline: false, avatarUrl: "" },
+        { id: "m1", name: "Alex Carter", isOnline: true, isSpeaking: false, avatarUrl: "" },
+        { id: "m2", name: "Mira Sen", isOnline: true, isSpeaking: false, avatarUrl: "" },
       ];
+
+      if (user) {
+        const userFullName = user.user_metadata?.full_name || user.email?.split("@")[0] || "You";
+        baseMembers.unshift({
+          id: user.id,
+          name: `${userFullName} (You)`,
+          isOnline: true,
+          isSpeaking: false,
+          avatarUrl: user.user_metadata?.avatar_url || ""
+        });
+      }
 
       // 1. Load mock members accepted from local storage
       const storedStr = localStorage.getItem(`ldk_workspace_members_${id}`);
@@ -182,7 +191,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               return {
                 id: prof.id,
                 name: prof.full_name || prof.username || "Collaborator",
-                role: item.role === "creator" ? "Creator" : "Collaborator",
                 avatarUrl: prof.avatar_url || "",
                 isOnline: true
               };
@@ -1349,7 +1357,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 ${
                       member.isSpeaking ? "ring-2 ring-emerald-500 scale-105" : ""
                     }`}
-                    title={`${member.name} (${member.role})`}
+                    title={member.name}
                   >
                     {member.avatarUrl ? (
                       <img 
@@ -1947,7 +1955,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
                     <div className="flex flex-col min-w-0 text-left">
                       <span className="text-xs font-semibold text-txt-main truncate">{member.name}</span>
-                      <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{member.role}</span>
                     </div>
                   </div>
 
