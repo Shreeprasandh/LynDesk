@@ -159,16 +159,18 @@ export default function ExplorePage() {
       const senderName = user?.user_metadata?.full_name || "A classmate";
       
       try {
-        if (user?.id) {
-          await supabase.from("notifications").insert({
-            user_id: id,
-            sender_id: user.id,
-            type: "invite",
+        await fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientId: id,
+            senderId: user?.id,
             title: "Teammate Match Invite",
-            content: `${senderName} invited you to join their project team!`,
-            link_url: "/workspace/e1"
-          });
-        }
+            message: `${senderName} invited you to join their project team!`,
+            actionUrl: "/workspace/e1",
+            type: "invite"
+          })
+        });
 
         const recipientKey = `ldk_user_notifications_${id}`;
         const notifStored = localStorage.getItem(recipientKey);
@@ -189,7 +191,7 @@ export default function ExplorePage() {
         localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
         window.dispatchEvent(new Event("ldk_notifications_update"));
       } catch (e) {
-        console.error("Failed to save notification: ", e);
+        console.error("Failed to send notification: ", e);
       }
 
       setModalMessage({

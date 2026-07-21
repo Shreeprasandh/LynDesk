@@ -861,13 +861,17 @@ export default function Home() {
           content: `Invited ${friendName} to collaborate via Dashboard!`
         });
 
-        // Insert notification into Supabase if available
-        await supabase.from("notifications").insert({
-          user_id: friendId,
-          sender_id: user.id,
-          type: "invite",
-          content: `Invited you to collaborate on project workspace!`,
-          link_url: `/workspace/${inviteEventId}`
+        await fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientId: friendId,
+            senderId: user.id,
+            title: "Teammate Match Invite",
+            message: `${user.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
+            actionUrl: `/workspace/${inviteEventId}`,
+            type: "invite"
+          })
         });
       }
 

@@ -428,7 +428,34 @@ export default function Header() {
     loadNotifications();
 
     window.addEventListener("ldk_notifications_update", loadNotifications);
-    return () => window.removeEventListener("ldk_notifications_update", loadNotifications);
+
+    let channel: any = null;
+    if (user?.id) {
+      channel = supabase
+        .channel(`user_notifs_${user.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+          () => {
+            loadNotifications();
+          }
+        )
+        .on(
+          "broadcast",
+          { event: "ldk_invite_sent" },
+          (payload) => {
+            if (payload.payload?.recipientId === user.id) {
+              loadNotifications();
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      window.removeEventListener("ldk_notifications_update", loadNotifications);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const handleClearTab = () => {

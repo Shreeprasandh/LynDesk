@@ -1217,13 +1217,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const targetUrl = `/workspace/${id}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`;
       
       if (user?.id) {
-        await supabase.from("notifications").insert({
-          user_id: friendId,
-          sender_id: user.id,
-          type: "invite",
-          title: "Workspace Invite",
-          content: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
-          link_url: targetUrl
+        await fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recipientId: friendId,
+            senderId: user.id,
+            title: "Workspace Invite",
+            message: `${user?.user_metadata?.full_name || user?.user_metadata?.username || "A classmate"} has invited you to collaborate on the project workspace "${projectName || id}".`,
+            actionUrl: targetUrl,
+            type: "invite"
+          })
         });
       }
 
