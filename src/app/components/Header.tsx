@@ -432,7 +432,7 @@ export default function Header() {
     let channel: any = null;
     if (user?.id) {
       channel = supabase
-        .channel(`user_notifs_${user.id}`)
+        .channel("ldk_global_realtime_bus")
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
@@ -444,7 +444,26 @@ export default function Header() {
           "broadcast",
           { event: "ldk_invite_sent" },
           (payload) => {
-            if (payload.payload?.recipientId === user.id) {
+            const data = payload.payload;
+            if (data && (data.recipientId === user.id || data.recipientId === user.email)) {
+              // Add to recipient's local storage and reload notifications drawer
+              const userKey = `ldk_user_notifications_${user.id}`;
+              const userStored = localStorage.getItem(userKey);
+              const notifList = userStored ? JSON.parse(userStored) : [];
+              notifList.unshift({
+                id: `n_rt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                recipientId: user.id,
+                senderId: data.senderId,
+                title: data.title || "Teammate Match Invite",
+                message: data.message || "You received a new team invite!",
+                type: data.type || "invite",
+                category: "alerts",
+                time: "Just now",
+                read: false,
+                actionLabel: "Accept Invite",
+                actionUrl: data.actionUrl || "/explore"
+              });
+              localStorage.setItem(userKey, JSON.stringify(notifList.slice(0, 100)));
               loadNotifications();
             }
           }
