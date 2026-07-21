@@ -187,61 +187,88 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Load workspace members dynamically from local storage and DB
   useEffect(() => {
     const loadMembers = async () => {
-      const baseMembers = [
-        { id: "m1", name: "Alex Carter", isOnline: true, isSpeaking: false, avatarUrl: "" },
-        { id: "m2", name: "Mira Sen", isOnline: true, isSpeaking: false, avatarUrl: "" },
-      ];
-
-      if (user) {
-        const userFullName = user.user_metadata?.full_name || user.email?.split("@")[0] || "You";
-        baseMembers.unshift({
+      const baseMembers: TeamMember[] = user ? [
+        {
           id: user.id,
-          name: `${userFullName} (You)`,
+          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "You",
           isOnline: true,
           isSpeaking: false,
           avatarUrl: user.user_metadata?.avatar_url || ""
-        });
-      }
+        }
+      ] : [];
 
       // 1. Load mock members accepted from local storage
       const storedStr = localStorage.getItem(`ldk_workspace_members_${id}`);
-      const storedList = storedStr ? JSON.parse(storedStr) : [];
+      const storedList: TeamMember[] = storedStr ? JSON.parse(storedStr) : [];
 
-      // 2. Query real database members if it's a UUID
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      // Default initial classmates for mock projects
+      const mockTeam: TeamMember[] = id === "e1" ? [
+        { id: "u2", name: "Mira Sen", isOnline: true, avatarUrl: "" },
+        { id: "u1", name: "Alex Carter", isOnline: false, avatarUrl: "" }
+      ] : id === "e2" ? [
+        { id: "u3", name: "Nikhil Mehta", isOnline: true, avatarUrl: "" }
+      ] : [];
+
+      // 2. Query real database members from Supabase project_members
       let dbMembersList: TeamMember[] = [];
-      if (isUuid) {
+      try {
+        const { data, error } = await supabase
+          .from("project_members")
+          .select(`
+            role,
+            profile:profile_id ( id, username, full_name, avatar_url )
+          `)
+          .eq("project_space_id", id);
+        
+        if (!error && data && data.length > 0) {
+          dbMembersList = data.map((item: any) => {
+            const prof = item.profile;
+            if (!prof) return null;
+            return {
+              id: prof.id,
+              name: prof.full_name || prof.username || "Collaborator",
+              avatarUrl: prof.avatar_url || "",
+              isOnline: true
+            };
+          }).filter(Boolean) as TeamMember[];
+        }
+      } catch (e) {
+        console.error("Error loading project members: ", e);
+      }
+
+      // Combine base, stored, mock, and DB members
+      const combined = [...baseMembers, ...storedList, ...dbMembersList, ...mockTeam];
+      const uniqueMap = new Map<string, TeamMember>();
+      combined.forEach(m => {
+        if (m && m.id) uniqueMap.set(m.id, m);
+      });
+
+      // Live Profile Avatar Enrichment from Supabase profiles table
+      const allMemberIds = Array.from(uniqueMap.keys());
+      if (allMemberIds.length > 0) {
         try {
-          const { data, error } = await supabase
-            .from("project_members")
-            .select(`
-              role,
-              profile:profile_id ( id, username, full_name, avatar_url )
-            `)
-            .eq("project_space_id", id);
-          
-          if (!error && data) {
-            dbMembersList = data.map((item: any) => {
-              const prof = item.profile;
-              return {
-                id: prof.id,
-                name: prof.full_name || prof.username || "Collaborator",
-                avatarUrl: prof.avatar_url || "",
-                isOnline: true
-              };
+          const { data: profData } = await supabase
+            .from("profiles")
+            .select("id, full_name, username, avatar_url")
+            .in("id", allMemberIds);
+
+          if (profData && profData.length > 0) {
+            profData.forEach((p: any) => {
+              const existing = uniqueMap.get(p.id);
+              if (existing) {
+                uniqueMap.set(p.id, {
+                  ...existing,
+                  name: p.full_name || p.username || existing.name,
+                  avatarUrl: p.avatar_url || existing.avatarUrl || ""
+                });
+              }
             });
           }
         } catch (e) {
-          console.error("Error loading project members: ", e);
+          console.warn("Avatar enrichment warning: ", e);
         }
       }
 
-      // Combine them, filtering out duplicate IDs
-      const combined = [...baseMembers, ...storedList, ...dbMembersList];
-      const uniqueMap = new Map();
-      combined.forEach(m => {
-        uniqueMap.set(m.id, m);
-      });
       setRoomMembers(Array.from(uniqueMap.values()));
     };
 
