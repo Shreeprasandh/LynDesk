@@ -324,14 +324,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
   }, [id, workspaceTrigger]);
 
-  // Handle invitation acceptance from notifications query string (URLSearchParams // await searchParams)
+  // Handle invitation acceptance from notifications query string
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
       const searchParams = new URLSearchParams(window.location.search);
       const inviteId = searchParams.get("acceptInvite");
-      const inviteName = searchParams.get("friendName");
+      const inviteName = searchParams.get("friendName") || "Teammate";
       
-      if (inviteId && inviteName) {
+      if (inviteId) {
         // Strip parameters from URL for clean navigation
         const newUrl = window.location.pathname;
         window.history.replaceState({}, document.title, newUrl);
@@ -340,13 +340,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         const storedStr = localStorage.getItem(storedKey);
         const storedList = storedStr ? JSON.parse(storedStr) : [];
 
-        if (!storedList.some((m: any) => m.id === inviteId)) {
+        const joiningUserId = user?.id || inviteId;
+        const joiningUserName = user?.user_metadata?.full_name || decodeURIComponent(inviteName);
+
+        // Register member in database project_members table
+        if (user?.id && id !== "e1" && id !== "e2") {
+          supabase.from("project_members").upsert({
+            project_space_id: id,
+            profile_id: user.id,
+            role: "member"
+          }).then(() => {});
+        }
+
+        if (!storedList.some((m: any) => m.id === joiningUserId)) {
           const newMember = {
-            id: inviteId,
-            name: decodeURIComponent(inviteName),
+            id: joiningUserId,
+            name: joiningUserName,
             role: "Collaborator",
             isOnline: true,
-            avatarUrl: ""
+            avatarUrl: user?.user_metadata?.avatar_url || ""
           };
           const updated = [...storedList, newMember];
           localStorage.setItem(storedKey, JSON.stringify(updated));
@@ -356,19 +368,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             id: getUniqueId("sys"),
             sender_name: "LDK:BOT",
             sender_role: "SYSTEM",
-            content: `${newMember.name} accepted the invite and joined the workspace.`,
+            content: `${joiningUserName} accepted the invite and joined the shared workspace deck.`,
             created_at: new Date().toISOString(),
             isSystem: true
           };
 
           queueMicrotask(() => {
             setSentInviteIds(prev => {
-              const cleanList = prev.filter(fid => fid !== inviteId);
+              const cleanList = prev.filter(fid => fid !== joiningUserId);
               localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
               return cleanList;
             });
             setChatMessages(prev => [...prev, botNotice]);
-            setMessage({ text: `${newMember.name} joined the workspace!`, type: "success" });
+            setMessage({ text: `Joined shared workspace!`, type: "success" });
             setWorkspaceTrigger(prev => prev + 1);
           });
         }
