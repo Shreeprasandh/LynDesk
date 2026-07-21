@@ -42,6 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     if (typeof window !== "undefined") {
       localStorage.removeItem("faculty_staff_member");
+      localStorage.removeItem("company_recruiter_member");
+      localStorage.removeItem("ldk_recruiter_session");
     }
     await supabase.auth.signOut();
     setUser(null);

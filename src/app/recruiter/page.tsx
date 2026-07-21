@@ -162,7 +162,7 @@ export default function RecruiterConsole() {
                           std.skills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesDept = filterDept ? std.department === filterDept : true;
     const matchesYear = filterGradYear ? std.gradYear === filterGradYear : true;
-    const matchesThreshold = std.leetcodeSolved >= filterSolvedThreshold;
+    const matchesThreshold = filterSolvedThreshold === 0 || (std.leetcodeSolved || 0) >= filterSolvedThreshold;
     return matchesSearch && matchesDept && matchesYear && matchesThreshold;
   });
 

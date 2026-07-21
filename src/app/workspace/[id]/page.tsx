@@ -113,11 +113,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const userSessionIdRef = useRef("");
-  useEffect(() => {
-    userSessionIdRef.current = generateSessionId();
-  }, []);
+  const userSessionIdRef = useRef(generateSessionId());
   const signalingChannelRef = useRef<any>(null);
+
+  // Guarantee WebRTC media track and peer connection cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop());
+        localStreamRef.current = null;
+      }
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+    };
+  }, []);
 
   // Chat Feed State
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);

@@ -146,20 +146,45 @@ export default function ExplorePage() {
     setInvitingStates(prev => ({ ...prev, [id]: true }));
     setTimeout(() => {
       setInvitingStates(prev => ({ ...prev, [id]: false }));
+      
+      const targetClassmate = classmates.find(c => c.id === id);
+      const name = targetClassmate ? targetClassmate.full_name : "Teammate";
+      
+      try {
+        const notifStored = localStorage.getItem("ldk_global_notifications");
+        const notifList = notifStored ? JSON.parse(notifStored) : [];
+        notifList.unshift({
+          id: `n_explore_invite_${Date.now()}`,
+          title: "Teammate Match Invite",
+          message: `You sent a team match invitation to ${name}.`,
+          type: "invite",
+          category: "alerts",
+          time: "Just now",
+          read: false,
+          actionLabel: "View Workspace",
+          actionUrl: "/workspace/w1"
+        });
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        window.dispatchEvent(new Event("ldk_notifications_update"));
+      } catch (e) {
+        console.error("Failed to save notification: ", e);
+      }
+
       setModalMessage({
         isOpen: true,
         title: "Invitation Sent",
-        text: "Invitation sent successfully! They will receive a notification in their chat deck."
+        text: `Invitation sent successfully to ${name}! They will receive a notification in their chat deck.`
       });
     }, 1200);
   };
 
   // Filters logic
   const filteredClassmates = classmates.filter(c => {
+    const skillsStr = Array.isArray(c.skills) ? c.skills.join(" ") : String(c.skills || "");
     const matchesSearch = c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          c.skills.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          skillsStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           c.username.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSkill = skillFilter === "" || c.skills.toLowerCase().includes(skillFilter.toLowerCase());
+    const matchesSkill = skillFilter === "" || skillsStr.toLowerCase().includes(skillFilter.toLowerCase());
     return matchesSearch && matchesSkill;
   });
 
