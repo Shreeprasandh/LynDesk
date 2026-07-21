@@ -2175,14 +2175,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           </div>
                           <button 
                             onClick={() => handleSendDirectInvite(f.id, f.full_name)}
-                            disabled={invitingFriendId === f.id || isAlreadyInvited}
-                            className={`h-7 px-3 text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 transition-all ${
-                              isAlreadyInvited 
-                                ? "bg-bg-card border border-border-main/50 text-txt-muted opacity-60 cursor-not-allowed" 
-                                : "bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base cursor-pointer"
-                            }`}
+                            disabled={invitingFriendId === f.id}
+                            className="h-7 px-3 text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 transition-all bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base cursor-pointer font-bold"
                           >
-                            {invitingFriendId === f.id ? "Inviting..." : isAlreadyInvited ? "Invite Sent" : "Send Invite"}
+                            {invitingFriendId === f.id ? "Inviting..." : isAlreadyInvited ? "Re-send Invite" : "Send Invite"}
                           </button>
                         </div>
                       );
