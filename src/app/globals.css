@@ -46,8 +46,8 @@
   --bg-secondary: 36 22% 93%;      /* #F1EDE7 - Warm Gray-Sand */
   --surface: 0 0% 100%;            /* #FFFFFF - Crisp White */
   --text-primary: 0 0% 6%;         /* #0F0F0F - Deep Obsidian */
-  --text-secondary: 37 6% 39%;     /* #6B665E - Muted Stone Gray */
-  --text-muted: 37 5% 60%;         /* #9E9991 - Warm Muted Gray */
+  --text-secondary: 37 6% 34%;     /* #5A5650 - Darker Stone Gray */
+  --text-muted: 37 8% 40%;         /* #6E675E - Warm Muted Gray (Contrast Compliant) */
   --accent: 215 35% 32%;          /* #344A66 - Polished Slate-Navy Accent */
   --border-line: 37 20% 86%;       /* #E2DDD5 - Soft Sand Border */
   --ring-line: 215 35% 32%;
@@ -59,8 +59,8 @@
   --bg-secondary: 0 0% 11%;        /* #1B1B1B - Charcoal Gray */
   --surface: 0 0% 11%;             /* #1B1B1B - Charcoal Card */
   --text-primary: 35 15% 82%;      /* #D8D3CC - Warm Sand/Alabaster */
-  --text-secondary: 34 6% 52%;     /* #8C867E - Muted Sand Gray */
-  --text-muted: 34 5% 35%;         /* #59544F - Dark Muted Sand */
+  --text-secondary: 34 8% 68%;     /* #B4AEA6 - Lighter Sand Gray */
+  --text-muted: 34 8% 60%;         /* #9E978E - Lighter Muted Sand (Contrast Compliant) */
   --accent: 35 15% 82%;            /* #D8D3CC - Warm Sand Accent */
   --border-line: 0 0% 17%;         /* #2C2C2C - Obsidian Border */
   --ring-line: 35 15% 82%;

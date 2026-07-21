@@ -1153,7 +1153,7 @@ export default function Home() {
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
                   <span className="text-[10px] text-txt-muted font-light">{collegeName || "Independent Student"}</span>
-                  <span className="text-[8px] text-txt-muted opacity-60 font-mono select-all mt-0.5">Desk ID: {user?.id}</span>
+                  <span className="text-[8px] text-txt-muted font-mono select-all mt-0.5">Desk ID: {user?.id}</span>
                 </div>
               </div>
             </div>
