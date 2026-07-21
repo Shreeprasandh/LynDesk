@@ -66,11 +66,35 @@ interface Artifact {
   created_at: string;
 }
 
+interface WorkspaceTask {
+  id: string;
+  title: string;
+  status: "todo" | "in_progress" | "done";
+  priority: "high" | "medium" | "low";
+  assignee: string;
+}
+
 const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
+
+  // Workspace Tasks & Milestones State
+  const [tasks, setTasks] = useState<WorkspaceTask[]>([
+    { id: "t1", title: "Setup WebRTC audio & video room connection", status: "done", priority: "high", assignee: "Alex Carter" },
+    { id: "t2", title: "Configure Supabase RLS schema policies", status: "in_progress", priority: "high", assignee: "Mira Sen" },
+    { id: "t3", title: "Design minimal dark glassmorphism dashboard UI", status: "todo", priority: "medium", assignee: "You" }
+  ]);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
+
+  // Collaborative Scratchpad Notes State
+  const [workspaceNotes, setWorkspaceNotes] = useState(
+    "## Team Architecture Notes\n- Next.js 16 App Router with React 19 Server Components\n- WebRTC peer connection for real-time voice call\n- Supabase real-time channel for live chat feed"
+  );
 
   // Project Details
   const [projectName, setProjectName] = useState("Loading Project...");
@@ -1278,6 +1302,24 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return () => clearInterval(interval);
   }, [fetchCommits]);
 
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    const newTask: WorkspaceTask = {
+      id: getUniqueId("task"),
+      title: newTaskTitle.trim(),
+      status: "todo",
+      priority: newTaskPriority,
+      assignee: user?.user_metadata?.full_name || user?.user_metadata?.username || "You"
+    };
+    setTasks(prev => [...prev, newTask]);
+    setNewTaskTitle("");
+  };
+
+  const handleUpdateTaskStatus = (taskId: string, newStatus: "todo" | "in_progress" | "done") => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+  };
+
   return (
     <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
@@ -1578,289 +1620,398 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         {/* ================= COLUMN 3: ARTIFACT DECK & VERIFICATIONS (3 Columns) ================= */}
         <section className="lg:col-span-3 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           
-          <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Decks & Codebases</span>
-            <h2 className="font-display text-lg font-light text-txt-main">Artifact Registry</h2>
-          </div>
-
-          {/* GitHub Repo Integration Card */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            {!isEditingGit ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
-                  <button 
-                    onClick={() => {
-                      setTempGit(githubRepo);
-                      setIsEditingGit(true);
-                    }}
-                    className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
-                <span className="text-xs font-mono text-txt-main truncate select-all">
-                  {githubRepo || "Not linked"}
-                </span>
-                {githubRepo && (
-                  <a 
-                    href={formatUrl(githubRepo)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-                  >
-                    Open Codebase
-                    <ExternalLink size={10} />
-                  </a>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setIsEditingGit(false)}
-                      className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={saveGitRepo}
-                      className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                <input 
-                  type="text"
-                  placeholder="github.com/username/project"
-                  value={tempGit}
-                  onChange={(e) => setTempGit(e.target.value)}
-                  className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveGitRepo();
-                  }}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Prototype Demo Card */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            {!isEditingDemo ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
-                  <button 
-                    onClick={() => {
-                      setTempDemo(liveDemo);
-                      setIsEditingDemo(true);
-                    }}
-                    className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
-                  >
-                    Edit
-                  </button>
-                </div>
-                <span className="text-xs font-mono text-txt-main truncate select-all">
-                  {liveDemo || "Not hosted"}
-                </span>
-                {liveDemo && (
-                  <a 
-                    href={formatUrl(liveDemo)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-                  >
-                    Launch Prototype
-                    <ExternalLink size={10} />
-                  </a>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setIsEditingDemo(false)}
-                      className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={saveLiveDemo}
-                      className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </div>
-                <input 
-                  type="text"
-                  placeholder="project-demo.vercel.app"
-                  value={tempDemo}
-                  onChange={(e) => setTempDemo(e.target.value)}
-                  className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveLiveDemo();
-                  }}
-                />
-              </>
-            )}
-          </div>
-
-          {/* Active Artifact Card */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Artifacts</span>
-              <FolderDown size={14} className="text-txt-main" />
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              {artifacts.filter(a => a.is_active).map(art => (
-                <div key={art.id} className="border border-border-main/60 p-3 rounded-sm flex flex-col gap-1.5 hover:bg-bg-card transition-colors duration-150 relative group">
-                  <div className="flex justify-between items-start gap-2">
-                    <span className="text-xs text-txt-main font-semibold truncate max-w-[80%]">{art.file_name}</span>
-                    <span className="text-[9px] font-mono text-txt-muted uppercase">v{art.version}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px] text-txt-muted font-mono">
-                    <span>by {art.uploaded_by}</span>
-                    <a href={art.file_url} className="text-txt-main hover:underline flex items-center gap-1">
-                      Download
-                      <FolderDown size={9} />
-                    </a>
-                  </div>
-                </div>
-              ))}
-
-              {artifacts.length === 0 && (
-                <span className="text-[10px] text-txt-muted font-light italic">No files uploaded yet.</span>
-              )}
-            </div>
-
-            {/* File upload hidden input */}
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileUpload} 
-              className="hidden" 
-              accept=".pdf,.ppt,.pptx,.doc,.docx"
-            />
-
-            <button 
-              onClick={triggerFileUpload}
-              disabled={isUploading}
-              className="w-full h-8 border border-border-main/80 border-dashed text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              {isUploading ? (
-                <>
-                  <span className="h-3 w-3 rounded-full border border-txt-main/30 border-t-txt-main animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <CloudUpload size={12} />
-                  Upload Deck/PDF
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* History drawer list */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Version History</span>
-            <div className="flex flex-col gap-2">
-              {artifacts.filter(a => !a.is_active).map(art => (
-                <div key={art.id} className="flex items-center justify-between border-b border-border-main/40 pb-2 text-[10px] font-mono">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-txt-sub truncate">{art.file_name}</span>
-                    <span className="text-[8px] text-txt-muted">v{art.version} • {art.uploaded_by}</span>
-                  </div>
-                  <a href={art.file_url} className="text-txt-main hover:underline flex-shrink-0">
-                    Get
-                  </a>
-                </div>
-              ))}
-
-              {artifacts.filter(a => !a.is_active).length === 0 && (
-                <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions.</span>
-              )}
-            </div>
-          </div>
-
-          {/* Live Git Commit Ticker */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Commit Feed</span>
-              <Clock size={11} className="text-txt-main animate-pulse" />
-            </div>
-            <div className="flex flex-col gap-3">
-              {commits.map((c, idx) => (
-                <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
-                  <div className="flex justify-between items-center text-txt-main font-semibold">
-                    <span className="text-txt-muted font-normal">[{c.hash}]</span>
-                    <span>{c.author}</span>
-                  </div>
-                  <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
-                  <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Claim Academic Credits Card */}
-          <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Academic Verification</span>
-              <Award size={14} className="text-txt-main" />
-            </div>
-            
-            {claimStatus === "idle" && (
-              <button 
-                onClick={handleClaimCredits}
-                disabled={isSubmittingClaim}
-                className="w-full h-9 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[10px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity cursor-pointer font-bold"
+          {/* Tab Navigation Header */}
+          <div className="flex border-b border-border-main/50 pb-2.5 gap-1 overflow-x-auto font-mono text-[9px] uppercase tracking-wider">
+            {(["workspace", "tasks", "artifacts", "notes", "credits"] as const).map(tab => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-2 py-1 rounded-sm cursor-pointer transition-colors ${
+                  activeTab === tab 
+                    ? "bg-accent-main text-bg-base font-bold" 
+                    : "text-txt-muted hover:text-txt-main hover:bg-bg-card"
+                }`}
               >
-                {isSubmittingClaim ? "Submitting Claim..." : "Claim Campus Credits"}
+                {tab}
               </button>
-            )}
+            ))}
+          </div>
 
-            {claimStatus === "pending" && (
-              <div className="border border-border-main/60 p-2.5 rounded-sm bg-bg-card/50 flex flex-col gap-1 text-center">
-                <span className="text-[10px] font-semibold text-txt-main">Verification Pending</span>
-                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
-                  Submitted to department verifier for review.
-                </p>
+          {(activeTab === "workspace") && (
+            <>
+              <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Decks & Codebases</span>
+                <h2 className="font-display text-lg font-light text-txt-main">Workspace Hub</h2>
               </div>
-            )}
 
-            {claimStatus === "approved" && (
-              <div className="border border-emerald-500/20 p-2.5 rounded-sm bg-emerald-500/5 flex flex-col gap-1 text-center">
-                <span className="text-[10px] font-semibold text-emerald-500">Credits Approved</span>
-                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
-                  10 academic points credited to profile.
-                </p>
+              {/* GitHub Repo Integration Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                {!isEditingGit ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
+                      <button 
+                        onClick={() => {
+                          setTempGit(githubRepo);
+                          setIsEditingGit(true);
+                        }}
+                        className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <span className="text-xs font-mono text-txt-main truncate select-all">
+                      {githubRepo || "Not linked"}
+                    </span>
+                    {githubRepo && (
+                      <a 
+                        href={formatUrl(githubRepo)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
+                      >
+                        Open Codebase
+                        <ExternalLink size={10} />
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Repository</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setIsEditingGit(false)}
+                          className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={saveGitRepo}
+                          className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                    <input 
+                      type="text"
+                      placeholder="github.com/username/project"
+                      value={tempGit}
+                      onChange={(e) => setTempGit(e.target.value)}
+                      className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveGitRepo();
+                      }}
+                    />
+                  </>
+                )}
               </div>
-            )}
 
-            {claimStatus === "rejected" && (
-              <div className="border border-red-500/20 p-2.5 rounded-sm bg-red-500/5 flex flex-col gap-1 text-center font-bold">
-                <span className="text-[10px] font-semibold text-red-500">Claim Rejected</span>
-                <p className="text-[9px] text-txt-muted font-light leading-relaxed">
-                  Please review files or contact coordinator.
-                </p>
+              {/* Prototype Demo Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                {!isEditingDemo ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
+                      <button 
+                        onClick={() => {
+                          setTempDemo(liveDemo);
+                          setIsEditingDemo(true);
+                        }}
+                        className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    <span className="text-xs font-mono text-txt-main truncate select-all">
+                      {liveDemo || "Not hosted"}
+                    </span>
+                    {liveDemo && (
+                      <a 
+                        href={formatUrl(liveDemo)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
+                      >
+                        Launch Prototype
+                        <ExternalLink size={10} />
+                      </a>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Prototype Demo URL</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setIsEditingDemo(false)}
+                          className="text-[9px] font-mono uppercase text-txt-muted hover:underline cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={saveLiveDemo}
+                          className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                    <input 
+                      type="text"
+                      placeholder="project-demo.vercel.app"
+                      value={tempDemo}
+                      onChange={(e) => setTempDemo(e.target.value)}
+                      className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveLiveDemo();
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* Live Git Commit Ticker */}
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Commit Feed</span>
+                  <Clock size={11} className="text-txt-main animate-pulse" />
+                </div>
+                <div className="flex flex-col gap-3">
+                  {commits.map((c, idx) => (
+                    <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
+                      <div className="flex justify-between items-center text-txt-main font-semibold">
+                        <span className="text-txt-muted font-normal">[{c.hash}]</span>
+                        <span>{c.author}</span>
+                      </div>
+                      <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
+                      <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "tasks" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Kanban Tasks</span>
+                <h2 className="font-display text-lg font-light text-txt-main">Milestone Tracker</h2>
+              </div>
+
+              {/* Add Task Form */}
+              <form onSubmit={handleAddTask} className="flex flex-col gap-2.5 bg-bg-surface border border-border-main/70 p-3 rounded-sm">
+                <input
+                  type="text"
+                  placeholder="Task title..."
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  className="h-8 px-2.5 bg-bg-base border border-border-main/80 rounded-sm text-xs text-txt-main placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-sans"
+                />
+                <div className="flex justify-between items-center gap-2">
+                  <select
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                    className="h-7 px-2 bg-bg-base border border-border-main/80 rounded-sm text-[10px] font-mono text-txt-main focus:outline-none"
+                  >
+                    <option value="high">High Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="low">Low Priority</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider rounded-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Add Task
+                  </button>
+                </div>
+              </form>
+
+              {/* Tasks List */}
+              <div className="flex flex-col gap-2.5">
+                {tasks.map(t => (
+                  <div key={t.id} className="border border-border-main/70 bg-bg-surface p-3 rounded-sm flex flex-col gap-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className={`text-xs text-txt-main font-medium ${t.status === "done" ? "line-through text-txt-muted" : ""}`}>
+                        {t.title}
+                      </span>
+                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                        t.priority === "high" ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-bg-card border-border-main/50 text-txt-muted"
+                      }`}>
+                        {t.priority}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted pt-1 border-t border-border-main/30">
+                      <span>{t.assignee}</span>
+                      <div className="flex gap-1">
+                        {(["todo", "in_progress", "done"] as const).map(st => (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => handleUpdateTaskStatus(t.id, st)}
+                            className={`px-1.5 py-0.5 rounded uppercase cursor-pointer ${
+                              t.status === st ? "bg-accent-main text-bg-base font-bold" : "hover:text-txt-main text-txt-muted"
+                            }`}
+                          >
+                            {st === "in_progress" ? "doing" : st}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "artifacts" && (
+            <>
+              {/* Active Artifact Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Artifacts</span>
+                  <FolderDown size={14} className="text-txt-main" />
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  {artifacts.filter(a => a.is_active).map(art => (
+                    <div key={art.id} className="border border-border-main/60 p-3 rounded-sm flex flex-col gap-1.5 hover:bg-bg-card transition-colors duration-150 relative group">
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-xs text-txt-main font-semibold truncate max-w-[80%]">{art.file_name}</span>
+                        <span className="text-[9px] font-mono text-txt-muted uppercase">v{art.version}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[9px] text-txt-muted font-mono">
+                        <span>by {art.uploaded_by}</span>
+                        <a href={art.file_url} className="text-txt-main hover:underline flex items-center gap-1">
+                          Download
+                          <FolderDown size={9} />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+
+                  {artifacts.length === 0 && (
+                    <span className="text-[10px] text-txt-muted font-light italic">No files uploaded yet.</span>
+                  )}
+                </div>
+
+                {/* File upload hidden input */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileUpload} 
+                  className="hidden" 
+                  accept=".pdf,.ppt,.pptx,.doc,.docx"
+                />
+
+                <button 
+                  onClick={triggerFileUpload}
+                  disabled={isUploading}
+                  className="w-full h-8 border border-border-main/80 border-dashed text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  {isUploading ? (
+                    <>
+                      <span className="h-3 w-3 rounded-full border border-txt-main/30 border-t-txt-main animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <CloudUpload size={12} />
+                      Upload Deck/PDF
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* History drawer list */}
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Version History</span>
+                <div className="flex flex-col gap-2">
+                  {artifacts.filter(a => !a.is_active).map(art => (
+                    <div key={art.id} className="flex items-center justify-between border-b border-border-main/40 pb-2 text-[10px] font-mono">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-txt-sub truncate">{art.file_name}</span>
+                        <span className="text-[8px] text-txt-muted">v{art.version} • {art.uploaded_by}</span>
+                      </div>
+                      <a href={art.file_url} className="text-txt-main hover:underline flex-shrink-0">
+                        Get
+                      </a>
+                    </div>
+                  ))}
+
+                  {artifacts.filter(a => !a.is_active).length === 0 && (
+                    <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions.</span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "notes" && (
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Shared Scratchpad</span>
+                <span className="text-[8px] font-mono text-emerald-500 font-semibold">Live Auto-saved</span>
+              </div>
+              <textarea
+                rows={16}
+                value={workspaceNotes}
+                onChange={(e) => setWorkspaceNotes(e.target.value)}
+                placeholder="Write team notes, API specs, architectural decisions..."
+                className="w-full p-3 bg-bg-surface border border-border-main/70 rounded-sm text-xs font-mono text-txt-main focus:outline-none focus:border-txt-main leading-relaxed"
+              />
+            </div>
+          )}
+
+          {activeTab === "credits" && (
+            <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Academic Verification</span>
+                <Award size={14} className="text-txt-main" />
+              </div>
+              
+              {claimStatus === "idle" && (
                 <button 
                   onClick={handleClaimCredits}
                   disabled={isSubmittingClaim}
-                  className="w-full h-8 mt-1 border border-border-main hover:bg-bg-card text-txt-main text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-full h-9 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[10px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity cursor-pointer font-bold"
                 >
-                  Resubmit Claim
+                  {isSubmittingClaim ? "Submitting Claim..." : "Claim Campus Credits"}
                 </button>
-              </div>
-            )}
-          </div>
+              )}
+
+              {claimStatus === "pending" && (
+                <div className="border border-border-main/60 p-2.5 rounded-sm bg-bg-card/50 flex flex-col gap-1 text-center">
+                  <span className="text-[10px] font-semibold text-txt-main">Verification Pending</span>
+                  <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                    Submitted to department verifier for review.
+                  </p>
+                </div>
+              )}
+
+              {claimStatus === "approved" && (
+                <div className="border border-emerald-500/20 p-2.5 rounded-sm bg-emerald-500/5 flex flex-col gap-1 text-center">
+                  <span className="text-[10px] font-semibold text-emerald-500">Credits Approved</span>
+                  <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                    10 academic points credited to profile.
+                  </p>
+                </div>
+              )}
+
+              {claimStatus === "rejected" && (
+                <div className="border border-red-500/20 p-2.5 rounded-sm bg-red-500/5 flex flex-col gap-1 text-center font-bold">
+                  <span className="text-[10px] font-semibold text-red-500">Claim Rejected</span>
+                  <p className="text-[9px] text-txt-muted font-light leading-relaxed">
+                    Please review files or contact coordinator.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
         </section>
 

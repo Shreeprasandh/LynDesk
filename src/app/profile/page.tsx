@@ -19,7 +19,8 @@ import {
   Info,
   Trash2,
   X,
-  Code2
+  Code2,
+  Sparkles
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -196,6 +197,24 @@ export default function ProfilePage() {
     setMessage(null);
   };
   
+  // Profile Completeness Calculation
+  const calculateCompleteness = () => {
+    let score = 0;
+    const missingItems: string[] = [];
+
+    if (avatarUrl) score += 15; else missingItems.push("Upload Avatar (+15%)");
+    if (fullName && fullName.trim().length > 2) score += 15; else missingItems.push("Set Full Name (+15%)");
+    if (username && username.trim().length > 2) score += 10; else missingItems.push("Set Username (+10%)");
+    if (collegeName && collegeName.trim().length > 2) score += 15; else missingItems.push("Select College (+15%)");
+    if (department && department.trim().length > 2) score += 15; else missingItems.push("Select Department (+15%)");
+    if (gradYear && gradYear.trim().length > 0) score += 10; else missingItems.push("Select Grad Year (+10%)");
+    if (githubUrl || linkedinUrl || portfolioUrl) score += 20; else missingItems.push("Add Portfolio / GitHub (+20%)");
+
+    return { score: Math.min(score, 100), missingItems };
+  };
+
+  const { score: completenessScore, missingItems } = calculateCompleteness();
+
   const resumeInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -995,6 +1014,41 @@ export default function ProfilePage() {
               : "bg-red-500/10 border-red-500/50 text-txt-muted"
           }`}>
             {message.text}
+          </div>
+        )}
+
+        {/* Profile Completeness Progress Card (hides automatically at 100%) */}
+        {completenessScore < 100 && (
+          <div className="border border-border-main/80 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-amber-400 animate-pulse" />
+                <span className="font-mono text-xs uppercase tracking-wider font-semibold text-txt-main">
+                  Profile Completeness
+                </span>
+              </div>
+              <span className="font-mono text-xs font-bold text-accent-main">
+                {completenessScore}%
+              </span>
+            </div>
+
+            <div className="w-full bg-bg-card h-2 rounded-full overflow-hidden border border-border-main/50">
+              <div 
+                className="h-full bg-accent-main transition-all duration-500" 
+                style={{ width: `${completenessScore}%` }} 
+              />
+            </div>
+
+            {missingItems.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Suggested Actions:</span>
+                {missingItems.map((item, idx) => (
+                  <span key={idx} className="text-[9px] font-mono px-2 py-0.5 rounded bg-accent-main/10 text-txt-main border border-accent-main/20">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
