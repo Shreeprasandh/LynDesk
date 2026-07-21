@@ -1227,7 +1227,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
       }
 
-      const notifStored = localStorage.getItem("ldk_global_notifications");
+      const recipientKey = `ldk_user_notifications_${friendId}`;
+      const notifStored = localStorage.getItem(recipientKey);
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       
       const alreadyInvited = notifList.some(
@@ -1248,7 +1249,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           actionLabel: "Accept Invite",
           actionUrl: targetUrl
         });
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
         window.dispatchEvent(new Event("ldk_notifications_update"));
       }
 

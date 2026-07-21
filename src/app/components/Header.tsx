@@ -352,13 +352,10 @@ export default function Header() {
               }
               return n;
             }).filter((n: any) => {
-              // Exclude outgoing invites sent by this user to someone else
-              if (user?.id && n.senderId === user.id && n.recipientId && n.recipientId !== user.id) {
-                return false;
-              }
-              if (user?.id && n.recipientId && n.recipientId !== user.id) {
-                return false;
-              }
+              // Always purge outgoing/invite entries from the general global list
+              if (n.type === "invite") return false;
+              if (n.message && (n.message.includes("sent a team") || n.message.startsWith("You sent"))) return false;
+              
               const key = `${n.type || ""}_${n.title || ""}_${n.message || ""}_${n.actionUrl || ""}`;
               if (seen.has(key)) return false;
               seen.add(key);
@@ -369,11 +366,24 @@ export default function Header() {
           console.error("Error cleaning notifications: ", e);
         }
       } else {
-        localList = defaultNotifications;
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(defaultNotifications));
+        localList = defaultNotifications.filter(n => n.type !== "invite");
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(localList));
       }
 
-      // Fetch real database notifications for recipient if logged in
+      // Read recipient-specific local notifications for current logged in user
+      let userLocalNotifs: NotificationItem[] = [];
+      if (user?.id) {
+        const userStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
+        if (userStored) {
+          try {
+            userLocalNotifs = JSON.parse(userStored);
+          } catch (e) {
+            console.error("Error parsing user notifications", e);
+          }
+        }
+      }
+
+      // Fetch real database notifications for recipient from Supabase
       let dbNotifs: NotificationItem[] = [];
       if (user?.id) {
         try {
@@ -401,7 +411,7 @@ export default function Header() {
         }
       }
 
-      const combined = [...dbNotifs, ...localList];
+      const combined = [...dbNotifs, ...userLocalNotifs, ...localList];
       const uniqueSet = new Set<string>();
       const finalNotifs = combined.filter((n: any) => {
         const idKey = n.id || `${n.title}_${n.message}`;
@@ -419,7 +429,7 @@ export default function Header() {
 
     window.addEventListener("ldk_notifications_update", loadNotifications);
     return () => window.removeEventListener("ldk_notifications_update", loadNotifications);
-  }, []);
+  }, [user]);
 
   const handleClearTab = () => {
     const updated = notifications.filter(n => {

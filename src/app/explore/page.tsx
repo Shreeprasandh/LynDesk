@@ -170,10 +170,11 @@ export default function ExplorePage() {
           });
         }
 
-        const notifStored = localStorage.getItem("ldk_global_notifications");
+        const recipientKey = `ldk_user_notifications_${id}`;
+        const notifStored = localStorage.getItem(recipientKey);
         const notifList = notifStored ? JSON.parse(notifStored) : [];
         notifList.unshift({
-          id: `n_explore_invite_${Date.now()}`,
+          id: `n_explore_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           recipientId: id,
           senderId: user?.id,
           title: "Teammate Match Invite",
@@ -185,7 +186,7 @@ export default function ExplorePage() {
           actionLabel: "Accept Invite",
           actionUrl: "/workspace/e1"
         });
-        localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+        localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
         window.dispatchEvent(new Event("ldk_notifications_update"));
       } catch (e) {
         console.error("Failed to save notification: ", e);

@@ -871,21 +871,24 @@ export default function Home() {
         });
       }
 
-      // Add to local notification bus for instant client feedback
-      const notifStored = localStorage.getItem("ldk_global_notifications");
+      // Add to local notification bus for recipient
+      const recipientKey = `ldk_user_notifications_${friendId}`;
+      const notifStored = localStorage.getItem(recipientKey);
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       notifList.unshift({
-        id: `n_invite_${Date.now()}`,
+        id: `n_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        recipientId: friendId,
+        senderId: user?.id,
         title: "Teammate Match Invite",
-        message: `You sent a team match invitation to ${friendName}.`,
+        message: `${user?.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
         type: "invite",
         category: "alerts",
         time: "Just now",
         read: false,
-        actionLabel: "View Workspace",
+        actionLabel: "Accept Invite",
         actionUrl: `/workspace/${inviteEventId}`
       });
-      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+      localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
       window.dispatchEvent(new Event("ldk_notifications_update"));
 
       alert(`Successfully sent invitation to ${friendName}!`);
