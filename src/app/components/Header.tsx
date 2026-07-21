@@ -31,6 +31,7 @@ interface NotificationItem {
   read: boolean;
   actionLabel?: string;
   actionUrl?: string;
+  role?: "student" | "faculty" | "recruiter";
 }
 
 export default function Header() {
@@ -66,8 +67,15 @@ export default function Header() {
     }
   }, [user, loading, pathname, router]);
 
+  // Derived state for notifications based on the current user's role
+  const userRole = isFaculty ? "faculty" : isRecruiter ? "recruiter" : "student";
+  const filteredNotifications = notifications.filter(n => {
+    if (n.role && n.role !== userRole) return false;
+    return true;
+  });
+
   // Compute unread count dynamically during render
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = filteredNotifications.filter(n => !n.read).length;
 
   // Onboarding Wizard States
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -261,7 +269,8 @@ export default function Header() {
         time: "10m ago", 
         read: false,
         actionLabel: "Accept Invite",
-        actionUrl: "/explore"
+        actionUrl: "/explore",
+        role: "student"
       },
       { 
         id: "n2", 
@@ -272,7 +281,8 @@ export default function Header() {
         time: "1h ago", 
         read: false,
         actionLabel: "View Event Details",
-        actionUrl: "/explore"
+        actionUrl: "/explore",
+        role: "student"
       },
       { 
         id: "n3", 
@@ -281,7 +291,8 @@ export default function Header() {
         type: "credit", 
         category: "alerts",
         time: "1d ago", 
-        read: true 
+        read: true,
+        role: "student"
       },
       {
         id: "n4",
@@ -290,7 +301,28 @@ export default function Header() {
         type: "system",
         category: "updates",
         time: "2h ago",
-        read: false
+        read: false,
+        role: "student"
+      },
+      {
+        id: "n_f1",
+        title: "New Credit Applications",
+        message: "There are 3 new pending credit applications awaiting review.",
+        type: "credit",
+        category: "alerts",
+        time: "15m ago",
+        read: false,
+        role: "faculty"
+      },
+      {
+        id: "n_f2",
+        title: "System Performance",
+        message: "All background cron jobs and nudge workers are executing with nominal latency.",
+        type: "system",
+        category: "updates",
+        time: "1d ago",
+        read: true,
+        role: "faculty"
       },
       {
         id: "n5",
@@ -507,7 +539,7 @@ export default function Header() {
                       : "text-txt-muted border-transparent hover:text-txt-main"
                   }`}
                 >
-                  Personal Alerts ({notifications.filter(n => n.category === "alerts" && !n.read).length})
+                  Personal Alerts ({filteredNotifications.filter(n => n.category === "alerts" && !n.read).length})
                 </button>
                 <button
                   onClick={() => setDrawerTab("updates")}
@@ -517,32 +549,34 @@ export default function Header() {
                       : "text-txt-muted border-transparent hover:text-txt-main"
                   }`}
                 >
-                  General Feed ({notifications.filter(n => n.category === "updates" && !n.read).length})
+                  General Feed ({filteredNotifications.filter(n => n.category === "updates" && !n.read).length})
                 </button>
               </div>
 
               {/* Nudge Engine Simulation Panel */}
-              <div className="px-6 py-4 bg-bg-base/40 border-b border-border-main/40 flex items-center justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-semibold text-txt-main flex items-center gap-1">
-                    <Sparkles size={11} className="text-yellow-500" /> Cron Simulator
-                  </span>
-                  <span className="text-[9px] text-txt-muted font-light leading-snug max-w-[240px]">
-                    Trigger background Resend worker deadlocks check manually.
-                  </span>
+              {(isFaculty || isRecruiter) && (
+                <div className="px-6 py-4 bg-bg-base/40 border-b border-border-main/40 flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] font-semibold text-txt-main flex items-center gap-1">
+                      <Sparkles size={11} className="text-yellow-500" /> Cron Simulator
+                    </span>
+                    <span className="text-[9px] text-txt-muted font-light leading-snug max-w-[240px]">
+                      Trigger background Resend worker deadlocks check manually.
+                    </span>
+                  </div>
+                  <button
+                    onClick={triggerCronNudge}
+                    className="h-7 px-3 bg-accent-main text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
+                  >
+                    Fire Worker
+                  </button>
                 </div>
-                <button
-                  onClick={triggerCronNudge}
-                  className="h-7 px-3 bg-accent-main text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
-                >
-                  Fire Worker
-                </button>
-              </div>
+              )}
 
               {/* Notification Items List */}
               <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
-                {notifications.filter(n => n.category === drawerTab).length > 0 ? (
-                  notifications.filter(n => n.category === drawerTab).map((item) => (
+                {filteredNotifications.filter(n => n.category === drawerTab).length > 0 ? (
+                  filteredNotifications.filter(n => n.category === drawerTab).map((item) => (
                     <div 
                       key={item.id} 
                       className={`p-4 border rounded-sm flex flex-col gap-3 transition-colors ${

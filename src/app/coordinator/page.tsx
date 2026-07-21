@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -47,7 +47,7 @@ const generateNotificationId = () => `notif_${Date.now()}`;
 const generateScheduledId = () => `sch_${Date.now()}`;
 const getLogTime = () => new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + " (Live)";
 
-export default function CoordinatorConsole() {
+function CoordinatorConsoleContent() {
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const [claims, setClaims] = useState<CreditClaim[]>([]);
@@ -56,9 +56,11 @@ export default function CoordinatorConsole() {
   const [isCompanyRecruiter, setIsCompanyRecruiter] = useState(false);
   
   // Handle verifications states
-  const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles">("credits");
+  const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles" | "links">("credits");
   const [handleRequests, setHandleRequests] = useState<any[]>([]);
   const [selectedHandleRequest, setSelectedHandleRequest] = useState<any | null>(null);
+  const [linkRequests, setLinkRequests] = useState<any[]>([]);
+  const [selectedLinkRequest, setSelectedLinkRequest] = useState<any | null>(null);
 
   const [activeTab, setActiveTab] = useState<"overview" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
 
@@ -134,6 +136,71 @@ export default function CoordinatorConsole() {
           localStorage.setItem("ldk_handle_verifications", JSON.stringify(defaultReqs));
         }
       }, 0);
+    }
+  }, []);
+
+  // Load link verification requests from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const loadLinkRequests = () => {
+        const stored = localStorage.getItem("ldk_institutional_verifications");
+        if (stored) {
+          setLinkRequests(JSON.parse(stored));
+        } else {
+          const defaultLinks = [
+            {
+              id: "link_req_1",
+              studentId: "s1",
+              studentName: "Alex Carter",
+              studentEmail: "alexcarter@srmeaswari.edu.in",
+              type: "college",
+              key: "COLLEGE_SRM",
+              batchCode: "Batch A / Class of 2026",
+              status: "pending",
+              previouslyUnlinked: false,
+              date: "Oct 14"
+            },
+            {
+              id: "link_req_2",
+              studentId: "s2",
+              studentName: "Mira Sen",
+              studentEmail: "mirasen@srmeaswari.edu.in",
+              type: "college",
+              key: "COLLEGE_SRM",
+              batchCode: "Class of 2027",
+              status: "pending",
+              previouslyUnlinked: true,
+              date: "Oct 14"
+            },
+            {
+              id: "link_req_3",
+              studentId: "s3",
+              studentName: "Rohan Patel",
+              studentEmail: "rohanpatel@google.com",
+              type: "company",
+              key: "COMPANY_GOOGLE",
+              batchCode: "Engineering Team",
+              status: "pending",
+              previouslyUnlinked: false,
+              date: "Oct 14"
+            }
+          ];
+          setLinkRequests(defaultLinks);
+          localStorage.setItem("ldk_institutional_verifications", JSON.stringify(defaultLinks));
+          
+          // Pre-seed mock user link statuses to synchronize profiles with coordinator console
+          const initialUserLinks = {
+            "s1_college": { status: "pending", key: "COLLEGE_SRM", batchCode: "Batch A / Class of 2026" },
+            "s2_college": { status: "pending", key: "COLLEGE_SRM", batchCode: "Class of 2027" },
+            "s3_company": { status: "pending", key: "COMPANY_GOOGLE", batchCode: "" }
+          };
+          localStorage.setItem("ldk_student_links", JSON.stringify(initialUserLinks));
+          window.dispatchEvent(new Event("ldk_student_links_update"));
+        }
+      };
+      loadLinkRequests();
+      window.addEventListener("ldk_link_requests_update", loadLinkRequests);
+      return () => window.removeEventListener("ldk_link_requests_update", loadLinkRequests);
     }
   }, []);
 
@@ -835,6 +902,81 @@ useEffect(() => {
     }
   };
 
+  const handleVerifyLinkRequest = async (reqId: string, action: "approved" | "rejected") => {
+    try {
+      const stored = localStorage.getItem("ldk_institutional_verifications");
+      const list = stored ? JSON.parse(stored) : [];
+      
+      let studentId = "";
+      let studentName = "";
+      let type: "college" | "company" = "college";
+      let key = "";
+      let batchCode = "";
+      
+      const updated = list.map((r: any) => {
+        if (r.id === reqId) {
+          studentId = r.studentId;
+          studentName = r.studentName;
+          type = r.type;
+          key = r.key;
+          batchCode = r.batchCode || "";
+          return { ...r, status: action };
+        }
+        return r;
+      });
+      
+      setLinkRequests(updated);
+      localStorage.setItem("ldk_institutional_verifications", JSON.stringify(updated));
+      
+      if (selectedLinkRequest && selectedLinkRequest.id === reqId) {
+        setSelectedLinkRequest((prev: any) => prev ? { ...prev, status: action } : null);
+      }
+      
+      // Update global map
+      const linksStored = localStorage.getItem("ldk_student_links");
+      const linksMap = linksStored ? JSON.parse(linksStored) : {};
+      
+      const mapKey = `${studentId}_${type}`;
+      if (action === "approved") {
+        linksMap[mapKey] = { status: "linked", key, batchCode };
+      } else {
+        linksMap[mapKey] = { status: "none", key: "", batchCode: "" };
+      }
+      localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
+      
+      // Dispatch event
+      window.dispatchEvent(new Event("ldk_student_links_update"));
+      
+      // Send notification to user
+      const notifStored = localStorage.getItem("ldk_global_notifications");
+      const notifList = notifStored ? JSON.parse(notifStored) : [];
+      notifList.unshift({
+        id: `notif_link_${Date.now()}`,
+        title: action === "approved" ? "Institutional Link Approved ✓" : "Institutional Link Declined ✗",
+        message: action === "approved" 
+          ? `Coordinator approved linking your profile to ${type === "college" ? "College" : "Company"} using key: ${key}.`
+          : `Coordinator declined your linking request for ${type === "college" ? "College" : "Company"} key: ${key}.`,
+        type: "system",
+        category: "alerts",
+        role: "student",
+        time: "Just now",
+        read: false
+      });
+      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+      window.dispatchEvent(new Event("ldk_notifications_update"));
+      
+      addAuditLog(`Coordinator ${action} institutional link request for ${studentName} (${type}: ${key})`);
+      
+      setModalMessage({
+        isOpen: true,
+        title: action === "approved" ? "Link Approved" : "Link Declined",
+        text: `The linking request from ${studentName} has been ${action}.`
+      });
+    } catch (err) {
+      console.error("Failed to verify link request:", err);
+    }
+  };
+
   const pendingCount = claims.filter(c => c.status === "pending").length;
   const approvedPoints = claims.filter(c => c.status === "approved").reduce((sum, c) => sum + c.points, 0);
 
@@ -1204,6 +1346,22 @@ useEffect(() => {
                 >
                   Handle Verifications ({handleRequests.filter(h => h.status === "pending").length})
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setVerifSubTab("links")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    verifSubTab === "links" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  Institutional Links ({
+                    (() => {
+                      const staffKey = currentStaff?.key || "";
+                      const matchKey = isCompanyRecruiter ? staffKey.replace("_ADMIN", "") : staffKey.replace("_FACULTY", "");
+                      const requestType = isCompanyRecruiter ? "company" : "college";
+                      return linkRequests.filter(l => l.status === "pending" && l.type === requestType && l.key === matchKey).length;
+                    })()
+                  })
+                </button>
               </div>
 
               <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
@@ -1262,7 +1420,7 @@ useEffect(() => {
                       ))}
                     </div>
                   )
-                ) : (
+                ) : verifSubTab === "handles" ? (
                   /* Handles verifications sublist */
                   <div className="flex flex-col divide-y divide-border-main/60">
                     {handleRequests.map((req) => (
@@ -1308,6 +1466,72 @@ useEffect(() => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                ) : (
+                  /* Institutional Links verifications sublist */
+                  <div className="flex flex-col divide-y divide-border-main/60">
+                    {(() => {
+                      const staffKey = currentStaff?.key || "";
+                      const matchKey = isCompanyRecruiter ? staffKey.replace("_ADMIN", "") : staffKey.replace("_FACULTY", "");
+                      const requestType = isCompanyRecruiter ? "company" : "college";
+                      const filtered = linkRequests.filter(l => l.type === requestType && l.key === matchKey);
+                      
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="p-8 text-center text-txt-muted text-[10px] font-mono uppercase">
+                            No linking requests found
+                          </div>
+                        );
+                      }
+                      
+                      return filtered.map((req) => (
+                        <div 
+                          key={req.id} 
+                          onClick={() => setSelectedLinkRequest(req)}
+                          className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                            selectedLinkRequest?.id === req.id ? "bg-bg-card/30" : ""
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs text-txt-main font-semibold">{req.studentName}</span>
+                              <span className="text-[9px] text-txt-muted font-mono">{req.date}</span>
+                            </div>
+                            <span className="text-[10px] text-txt-sub truncate">
+                              Type: {req.type === "college" ? "College Link" : "Employer Link"} ({req.key})
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-1 text-left">
+                              <span className={`text-[8px] font-mono tracking-wider border px-1.5 py-0.2 rounded uppercase font-bold ${
+                                req.previouslyUnlinked
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                                  : "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                              }`}>
+                                {req.previouslyUnlinked ? "Unlinked & Re-linking" : "New Link"}
+                              </span>
+                              {req.batchCode && (
+                                <span className="text-[9px] text-txt-muted font-mono">
+                                  ({req.batchCode})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 flex-shrink-0">
+                            <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
+                              req.status === "approved"
+                                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
+                                : req.status === "rejected"
+                                ? "bg-red-500/10 border-red-500/40 text-red-500"
+                                : req.status === "unlinked"
+                                ? "bg-txt-muted/10 border-border-main text-txt-muted"
+                                : "bg-bg-card border-border-main/80 text-txt-muted"
+                            }`}>
+                              {req.status}
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
@@ -1598,7 +1822,7 @@ useEffect(() => {
                 : activeTab === "broadcasts"
                 ? (isCompanyRecruiter ? "Job Listings Queue" : "Announcement Queue")
                 : activeTab === "verifications"
-                ? (isCompanyRecruiter ? "Resume Inspector" : "Portfolio Inspector")
+                ? (verifSubTab === "links" ? "Enrollment Auditor" : (isCompanyRecruiter ? "Resume Inspector" : "Portfolio Inspector"))
                 : "Console Session Log"}
             </h2>
           </div>
@@ -1726,7 +1950,7 @@ useEffect(() => {
                   <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
                 </div>
               )
-            ) : (
+            ) : verifSubTab === "handles" ? (
               selectedHandleRequest ? (
                 <div className="flex flex-col gap-6 animate-fade-in text-left">
                   {/* Student Details */}
@@ -1803,6 +2027,86 @@ useEffect(() => {
                 <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
                   <span className="text-[10px] font-mono uppercase tracking-wider">Verification Queue Empty</span>
                   <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a handle verification request from the pending list to audit owner credentials.</p>
+                </div>
+              )
+            ) : (
+              selectedLinkRequest ? (
+                <div className="flex flex-col gap-6 animate-fade-in text-left">
+                  {/* Student Details */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Student details</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-txt-main font-semibold">{selectedLinkRequest.studentName}</span>
+                      <span className="text-xs text-txt-muted font-mono">{selectedLinkRequest.studentEmail}</span>
+                    </div>
+                  </div>
+
+                  {/* Linking Request Parameters */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Linking parameters</span>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Enrollment Type</span>
+                      <span className="text-xs text-txt-main font-semibold font-mono">
+                        {selectedLinkRequest.type === "college" ? "College Registrar Link" : "Employer Corporate Link"}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Verification Access Key</span>
+                      <span className="text-xs text-accent-main font-bold font-mono">{selectedLinkRequest.key}</span>
+                    </div>
+
+                    {selectedLinkRequest.batchCode && (
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                        <span className="text-[10px] text-txt-sub font-mono uppercase">Batch / Class / Department</span>
+                        <span className="text-xs text-txt-main font-mono">{selectedLinkRequest.batchCode}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Status History</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[8px] font-mono tracking-wider border px-1.5 py-0.2 rounded uppercase font-bold ${
+                          selectedLinkRequest.previouslyUnlinked
+                            ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                            : "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                        }`}>
+                          {selectedLinkRequest.previouslyUnlinked ? "Unlinked & Requesting Re-link" : "First Time Link Request"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {selectedLinkRequest.status === "pending" ? (
+                    <div className="flex gap-3 border-t border-border-main/40 pt-4">
+                      <button 
+                        onClick={() => handleVerifyLinkRequest(selectedLinkRequest.id, "rejected")}
+                        className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle size={12} />
+                        Decline Link
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleVerifyLinkRequest(selectedLinkRequest.id, "approved")}
+                        className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+                      >
+                        <CheckCircle2 size={12} />
+                        Approve Link
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
+                      This institutional link verification has been completed ({selectedLinkRequest.status}).
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
+                  <span className="text-[10px] font-mono uppercase tracking-wider">Verification Queue Empty</span>
+                  <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a linking request from the list to audit student details and approve enrollment.</p>
                 </div>
               )
             )
@@ -2166,5 +2470,18 @@ useEffect(() => {
       )}
 
     </div>
+  );
+}
+
+export default function CoordinatorConsole() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+        <span>Loading Console...</span>
+      </div>
+    }>
+      <CoordinatorConsoleContent />
+    </Suspense>
   );
 }
