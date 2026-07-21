@@ -35,7 +35,7 @@ interface NotificationItem {
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -59,11 +59,12 @@ export default function Header() {
 
   // Global authentication route guard: redirects unauthorized sessions immediately to landing page
   useEffect(() => {
+    if (loading) return; // Wait until authentication check completes!
     const publicPaths = ["/", "/terms", "/privacy", "/help"];
     if (!user && !publicPaths.includes(pathname)) {
       router.push("/");
     }
-  }, [user, pathname, router]);
+  }, [user, loading, pathname, router]);
 
   // Compute unread count dynamically during render
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -248,9 +249,9 @@ export default function Header() {
     }
   };
 
-  // Initialize notifications
+  // Initialize notifications from localStorage
   useEffect(() => {
-    const initial: NotificationItem[] = [
+    const defaultNotifications: NotificationItem[] = [
       { 
         id: "n1", 
         title: "Teammate Match Invite", 
@@ -301,28 +302,43 @@ export default function Header() {
         read: true
       }
     ];
-    const handle = setTimeout(() => {
-      setNotifications(initial);
-    }, 0);
-    return () => clearTimeout(handle);
+
+    const loadNotifications = () => {
+      const stored = localStorage.getItem("ldk_global_notifications");
+      if (stored) {
+        setNotifications(JSON.parse(stored));
+      } else {
+        setNotifications(defaultNotifications);
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(defaultNotifications));
+      }
+    };
+
+    loadNotifications();
+
+    window.addEventListener("ldk_notifications_update", loadNotifications);
+    return () => window.removeEventListener("ldk_notifications_update", loadNotifications);
   }, []);
 
   const handleMarkAllRead = () => {
-    setNotifications(prev => prev.map(n => {
+    const updated = notifications.map(n => {
       if (n.category === drawerTab) {
         return { ...n, read: true };
       }
       return n;
-    }));
+    });
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
   };
 
   const handleNotificationAction = (id: string) => {
-    setNotifications(prev => prev.map(n => {
+    const updated = notifications.map(n => {
       if (n.id === id) {
         return { ...n, read: true, message: "Invitation accepted. Workspace link activated." };
       }
       return n;
-    }));
+    });
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
   };
 
   const triggerCronNudge = () => {
@@ -350,7 +366,9 @@ export default function Header() {
     ];
 
     const randomAlert = alerts[Math.floor(Math.random() * alerts.length)];
-    setNotifications(prev => [randomAlert, ...prev]);
+    const updated = [randomAlert, ...notifications];
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
   };
 
   return (
@@ -370,13 +388,18 @@ export default function Header() {
             <nav className="hidden lg:flex items-center gap-6 font-mono text-[10px] uppercase tracking-wider">
               {isFaculty ? (
                 <>
-                  <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
-                  <Link href="/coordinator" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Faculty Console</Link>
+                  <Link href="/coordinator?tab=overview" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Overview</Link>
+                  <Link href="/coordinator?tab=talent_registry" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Talent Registry</Link>
+                  <Link href="/coordinator?tab=broadcasts" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Broadcasts</Link>
+                  <Link href="/coordinator?tab=verifications" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Claims Queue</Link>
+                  <Link href="/coordinator?tab=staff_access" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Staff Access</Link>
                 </>
               ) : isRecruiter ? (
                 <>
-                  <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
-                  <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Recruiter Console</Link>
+                  <Link href="/coordinator?tab=overview" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Overview</Link>
+                  <Link href="/coordinator?tab=talent_registry" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Talent Pipeline</Link>
+                  <Link href="/coordinator?tab=broadcasts" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Job Openings</Link>
+                  <Link href="/coordinator?tab=verifications" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Resume Vault</Link>
                 </>
               ) : (
                 <>

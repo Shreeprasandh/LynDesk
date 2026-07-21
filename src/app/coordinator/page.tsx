@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import { useAuth } from "../context/AuthContext";
 import { 
@@ -28,6 +29,7 @@ interface CreditClaim {
   event_title: string;
   repo_url: string;
   artifact_name: string;
+  artifact_url?: string;
   points: number;
   status: "pending" | "approved" | "rejected";
   created_at: string;
@@ -41,30 +43,117 @@ const GithubIcon = ({ size = 14, className = "" }: { size?: number; className?: 
 );
 
 const generateLogId = () => `log_${Date.now()}`;
+const generateNotificationId = () => `notif_${Date.now()}`;
+const generateScheduledId = () => `sch_${Date.now()}`;
 const getLogTime = () => new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) + " (Live)";
 
 export default function CoordinatorConsole() {
   const { user, loading: authLoading } = useAuth();
+  const searchParams = useSearchParams();
   const [claims, setClaims] = useState<CreditClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<CreditClaim | null>(null);
+  const [isCompanyRecruiter, setIsCompanyRecruiter] = useState(false);
+  
+  // Handle verifications states
+  const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles">("credits");
+  const [handleRequests, setHandleRequests] = useState<any[]>([]);
+  const [selectedHandleRequest, setSelectedHandleRequest] = useState<any | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"verifications" | "talent_registry" | "staff_access">("verifications");
+  const [activeTab, setActiveTab] = useState<"overview" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
+
+  // Sync activeTab with search parameter updates
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && ["overview", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
+      setTimeout(() => {
+        setActiveTab(tabParam as any);
+      }, 0);
+    }
+  }, [searchParams]);
   const [currentStaff, setCurrentStaff] = useState<{ name: string; key: string } | null>(null);
   const [registeredStaff, setRegisteredStaff] = useState<{ name: string; key: string }[]>([]);
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffKey, setNewStaffKey] = useState("");
   const [auditLogs, setAuditLogs] = useState<{ id: string; msg: string; time: string }[]>([]);
 
-  // Guard route for non-faculty users
+  // AI verify states
+  const [aiVerifyLoading, setAiVerifyLoading] = useState(false);
+  const [aiVerifyResult, setAiVerifyResult] = useState<{
+    status: string;
+    confidence: number;
+    recipientMatch: boolean;
+    eventMatch: boolean;
+    aiNotes: string;
+  } | null>(null);
+
+  // Broadcast messaging states
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [broadcastType, setBroadcastType] = useState<"system" | "deadline" | "credit" | "invite">("system");
+  const [broadcastTarget, setBroadcastTarget] = useState<"all" | "cs" | "it" | "ee">("all");
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
+  const [scheduledBroadcasts, setScheduledBroadcasts] = useState<any[]>([]);
+
+  // Targeted Nudge Alert States
+  const [nudgeStudent, setNudgeStudent] = useState<any | null>(null);
+  const [nudgeMessage, setNudgeMessage] = useState("");
+
+  // Load scheduled broadcasts from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("faculty_staff_member");
-      if (!raw) {
+      const stored = localStorage.getItem("ldk_scheduled_notifications");
+      setTimeout(() => {
+        if (stored) {
+          setScheduledBroadcasts(JSON.parse(stored));
+        } else {
+          const defaultScheduled = [
+            { id: "sch-1", title: "Upcoming Coding Contest", message: "CodeChef Starters 148 is scheduled for next Friday. Make sure to participate!", type: "system", target: "all", date: "2026-07-24", time: "12:00" }
+          ];
+          setScheduledBroadcasts(defaultScheduled);
+          localStorage.setItem("ldk_scheduled_notifications", JSON.stringify(defaultScheduled));
+        }
+      }, 0);
+    }
+  }, []);
+
+  // Load handle verification requests from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("ldk_handle_verifications");
+      setTimeout(() => {
+        if (stored) {
+          setHandleRequests(JSON.parse(stored));
+        } else {
+          const defaultReqs = [
+            { id: "verify_1", studentId: "s1", studentName: "Alex Carter", studentEmail: "alexcarter@mit.edu", platform: "LeetCode", handle: "alexcarter", requestType: "new_verification", reason: "First-time competitive coding profile setup.", oldHandle: null, status: "pending", date: "Oct 14" },
+            { id: "verify_2", studentId: "s2", studentName: "Mira Sen", studentEmail: "mirasen@mit.edu", platform: "Codeforces", handle: "mira_cf", requestType: "handle_switch", reason: "Switched handles to match github username.", oldHandle: "mira_old_cf", status: "pending", date: "Oct 14" }
+          ];
+          setHandleRequests(defaultReqs);
+          localStorage.setItem("ldk_handle_verifications", JSON.stringify(defaultReqs));
+        }
+      }, 0);
+    }
+  }, []);
+
+  // Guard route for non-faculty and non-recruiter users
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const rawFaculty = localStorage.getItem("faculty_staff_member");
+      const rawRecruiter = localStorage.getItem("company_recruiter_member");
+      
+      if (!rawFaculty && !rawRecruiter) {
         window.location.href = "/";
       } else {
         setTimeout(() => {
-          setCurrentStaff(JSON.parse(raw));
+          if (rawFaculty) {
+            setCurrentStaff(JSON.parse(rawFaculty));
+            setIsCompanyRecruiter(false);
+          } else if (rawRecruiter) {
+            setCurrentStaff(JSON.parse(rawRecruiter));
+            setIsCompanyRecruiter(true);
+          }
         }, 0);
       }
     }
@@ -110,7 +199,7 @@ export default function CoordinatorConsole() {
       msg,
       time: getLogTime()
     };
-    const updated = [newLog, ...auditLogs];
+    const updated = [newLog, ...auditLogs].slice(0, 150);
     setAuditLogs(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_audit_logs", JSON.stringify(updated));
@@ -215,10 +304,30 @@ export default function CoordinatorConsole() {
     header: string[];
     rows: string[][];
     isMock?: boolean;
+    clarificationNeeded?: boolean;
+    clarificationMessage?: string;
   } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiStage, setAiStage] = useState("");
   const [aiError, setAiError] = useState("");
+
+  // Check if student handle is verified based on requests status
+  const isHandleVerified = (studentId: string, platform: string) => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("ldk_handle_verifications");
+    if (!stored) return true; // Defaults mock students to true
+    try {
+      const list = JSON.parse(stored);
+      const found = list.find((r: any) => r.studentId === studentId && r.platform.toLowerCase() === platform.toLowerCase());
+      if (found) {
+        return found.status === "approved";
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    // Mock students starting with "s" default to verified for demo, others default to false
+    return studentId.startsWith("s");
+  };
 
   // Unified Alert and Confirmation Modal state
   const [modalMessage, setModalMessage] = useState<{
@@ -269,6 +378,194 @@ export default function CoordinatorConsole() {
     }
   };
 
+  const handleSendBroadcast = () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim()) return;
+
+    const stored = localStorage.getItem("ldk_global_notifications");
+    const list = stored ? JSON.parse(stored) : [];
+    
+    const newNotif = {
+      id: generateNotificationId(),
+      title: broadcastTitle.trim(),
+      message: `${broadcastMessage.trim()} (Broadcast to: ${broadcastTarget.toUpperCase()})`,
+      type: broadcastType,
+      category: "alerts" as const,
+      time: "Just now",
+      read: false
+    };
+
+    const updated = [newNotif, ...list].slice(0, 100);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_notifications_update"));
+
+    addAuditLog(`Broadcast Alert sent: "${broadcastTitle.trim()}" to all ${broadcastTarget}`);
+    
+    setBroadcastTitle("");
+    setBroadcastMessage("");
+    
+    setModalMessage({
+      isOpen: true,
+      title: "Broadcast Dispatched",
+      text: `Your announcement was broadcasted successfully to targeted students.`
+    });
+  };
+
+  const handleScheduleBroadcast = () => {
+    if (!broadcastTitle.trim() || !broadcastMessage.trim() || !scheduledDate || !scheduledTime) return;
+
+    const newSch = {
+      id: generateScheduledId(),
+      title: broadcastTitle.trim(),
+      message: broadcastMessage.trim(),
+      type: broadcastType,
+      target: broadcastTarget,
+      date: scheduledDate,
+      time: scheduledTime
+    };
+
+    const updated = [newSch, ...scheduledBroadcasts].slice(0, 50);
+    setScheduledBroadcasts(updated);
+    localStorage.setItem("ldk_scheduled_notifications", JSON.stringify(updated));
+
+    addAuditLog(`Broadcast Scheduled: "${broadcastTitle.trim()}" for ${scheduledDate} at ${scheduledTime}`);
+
+    setBroadcastTitle("");
+    setBroadcastMessage("");
+    setScheduledDate("");
+    setScheduledTime("");
+
+    setModalMessage({
+      isOpen: true,
+      title: "Broadcast Scheduled",
+      text: `Your announcement has been scheduled for ${newSch.date} at ${newSch.time}.`
+    });
+  };
+
+  const handleCancelScheduled = (id: string) => {
+    const updated = scheduledBroadcasts.filter(s => s.id !== id);
+    setScheduledBroadcasts(updated);
+    localStorage.setItem("ldk_scheduled_notifications", JSON.stringify(updated));
+    addAuditLog(`Scheduled Broadcast cancelled (ID: ${id})`);
+  };
+
+  const handleSendNudge = () => {
+    if (!nudgeStudent || !nudgeMessage.trim()) return;
+
+    const stored = localStorage.getItem("ldk_global_notifications");
+    const list = stored ? JSON.parse(stored) : [];
+
+    const newNotif = {
+      id: generateNotificationId(),
+      title: `Message from Coordinator`,
+      message: `${nudgeMessage.trim()} (Direct message to ${nudgeStudent.name})`,
+      type: "system" as const,
+      category: "alerts" as const,
+      time: "Just now",
+      read: false
+    };
+
+    const updated = [newNotif, ...list].slice(0, 100);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_notifications_update"));
+
+    addAuditLog(`Direct Nudge sent to student "${nudgeStudent.name}": "${nudgeMessage.trim()}"`);
+
+    setNudgeMessage("");
+    setNudgeStudent(null);
+
+    setModalMessage({
+      isOpen: true,
+      title: "Direct Nudge Sent",
+      text: `Your nudge notification has been dispatched directly to the student.`
+    });
+  };
+
+  const handleAiVerifyCertificate = async (claim: CreditClaim) => {
+    setAiVerifyLoading(true);
+    setAiVerifyResult(null);
+
+    try {
+      const res = await fetch("/api/ai/verify-certificate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: claim.student_name,
+          eventTitle: claim.event_title,
+          artifactName: claim.artifact_name,
+          points: claim.points
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAiVerifyResult(data);
+      } else {
+        setModalMessage({
+          isOpen: true,
+          title: "AI Verification Failed",
+          text: "Connection error with AI Verification service."
+        });
+      }
+    } catch {
+      setModalMessage({
+        isOpen: true,
+        title: "AI Verification Failed",
+        text: "Could not connect to verification server."
+      });
+    } finally {
+      setAiVerifyLoading(false);
+    }
+  };
+
+  const generateCleanFileName = (query: string): string => {
+    if (!query.trim()) return "ai_compiled_report.csv";
+    const cleaned = query.toLowerCase();
+    
+    // Check for roll range like "1001 to 2000" or "1001-2000"
+    let rangePart = "";
+    const rangeMatch = cleaned.match(/(\d+)\s*(?:to|and|-)\s*(\d+)/);
+    if (rangeMatch) {
+      rangePart = `_${rangeMatch[1]}-${rangeMatch[2]}`;
+    }
+    
+    // Check for platform
+    let platformPart = "";
+    if (cleaned.includes("leetcode")) platformPart = "_leetcode";
+    else if (cleaned.includes("codeforces")) platformPart = "_codeforces";
+    else if (cleaned.includes("codechef")) platformPart = "_codechef";
+    else if (cleaned.includes("unstop")) platformPart = "_unstop";
+    
+    // Check for weekly
+    let durationPart = "";
+    if (cleaned.includes("week") || cleaned.includes("weekly")) {
+      durationPart = "_weekly";
+    }
+
+    // Check for department
+    let deptPart = "";
+    if (cleaned.includes("it")) deptPart = "_it";
+    else if (cleaned.includes("cse") || cleaned.includes("computer science")) deptPart = "_cse";
+    else if (cleaned.includes("ece")) deptPart = "_ece";
+    
+    // Combine parts if we found any key elements
+    if (rangePart || platformPart || durationPart || deptPart) {
+      return `report${deptPart}${platformPart}${rangePart}${durationPart}.csv`;
+    }
+    
+    // Fallback: take first 3 alphanumeric-ish words
+    const words = cleaned
+      .replace(/[^a-z0-9\s]/g, "")
+      .split(/\s+/)
+      .filter(w => w && !["i", "want", "to", "download", "find", "get", "show", "give", "list"].includes(w))
+      .slice(0, 3);
+      
+    if (words.length > 0) {
+      return `report_${words.join("_")}.csv`;
+    }
+    
+    return "ai_compiled_report.csv";
+  };
+
   const downloadAiReportCsv = () => {
     if (!aiResult) return;
     const headers = Array.isArray(aiResult.header) ? aiResult.header : [];
@@ -283,8 +580,9 @@ export default function CoordinatorConsole() {
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const fileName = generateCleanFileName(aiQuery);
     link.setAttribute("href", url);
-    link.setAttribute("download", `ai_compiled_report.csv`);
+    link.setAttribute("download", fileName);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -310,10 +608,14 @@ export default function CoordinatorConsole() {
       "Graduation Year",
       "LeetCode Handle",
       "LeetCode Solved",
+      "LeetCode Verified",
       "CodeForces Handle",
       "CodeForces Rating",
+      "CodeForces Verified",
       "CodeChef Handle",
+      "CodeChef Verified",
       "Unstop Handle",
+      "Unstop Verified",
       "Hackathons Participated",
       "Consent Authorized"
     ];
@@ -326,10 +628,14 @@ export default function CoordinatorConsole() {
       s.gradYear,
       s.leetcode,
       s.leetcodeSolved,
+      isHandleVerified(s.id, "LeetCode") ? "VERIFIED" : "UNVERIFIED",
       s.codeforces,
       s.codeforcesRating,
+      isHandleVerified(s.id, "Codeforces") ? "VERIFIED" : "UNVERIFIED",
       s.codechef,
+      isHandleVerified(s.id, "CodeChef") ? "VERIFIED" : "UNVERIFIED",
       s.unstop,
+      isHandleVerified(s.id, "Unstop") ? "VERIFIED" : "UNVERIFIED",
       s.hackathons,
       s.authorized ? "YES" : "NO"
     ]);
@@ -472,6 +778,63 @@ useEffect(() => {
     }
   };
 
+  const handleVerifyHandle = async (reqId: string, studentId: string, platform: string, handle: string, action: "approved" | "rejected") => {
+    try {
+      if (action === "approved") {
+        let columnName = "";
+        const lowerPlat = platform.toLowerCase();
+        if (lowerPlat.includes("leetcode")) columnName = "leetcode_verified";
+        else if (lowerPlat.includes("codeforces")) columnName = "codeforces_verified";
+        else if (lowerPlat.includes("codechef")) columnName = "codechef_verified";
+        else if (lowerPlat.includes("unstop")) columnName = "unstop_verified";
+        else if (lowerPlat.includes("hack2skill")) columnName = "hack2skill_verified";
+
+        if (columnName) {
+          await supabase
+            .from("profiles")
+            .update({ [columnName]: true })
+            .eq("id", studentId);
+        }
+
+        const stored = localStorage.getItem("ldk_global_notifications");
+        const list = stored ? JSON.parse(stored) : [];
+        list.unshift({
+          id: generateNotificationId(),
+          title: "Handle Verified ✓",
+          message: `Coordinator approved verification for your ${platform} handle: @${handle}.`,
+          type: "system" as const,
+          category: "alerts" as const,
+          time: "Just now",
+          read: false
+        });
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(list.slice(0, 100)));
+        window.dispatchEvent(new Event("ldk_notifications_update"));
+      }
+
+      const updated = handleRequests.map(r => {
+        if (r.id === reqId) return { ...r, status: action };
+        return r;
+      });
+      setHandleRequests(updated);
+      localStorage.setItem("ldk_handle_verifications", JSON.stringify(updated));
+
+      if (selectedHandleRequest && selectedHandleRequest.id === reqId) {
+        setSelectedHandleRequest((prev: any) => prev ? { ...prev, status: action } : null);
+      }
+
+      addAuditLog(`Coordinator ${action} verification for ${platform} handle @${handle}`);
+      
+      setModalMessage({
+        isOpen: true,
+        title: action === "approved" ? "Handle Verified" : "Verification Rejected",
+        text: `The ${platform} handle verification request has been successfully ${action}.`
+      });
+
+    } catch (err) {
+      console.error("Failed to update handle verification status:", err);
+    }
+  };
+
   const pendingCount = claims.filter(c => c.status === "pending").length;
   const approvedPoints = claims.filter(c => c.status === "approved").reduce((sum, c) => sum + c.points, 0);
 
@@ -496,7 +859,7 @@ useEffect(() => {
       <main className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
         
         {/* ================= LEFT CONSOLE: APPLICATION LIST (7 Columns) ================= */}
-        <section className="lg:col-span-7 border-r border-border-main/50 flex flex-col h-full bg-bg-base overflow-hidden p-6 gap-6">
+        <section className="lg:col-span-8 border-r border-border-main/50 flex flex-col h-full bg-bg-base overflow-hidden p-6 gap-6">
           <Link 
             href="/"
             className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase self-start"
@@ -504,22 +867,39 @@ useEffect(() => {
             <ArrowLeft size={12} />
             Back to Portal
           </Link>
-
           <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Registrar Desk</span>
+            <div className="flex flex-col gap-1 text-left">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                {isCompanyRecruiter ? "Recruiter Desk" : "Registrar Desk"}
+              </span>
               <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">
-                {activeTab === "verifications" 
-                  ? "Academic Credit Claims" 
+                {activeTab === "overview"
+                  ? (isCompanyRecruiter ? "Recruiter Insights Dashboard" : "Coordinator Performance Dashboard")
                   : activeTab === "talent_registry"
-                  ? "Student Talent Registry"
+                  ? (isCompanyRecruiter ? "Talent Pipeline & Candidates" : "Student Talent Registry")
+                  : activeTab === "broadcasts"
+                  ? (isCompanyRecruiter ? "Job & Internship Postings" : "Broadcast Alerts & Notifications")
+                  : activeTab === "verifications"
+                  ? (isCompanyRecruiter ? "Student Resume Vault & Portfolios" : "Academic Credit Claims")
                   : "Staff Console Access Keys"}
               </h1>
               <p className="text-xs text-txt-sub">
-                {activeTab === "verifications" 
-                  ? "Verify student hackathon portfolios and award extracurricular graduation credits." 
+                {activeTab === "overview"
+                  ? (isCompanyRecruiter 
+                      ? "Analytics overview of candidates, top coders, and active university skill distributions." 
+                      : "High-level summary of student competitive programming performance and activity metrics.")
                   : activeTab === "talent_registry"
-                  ? "Track student performance registry across LeetCode, Codeforces, and Hackathon platforms."
+                  ? (isCompanyRecruiter 
+                      ? "Search, filter, and shortlist student candidates by LeetCode count, language skills, or graduation years." 
+                      : "Track student performance registry across LeetCode, Codeforces, and Hackathon platforms.")
+                  : activeTab === "broadcasts"
+                  ? (isCompanyRecruiter 
+                      ? "Broadcast vacancy announcements, coding challenge invites, or internship openings directly to students." 
+                      : "Send direct nudges, schedule announcements, and push broadcast alerts to students.")
+                  : activeTab === "verifications"
+                  ? (isCompanyRecruiter 
+                      ? "Access, audit, and verify student project repositories and certified resume credentials." 
+                      : "Verify student hackathon portfolios and award extracurricular graduation credits.")
                   : "Manage credentials and track unique login keys for your department staff."}
               </p>
               {currentStaff && (
@@ -528,35 +908,7 @@ useEffect(() => {
                 </div>
               )}
             </div>
-            
-            <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start sm:self-center font-mono text-[9px] tracking-wider uppercase">
-              <button 
-                onClick={() => setActiveTab("verifications")}
-                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                  activeTab === "verifications" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
-                }`}
-              >
-                Claims Queue
-              </button>
-              <button 
-                onClick={() => setActiveTab("talent_registry")}
-                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                  activeTab === "talent_registry" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
-                }`}
-              >
-                Talent Registry
-              </button>
-              <button 
-                onClick={() => setActiveTab("staff_access")}
-                className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                  activeTab === "staff_access" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
-                }`}
-              >
-                Staff Access
-              </button>
-            </div>
           </div>
-
           {/* Quick Metrics Cards */}
           <div className="grid grid-cols-3 gap-4 flex-shrink-0">
             <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-1">
@@ -583,58 +935,375 @@ useEffect(() => {
           </div>
 
           {/* Active Tab contents */}
+          {activeTab === "overview" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
+              
+              {/* Central AI Data Analytics (Natural Language Query) */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={16} className="text-accent-main animate-pulse" />
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Gemini AI Analytics Engine</span>
+                </div>
+                <p className="text-[11px] text-txt-sub leading-relaxed font-light">
+                  Query student databases using natural language. Extract list of problems completed, filter by roll numbers, or compile leaderboard spreadsheets instantly.
+                </p>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    placeholder="e.g. give data of how many problems completed along with name and roll number for first 3 roll numbers"
+                    className="flex-1 h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/55 font-sans"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAiQuery(); }}
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleAiQuery}
+                    disabled={aiLoading}
+                    className="h-9 px-4 bg-accent-main text-bg-base text-xs font-mono tracking-wider uppercase rounded-sm hover:bg-accent-main/80 flex items-center justify-center gap-1.5 transition-colors font-bold disabled:opacity-50 cursor-pointer"
+                  >
+                    {aiLoading ? "Analyzing..." : "Generate"}
+                  </button>
+                </div>
+
+                {/* AI Loading Stages */}
+                {aiLoading && (
+                  <div className="flex items-center gap-2 text-[10px] text-accent-main font-mono mt-1">
+                    <div className="w-2.5 h-2.5 border border-accent-main border-t-transparent rounded-full animate-spin" />
+                    <span>{aiStage}</span>
+                  </div>
+                )}
+
+                {/* AI Error Notification */}
+                {aiError && (
+                  <div className="text-[10px] text-red-500 font-mono mt-1 border border-red-500/30 bg-red-500/5 p-2.5 rounded-sm">
+                    ⚠️ {aiError}
+                  </div>
+                )}
+                
+                {/* AI Query Result Output */}
+                {aiResult && (
+                  <div className="border border-border-main bg-bg-base/40 p-4 rounded-sm flex flex-col gap-3 mt-1 animate-fade-in">
+                    {/* Clarification Prompts check */}
+                    {aiResult.clarificationNeeded ? (
+                      <div className="flex flex-col gap-2 bg-yellow-500/10 border border-yellow-500/30 p-3 rounded text-[11px] font-mono text-yellow-500">
+                        <span className="font-bold">🤔 Clarification Request:</span>
+                        <p>{aiResult.clarificationMessage}</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center border-b border-border-main/55 pb-2.5">
+                          <span className="text-[10px] font-mono text-txt-main font-semibold leading-relaxed max-w-[80%]">
+                            {aiResult.explanation}
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={downloadAiReportCsv}
+                            className="text-[9px] font-mono text-accent-main hover:underline flex items-center gap-1 uppercase"
+                          >
+                            <Download size={10} /> CSV
+                          </button>
+                        </div>
+                        
+                        {/* Render AI Result Table */}
+                        <div className="overflow-x-auto max-h-48 border border-border-main/60 bg-bg-surface/50 rounded-sm">
+                          <table className="w-full text-left font-mono text-[9.5px] border-collapse">
+                            <thead>
+                              <tr className="bg-bg-card/45 border-b border-border-main/80 text-txt-muted uppercase tracking-wider text-[8px]">
+                                {aiResult.header.map((col, idx) => (
+                                  <th key={idx} className="p-2.5 font-bold">{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-main/40 text-txt-main">
+                              {aiResult.rows.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-bg-card/20 transition-colors">
+                                  {row.map((cell, cIdx) => (
+                                    <td key={cIdx} className="p-2.5 font-light">{cell}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Department Statistics & Coders Standings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Standings list */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Top Performing Coders</span>
+                  <div className="flex flex-col divide-y divide-border-main/30">
+                    {registryStudents
+                      .sort((a, b) => b.leetcodeSolved - a.leetcodeSolved)
+                      .slice(0, 3)
+                      .map((s, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-txt-muted font-mono font-bold">#{idx + 1}</span>
+                            <div className="flex flex-col">
+                              <span className="text-txt-main font-semibold">{s.name}</span>
+                              <span className="text-[9px] text-txt-sub">{s.department}</span>
+                            </div>
+                          </div>
+                          <span className="text-[11px] font-mono font-bold text-accent-main">{s.leetcodeSolved} LC Solved</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Department breakdowns */}
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Department Analytics</span>
+                  <div className="flex flex-col divide-y divide-border-main/30 text-xs">
+                    <div className="flex justify-between py-2 items-center">
+                      <span className="text-txt-main font-semibold">Computer Science</span>
+                      <span className="font-mono text-txt-sub">2 active • Avg 315 LC</span>
+                    </div>
+                    <div className="flex justify-between py-2 items-center">
+                      <span className="text-txt-main font-semibold">Information Technology</span>
+                      <span className="font-mono text-txt-sub">1 active • Avg 412 LC</span>
+                    </div>
+                    <div className="flex justify-between py-2 items-center">
+                      <span className="text-txt-main font-semibold">Electrical Engineering</span>
+                      <span className="font-mono text-txt-sub">1 active • Avg 184 LC</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "broadcasts" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Draft New Announcement</span>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Broadcast Title</label>
+                  <input 
+                    type="text" 
+                    value={broadcastTitle}
+                    onChange={(e) => setBroadcastTitle(e.target.value)}
+                    placeholder="e.g. Hackathon Project Registration Nudge"
+                    className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Announcement Body</label>
+                  <textarea 
+                    rows={3}
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    placeholder="Type announcement contents here..."
+                    className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans font-light"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Alert Category</label>
+                    <select
+                      value={broadcastType}
+                      onChange={(e) => setBroadcastType(e.target.value as any)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                    >
+                      <option value="system">System Notification</option>
+                      <option value="deadline">Deadline Nudge</option>
+                      <option value="credit">Credit Verified Alert</option>
+                      <option value="invite">Team Invite Alert</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase text-xs">Target Audience</label>
+                    <select
+                      value={broadcastTarget}
+                      onChange={(e) => setBroadcastTarget(e.target.value as any)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                    >
+                      <option value="all">All Tracked Students</option>
+                      <option value="cs">Computer Science Department</option>
+                      <option value="it">Information Technology</option>
+                      <option value="ee">Electrical Engineering</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-border-main/55 pt-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-3">Scheduling Options (Optional)</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] text-txt-sub font-mono uppercase">Release Date</label>
+                      <input 
+                        type="date"
+                        value={scheduledDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[9px] text-txt-sub font-mono uppercase">Release Time</label>
+                      <input 
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <button 
+                    type="button"
+                    onClick={handleScheduleBroadcast}
+                    disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || !scheduledDate || !scheduledTime}
+                    className="h-9 px-4 border border-border-main text-txt-main text-xs font-mono uppercase rounded-sm hover:bg-bg-card disabled:opacity-50 cursor-pointer font-semibold transition-all"
+                  >
+                    Schedule Alert
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSendBroadcast}
+                    disabled={!broadcastTitle.trim() || !broadcastMessage.trim() || (!!scheduledDate && !!scheduledTime)}
+                    className="h-9 px-5 bg-accent-main text-bg-base text-xs font-mono uppercase rounded-sm hover:bg-accent-main/80 disabled:opacity-50 cursor-pointer font-bold transition-all"
+                  >
+                    Send Instantly
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === "verifications" && (
             <div className="flex-grow flex flex-col min-h-0 gap-4">
-              {/* Claims List Table */}
+              
+              {/* Verification Sub-tabs Select */}
+              <div className="flex border-b border-border-main/40 pb-2 gap-3 text-[10px] uppercase font-mono tracking-wider font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setVerifSubTab("credits")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    verifSubTab === "credits" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  Credit Applications ({claims.filter(c => c.status === "pending").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVerifSubTab("handles")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    verifSubTab === "handles" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  Handle Verifications ({handleRequests.filter(h => h.status === "pending").length})
+                </button>
+              </div>
+
               <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
-                {loading ? (
-                  <div className="flex flex-col divide-y divide-border-main/40 animate-pulse">
-                    {[1, 2, 3, 4].map(n => (
-                      <div key={n} className="p-4 flex justify-between items-center gap-4">
-                        <div className="flex flex-col gap-2 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-20 bg-border-main/20 rounded-sm" />
-                            <div className="h-2 w-12 bg-border-main/10 rounded-sm" />
+                {verifSubTab === "credits" ? (
+                  loading ? (
+                    <div className="flex flex-col divide-y divide-border-main/40 animate-pulse">
+                      {[1, 2, 3, 4].map(n => (
+                        <div key={n} className="p-4 flex justify-between items-center gap-4">
+                          <div className="flex flex-col gap-2 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="h-3 w-20 bg-border-main/20 rounded-sm" />
+                              <div className="h-2 w-12 bg-border-main/10 rounded-sm" />
+                            </div>
+                            <div className="h-2.5 w-32 bg-border-main/10 rounded-sm" />
+                            <div className="h-2 w-24 bg-border-main/10 rounded-sm" />
                           </div>
-                          <div className="h-2.5 w-32 bg-border-main/10 rounded-sm" />
-                          <div className="h-2 w-24 bg-border-main/10 rounded-sm" />
+                          <div className="flex items-center gap-4 flex-shrink-0">
+                            <div className="h-3.5 w-12 bg-border-main/20 rounded-sm" />
+                            <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 flex-shrink-0">
-                          <div className="h-3.5 w-12 bg-border-main/20 rounded-sm" />
-                          <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col divide-y divide-border-main/60">
+                      {claims.map((claim) => (
+                        <div 
+                          key={claim.id} 
+                          onClick={() => setSelectedClaim(claim)}
+                          className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                            selectedClaim?.id === claim.id ? "bg-bg-card/30" : ""
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs text-txt-main font-semibold">{claim.student_name}</span>
+                              <span className="text-[9px] text-txt-muted font-mono">{claim.created_at}</span>
+                            </div>
+                            <span className="text-[10px] text-txt-sub truncate">{claim.project_name}</span>
+                            <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{claim.event_title}</span>
+                          </div>
+
+                          <div className="flex items-center gap-4 flex-shrink-0">
+                            <span className="text-xs text-txt-main font-bold font-mono">+{claim.points} pts</span>
+                            <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
+                              claim.status === "approved"
+                                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
+                                : claim.status === "rejected"
+                                ? "bg-red-500/10 border-red-500/40 text-red-500"
+                                : "bg-bg-card border-border-main/80 text-txt-muted"
+                            }`}>
+                              {claim.status}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
+                  /* Handles verifications sublist */
                   <div className="flex flex-col divide-y divide-border-main/60">
-                    {claims.map((claim) => (
+                    {handleRequests.map((req) => (
                       <div 
-                        key={claim.id} 
-                        onClick={() => setSelectedClaim(claim)}
+                        key={req.id} 
+                        onClick={() => setSelectedHandleRequest(req)}
                         className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
-                          selectedClaim?.id === claim.id ? "bg-bg-card/30" : ""
+                          selectedHandleRequest?.id === req.id ? "bg-bg-card/30" : ""
                         }`}
                       >
                         <div className="flex flex-col min-w-0">
                           <div className="flex items-baseline gap-2">
-                            <span className="text-xs text-txt-main font-semibold">{claim.student_name}</span>
-                            <span className="text-[9px] text-txt-muted font-mono">{claim.created_at}</span>
+                            <span className="text-xs text-txt-main font-semibold">{req.studentName}</span>
+                            <span className="text-[9px] text-txt-muted font-mono">{req.date}</span>
                           </div>
-                          <span className="text-[10px] text-txt-sub truncate">{claim.project_name}</span>
-                          <span className="text-[9px] text-txt-muted font-mono uppercase tracking-wider">{claim.event_title}</span>
+                          <span className="text-[10px] text-txt-sub truncate">Platform: {req.platform} (@{req.handle})</span>
+                          <div className="flex items-center gap-1.5 mt-1 text-left">
+                            <span className={`text-[8px] font-mono tracking-wider border px-1.5 py-0.2 rounded uppercase font-bold ${
+                              req.requestType === "handle_switch"
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                                : "bg-blue-500/10 border-blue-500/30 text-blue-500"
+                            }`}>
+                              {req.requestType === "handle_switch" ? "Handle Switch" : "New Handle"}
+                            </span>
+                            {req.oldHandle && (
+                              <span className="text-[9px] text-txt-muted font-mono">
+                                (from @{req.oldHandle})
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="flex items-center gap-4 flex-shrink-0">
-                          <span className="text-xs text-txt-main font-bold font-mono">+{claim.points} pts</span>
                           <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
-                            claim.status === "approved"
+                            req.status === "approved"
                               ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
-                              : claim.status === "rejected"
+                              : req.status === "rejected"
                               ? "bg-red-500/10 border-red-500/40 text-red-500"
                               : "bg-bg-card border-border-main/80 text-txt-muted"
                           }`}>
-                            {claim.status}
+                            {req.status}
                           </span>
                         </div>
                       </div>
@@ -801,6 +1470,17 @@ useEffect(() => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNudgeStudent(student);
+                            setNudgeMessage(`Please link your coding platform accounts to ensure all extracurricular metrics sync correctly.`);
+                          }}
+                          className="h-6 px-2 border border-border-main hover:bg-bg-card text-txt-main text-[8px] font-mono tracking-wider uppercase rounded-sm transition-colors cursor-pointer"
+                        >
+                          Nudge
+                        </button>
                         {student.authorized ? (
                           <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
                             Authorized
@@ -896,132 +1576,235 @@ useEffect(() => {
         </section>
 
         {/* ================= RIGHT PANEL: INSPECTOR (5 Columns) ================= */}
-        <section className="lg:col-span-5 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-4 bg-bg-surface/30 flex flex-col h-full overflow-y-auto p-6 gap-6">
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-              {activeTab === "verifications" 
-                ? "Security Audit" 
+              {activeTab === "overview"
+                ? "Live Auditor"
                 : activeTab === "talent_registry"
-                ? "Skills Analytics"
+                ? (isCompanyRecruiter ? "Candidate Details" : "Skills Analytics")
+                : activeTab === "broadcasts"
+                ? (isCompanyRecruiter ? "Outreach Logs" : "Broadcast Logs")
+                : activeTab === "verifications"
+                ? (isCompanyRecruiter ? "Credentials Check" : "Security Audit")
                 : "Security Ledger"}
             </span>
             <h2 className="font-display text-lg font-light text-txt-main">
-              {activeTab === "verifications" 
-                ? "Portfolio Inspector" 
+              {activeTab === "overview"
+                ? "Console Ledger"
                 : activeTab === "talent_registry"
-                ? "Talent Dossier"
+                ? (isCompanyRecruiter ? "Candidate Dossier" : "Talent Dossier")
+                : activeTab === "broadcasts"
+                ? (isCompanyRecruiter ? "Job Listings Queue" : "Announcement Queue")
+                : activeTab === "verifications"
+                ? (isCompanyRecruiter ? "Resume Inspector" : "Portfolio Inspector")
                 : "Console Session Log"}
             </h2>
           </div>
 
           {activeTab === "verifications" && (
-            selectedClaim ? (
-              <div className="flex flex-col gap-6 animate-fade-in">
-                
-                {/* Student Identification */}
-                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant details</span>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-txt-main font-semibold">{selectedClaim.student_name}</span>
-                    <span className="text-xs text-txt-muted font-mono">{selectedClaim.student_email}</span>
-                  </div>
-                </div>
-
-                {/* Submission Materials */}
-                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Submission materials</span>
+            verifSubTab === "credits" ? (
+              selectedClaim ? (
+                <div className="flex flex-col gap-6 animate-fade-in text-left">
                   
-                  {/* PDF Deck Link */}
-                  <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <FileText size={14} className="text-txt-muted" />
-                      <div className="flex flex-col">
-                        <span className="text-xs text-txt-main font-medium">Pitch presentation deck</span>
-                        <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.artifact_name}</span>
-                      </div>
-                    </div>
-                    <a 
-                      href={selectedClaim.repo_url}
-                      className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
-                    >
-                      View
-                      <ExternalLink size={9} />
-                    </a>
-                  </div>
-
-                  {/* Git Repository Link */}
-                  <div className="flex items-center justify-between pb-1">
-                    <div className="flex items-center gap-2">
-                      <GithubIcon size={14} className="text-txt-muted" />
-                      <div className="flex flex-col">
-                        <span className="text-xs text-txt-main font-medium">Git repository codebase</span>
-                        <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.repo_url}</span>
-                      </div>
-                    </div>
-                    <a 
-                      href={`https://${selectedClaim.repo_url}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
-                    >
-                      Repo
-                      <ExternalLink size={9} />
-                    </a>
-                  </div>
-                </div>
-
-                {/* Cryptographic verification checklist */}
-                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">LDK:BOT Security Validation</span>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 size={11} /> GitHub Commits Validated
-                      </span>
-                      <span>PASS</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-emerald-500 font-mono text-[10px]">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 size={11} /> Artifact PDF Hash Verified
-                      </span>
-                      <span>PASS</span>
+                  {/* Student Identification */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Claimant details</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-txt-main font-semibold">{selectedClaim.student_name}</span>
+                      <span className="text-xs text-txt-muted font-mono">{selectedClaim.student_email}</span>
                     </div>
                   </div>
-                </div>
 
-                {/* Action Buttons (Verify/Decline) */}
-                {selectedClaim.status === "pending" ? (
-                  <div className="flex gap-3 border-t border-border-main/40 pt-4">
-                    <button 
-                      onClick={() => handleVerifyClaim(selectedClaim.id, "rejected")}
-                      className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <XCircle size={12} />
-                      Decline Claim
-                    </button>
+                  {/* Submission Materials */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Submission materials</span>
                     
-                    <button 
-                      onClick={() => handleVerifyClaim(selectedClaim.id, "approved")}
-                      className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle2 size={12} />
-                      Approve Credit
-                    </button>
-                  </div>
-                ) : (
-                  <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
-                    This activity point application has been completed ({selectedClaim.status}).
-                  </div>
-                )}
+                    {/* PDF Deck Link */}
+                    <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <FileText size={14} className="text-txt-muted" />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main font-medium">Pitch presentation deck</span>
+                          <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.artifact_name}</span>
+                        </div>
+                      </div>
+                      <a 
+                        href={`https://dsqkxedafwzkjtcupzwx.supabase.co/storage/v1/object/public/event-verifications/${selectedClaim.artifact_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
+                      >
+                        View
+                        <ExternalLink size={9} />
+                      </a>
+                    </div>
 
-              </div>
+                    {/* Git Repository Link */}
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <GithubIcon size={14} className="text-txt-muted" />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main font-medium">Git repository codebase</span>
+                          <span className="text-[9px] text-txt-muted font-mono truncate max-w-[180px]">{selectedClaim.repo_url}</span>
+                        </div>
+                      </div>
+                      <a 
+                        href={`https://${selectedClaim.repo_url}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-txt-main hover:underline flex items-center gap-1 font-mono uppercase"
+                      >
+                        Repo
+                        <ExternalLink size={9} />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Academic Credits Verified */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Academic Credit Points</span>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-txt-sub font-light">Calculated reward payload:</span>
+                      <strong className="text-sm text-accent-main font-mono font-bold">+{selectedClaim.points} Points</strong>
+                    </div>
+                  </div>
+
+                  {/* Multi-modal AI verifier */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">AI Document Auditor</span>
+                    <div className="flex justify-between items-center bg-bg-base/40 border border-border-main/50 p-2.5 rounded-sm">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Sparkles size={13} className="text-accent-main animate-pulse" />
+                        <span className="font-mono text-[10px] text-txt-main font-semibold">Gemini Multimodal Auditor</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAiVerifyCertificate(selectedClaim)}
+                        disabled={aiVerifyLoading}
+                        className="h-7 px-3 bg-accent-main text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-accent-main/80 flex items-center justify-center font-bold disabled:opacity-50 cursor-pointer"
+                      >
+                        {aiVerifyLoading ? "Auditing..." : "Verify Certificate"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Verify authenticity, recipient credentials, signatures, and credit metrics using multimodal document validation.
+                    </p>
+                  </div>
+
+                  {/* Action Buttons (Verify/Decline) */}
+                  {selectedClaim.status === "pending" ? (
+                    <div className="flex gap-3 border-t border-border-main/40 pt-4">
+                      <button 
+                        onClick={() => handleVerifyClaim(selectedClaim.id, "rejected")}
+                        className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle size={12} />
+                        Decline Claim
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleVerifyClaim(selectedClaim.id, "approved")}
+                        className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+                      >
+                        <CheckCircle2 size={12} />
+                        Approve Credit
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
+                      This activity point application has been completed ({selectedClaim.status}).
+                    </div>
+                  )}
+
+                </div>
+              ) : (
+                <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
+                  <FolderLock size={18} className="mb-2 text-txt-muted/80" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider">Audit Queue Empty</span>
+                  <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
+                </div>
+              )
             ) : (
-              <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted">
-                <FolderLock size={18} className="mb-2" />
-                <span className="text-[10px] font-mono uppercase tracking-wider">Audit Queue Empty</span>
-                <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student credit claim from the pending list to audit codebase references and verify credits.</p>
-              </div>
+              selectedHandleRequest ? (
+                <div className="flex flex-col gap-6 animate-fade-in text-left">
+                  {/* Student Details */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Student details</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-txt-main font-semibold">{selectedHandleRequest.studentName}</span>
+                      <span className="text-xs text-txt-muted font-mono">{selectedHandleRequest.studentEmail}</span>
+                    </div>
+                  </div>
+
+                  {/* Handle Request Materials */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Verification parameters</span>
+                    
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Platform</span>
+                      <span className="text-xs text-txt-main font-semibold font-mono">{selectedHandleRequest.platform}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Handle / Username</span>
+                      <span className="text-xs text-accent-main font-bold font-mono">@{selectedHandleRequest.handle}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Request Type</span>
+                      <span className="text-xs text-txt-main font-semibold font-mono">
+                        {selectedHandleRequest.requestType === "handle_switch" ? "Handle Switch (Change of Username)" : "New Handle Setup"}
+                      </span>
+                    </div>
+
+                    {selectedHandleRequest.oldHandle && (
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                        <span className="text-[10px] text-txt-sub font-mono uppercase font-bold">Unverifies Previous Handle</span>
+                        <span className="text-xs text-red-400 font-mono">@{selectedHandleRequest.oldHandle}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Reason / Coordinator Notes</span>
+                      <p className="text-[11px] text-txt-main font-light leading-relaxed italic bg-bg-base/40 p-2 border border-border-main/55 rounded mt-0.5">
+                        &ldquo;{selectedHandleRequest.reason}&rdquo;
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {selectedHandleRequest.status === "pending" ? (
+                    <div className="flex gap-3 border-t border-border-main/40 pt-4">
+                      <button 
+                        onClick={() => handleVerifyHandle(selectedHandleRequest.id, selectedHandleRequest.studentId, selectedHandleRequest.platform, selectedHandleRequest.handle, "rejected")}
+                        className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <XCircle size={12} />
+                        Decline Handle
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleVerifyHandle(selectedHandleRequest.id, selectedHandleRequest.studentId, selectedHandleRequest.platform, selectedHandleRequest.handle, "approved")}
+                        className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+                      >
+                        <CheckCircle2 size={12} />
+                        Verify Handle
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub">
+                      This handle verification has been completed ({selectedHandleRequest.status}).
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
+                  <span className="text-[10px] font-mono uppercase tracking-wider">Verification Queue Empty</span>
+                  <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a handle verification request from the pending list to audit owner credentials.</p>
+                </div>
+              )
             )
           )}
 
@@ -1054,7 +1837,14 @@ useEffect(() => {
                 <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
                   <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
                     <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">LeetCode Metrics</span>
-                    <span className="text-[9px] font-mono text-accent-main font-bold">@{selectedStudent.leetcode}</span>
+                    <span className="text-[9px] font-mono text-accent-main font-bold">
+                      @{selectedStudent.leetcode}
+                      {isHandleVerified(selectedStudent.id, "LeetCode") ? (
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                      ) : (
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                      )}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
@@ -1080,7 +1870,14 @@ useEffect(() => {
                   
                   <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
                     <span className="text-xs font-semibold text-txt-main">Codeforces Profile</span>
-                    <span className="text-[10px] text-txt-sub font-mono">@{selectedStudent.codeforces} ({selectedStudent.codeforcesRank})</span>
+                    <span className="text-[10px] text-txt-sub font-mono">
+                      @{selectedStudent.codeforces} ({selectedStudent.codeforcesRank})
+                      {isHandleVerified(selectedStudent.id, "Codeforces") ? (
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                      ) : (
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-xs text-txt-main">
                     <span className="text-txt-sub">Current Rating</span>
@@ -1089,16 +1886,30 @@ useEffect(() => {
 
                   <div className="flex justify-between items-center border-b border-border-main/40 pb-2 mt-2">
                     <span className="text-xs font-semibold text-txt-main">CodeChef Profile</span>
-                    <span className="text-[10px] text-txt-sub font-mono">@{selectedStudent.codechef} ({selectedStudent.codechefStars})</span>
+                    <span className="text-[10px] text-txt-sub font-mono">
+                      @{selectedStudent.codechef} ({selectedStudent.codechefStars})
+                      {isHandleVerified(selectedStudent.id, "CodeChef") ? (
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                      ) : (
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                      )}
+                    </span>
                   </div>
                 </div>
 
                 {/* Hackathons */}
                 <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-bold">Hackathon Standings</span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Hackathon Standings</span>
                   <div className="flex justify-between items-center text-xs text-txt-main">
                     <span className="text-txt-sub">Unstop Handle</span>
-                    <span className="font-mono">@{selectedStudent.unstop}</span>
+                    <span className="font-mono">
+                      @{selectedStudent.unstop}
+                      {isHandleVerified(selectedStudent.id, "Unstop") ? (
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                      ) : (
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center text-xs text-txt-main mt-1">
                     <span className="text-txt-sub">Completed Hackathons</span>
@@ -1114,6 +1925,73 @@ useEffect(() => {
                 <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student from the registry list to audit their complete coding and hackathon performance profile.</p>
               </div>
             )
+          )}
+
+          {activeTab === "overview" && (
+            <div className="flex flex-col gap-4 animate-fade-in">
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Console Activity Ledger</span>
+                <p className="text-[10px] text-txt-sub leading-relaxed font-light">Real-time interactions across the faculty dashboard session log.</p>
+              </div>
+
+              {/* Logs list */}
+              <div className="border border-border-main/70 bg-bg-surface rounded-sm flex flex-col h-[320px] overflow-y-auto divide-y divide-border-main/40">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="p-3.5 flex flex-col gap-1 text-xs">
+                    <span className="font-mono text-[9px] text-txt-muted">{log.time}</span>
+                    <p className="text-txt-main font-mono text-[10px] leading-relaxed break-all">{log.msg}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "broadcasts" && (
+            <div className="flex flex-col gap-6 animate-fade-in">
+              {/* Scheduled Notifications Queue */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Scheduled Alerts queue</span>
+                <div className="flex flex-col divide-y divide-border-main/40 max-h-48 overflow-y-auto">
+                  {scheduledBroadcasts.length === 0 ? (
+                    <span className="text-[10px] text-txt-muted italic font-mono py-2">No scheduled alerts queued.</span>
+                  ) : (
+                    scheduledBroadcasts.map((sch) => (
+                      <div key={sch.id} className="py-2.5 flex justify-between items-start gap-3">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[11px] text-txt-main font-semibold">{sch.title}</span>
+                          <span className="text-[9px] text-txt-muted font-mono">{sch.date} at {sch.time} • Target: {sch.target.toUpperCase()}</span>
+                        </div>
+                        <button
+                          onClick={() => handleCancelScheduled(sch.id)}
+                          className="text-[9px] font-mono text-red-500 hover:underline uppercase"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Recently Broadcasted list */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">Recently Dispatched Alerts</span>
+                <div className="flex flex-col divide-y divide-border-main/40 max-h-60 overflow-y-auto text-[10.5px]">
+                  {auditLogs.filter(log => log.msg.includes("Broadcast Alert sent") || log.msg.includes("Direct Nudge sent")).length === 0 ? (
+                    <span className="text-[10px] text-txt-muted italic font-mono py-2">No announcements sent in this session.</span>
+                  ) : (
+                    auditLogs
+                      .filter(log => log.msg.includes("Broadcast Alert sent") || log.msg.includes("Direct Nudge sent"))
+                      .map((log) => (
+                        <div key={log.id} className="py-2 flex flex-col gap-0.5">
+                          <span className="font-mono text-[8.5px] text-txt-muted">{log.time}</span>
+                          <p className="text-txt-main font-light leading-relaxed">{log.msg}</p>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {activeTab === "staff_access" && (
@@ -1138,6 +2016,103 @@ useEffect(() => {
         </section>
 
       </main>
+
+      {/* Targeted Nudge Modal */}
+      {nudgeStudent && (
+        <div className="fixed inset-0 z-[14900] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setNudgeStudent(null)} />
+          <div className="relative w-full max-w-md border border-border-main bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 z-10 animate-fade-in text-left">
+            <div className="flex flex-col gap-1.5 border-b border-border-main/45 pb-3">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Targeted Student Nudge</span>
+              <h3 className="text-sm font-semibold text-txt-main">Direct Alert to {nudgeStudent.name}</h3>
+              <p className="text-[10px] text-txt-muted">{nudgeStudent.email} • {nudgeStudent.department}</p>
+            </div>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[9px] font-mono uppercase text-txt-muted">Nudge Message Alert Text</label>
+              <textarea
+                rows={4}
+                value={nudgeMessage}
+                onChange={(e) => setNudgeMessage(e.target.value)}
+                placeholder="Type the warning or notice..."
+                className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-light leading-relaxed"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider">
+              <button
+                type="button"
+                onClick={() => setNudgeStudent(null)}
+                className="px-4 py-2 border border-border-main hover:bg-bg-card text-txt-main rounded-sm transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendNudge}
+                disabled={!nudgeMessage.trim()}
+                className="px-4 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Dispatch Nudge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Certificate Auditor Modal */}
+      {aiVerifyResult && (
+        <div className="fixed inset-0 z-[14900] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAiVerifyResult(null)} />
+          <div className="relative w-full max-w-md border border-border-main bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 z-10 animate-fade-in text-left">
+            <div className="flex flex-col gap-1.5 border-b border-border-main/45 pb-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Gemini Multimodal Auditor Verdict</span>
+                <span className={`text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase ${
+                  aiVerifyResult.status === "Verified"
+                    ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
+                    : "bg-red-500/10 border-red-500/40 text-red-500 animate-pulse"
+                }`}>
+                  {aiVerifyResult.status}
+                </span>
+              </div>
+              <h3 className="text-sm font-semibold text-txt-main">Certificate Verification Analysis</h3>
+              <p className="text-[10px] text-txt-muted font-light leading-relaxed">Confidence Score: <strong className="text-txt-main font-bold">{aiVerifyResult.confidence}%</strong></p>
+            </div>
+
+            <div className="flex flex-col gap-3 font-mono text-[10.5px]">
+              <div className="flex justify-between items-center bg-bg-base/30 p-2.5 border border-border-main/50 rounded">
+                <span className="text-txt-sub">Student Name Matches Recipient?</span>
+                <span className={aiVerifyResult.recipientMatch ? "text-emerald-500 font-bold" : "text-red-500 font-bold"}>
+                  {aiVerifyResult.recipientMatch ? "✓ MATCHED" : "✗ MISMATCH"}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-bg-base/30 p-2.5 border border-border-main/50 rounded">
+                <span className="text-txt-sub">Event Details Matches Claim?</span>
+                <span className={aiVerifyResult.eventMatch ? "text-emerald-500 font-bold" : "text-red-500 font-bold"}>
+                  {aiVerifyResult.eventMatch ? "✓ MATCHED" : "✗ MISMATCH"}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 bg-bg-base/30 p-3 border border-border-main/50 rounded font-sans text-xs font-light leading-relaxed">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">AI Analysis Notes</span>
+                <p className="text-txt-main">{aiVerifyResult.aiNotes}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider pt-2">
+              <button
+                type="button"
+                onClick={() => setAiVerifyResult(null)}
+                className="px-5 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer"
+              >
+                Acknowledge Verdict
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Custom Themed Alert & Confirmation Modal */}
       {modalMessage?.isOpen && (

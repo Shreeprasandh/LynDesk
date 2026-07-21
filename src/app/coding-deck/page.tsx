@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
 import Link from "next/link";
 import { 
@@ -36,52 +35,20 @@ interface PlatformStats {
   activeYears?: number[];
 }
 
-const extractUsername = (platform: string, input: string): string => {
-  let val = input.trim();
-  if (!val) return "";
-  
-  // Remove trailing slashes
-  val = val.replace(/\/+$/, "");
-  
-  try {
-    // If it's a URL
-    if (val.startsWith("http://") || val.startsWith("https://") || val.includes(".com/")) {
-      const urlString = val.startsWith("http") ? val : `https://${val}`;
-      const url = new URL(urlString);
-      const pathname = url.pathname;
-      const segments = pathname.split("/").filter(Boolean);
-      
-      if (platform === "leetcode") {
-        if (segments[0] === "u" && segments[1]) return segments[1];
-        if (segments[0]) return segments[0];
-      } else if (platform === "codeforces") {
-        if (segments[0] === "profile" && segments[1]) return segments[1];
-        if (segments[0]) return segments[0];
-      } else if (platform === "codechef") {
-        if (segments[0] === "users" && segments[1]) return segments[1];
-        if (segments[0]) return segments[0];
-      } else if (platform === "unstop" || platform === "hack2skill") {
-        if (segments[0] === "u" && segments[1]) return segments[1];
-        if (segments[0]) return segments[0];
-      }
-    }
-  } catch (e) {
-    console.warn("URL parsing failed", e);
-  }
-  
-  if (val.includes("/")) {
-    const parts = val.split("/");
-    return parts[parts.length - 1] || val;
-  }
-  
-  return val;
-};
-
 export default function CodingDeckPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Auto-clear message notification after 4 seconds
+  useEffect(() => {
+    if (message) {
+      const handle = setTimeout(() => {
+        setMessage(null);
+      }, 4000);
+      return () => clearTimeout(handle);
+    }
+  }, [message]);
 
 
 
@@ -94,13 +61,6 @@ export default function CodingDeckPage() {
 
 
 
-  // Connection edit states
-  const [editLeetcode, setEditLeetcode] = useState(false);
-  const [editCodeforces, setEditCodeforces] = useState(false);
-  const [editCodechef, setEditCodechef] = useState(false);
-  const [editUnstop, setEditUnstop] = useState(false);
-  const [editHack2skill, setEditHack2skill] = useState(false);
-
   // LeetCode year filter state
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
   const heatmapScrollRef = useRef<HTMLDivElement>(null);
@@ -109,12 +69,6 @@ export default function CodingDeckPage() {
   // LeetCode success banner transition and display state
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
   const [prevCompleted, setPrevCompleted] = useState<boolean | null>(null);
-
-  // Custom disconnect confirmation modal state
-  const [disconnectModal, setDisconnectModal] = useState<{
-    isOpen: boolean;
-    platform: string;
-  }>({ isOpen: false, platform: "" });
 
   // Error messages for failed API fetches
   const [platformErrors, setPlatformErrors] = useState<Record<string, string>>({});
@@ -346,110 +300,14 @@ export default function CodingDeckPage() {
     return () => clearInterval(interval);
   }, [user, leetcodeUser, codeforcesUser, codechefUser, selectedLcYear]);
 
-  // Save specific platform handle
-  const handleSavePlatform = async (platform: string, username: string) => {
-    if (!user) return;
-    setSaving(true);
-    setMessage(null);
 
-    const metaKey = `${platform}_username`;
-
-    try {
-      // 1. Try public profiles updates first
-      try {
-        const payload: Record<string, string | boolean> = { id: user.id };
-        payload[metaKey] = username.trim();
-        
-        await supabase
-          .from("profiles")
-          .upsert(payload);
-      } catch (dbErr) {
-        console.warn("Profiles table handle write error. Proceeding with Auth Metadata fallback.", dbErr);
-      }
-
-      // 2. Auth metadata update
-      const updateData: Record<string, string | boolean> = {};
-      updateData[metaKey] = username.trim();
-
-      const { error } = await supabase.auth.updateUser({
-        data: updateData
-      });
-
-      if (error) throw error;
-
-      // Fetch stats for the newly connected platform dynamically
-      let platformStats = null;
-      if (username.trim()) {
-        if (platform === "leetcode" || platform === "codeforces" || platform === "codechef") {
-          try {
-            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}`);
-            if (res.ok) {
-              setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
-              platformStats = await res.json();
-            } else {
-              const err = await res.json();
-              setPlatformErrors(prev => ({ ...prev, [platform]: err.error || `Failed to link ${platform}` }));
-            }
-          } catch (e) {
-            console.warn("Error fetching dynamic connected stats", e);
-            setPlatformErrors(prev => ({ ...prev, [platform]: "Connection error while linking profile" }));
-          }
-        } else if (platform === "unstop") {
-          platformStats = { registered: 6, completed: 4, rank: 42 };
-        } else {
-          platformStats = { registered: 3, completed: 3, rank: 12 };
-        }
-      } else {
-        setPlatformErrors(prev => ({ ...prev, [platform]: "" }));
-      }
-
-      // Update local state metrics dynamically
-      setStats(prev => ({
-        ...prev,
-        [platform]: platformStats
-      }));
-
-      // Close editing
-      if (platform === "leetcode") setEditLeetcode(false);
-      if (platform === "codeforces") setEditCodeforces(false);
-      if (platform === "codechef") setEditCodechef(false);
-      if (platform === "unstop") setEditUnstop(false);
-      if (platform === "hack2skill") setEditHack2skill(false);
-
-      setMessage({ text: `${platform.toUpperCase()} handle connected successfully.`, type: "success" });
-    } catch (err) {
-      setMessage({ text: "Failed to link coding platform.", type: "error" });
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Trigger disconnect modal
-  const handleDisconnectClick = (platform: string) => {
-    setDisconnectModal({ isOpen: true, platform });
-  };
-
-  // Perform actual disconnect action
-  const confirmDisconnect = async () => {
-    const platform = disconnectModal.platform;
-    if (!platform || !user) return;
-    
-    // Reset state locally
-    if (platform === "leetcode") setLeetcodeUser("");
-    if (platform === "codeforces") setCodeforcesUser("");
-    if (platform === "codechef") setCodechefUser("");
-    if (platform === "unstop") setUnstopUser("");
-    if (platform === "hack2skill") setHack2skillUser("");
-
-    setDisconnectModal({ isOpen: false, platform: "" });
-    await handleSavePlatform(platform, "");
-  };
 
 
 
   // Heatmap helper: Generate 53 columns x 7 rows mapping to actual calendar dates
   const renderHeatmap = () => {
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     // 1. Build a combined calendar map of YYYY-MM-DD: count from active platforms
     const combinedCal: Record<string, number> = {};
     const addCalendar = (cal?: Record<string, number>) => {
@@ -479,8 +337,7 @@ export default function CodingDeckPage() {
       endDate.setDate(startDate.getDate() + (53 * 7 - 1)); // Saturday of 53 weeks later
     } else {
       // Show last 12 months ending today
-      const now = new Date();
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      endDate = new Date(todayMidnight.getTime());
       const endDay = endDate.getDay();
       endDate.setDate(endDate.getDate() + (6 - endDay)); // Saturday of the current week
 
@@ -584,7 +441,7 @@ export default function CodingDeckPage() {
             const cellDate = new Date(startDate.getTime());
             cellDate.setDate(startDate.getDate() + cellIdx);
 
-            const isSpacer = cell.monthYearKey !== monthYearKey;
+            const isSpacer = cell.monthYearKey !== monthYearKey || cellDate > todayMidnight;
 
             weekCells.push({
               dateStr: cell.dateStr,
@@ -617,7 +474,6 @@ export default function CodingDeckPage() {
               <strong className="text-lg font-semibold text-txt-main font-sans mr-1">{totalSubmissionsInCalendar}</strong> 
               {selectedLcYear ? `submissions in ${selectedLcYear}` : "submissions in the past one year"}
             </span>
-            <span className="text-txt-muted text-xs cursor-pointer select-none" title="Information">ⓘ</span>
           </div>
           <div className="flex items-center gap-4 font-mono text-[10px] text-txt-muted">
             <span>Total active days: <strong className="text-txt-main font-bold">{totalActiveDays}</strong></span>
@@ -838,58 +694,17 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {!editLeetcode && leetcodeUser && (
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => setEditLeetcode(true)}
-                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
-                      >
-                        Update Handle
-                      </button>
-                      <button 
-                        onClick={() => handleDisconnectClick("leetcode")}
-                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
+                  {leetcodeUser && (
+                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
+                      @{leetcodeUser}
+                    </span>
                   )}
                 </div>
 
-                {!leetcodeUser || editLeetcode ? (
-                  <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1 w-full">
-                      <label className="text-[10px] text-txt-sub font-semibold">LeetCode Profile Link / Username</label>
-                      <input 
-                        type="text" 
-                        defaultValue={leetcodeUser ? `https://leetcode.com/${leetcodeUser}` : ""}
-                        id="leetcode-username-input"
-                        placeholder="e.g. https://leetcode.com/mirasen_code"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      {editLeetcode && (
-                        <button 
-                          onClick={() => setEditLeetcode(false)}
-                          className="h-10 px-3 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("leetcode-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("leetcode", rawVal);
-                          setLeetcodeUser(extracted);
-                          handleSavePlatform("leetcode", extracted);
-                        }}
-                        disabled={saving}
-                        className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
-                      >
-                        {saving ? "Saving..." : "Connect"}
-                      </button>
-                    </div>
+                {!leetcodeUser ? (
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                    <span>LeetCode account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6 pt-2">
@@ -975,8 +790,9 @@ export default function CodingDeckPage() {
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
                     <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center text-[#A87D56]">
-                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="currentColor">
-                        <path d="M11.2574.0039c-.37.0101-.7353.041-1.1003.095C9.6164.153 9.0766.4236 8.482.694c-.757.3244-1.5147.6486-2.2176.7027-1.1896.3785-1.568.919-1.8925 1.3516 0 .054-.054.1079-.054.1079-.4325.865-.4873 1.73-.325 2.5952.1621.5407.3786 1.0282.5408 1.5148.3785 1.0274.7578 2.0007.92 3.1362.1622.3244.3235.7571.4316 1.1897.2704.8651.542 1.8383 1.353 2.5952l.0057-.0028c.0175.0183.0301.0387.0482.0568.0072-.0036.0141-.0063.0213-.0099l-.0213-.5849c.6489-.9733 1.5673-1.6221 2.865-1.8925.5195-.1093 1.081-.1497 1.6625-.1278a8.7733 8.7733 0 0 1 1.7988.2357c1.4599.3785 2.595 1.1358 2.6492 1.7846.0273.3549.0398.6952.0326 1.0364-.001.064-.0046.1285-.007.193l.1362.0682c.075-.0375.1424-.107.2059-.1902.0008-.001.002-.002.0028-.0028.0018-.0023.0039-.0061.0057-.0085.0396-.0536.0747-.1236.1107-.1931.0188-.0377.0372-.0866.0554-.1292.2048-.4622.362-1.1536.538-1.9635.0541-.2703.1092-.4864.1633-.7027.4326-.9733 1.0266-1.8382 1.6213-2.6492.9733-1.3518 1.8928-2.5962 1.7846-4.0561-1.784-3.4608-4.2718-4.0017-5.5695-4.272-.2163-.0541-.3233-.0539-.4856-.108-1.3382-.2433-2.4945-.3953-3.6046-.3648zm5.0428 14.3788a9.8602 9.8602 0 0 0-.0326-.9824c-.0541-.703-1.1892-1.46-2.7032-1.8386-.588-.1336-1.1764-.2142-1.7448-.2356-.539-.0137-1.0657.0248-1.5546.1277-1.2436.2704-2.2162.9193-2.811 1.8925l.0511 1.431c.6672-.3558 1.7326-.8747 3.139-.9994.0662-.0059.1368-.0059.2044-.0099.1177-.013.2667-.044.4444-.044 1.6075 0 3.2682.5336 4.8767 1.6483.039-.2744.0611-.549.071-.8234l.044.0227c.0028-.0622.0143-.1268.0156-.1888zM11.256.0578c.1239-.0034.2538.01.379.0114-.23-.0022-.4588.0026-.6871.0156.103-.0061.2046-.0242.308-.027zm.4983.0156c.6552.014 1.3255.0711 2.0387.1803-.6834-.0987-1.3646-.1671-2.0387-.1803zm-1.3147.0554c-.076.0087-.1527.0133-.2285.0241-.8168.1167-1.7742.7015-2.75 1.045.3545-.1323.7143-.2957 1.0747-.4501C9.0765.4774 9.6705.207 .999z" />
+                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 18V20H18V18" />
+                        <path d="M12 2C8.5 2 7 4.5 7 7C7 8.5 8 9.5 9 10C7.5 11 6 13 6 15C6 17 8 18 12 18C16 18 18 17 18 15C18 13 16.5 11 15 10C16 9.5 17 8.5 17 7C17 4.5 15.5 2 12 2Z" />
                       </svg>
                     </span>
                     <div className="flex flex-col">
@@ -985,58 +801,17 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {!editCodechef && codechefUser && (
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => setEditCodechef(true)}
-                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
-                      >
-                        Update Handle
-                      </button>
-                      <button 
-                        onClick={() => handleDisconnectClick("codechef")}
-                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
+                  {codechefUser && (
+                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
+                      @{codechefUser}
+                    </span>
                   )}
                 </div>
 
-                {!codechefUser || editCodechef ? (
-                  <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1 w-full">
-                      <label className="text-[10px] text-txt-sub font-semibold">CodeChef Profile Link / Username</label>
-                      <input 
-                        type="text" 
-                        defaultValue={codechefUser ? `https://www.codechef.com/users/${codechefUser}` : ""}
-                        id="codechef-username-input"
-                        placeholder="e.g. https://www.codechef.com/users/mirasen_cc"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      {editCodechef && (
-                        <button 
-                          onClick={() => setEditCodechef(false)}
-                          className="h-10 px-3 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("codechef-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("codechef", rawVal);
-                          setCodechefUser(extracted);
-                          handleSavePlatform("codechef", extracted);
-                        }}
-                        disabled={saving}
-                        className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
-                      >
-                        {saving ? "Saving..." : "Connect"}
-                      </button>
-                    </div>
+                {!codechefUser ? (
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                    <span>CodeChef account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1095,58 +870,17 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {!editCodeforces && codeforcesUser && (
-                    <div className="flex gap-3">
-                      <button 
-                        onClick={() => setEditCodeforces(true)}
-                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main underline cursor-pointer"
-                      >
-                        Update Handle
-                      </button>
-                      <button 
-                        onClick={() => handleDisconnectClick("codeforces")}
-                        className="text-[10px] font-mono text-red-500 hover:text-red-600 hover:underline cursor-pointer"
-                      >
-                        Disconnect
-                      </button>
-                    </div>
+                  {codeforcesUser && (
+                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
+                      @{codeforcesUser}
+                    </span>
                   )}
                 </div>
 
-                {!codeforcesUser || editCodeforces ? (
-                  <div className="flex flex-col sm:flex-row gap-3 items-end pt-2">
-                    <div className="flex-grow flex flex-col gap-1 w-full">
-                      <label className="text-[10px] text-txt-sub font-semibold">Codeforces Profile Link / Username</label>
-                      <input 
-                        type="text" 
-                        defaultValue={codeforcesUser ? `https://codeforces.com/profile/${codeforcesUser}` : ""}
-                        id="codeforces-username-input"
-                        placeholder="e.g. https://codeforces.com/profile/mirasen_cf"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono w-full"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      {editCodeforces && (
-                        <button 
-                          onClick={() => setEditCodeforces(false)}
-                          className="h-10 px-3 border border-border-main hover:bg-bg-card text-txt-main text-xs uppercase font-mono rounded-sm transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("codeforces-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("codeforces", rawVal);
-                          setCodeforcesUser(extracted);
-                          handleSavePlatform("codeforces", extracted);
-                        }}
-                        disabled={saving}
-                        className="h-10 px-4 bg-accent-main text-bg-base text-xs uppercase font-semibold rounded-sm hover:opacity-90 transition-opacity cursor-pointer"
-                      >
-                        {saving ? "Saving..." : "Connect"}
-                      </button>
-                    </div>
+                {!codeforcesUser ? (
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                    <span>Codeforces account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1341,59 +1075,17 @@ export default function CodingDeckPage() {
                 <div className="border-b border-border-main/40 pb-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-txt-main">Unstop Integrations</span>
-                    {!unstopUser && !editUnstop && (
-                      <button onClick={() => setEditUnstop(true)} className="text-[9px] text-accent-main font-mono uppercase font-bold cursor-pointer">Link</button>
+                    {unstopUser && (
+                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.unstop?.registered} Applied</span>
                     )}
                   </div>
 
-                  {unstopUser && !editUnstop ? (
+                  {unstopUser ? (
                     <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                      <div className="flex items-center gap-2">
-                        <span>@{unstopUser}</span>
-                        <button
-                          onClick={() => setEditUnstop(true)}
-                          className="text-[8px] text-txt-muted hover:text-txt-main underline cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDisconnectClick("unstop")}
-                          className="text-[8px] text-red-500 hover:text-red-600 underline cursor-pointer"
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.unstop?.registered} Applied</span>
-                    </div>
-                  ) : editUnstop ? (
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        defaultValue={unstopUser ? `https://unstop.com/u/${unstopUser}` : ""}
-                        id="unstop-username-input"
-                        placeholder="Unstop Link / Handle"
-                        className="h-8 flex-1 px-2 border border-border-main bg-bg-base text-xs font-mono text-txt-main focus:outline-none"
-                      />
-                      <button
-                        onClick={() => setEditUnstop(false)}
-                        className="h-8 px-2 border border-border-main text-txt-main text-[10px] uppercase font-mono cursor-pointer hover:bg-bg-card"
-                      >
-                        X
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("unstop-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("unstop", rawVal);
-                          setUnstopUser(extracted);
-                          handleSavePlatform("unstop", extracted);
-                        }}
-                        className="h-8 px-3 bg-accent-main text-bg-base text-[10px] uppercase font-mono font-bold cursor-pointer"
-                      >
-                        Save
-                      </button>
+                      <span>@{unstopUser}</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-txt-muted italic font-light">Link Unstop to fetch hackathon standings.</span>
+                    <span className="text-[10px] text-txt-muted italic font-light">Link Unstop in your Profile Settings to sync metrics.</span>
                   )}
                 </div>
 
@@ -1401,59 +1093,17 @@ export default function CodingDeckPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-txt-main">Hack2Skill Integrations</span>
-                    {!hack2skillUser && !editHack2skill && (
-                      <button onClick={() => setEditHack2skill(true)} className="text-[9px] text-accent-main font-mono uppercase font-bold cursor-pointer">Link</button>
+                    {hack2skillUser && (
+                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.hack2skill?.registered} Applied</span>
                     )}
                   </div>
 
-                  {hack2skillUser && !editHack2skill ? (
+                  {hack2skillUser ? (
                     <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                      <div className="flex items-center gap-2">
-                        <span>@{hack2skillUser}</span>
-                        <button
-                          onClick={() => setEditHack2skill(true)}
-                          className="text-[8px] text-txt-muted hover:text-txt-main underline cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDisconnectClick("hack2skill")}
-                          className="text-[8px] text-red-500 hover:text-red-600 underline cursor-pointer"
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.hack2skill?.registered} Applied</span>
-                    </div>
-                  ) : editHack2skill ? (
-                    <div className="flex gap-2 items-center">
-                      <input 
-                        type="text" 
-                        defaultValue={hack2skillUser ? `https://hack2skill.com/u/${hack2skillUser}` : ""}
-                        id="hack2skill-username-input"
-                        placeholder="Hack2Skill Link / Handle"
-                        className="h-8 flex-1 px-2 border border-border-main bg-bg-base text-xs font-mono text-txt-main focus:outline-none"
-                      />
-                      <button
-                        onClick={() => setEditHack2skill(false)}
-                        className="h-8 px-2 border border-border-main text-txt-main text-[10px] uppercase font-mono cursor-pointer hover:bg-bg-card"
-                      >
-                        X
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const rawVal = (document.getElementById("hack2skill-username-input") as HTMLInputElement)?.value || "";
-                          const extracted = extractUsername("hack2skill", rawVal);
-                          setHack2skillUser(extracted);
-                          handleSavePlatform("hack2skill", extracted);
-                        }}
-                        className="h-8 px-3 bg-accent-main text-bg-base text-[10px] uppercase font-mono font-bold cursor-pointer"
-                      >
-                        Save
-                      </button>
+                      <span>@{hack2skillUser}</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-txt-muted italic font-light">Link Hack2Skill to fetch college hackathon credentials.</span>
+                    <span className="text-[10px] text-txt-muted italic font-light">Link Hack2Skill in your Profile Settings to sync metrics.</span>
                   )}
                 </div>
 
@@ -1491,42 +1141,7 @@ export default function CodingDeckPage() {
 
       </main>
 
-      {/* Custom Disconnect Confirmation Modal */}
-      {disconnectModal.isOpen && (
-        <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-            onClick={() => setDisconnectModal({ isOpen: false, platform: "" })}
-          />
-          
-          {/* Modal Container */}
-          <div className="relative w-full max-w-sm border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl animate-fade-in flex flex-col gap-5 z-10">
-            <div className="flex flex-col gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-red-500 font-bold">Revoke Connection</span>
-              <h3 className="text-sm font-semibold text-txt-main">Disconnect Profile?</h3>
-              <p className="text-xs text-txt-muted font-light leading-relaxed">
-                Are you sure you want to disconnect your <span className="font-mono font-semibold text-txt-main">{disconnectModal.platform.toUpperCase()}</span> handle? You will lose immediate access to synced metrics and scoreboards.
-              </p>
-            </div>
-            
-            <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider">
-              <button
-                onClick={() => setDisconnectModal({ isOpen: false, platform: "" })}
-                className="px-4 py-2.5 border border-border-main hover:bg-bg-card text-txt-main rounded-sm transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDisconnect}
-                className="px-4 py-2.5 bg-red-600 text-white rounded-sm hover:bg-red-700 transition-colors cursor-pointer font-bold"
-              >
-                Disconnect
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );

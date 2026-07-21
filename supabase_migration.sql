@@ -335,6 +335,8 @@ CREATE TABLE public.friendships (
     sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')) NOT NULL,
+    sender_restricted BOOLEAN DEFAULT false NOT NULL,
+    receiver_restricted BOOLEAN DEFAULT false NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     UNIQUE(sender_id, receiver_id)
 );
@@ -365,4 +367,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS graduation_year TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS github_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS portfolio_url TEXT;
+
+-- Add restriction settings to friendships table
+ALTER TABLE public.friendships ADD COLUMN IF NOT EXISTS sender_restricted BOOLEAN DEFAULT false NOT NULL;
+ALTER TABLE public.friendships ADD COLUMN IF NOT EXISTS receiver_restricted BOOLEAN DEFAULT false NOT NULL;
 

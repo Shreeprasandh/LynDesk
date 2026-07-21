@@ -91,6 +91,26 @@ export default function ProfilePage() {
   const [companyKey, setCompanyKey] = useState("");
   const [batchCode, setBatchCode] = useState("");
   const [grantSharePermission, setGrantSharePermission] = useState(false);
+  const [academicCredits, setAcademicCredits] = useState(0);
+  
+  // Coding platforms handles
+  const [leetcodeUsername, setLeetcodeUsername] = useState("");
+  const [codeforcesUsername, setCodeforcesUsername] = useState("");
+  const [codechefUsername, setCodechefUsername] = useState("");
+  const [unstopUsername, setUnstopUsername] = useState("");
+  const [hack2skillUsername, setHack2skillUsername] = useState("");
+
+  // Handle verification statuses
+  const [leetcodeVerified, setLeetcodeVerified] = useState(false);
+  const [codeforcesVerified, setCodeforcesVerified] = useState(false);
+  const [codechefVerified, setCodechefVerified] = useState(false);
+  const [unstopVerified, setUnstopVerified] = useState(false);
+  const [hack2skillVerified, setHack2skillVerified] = useState(false);
+
+  // Verification request modal states
+  const [verifyPlatform, setVerifyPlatform] = useState<string | null>(null);
+  const [verifyReason, setVerifyReason] = useState("");
+  const [verifiedHandlesBackup, setVerifiedHandlesBackup] = useState<Record<string, string>>({});
   
   // Interface states
   const [loading, setLoading] = useState(true);
@@ -106,6 +126,18 @@ export default function ProfilePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [isStaff] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("faculty_staff_member");
+    }
+    return false;
+  });
+  const [isRec] = useState(() => {
+    if (typeof window !== "undefined") {
+      return !!localStorage.getItem("company_recruiter_member");
+    }
+    return false;
+  });
   
   // Suggestions
   const [collegeSuggestion, setCollegeSuggestion] = useState<string | null>(null);
@@ -190,13 +222,47 @@ export default function ProfilePage() {
           setUsername(profile.username || "");
           setAvatarUrl(profile.avatar_url || "");
           setIsPublic(profile.is_profile_public ?? true);
+          setGithubUrl(profile.github_url || "");
+          setLinkedinUrl(profile.linkedin_url || "");
+          setPortfolioUrl(profile.portfolio_url || "");
+          setDepartment(profile.department || "");
+          setGradYear(profile.graduation_year || "");
+          setCollegeKey(profile.college_key || "");
+          setCompanyKey(profile.company_key || "");
+          setAcademicCredits(profile.academic_credits || 0);
+          setCollegeName(profile.college_name || "");
+          setLeetcodeUsername(profile.leetcode_username || "");
+          setCodeforcesUsername(profile.codeforces_username || "");
+          setCodechefUsername(profile.codechef_username || "");
+          setUnstopUsername(profile.unstop_username || "");
+          setHack2skillUsername(profile.hack2skill_username || "");
+          const hasKeys = (profile.college_key || "").trim() !== "" || (profile.company_key || "").trim() !== "";
+          setLeetcodeVerified(hasKeys ? !!profile.leetcode_verified : true);
+          setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
+          setCodechefVerified(hasKeys ? !!profile.codechef_verified : true);
+          setUnstopVerified(hasKeys ? !!profile.unstop_verified : true);
+          setHack2skillVerified(hasKeys ? !!profile.hack2skill_verified : true);
+
+          const verifiedBackup: Record<string, string> = {};
+          if (profile.leetcode_verified) verifiedBackup["LeetCode"] = profile.leetcode_username || "";
+          if (profile.codeforces_verified) verifiedBackup["Codeforces"] = profile.codeforces_username || "";
+          if (profile.codechef_verified) verifiedBackup["CodeChef"] = profile.codechef_username || "";
+          if (profile.unstop_verified) verifiedBackup["Unstop"] = profile.unstop_username || "";
+          if (profile.hack2skill_verified) verifiedBackup["Hack2Skill"] = profile.hack2skill_username || "";
+          setVerifiedHandlesBackup(verifiedBackup);
+
           if (profile.institutes) {
-            setCollegeName(profile.institutes.name || "");
+            setCollegeName(profile.institutes.name || profile.college_name || "");
           }
         }
 
         // 2. Fetch detailed record metadata from Auth user metadata as fallback/extension
         const meta = user.user_metadata || {};
+        setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
+        setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
+        setCodechefUsername(meta.codechef_username || profile?.codechef_username || "");
+        setUnstopUsername(meta.unstop_username || profile?.unstop_username || "");
+        setHack2skillUsername(meta.hack2skill_username || profile?.hack2skill_username || "");
         setBio(meta.bio || "");
         setSkills(meta.skills || "");
         setGithubUrl(meta.github_url || "");
@@ -316,18 +382,126 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
+      // Unique Handle Validation (must be checked outside inner try to block saving on duplicates)
+      const lcTrim = leetcodeUsername.trim();
+      const cfTrim = codeforcesUsername.trim();
+      const ccTrim = codechefUsername.trim();
+      const usTrim = unstopUsername.trim();
+      const h2sTrim = hack2skillUsername.trim();
+
+      if (lcTrim || cfTrim || ccTrim || usTrim || h2sTrim) {
+        const { data: existingProfiles } = await supabase
+          .from("profiles")
+          .select("id, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username")
+          .neq("id", user.id);
+          
+        if (existingProfiles) {
+          for (const ep of existingProfiles) {
+            if (lcTrim && ep.leetcode_username && ep.leetcode_username.toLowerCase() === lcTrim.toLowerCase()) {
+              throw new Error(`The LeetCode handle @${lcTrim} is already registered by another student.`);
+            }
+            if (cfTrim && ep.codeforces_username && ep.codeforces_username.toLowerCase() === cfTrim.toLowerCase()) {
+              throw new Error(`The Codeforces handle @${cfTrim} is already registered by another student.`);
+            }
+            if (ccTrim && ep.codechef_username && ep.codechef_username.toLowerCase() === ccTrim.toLowerCase()) {
+              throw new Error(`The CodeChef handle @${ccTrim} is already registered by another student.`);
+            }
+            if (usTrim && ep.unstop_username && ep.unstop_username.toLowerCase() === usTrim.toLowerCase()) {
+              throw new Error(`The Unstop handle @${usTrim} is already registered by another student.`);
+            }
+            if (h2sTrim && ep.hack2skill_username && ep.hack2skill_username.toLowerCase() === h2sTrim.toLowerCase()) {
+              throw new Error(`The Hack2Skill handle @${h2sTrim} is already registered by another student.`);
+            }
+          }
+        }
+      }
+
       // 1. Try updating the public profiles table, but fail gracefully to prevent blocking the user
       try {
+        const { data: currentDbProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        const hasCollegeOrCompany = collegeKey.trim() !== "" || companyKey.trim() !== "";
+        const joinedOrChangedInstitution = 
+          (collegeKey.trim() !== "" && collegeKey.trim() !== (currentDbProfile?.college_key || "").trim()) ||
+          (companyKey.trim() !== "" && companyKey.trim() !== (currentDbProfile?.company_key || "").trim());
+
+        let nextLcVerified = leetcodeVerified;
+        let nextCfVerified = codeforcesVerified;
+        let nextCcVerified = codechefVerified;
+        let nextUsVerified = unstopVerified;
+        let nextH2sVerified = hack2skillVerified;
+
+        if (hasCollegeOrCompany) {
+          if (joinedOrChangedInstitution) {
+            nextLcVerified = false;
+            nextCfVerified = false;
+            nextCcVerified = false;
+            nextUsVerified = false;
+            nextH2sVerified = false;
+          } else {
+            if (leetcodeUsername.trim() !== (currentDbProfile?.leetcode_username || "").trim()) {
+              nextLcVerified = false;
+            }
+            if (codeforcesUsername.trim() !== (currentDbProfile?.codeforces_username || "").trim()) {
+              nextCfVerified = false;
+            }
+            if (codechefUsername.trim() !== (currentDbProfile?.codechef_username || "").trim()) {
+              nextCcVerified = false;
+            }
+            if (unstopUsername.trim() !== (currentDbProfile?.unstop_username || "").trim()) {
+              nextUsVerified = false;
+            }
+            if (hack2skillUsername.trim() !== (currentDbProfile?.hack2skill_username || "").trim()) {
+              nextH2sVerified = false;
+            }
+          }
+        } else {
+          // Solo users do not require verification
+          nextLcVerified = true;
+          nextCfVerified = true;
+          nextCcVerified = true;
+          nextUsVerified = true;
+          nextH2sVerified = true;
+        }
+
+        setLeetcodeVerified(nextLcVerified);
+        setCodeforcesVerified(nextCfVerified);
+        setCodechefVerified(nextCcVerified);
+        setUnstopVerified(nextUsVerified);
+        setHack2skillVerified(nextH2sVerified);
+
         const { error: profileError } = await supabase
           .from("profiles")
-          .upsert({
-            id: user.id,
+          .update({
             username: cleanUsername,
             full_name: cleanFullName,
             avatar_url: avatarUrl,
             is_profile_public: isPublic,
+            department: cleanDept,
+            graduation_year: gradYear.trim(),
+            github_url: githubUrl.trim(),
+            linkedin_url: linkedinUrl.trim(),
+            portfolio_url: portfolioUrl.trim(),
+            college_key: collegeKey.trim(),
+            company_key: companyKey.trim(),
+            college_name: cleanCollege,
+            leetcode_username: leetcodeUsername.trim(),
+            codeforces_username: codeforcesUsername.trim(),
+            codechef_username: codechefUsername.trim(),
+            unstop_username: unstopUsername.trim(),
+            hack2skill_username: hack2skillUsername.trim(),
+            leetcode_verified: nextLcVerified,
+            codeforces_verified: nextCfVerified,
+            codechef_verified: nextCcVerified,
+            unstop_verified: nextUsVerified,
+            hack2skill_verified: nextH2sVerified,
             updated_at: new Date().toISOString()
-          });
+          })
+          .eq("id", user.id);
 
         if (profileError) {
           console.warn("Profiles table upsert failed (database RLS/Schema). Proceeding with Auth Metadata fallback.", profileError);
@@ -356,7 +530,12 @@ export default function ProfilePage() {
           college_key: collegeKey.trim(),
           company_key: companyKey.trim(),
           batch_code: batchCode.trim(),
-          grant_share_permission: grantSharePermission
+          grant_share_permission: grantSharePermission,
+          leetcode_username: leetcodeUsername.trim(),
+          codeforces_username: codeforcesUsername.trim(),
+          codechef_username: codechefUsername.trim(),
+          unstop_username: unstopUsername.trim(),
+          hack2skill_username: hack2skillUsername.trim()
         }
       });
 
@@ -697,133 +876,296 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Resume and Tech Profile Panel */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Technical Portfolio Details (Optional)</span>
-              
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-txt-sub font-semibold">Professional Bio</label>
-                <textarea 
-                  rows={3}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="Tell us about your developer specialties, hackathon goals, or stack specialties..."
-                  className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light resize-none disabled:opacity-60"
-                />
-              </div>
+            {!(isStaff || isRec) && (
+              <>
+                {/* Resume and Tech Profile Panel */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Technical Portfolio Details (Optional)</span>
+                  
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-txt-sub font-semibold">Professional Bio</label>
+                    <textarea 
+                      rows={3}
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Tell us about your developer specialties, hackathon goals, or stack specialties..."
+                      className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light resize-none disabled:opacity-60"
+                    />
+                  </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-txt-sub font-semibold">Skills & Stack Specialties (comma-separated)</label>
-                <input 
-                  type="text" 
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="e.g. Next.js, TypeScript, PostgreSQL, Figma, UI/UX"
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
-                />
-              </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-txt-sub font-semibold">Skills & Stack Specialties (comma-separated)</label>
+                    <input 
+                      type="text" 
+                      value={skills}
+                      onChange={(e) => setSkills(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="e.g. Next.js, TypeScript, PostgreSQL, Figma, UI/UX"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
+                    />
+                  </div>
 
-              {/* Resume upload */}
-              <div className="flex flex-col gap-2 border border-border-main/60 p-4 rounded bg-bg-base/30">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Certified Resume PDF</span>
-                
-                <div className="flex items-center justify-between gap-4 mt-1">
-                  {resumeFileName ? (
-                    <div className="flex items-center gap-2 text-xs text-txt-main font-mono">
-                      <FileText size={14} className="text-txt-muted" />
-                      <span className="truncate max-w-[180px]">{resumeFileName}</span>
-                      {resumeUrl !== "#mock-resume-url" && (
-                        <a href={resumeUrl} target="_blank" rel="noreferrer" className="text-[10px] text-txt-muted hover:text-txt-main underline ml-1">
-                          View
-                        </a>
+                  {/* Resume upload */}
+                  <div className="flex flex-col gap-2 border border-border-main/60 p-4 rounded bg-bg-base/30">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Certified Resume PDF</span>
+                    
+                    <div className="flex items-center justify-between gap-4 mt-1">
+                      {resumeFileName ? (
+                        <div className="flex items-center gap-2 text-xs text-txt-main font-mono">
+                          <FileText size={14} className="text-txt-muted" />
+                          <span className="truncate max-w-[140px] md:max-w-[240px]" title={resumeFileName}>{resumeFileName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-txt-muted italic font-mono">No resume PDF uploaded.</span>
                       )}
+                      
+                      <input 
+                        type="file" 
+                        ref={resumeInputRef}
+                        onChange={handleResumeUpload}
+                        disabled={!isEditing}
+                        className="hidden" 
+                        accept=".pdf,.doc,.docx"
+                      />
+                      
+                      <button
+                        type="button"
+                        onClick={() => resumeInputRef.current?.click()}
+                        disabled={!isEditing || uploadingResume}
+                        className="h-8 px-4 border border-border-main/80 text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        {uploadingResume ? "..." : <><Upload size={12} /> Upload PDF</>}
+                      </button>
                     </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light italic">No resume uploaded yet.</span>
-                  )}
+                  </div>
+                </div>
+
+                {/* Social Platform Profiles */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Social Platform Profiles (Optional)</span>
                   
-                  <input 
-                    type="file" 
-                    ref={resumeInputRef}
-                    onChange={handleResumeUpload}
-                    disabled={!isEditing}
-                    className="hidden" 
-                    accept=".pdf,.doc,.docx"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                        <GithubIcon size={12} /> GitHub URL
+                      </label>
+                      <input 
+                        type="url" 
+                        value={githubUrl}
+                        onChange={(e) => setGithubUrl(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="https://github.com/myusername"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                        <LinkedinIcon size={12} /> LinkedIn URL
+                      </label>
+                      <input 
+                        type="url" 
+                        value={linkedinUrl}
+                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="https://linkedin.com/in/myusername"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                        <DiscordIcon size={12} /> Discord Username
+                      </label>
+                      <input 
+                        type="text" 
+                        value={discordUsername}
+                        onChange={(e) => setDiscordUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="username#0000"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
+                        <Globe size={12} /> Personal Portfolio URL
+                      </label>
+                      <input 
+                        type="url" 
+                        value={portfolioUrl}
+                        onChange={(e) => setPortfolioUrl(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="https://myportfolio.dev"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coding Platform Integrations */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Coding Platform Integrations (Optional)</span>
                   
-                  <button
-                    type="button"
-                    onClick={() => resumeInputRef.current?.click()}
-                    disabled={!isEditing || uploadingResume}
-                    className="h-8 px-4 border border-border-main/80 text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                  >
-                    {uploadingResume ? "..." : <><Upload size={12} /> Upload PDF</>}
-                  </button>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">LeetCode Username</label>
+                        {leetcodeUsername.trim() && (
+                          (leetcodeVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("LeetCode");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={leetcodeUsername}
+                        onChange={(e) => setLeetcodeUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter LeetCode handle"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                    <GithubIcon size={12} /> GitHub URL
-                  </label>
-                  <input 
-                    type="url" 
-                    value={githubUrl}
-                    onChange={(e) => setGithubUrl(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="https://github.com/username"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
-                </div>
- 
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                    <LinkedinIcon size={12} /> LinkedIn URL
-                  </label>
-                  <input 
-                    type="url" 
-                    value={linkedinUrl}
-                    onChange={(e) => setLinkedinUrl(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="https://linkedin.com/in/username"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
-                </div>
-              </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">Codeforces Handle</label>
+                        {codeforcesUsername.trim() && (
+                          (codeforcesVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("Codeforces");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={codeforcesUsername}
+                        onChange={(e) => setCodeforcesUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter Codeforces handle"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                    <DiscordIcon size={12} /> Discord Username
-                  </label>
-                  <input 
-                    type="text" 
-                    value={discordUsername}
-                    onChange={(e) => setDiscordUsername(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="username#0000"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">CodeChef Username</label>
+                        {codechefUsername.trim() && (
+                          (codechefVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("CodeChef");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={codechefUsername}
+                        onChange={(e) => setCodechefUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter CodeChef handle"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-txt-sub font-semibold flex items-center gap-1.5">
-                    <Globe size={12} /> Personal Portfolio URL
-                  </label>
-                  <input 
-                    type="url" 
-                    value={portfolioUrl}
-                    onChange={(e) => setPortfolioUrl(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="https://myportfolio.dev"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">Unstop Username</label>
+                        {unstopUsername.trim() && (
+                          (unstopVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("Unstop");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={unstopUsername}
+                        onChange={(e) => setUnstopUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter Unstop handle"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">Hack2Skill Username</label>
+                        {hack2skillUsername.trim() && (
+                          (hack2skillVerified || (!collegeKey.trim() && !companyKey.trim())) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("Hack2Skill");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={hack2skillUsername}
+                        onChange={(e) => setHack2skillUsername(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter Hack2Skill handle"
+                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* College & Department Panel */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
@@ -945,207 +1287,224 @@ export default function ProfilePage() {
           {/* ================= RIGHT COLUMN: ACCOUNT CONNECTIONS & VERIFIED STATS (5 Columns) ================= */}
           <section className="lg:col-span-5 flex flex-col gap-6 lg:sticky lg:top-24">
             
-            {/* OAuth Connection linking panel */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Authentication Connections</span>
-              
-              <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-3">
-                <h3 className="font-display text-sm font-semibold text-txt-main">Linked Credentials</h3>
-                <p className="text-[10px] text-txt-muted font-light leading-relaxed">
-                  Link multiple authentication accounts to this profile. You can log in using any linked account in the future.
-                </p>
+            {isStaff || isRec ? (
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-3 text-left">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Session Context</span>
+                <div className="flex flex-col gap-1 border-b border-border-main/45 pb-3">
+                  <h3 className="font-display text-sm font-semibold text-txt-main font-semibold">Administrative Desk</h3>
+                  <p className="text-[10px] text-txt-muted leading-relaxed font-light">
+                    You are logged in as a {isStaff ? "Faculty Coordinator" : "Company Partner Recruiter"}. Student-specific features like handle integrations, enrollment keys, and academic credit claims are disabled.
+                  </p>
+                </div>
+                <div className="text-[10.5px] font-mono text-txt-sub">
+                  Authorized Role: <strong className="text-emerald-500 uppercase font-bold">{isStaff ? "Faculty Staff" : "Corporate Recruiter"}</strong>
+                </div>
               </div>
+            ) : (
+              <>
+                {/* OAuth Connection linking panel */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Authentication Connections</span>
+                  
+                  <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">Linked Credentials</h3>
+                    <p className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link multiple authentication accounts to this profile. You can log in using any linked account in the future.
+                    </p>
+                  </div>
 
-              {/* Provider List */}
-              <div className="flex flex-col gap-3 pt-1">
-                
-                {/* Google */}
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Globe size={14} className="text-txt-sub" />
+                  {/* Provider List */}
+                  <div className="flex flex-col gap-3 pt-1">
+                    
+                    {/* Google */}
+                    <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Globe size={14} className="text-txt-sub" />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-txt-main">Google Account</span>
+                          <span className="text-[9px] text-txt-muted font-mono">{user?.email}</span>
+                        </div>
+                      </div>
+                      {connectedProviders.includes("google") ? (
+                        <div className="flex items-center gap-1 text-[9px] text-emerald-500 font-mono uppercase font-bold">
+                          <CheckCircle2 size={10} /> Connected
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => handleLinkIdentity("google")}
+                          disabled={linking}
+                          className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+
+                    {/* GitHub */}
+                    <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <GithubIcon size={14} className="text-txt-sub" />
+                        <span className="text-xs font-semibold text-txt-main">GitHub Login</span>
+                      </div>
+                      {connectedProviders.includes("github") ? (
+                        <button 
+                          onClick={() => handleUnlinkIdentity("github")}
+                          disabled={linking}
+                          className="text-[9px] text-txt-muted hover:text-red-500 font-mono uppercase font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Unlink size={10} /> Linked (Disconnect)
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleLinkIdentity("github")}
+                          disabled={linking}
+                          className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Discord */}
+                    <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <DiscordIcon size={14} className="text-txt-sub" />
+                        <span className="text-xs font-semibold text-txt-main">Discord Login</span>
+                      </div>
+                      {connectedProviders.includes("discord") ? (
+                        <button 
+                          onClick={() => handleUnlinkIdentity("discord")}
+                          disabled={linking}
+                          className="text-[9px] text-txt-muted hover:text-red-500 font-mono uppercase font-semibold flex items-center gap-1 transition-colors"
+                        >
+                          <Unlink size={10} /> Linked (Disconnect)
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleLinkIdentity("discord")}
+                          disabled={linking}
+                          className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
+                        >
+                          Connect
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+
+                  <div className="flex items-start gap-1.5 bg-bg-base/30 border border-border-main/60 p-3 rounded mt-2">
+                    <Info size={12} className="text-txt-muted mt-0.5 flex-shrink-0" />
+                    <span className="text-[9px] text-txt-muted leading-relaxed font-light">
+                      <strong>Important</strong>: You cannot disconnect all login options. At least one linked authentication method must remain active to prevent locking yourself out.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Academic stats card */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credit Balance</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-accent-main text-bg-base flex items-center justify-center">
+                      <Award size={18} className="stroke-[1.5]" />
+                    </div>
                     <div className="flex flex-col">
-                      <span className="text-xs font-semibold text-txt-main">Google Account</span>
-                      <span className="text-[9px] text-txt-muted font-mono">{user?.email}</span>
+                      <span className="text-2xl font-display font-light tracking-tight text-txt-main">{academicCredits} Points</span>
+                      <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Verified Extracurriculars</span>
                     </div>
                   </div>
-                  {connectedProviders.includes("google") ? (
-                    <div className="flex items-center gap-1 text-[9px] text-emerald-500 font-mono uppercase font-bold">
-                      <CheckCircle2 size={10} /> Connected
+                </div>
+
+                {/* Coding & Platform Deck Integrations Panel */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
+                  <div className="flex flex-col gap-1 border-b border-border-main/40 pb-2">
+                    <span className="text-xs font-semibold text-txt-main">Coding & Hackathon Decks</span>
+                    <span className="text-[10px] text-txt-sub font-light leading-relaxed">
+                      Link your profiles to aggregate solves, global ranks, and hackathon milestones.
+                    </span>
+                  </div>
+                  <Link 
+                    href="/coding-deck"
+                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity"
+                  >
+                    <Code2 size={12} /> Manage Coding Deck
+                  </Link>
+                </div>
+
+                {/* Institutional Link / Key Enrollment Panel */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
+                  <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-2.5">
+                    <span className="text-xs font-semibold text-txt-main">Link College or Employer</span>
+                    <span className="text-[10px] text-txt-sub font-light leading-relaxed">
+                      Enter verification codes provided by your institution or coordinator to share your accomplishments.
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub font-semibold">College Enrollment Key</label>
+                      <input 
+                        type="password"
+                        value={collegeKey}
+                        onChange={(e) => setCollegeKey(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter College Registrar Key"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                      {collegeKey && (
+                        <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
+                          <CheckCircle2 size={10} /> Associated College Verified
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    <button 
-                      onClick={() => handleLinkIdentity("google")}
-                      disabled={linking}
-                      className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
-                    >
-                      Connect
-                    </button>
-                  )}
-                </div>
 
-                {/* GitHub */}
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <GithubIcon size={14} className="text-txt-sub" />
-                    <span className="text-xs font-semibold text-txt-main">GitHub Login</span>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub font-semibold">Batch Code / Section</label>
+                      <input 
+                        type="text"
+                        value={batchCode}
+                        onChange={(e) => setBatchCode(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="e.g. Batch A / Class of 2026"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors disabled:opacity-60"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-txt-sub font-semibold">Company Access Key</label>
+                      <input 
+                        type="password"
+                        value={companyKey}
+                        onChange={(e) => setCompanyKey(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Enter Corporate Access Key"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                      />
+                      {companyKey && (
+                        <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
+                          <CheckCircle2 size={10} /> Connected Employer Verified
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-start gap-2.5 mt-2 border-t border-border-main/40 pt-3">
+                      <input 
+                        type="checkbox"
+                        id="grantSharePermission"
+                        checked={grantSharePermission}
+                        onChange={(e) => setGrantSharePermission(e.target.checked)}
+                        disabled={!isEditing}
+                        className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
+                      />
+                      <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
+                        <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College/Company coordinators to view, audit, and export my milestones, competitive scores, and code verification statuses.
+                      </label>
+                    </div>
                   </div>
-                  {connectedProviders.includes("github") ? (
-                    <button 
-                      onClick={() => handleUnlinkIdentity("github")}
-                      disabled={linking}
-                      className="text-[9px] text-txt-muted hover:text-red-500 font-mono uppercase font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <Unlink size={10} /> Linked (Disconnect)
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleLinkIdentity("github")}
-                      disabled={linking}
-                      className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
-                    >
-                      Connect
-                    </button>
-                  )}
                 </div>
-
-                {/* Discord */}
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <DiscordIcon size={14} className="text-txt-sub" />
-                    <span className="text-xs font-semibold text-txt-main">Discord Login</span>
-                  </div>
-                  {connectedProviders.includes("discord") ? (
-                    <button 
-                      onClick={() => handleUnlinkIdentity("discord")}
-                      disabled={linking}
-                      className="text-[9px] text-txt-muted hover:text-red-500 font-mono uppercase font-semibold flex items-center gap-1 transition-colors"
-                    >
-                      <Unlink size={10} /> Linked (Disconnect)
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleLinkIdentity("discord")}
-                      disabled={linking}
-                      className="h-7 px-3 border border-border-main/80 text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card transition-colors"
-                    >
-                      Connect
-                    </button>
-                  )}
-                </div>
-
-              </div>
-
-              <div className="flex items-start gap-1.5 bg-bg-base/30 border border-border-main/60 p-3 rounded mt-2">
-                <Info size={12} className="text-txt-muted mt-0.5 flex-shrink-0" />
-                <span className="text-[9px] text-txt-muted leading-relaxed font-light">
-                  <strong>Important</strong>: You cannot disconnect all login options. At least one linked authentication method must remain active to prevent locking yourself out.
-                </span>
-              </div>
-            </div>
-
-            {/* Academic stats card */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credit Balance</span>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-accent-main text-bg-base flex items-center justify-center">
-                  <Award size={18} className="stroke-[1.5]" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-2xl font-display font-light tracking-tight text-txt-main">32 Points</span>
-                  <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Verified Extracurriculars</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Coding & Platform Deck Integrations Panel */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
-              <div className="flex flex-col gap-1 border-b border-border-main/40 pb-2">
-                <span className="text-xs font-semibold text-txt-main">Coding & Hackathon Decks</span>
-                <span className="text-[10px] text-txt-sub font-light leading-relaxed">
-                  Link your profiles to aggregate solves, global ranks, and hackathon milestones.
-                </span>
-              </div>
-              <Link 
-                href="/coding-deck"
-                className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity"
-              >
-                <Code2 size={12} /> Manage Coding Deck
-              </Link>
-            </div>
-
-            {/* Institutional Link / Key Enrollment Panel */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
-              <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-2.5">
-                <span className="text-xs font-semibold text-txt-main">Link College or Employer</span>
-                <span className="text-[10px] text-txt-sub font-light leading-relaxed">
-                  Enter verification codes provided by your institution or coordinator to share your accomplishments.
-                </span>
-              </div>
-              
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold">College Enrollment Key</label>
-                  <input 
-                    type="password"
-                    value={collegeKey}
-                    onChange={(e) => setCollegeKey(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Enter College Registrar Key"
-                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
-                  {collegeKey && (
-                    <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
-                      <CheckCircle2 size={10} /> Associated College Verified
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold">Batch Code / Section</label>
-                  <input 
-                    type="text"
-                    value={batchCode}
-                    onChange={(e) => setBatchCode(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="e.g. Batch A / Class of 2026"
-                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors disabled:opacity-60"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold">Company Access Key</label>
-                  <input 
-                    type="password"
-                    value={companyKey}
-                    onChange={(e) => setCompanyKey(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Enter Corporate Access Key"
-                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                  />
-                  {companyKey && (
-                    <span className="text-[9px] text-emerald-500 font-mono flex items-center gap-0.5 mt-0.5">
-                      <CheckCircle2 size={10} /> Connected Employer Verified
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-start gap-2.5 mt-2 border-t border-border-main/40 pt-3">
-                  <input 
-                    type="checkbox"
-                    id="grantSharePermission"
-                    checked={grantSharePermission}
-                    onChange={(e) => setGrantSharePermission(e.target.checked)}
-                    disabled={!isEditing}
-                    className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
-                  />
-                  <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
-                    <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College/Company coordinators to view, audit, and export my milestones, competitive scores, and code verification statuses.
-                  </label>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Account Deletion Button */}
             <div className="flex justify-center mt-2 pb-6">
@@ -1163,6 +1522,121 @@ export default function ProfilePage() {
         </div>
 
       </main>
+
+      {/* Request Handle Verification Modal */}
+      {verifyPlatform && (() => {
+        const handleName = verifyPlatform === "LeetCode" ? leetcodeUsername
+                         : verifyPlatform === "Codeforces" ? codeforcesUsername
+                         : verifyPlatform === "CodeChef" ? codechefUsername
+                         : verifyPlatform === "Unstop" ? unstopUsername
+                         : hack2skillUsername;
+        const prevVerifiedHandle = verifiedHandlesBackup[verifyPlatform] || "";
+        const isSwitch = !!prevVerifiedHandle;
+
+        return (
+          <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setVerifyPlatform(null)} />
+            <div className="relative w-full max-w-sm border border-border-main bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 z-10 animate-fade-in text-left">
+              <div className="flex flex-col gap-1.5 border-b border-border-main/45 pb-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">
+                  {isSwitch ? "Request Handle Switch" : "Request Handle Verification"}
+                </span>
+                <h3 className="text-sm font-semibold text-txt-main font-sans">Verify your {verifyPlatform} account</h3>
+                <p className="text-[10px] text-txt-muted leading-relaxed">
+                  {isSwitch ? (
+                    <>
+                      You are changing your verified {verifyPlatform} handle from <strong className="font-semibold font-mono">@{prevVerifiedHandle}</strong> to <strong className="font-semibold font-mono">@{handleName}</strong>. This will unverify your previous handle.
+                    </>
+                  ) : (
+                    <>
+                      Submit a verification request for your new {verifyPlatform} handle <strong className="font-semibold font-mono">@{handleName}</strong>.
+                    </>
+                  )}
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-mono uppercase text-txt-muted">
+                  {isSwitch ? "Reason for Username Change" : "Verification Notes (Optional)"}
+                </label>
+                <textarea
+                  rows={3}
+                  value={verifyReason}
+                  onChange={(e) => setVerifyReason(e.target.value)}
+                  placeholder={isSwitch ? "e.g. Switched username to align with my GitHub handle..." : "e.g. First-time competitive coding profile setup..."}
+                  className="w-full p-2.5 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 font-mono text-[10px] uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setVerifyPlatform(null)}
+                  className="px-4 py-2 border border-border-main hover:bg-bg-card text-txt-main rounded-sm transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSwitch && !verifyReason.trim()) return;
+
+                    // Submit request to localStorage
+                    const stored = localStorage.getItem("ldk_handle_verifications");
+                    const list = stored ? JSON.parse(stored) : [];
+                    
+                    const newReq = {
+                      id: `verify_${Date.now()}`,
+                      studentId: user?.id,
+                      studentName: fullName || "Student",
+                      studentEmail: user?.email,
+                      platform: verifyPlatform,
+                      handle: handleName,
+                      requestType: isSwitch ? "handle_switch" : "new_verification",
+                      oldHandle: isSwitch ? prevVerifiedHandle : null,
+                      newHandle: handleName,
+                      reason: verifyReason.trim() || (isSwitch ? "Requested username switch." : "New profile verification setup."),
+                      status: "pending",
+                      date: new Date().toLocaleDateString()
+                    };
+                    
+                    localStorage.setItem("ldk_handle_verifications", JSON.stringify([newReq, ...list].slice(0, 100)));
+                    
+                    // Add a student notification
+                    const storedNotifs = localStorage.getItem("ldk_global_notifications");
+                    const notifs = storedNotifs ? JSON.parse(storedNotifs) : [];
+                    notifs.unshift({
+                      id: `notif_verify_req_${Date.now()}`,
+                      title: isSwitch ? "Switch Verification Requested" : "Verification Requested",
+                      message: isSwitch 
+                        ? `Switch request from @${prevVerifiedHandle} to @${handleName} submitted.`
+                        : `Verification request for @${handleName} submitted.`,
+                      type: "system",
+                      category: "alerts",
+                      time: "Just now",
+                      read: false
+                    });
+                    localStorage.setItem("ldk_global_notifications", JSON.stringify(notifs.slice(0, 100)));
+                    window.dispatchEvent(new Event("ldk_notifications_update"));
+
+                    setVerifyPlatform(null);
+                    setMessage({ 
+                      text: isSwitch 
+                        ? `Handle switch verification request submitted for @${handleName}.` 
+                        : `Verification request submitted for @${handleName}.`, 
+                      type: "success" 
+                    });
+                  }}
+                  disabled={isSwitch && !verifyReason.trim()}
+                  className="px-4 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Submit Request
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Account OTP Confirmation Modal */}
       {showDeleteModal && (
