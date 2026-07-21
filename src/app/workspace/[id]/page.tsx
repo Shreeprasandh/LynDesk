@@ -1,6 +1,7 @@
 "use client";
 
 import React, { use, useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import Link from "next/link";
@@ -1243,7 +1244,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     // 1. Try GitHub public API if a custom repository link is configured
     try {
       const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
-      if (githubMatch && githubRepo.trim() !== "github.com/shreeprasandh/carbontrace" && githubRepo.trim() !== "github.com/shreeprasandh/healthvibe") {
+      if (githubMatch) {
         const owner = githubMatch[1];
         const repo = githubMatch[2].replace(/\.git$/, "");
         // try catch error handling safeguard
@@ -1351,25 +1352,46 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div className="absolute top-0 bottom-0 left-[21px] w-[1px] bg-border-main/60 z-0" />
             
             {stages.map((stg, idx) => {
-              const isActive = status === stg.toLowerCase();
-              const isPast = stages.indexOf(status.charAt(0).toUpperCase() + status.slice(1)) > idx;
+              const currentStageLower = status.toLowerCase();
+              const stgLower = stg.toLowerCase();
+              const currentIdx = stages.findIndex(s => s.toLowerCase() === currentStageLower);
+              const isActive = currentStageLower === stgLower;
+              const isPast = idx < (currentIdx >= 0 ? currentIdx : 0);
               
               return (
-                <div key={idx} className="relative z-10 flex gap-4 group cursor-help">
+                <motion.div 
+                  key={idx} 
+                  whileHover={{ x: 2 }}
+                  onClick={async () => {
+                    const newStatus = stgLower as "ideation" | "development" | "testing" | "submitted";
+                    setStatus(newStatus);
+                    try {
+                      if (user && id !== "e1" && id !== "e2") {
+                        await supabase
+                          .from("project_spaces")
+                          .update({ status: newStatus })
+                          .eq("id", id);
+                      }
+                    } catch (err) {
+                      console.error("Failed updating stage status", err);
+                    }
+                  }}
+                  className="relative z-10 flex gap-4 group cursor-pointer"
+                >
                   <div className={`h-4 w-4 rounded-full border-2 bg-bg-base flex items-center justify-center translate-y-0.5 transition-colors duration-200 ${
                     isActive 
                       ? "border-accent-main ring-4 ring-accent-main/10" 
                       : isPast 
                       ? "border-accent-main bg-accent-main" 
-                      : "border-border-main"
+                      : "border-border-main group-hover:border-accent-main/60"
                   }`}>
                     {isPast && <CheckCircle2 size={10} className="text-bg-base fill-accent-main" />}
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className={`text-xs font-semibold ${isActive ? "text-txt-main" : "text-txt-sub"}`}>{stg}</span>
+                    <span className={`text-xs font-semibold ${isActive ? "text-txt-main font-bold" : "text-txt-sub"}`}>{stg}</span>
                     <span className="text-[10px] text-txt-muted font-mono">{stageDeadlines[idx]}</span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -1450,9 +1472,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   >
                     {member.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <img 
+                        src={member.avatarUrl} 
+                        alt={member.name} 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => { 
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }} 
+                      />
                     ) : (
-                      member.name.charAt(0)
+                      <span className="font-mono text-[8px] font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
                     )}
                   </div>
                 ))}
@@ -1617,14 +1646,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         {/* ================= COLUMN 3: ARTIFACT DECK & VERIFICATIONS (3 Columns) ================= */}
         <section className="lg:col-span-3 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
           
-          {/* Tab Navigation Header */}
-          <div className="flex border-b border-border-main/50 pb-2.5 gap-1 overflow-x-auto font-mono text-[9px] uppercase tracking-wider">
+          {/* Tab Navigation Header - 5-column grid alignment */}
+          <div className="grid grid-cols-5 border-b border-border-main/50 pb-2.5 gap-1 font-mono text-[9px] uppercase tracking-wider text-center">
             {(["workspace", "tasks", "artifacts", "notes", "credits"] as const).map(tab => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={`px-2 py-1 rounded-sm cursor-pointer transition-colors ${
+                className={`px-1 py-1.5 rounded-sm cursor-pointer transition-colors text-center truncate ${
                   activeTab === tab 
                     ? "bg-accent-main text-bg-base font-bold" 
                     : "text-txt-muted hover:text-txt-main hover:bg-bg-card"
@@ -2134,9 +2163,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     }`}>
                       {member.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img 
+                          src={member.avatarUrl} 
+                          alt={member.name} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => { 
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }} 
+                        />
                       ) : (
-                        member.name.charAt(0)
+                        <span className="font-mono text-xs font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
                       )}
                       
                       {/* Status badge dot */}

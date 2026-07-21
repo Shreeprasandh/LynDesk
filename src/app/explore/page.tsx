@@ -59,24 +59,31 @@ export default function ExplorePage() {
       try {
         setLoading(true);
         
-        // 1. Fetch profiles from database with Joined Institute Name
-        const { data: profiles, error } = await supabase
+        // 1. Fetch profiles from database with Joined Institute Name (excluding logged in user)
+        let query = supabase
           .from("profiles")
-          .select("*, institutes(name)")
-          .limit(20);
+          .select("*, institutes(name)");
+
+        if (user?.id) {
+          query = query.neq("id", user.id);
+        }
+
+        const { data: profiles, error } = await query.limit(20);
 
         if (!error && profiles) {
-          const formatted: ProfileItem[] = profiles.map((p: any) => ({
-            id: p.id,
-            full_name: p.full_name || "Student Engineer",
-            username: p.username || "student",
-            avatar_url: p.avatar_url || "",
-            skills: p.skills || (p.department?.toLowerCase().includes("design") ? "Figma, React, Tailwind, UI/UX" : "React, Next.js, TypeScript, Node.js"),
-            bio: p.bio || "Building clean codebases and minimal interfaces. Open to hackathons.",
-            college_name: p.institutes?.name || p.college_name || "Independent University",
-            department: p.department || "Computer Science",
-            isOpenToTeam: p.is_profile_public ?? true
-          }));
+          const formatted: ProfileItem[] = profiles
+            .filter((p: any) => p.id !== user?.id)
+            .map((p: any) => ({
+              id: p.id,
+              full_name: p.full_name || "Student Engineer",
+              username: p.username || "student",
+              avatar_url: p.avatar_url || "",
+              skills: p.skills || (p.department?.toLowerCase().includes("design") ? "Figma, React, Tailwind, UI/UX" : "React, Next.js, TypeScript, Node.js"),
+              bio: p.bio || "Building clean codebases and minimal interfaces. Open to hackathons.",
+              college_name: p.institutes?.name || p.college_name || "Independent University",
+              department: p.department || "Computer Science",
+              isOpenToTeam: p.is_profile_public ?? true
+            }));
           setClassmates(formatted);
         } else {
           // Fallback mock data

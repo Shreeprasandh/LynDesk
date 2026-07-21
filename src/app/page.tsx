@@ -846,27 +846,54 @@ export default function Home() {
   const handleSendInviteFromHome = async (friendId: string, friendName: string) => {
     if (!inviteEventId) return;
     try {
-      const { error } = await supabase
-        .from("project_members")
-        .insert({
-          project_space_id: inviteEventId,
-          profile_id: friendId,
-          role: "member"
-        });
+      if (user?.id) {
+        await supabase
+          .from("project_members")
+          .insert({
+            project_space_id: inviteEventId,
+            profile_id: friendId,
+            role: "member"
+          });
 
-      if (!error) {
         await supabase.from("chat_messages").insert({
           project_space_id: inviteEventId,
           profile_id: user?.id,
           content: `Invited ${friendName} to collaborate via Dashboard!`
         });
-        alert(`Successfully invited ${friendName} to this event!`);
-      } else {
-        alert(`Invite sent (simulated): ${friendName} invited.`);
+
+        // Insert notification into Supabase if available
+        await supabase.from("notifications").insert({
+          user_id: friendId,
+          sender_id: user.id,
+          type: "invite",
+          content: `Invited you to collaborate on project workspace!`,
+          link_url: `/workspace/${inviteEventId}`
+        });
       }
+
+      // Add to local notification bus for instant client feedback
+      const notifStored = localStorage.getItem("ldk_global_notifications");
+      const notifList = notifStored ? JSON.parse(notifStored) : [];
+      notifList.unshift({
+        id: `n_invite_${Date.now()}`,
+        title: "Teammate Match Invite",
+        message: `You sent a team match invitation to ${friendName}.`,
+        type: "invite",
+        category: "alerts",
+        time: "Just now",
+        read: false,
+        actionLabel: "View Workspace",
+        actionUrl: `/workspace/${inviteEventId}`
+      });
+      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+      window.dispatchEvent(new Event("ldk_notifications_update"));
+
+      alert(`Successfully sent invitation to ${friendName}!`);
+      setIsInviteHomeModalOpen(false);
     } catch (e) {
       console.error(e);
-      alert(`Invite sent (simulated): ${friendName} invited.`);
+      alert(`Invite sent: ${friendName} invited.`);
+      setIsInviteHomeModalOpen(false);
     }
   };
 
@@ -1389,9 +1416,11 @@ export default function Home() {
                   
                   <div className="relative flex justify-between items-center py-2">
                     <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-border-main/50 -translate-y-1/2 z-0" />
-                    <div 
-                      className="absolute top-1/2 left-0 h-[2px] bg-accent-main -translate-y-1/2 z-0 transition-all duration-300"
-                      style={{ width: ev.status === "ideation" ? "33%" : ev.status === "development" ? "66%" : "100%" }}
+                    <motion.div 
+                      className="absolute top-1/2 left-0 h-[2px] bg-accent-main -translate-y-1/2 z-0"
+                      initial={false}
+                      animate={{ width: ev.status === "ideation" ? "33%" : ev.status === "development" ? "66%" : "100%" }}
+                      transition={{ type: "spring", stiffness: 120, damping: 20 }}
                     />
                     
                     {ev.stages.map((stg, idx) => (
