@@ -184,6 +184,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   }, [message]);
 
+  const getBestAvatarUrl = (item: any): string => {
+    if (!item) return "";
+    if (typeof item === "string") return item;
+    
+    const direct = item.avatar_url || item.avatarUrl || item.picture || item.avatar;
+    if (direct && typeof direct === "string" && direct.trim().length > 0) {
+      return direct.trim();
+    }
+    
+    const meta = item.raw_user_meta_data || item.user_metadata;
+    if (meta) {
+      const metaAvatar = meta.avatar_url || meta.picture || meta.avatar;
+      if (metaAvatar && typeof metaAvatar === "string" && metaAvatar.trim().length > 0) {
+        return metaAvatar.trim();
+      }
+    }
+
+    const email = item.email || meta?.email;
+    if (email && typeof email === "string" && email.includes("@")) {
+      return `https://unavatar.io/${encodeURIComponent(email)}`;
+    }
+
+    return "";
+  };
+
   // Load workspace members dynamically from local storage and DB
   useEffect(() => {
     const loadMembers = async () => {
@@ -193,7 +218,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           name: user.user_metadata?.full_name || user.email?.split("@")[0] || "You",
           isOnline: true,
           isSpeaking: false,
-          avatarUrl: user.user_metadata?.avatar_url || ""
+          avatarUrl: getBestAvatarUrl(user)
         }
       ] : [];
 
@@ -216,7 +241,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           .from("project_members")
           .select(`
             role,
-            profile:profile_id ( id, username, full_name, avatar_url )
+            profile:profile_id ( * )
           `)
           .eq("project_space_id", id);
         
@@ -227,7 +252,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             return {
               id: prof.id,
               name: prof.full_name || prof.username || "Collaborator",
-              avatarUrl: prof.avatar_url || "",
+              avatarUrl: getBestAvatarUrl(prof),
               isOnline: true
             };
           }).filter(Boolean) as TeamMember[];
@@ -249,17 +274,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         try {
           const { data: profData } = await supabase
             .from("profiles")
-            .select("id, full_name, username, avatar_url")
+            .select("*")
             .in("id", allMemberIds);
 
           if (profData && profData.length > 0) {
             profData.forEach((p: any) => {
               const existing = uniqueMap.get(p.id);
               if (existing) {
+                const resolvedAvatar = getBestAvatarUrl(p);
                 uniqueMap.set(p.id, {
                   ...existing,
                   name: p.full_name || p.username || existing.name,
-                  avatarUrl: p.avatar_url || existing.avatarUrl || ""
+                  avatarUrl: resolvedAvatar || existing.avatarUrl || ""
                 });
               }
             });
