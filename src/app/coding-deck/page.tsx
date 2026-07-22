@@ -861,51 +861,51 @@ export default function CodingDeckPage() {
                         </span>
                       </div>
                     )}
-                     {/* Stats stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {/* Stats cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                       
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Solved Problems</span>
                         <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.solved ?? 0}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
                           {stats.leetcode 
                             ? `E: ${stats.leetcode.solvedEasy} | M: ${stats.leetcode.solvedMedium} | H: ${stats.leetcode.solvedHard}`
                             : "E: 0 | M: 0 | H: 0"}
                         </span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Submissions</span>
                         <span className="text-xl font-semibold text-txt-main font-display">{(stats.leetcode as any)?.totalSubmissions ?? 0}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
                           {stats.leetcode 
                             ? `E: ${(stats.leetcode as any).totalEasySubmissions ?? 0} | M: ${(stats.leetcode as any).totalMediumSubmissions ?? 0} | H: ${(stats.leetcode as any).totalHardSubmissions ?? 0}`
                             : "E: 0 | M: 0 | H: 0"}
                         </span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Acceptance Rate</span>
                         <span className="text-xl font-semibold text-txt-main font-display">
                           {((stats.leetcode as any)?.totalSubmissions 
                             ? (((stats.leetcode as any)?.acceptedSubmissions / (stats.leetcode as any)?.totalSubmissions) * 100).toFixed(1)
                             : "0.0")}%
                         </span>
-                        <span className="text-[9px] text-txt-sub font-mono">Correct solves ratio</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Correct solves ratio</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Global Rank</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Global Rank</span>
                         <span className="text-xl font-semibold text-txt-main font-display">
                           {stats.leetcode?.globalRank ? `#${stats.leetcode.globalRank.toLocaleString()}` : "N/A"}
                         </span>
-                        <span className="text-[9px] text-txt-sub font-mono">{stats.leetcode?.rank || "N/A"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">{stats.leetcode?.rank || "N/A"}</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Contest Rating</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Contest Rating</span>
                         <span className="text-xl font-semibold text-txt-main font-display">{stats.leetcode?.rating ?? "N/A"}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Active Tier</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Active Tier</span>
                       </div>
 
                     </div>

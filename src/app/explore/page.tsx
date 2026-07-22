@@ -353,21 +353,21 @@ export default function ExplorePage() {
             
             {/* 1. Teammate Board */}
             {activeTab === "teammate_board" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-8">
                 {filteredClassmates.filter(c => c.isOpenToTeam).map(c => (
-                  <div key={c.id} className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300">
+                  <div key={c.id} className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-5 rounded flex flex-col gap-3.5 hover:border-border-main/80 transition-colors">
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full border border-border-main bg-bg-card flex items-center justify-center font-mono text-sm font-bold text-txt-main select-none">
+                        <div className="w-9 h-9 rounded-full border border-border-main/60 bg-bg-base flex items-center justify-center font-mono text-xs font-bold text-txt-main select-none">
                           {c.full_name.charAt(0)}
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs text-txt-main font-semibold truncate">{c.full_name}</span>
-                          <span className="text-[9px] text-txt-muted font-mono">@{c.username} • {c.college_name}</span>
+                          <span className="text-[9px] text-txt-muted font-mono tracking-tight">@{c.username} • {c.college_name}</span>
                         </div>
                       </div>
 
-                      <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/40 px-2 py-0.5 rounded uppercase">
+                      <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-semibold">
                         Available
                       </span>
                     </div>
@@ -378,21 +378,21 @@ export default function ExplorePage() {
 
                     <div className="flex flex-wrap gap-1.5">
                       {c.skills.split(",").map((s, idx) => (
-                        <span key={idx} className="text-[8px] font-mono text-txt-muted border border-border-main/80 px-2 py-0.5 rounded bg-bg-card/50">
+                        <span key={idx} className="text-[8px] font-mono text-txt-muted border border-border-main/40 px-2 py-0.5 rounded bg-bg-base/40">
                           {s.trim()}
                         </span>
                       ))}
                     </div>
 
-                    <div className="flex gap-2 border-t border-border-main/40 pt-4 mt-2 justify-end">
+                    <div className="flex gap-2 border-t border-border-main/30 pt-3 mt-1 justify-end">
                       <button 
                         onClick={() => handleConnect(c.id)}
-                        className={`h-8 px-3 rounded-sm font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer ${
+                        className={`h-7 px-3 rounded font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer ${
                           connectionStates[c.id] === "connected"
-                            ? "bg-bg-card text-emerald-500 border border-border-main"
+                            ? "bg-bg-base text-emerald-400 border border-emerald-500/30 font-semibold"
                             : connectionStates[c.id] === "pending"
-                            ? "bg-bg-card text-txt-muted border border-border-main"
-                            : "border border-border-main/80 text-txt-main hover:bg-bg-card"
+                            ? "bg-bg-base text-txt-muted border border-border-main/50"
+                            : "border border-border-main/60 text-txt-main hover:bg-bg-base"
                         }`}
                       >
                         {connectionStates[c.id] === "connected" ? (
@@ -407,7 +407,7 @@ export default function ExplorePage() {
                       <button 
                         onClick={() => handleInviteToTeam(c.id)}
                         disabled={invitingStates[c.id]}
-                        className="h-8 px-4 bg-accent-main text-bg-base font-mono text-[9px] tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                        className="h-7 px-3.5 bg-accent-main/90 hover:bg-accent-main text-bg-base font-mono text-[9px] tracking-wider uppercase font-semibold rounded hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50"
                       >
                         {invitingStates[c.id] ? "Inviting..." : "Invite to Team"}
                       </button>
