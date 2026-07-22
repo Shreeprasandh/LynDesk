@@ -333,9 +333,19 @@ export default function Header() {
         }
       }
 
+      // Filter out duplicate invites for workspaces the user has already joined
+      const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
+      const joinedWorkspaces: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+
       const combined = [...dbNotifs, ...userLocalNotifs, ...localList];
       const uniqueSet = new Set<string>();
       const finalNotifs = combined.filter((n: any) => {
+        // If it's an invite for a workspace the user is already in, skip it
+        if (n.type === "invite" && n.actionUrl) {
+          const wsId = n.actionUrl.split("?")[0].split("/").pop();
+          if (wsId && joinedWorkspaces.includes(wsId)) return false;
+        }
+
         const idKey = n.id || `${n.title}_${n.message}`;
         const contentKey = `${n.title}_${n.message}`;
         if (uniqueSet.has(idKey) || uniqueSet.has(contentKey)) return false;
@@ -353,29 +363,44 @@ export default function Header() {
           const res = await fetch(`/api/coding-stats?platform=leetcode&username=${lcHandle}`);
           if (res.ok) {
             const data = await res.json();
-            if (data?.dailyChallenge && !data.dailyChallenge.completed) {
-              const todayStr = new Date().toISOString().split("T")[0];
-              const streakNotifId = `notif_streak_warning_${todayStr}`;
-              const title = data.dailyChallenge.title || "Daily Challenge";
-              const diff = data.dailyChallenge.difficulty || "Medium";
-              const streak = data.leetcodeStreak || 0;
+            if (data?.dailyChallenge) {
+              if (data.dailyChallenge.completed) {
+                // If today's challenge is completed, purge streak warnings!
+                setNotifications(prev => prev.filter(n => !n.title.includes("Streak at Risk") && !n.id.startsWith("notif_streak_warning_")));
+                if (typeof window !== "undefined") {
+                  const globalStored = localStorage.getItem("ldk_global_notifications");
+                  if (globalStored) {
+                    try {
+                      const parsed = JSON.parse(globalStored);
+                      const cleaned = parsed.filter((n: any) => !n.title?.includes("Streak at Risk") && !n.id?.startsWith("notif_streak_warning_"));
+                      localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+                    } catch (e) {}
+                  }
+                }
+              } else {
+                const todayStr = new Date().toISOString().split("T")[0];
+                const streakNotifId = `notif_streak_warning_${todayStr}`;
+                const title = data.dailyChallenge.title || "Daily Challenge";
+                const diff = data.dailyChallenge.difficulty || "Medium";
+                const streak = data.leetcodeStreak || 0;
 
-              const streakNotif: NotificationItem = {
-                id: streakNotifId,
-                title: "🔥 LeetCode Streak at Risk!",
-                message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
-                type: "deadline",
-                category: "alerts",
-                time: "Today",
-                read: false,
-                actionLabel: "Solve Challenge",
-                actionUrl: "/coding-deck"
-              };
+                const streakNotif: NotificationItem = {
+                  id: streakNotifId,
+                  title: "🔥 LeetCode Streak at Risk!",
+                  message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
+                  type: "deadline",
+                  category: "alerts",
+                  time: "Today",
+                  read: false,
+                  actionLabel: "Solve Challenge",
+                  actionUrl: "/coding-deck"
+                };
 
-              setNotifications(prev => {
-                if (prev.some(n => n.id === streakNotifId)) return prev;
-                return [streakNotif, ...prev];
-              });
+                setNotifications(prev => {
+                  if (prev.some(n => n.id === streakNotifId)) return prev;
+                  return [streakNotif, ...prev];
+                });
+              }
             }
           }
         } catch (e) {}
@@ -435,13 +460,30 @@ export default function Header() {
   }, [user]);
 
   const handleClearTab = () => {
-    const updated = notifications.filter(n => {
-      if (n.category !== drawerTab) return true;
-      if (n.actionLabel && !n.read) return true;
-      return false;
-    });
+    const updated = notifications.filter(n => n.category !== drawerTab);
     setNotifications(updated);
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    if (user?.id) {
+      localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
+    }
+    window.dispatchEvent(new Event("ldk_notifications_update"));
+  };
+
+  const handleDismissNotification = (id: string) => {
+    const updated = notifications.filter(n => n.id !== id);
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    if (user?.id) {
+      const userKey = `ldk_user_notifications_${user.id}`;
+      const userStored = localStorage.getItem(userKey);
+      if (userStored) {
+        try {
+          const parsed = JSON.parse(userStored);
+          const cleaned = parsed.filter((n: any) => n.id !== id);
+          localStorage.setItem(userKey, JSON.stringify(cleaned));
+        } catch (e) {}
+      }
+    }
     window.dispatchEvent(new Event("ldk_notifications_update"));
   };
 
@@ -882,7 +924,17 @@ export default function Header() {
                           }`} />
                           <h4 className="text-xs font-semibold text-txt-main">{item.title}</h4>
                         </div>
-                        <span className="text-[8px] font-mono text-txt-muted">{item.time}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-mono text-txt-muted">{item.time}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDismissNotification(item.id)}
+                            className="p-1 rounded hover:bg-bg-surface text-txt-muted hover:text-red-400 transition-colors cursor-pointer"
+                            title="Dismiss notification"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
                       </div>
 
                       <p className="text-[11px] text-txt-sub font-light leading-relaxed">
