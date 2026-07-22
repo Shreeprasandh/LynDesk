@@ -22,7 +22,8 @@ import {
   X,
   Eye,
   EyeOff,
-  RotateCw
+  RotateCw,
+  Edit2
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -122,29 +123,8 @@ interface EventItem {
   stages: string[];
 }
 
-// Mock Timelines for initial state
-const INITIAL_EVENTS: EventItem[] = [
-  {
-    id: "e1",
-    title: "MIT HackHarvard 2026",
-    deadline: "Oct 12, 2026",
-    location: "hybrid",
-    level: "global",
-    url: "https://hackharvard.org",
-    status: "development",
-    stages: ["Ideation", "Build", "Review", "Submitted"]
-  },
-  {
-    id: "e2",
-    title: "Google Developer Hackathon",
-    deadline: "Nov 02, 2026",
-    location: "online",
-    level: "national",
-    url: "https://build.google.com",
-    status: "ideation",
-    stages: ["Concept", "Prototype Selection", "Final Presentation"]
-  }
-];
+// Production empty initial state
+const INITIAL_EVENTS: EventItem[] = [];
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
@@ -179,6 +159,10 @@ export default function Home() {
   const [newEventDeadline, setNewEventDeadline] = useState("");
   const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Home Workspace Title Rename States
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [tempWorkspaceTitle, setTempWorkspaceTitle] = useState("");
 
   // Active Co-workers live list state
   const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
@@ -331,7 +315,8 @@ export default function Home() {
     const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
-        setCodingStats(JSON.parse(cached));
+        const parsed = JSON.parse(cached);
+        queueMicrotask(() => setCodingStats(parsed));
       } catch (e) {
         console.warn("Failed parsing cached stats", e);
       }
@@ -395,20 +380,39 @@ export default function Home() {
     return () => window.removeEventListener("ldk_coding_stats_update", handleStatsUpdate);
   }, [user]);
 
-  // Load events from localStorage on mount
+  // Load events and joined workspaces from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("ldk_events");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          setTimeout(() => {
-            setEvents(parsed);
-          }, 0);
-        } catch (e) {
-          console.error("Failed to parse stored events: ", e);
+      const loadLocalWorkspaces = () => {
+        const stored = localStorage.getItem("ldk_events");
+        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+        let parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
+        const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+
+        // Check if any joined workspace is missing from parsedEvents
+        joinedIds.forEach(id => {
+          if (!parsedEvents.some(e => e.id === id)) {
+            parsedEvents.unshift({
+              id,
+              title: `Shared Workspace (${id.substring(0, 8)})`,
+              deadline: "Ongoing",
+              location: "online",
+              level: "global",
+              url: `/workspace/${id}`,
+              status: "development",
+              stages: ["Ideation", "Development", "Final Submission"]
+            });
+          }
+        });
+
+        if (parsedEvents.length > 0) {
+          setEvents(parsedEvents);
         }
-      }
+      };
+
+      loadLocalWorkspaces();
+      window.addEventListener("ldk_events_update", loadLocalWorkspaces);
+      return () => window.removeEventListener("ldk_events_update", loadLocalWorkspaces);
     }
   }, []);
 
@@ -463,7 +467,7 @@ export default function Home() {
           }
 
           // Fetch database workspaces/events user is a member of
-          const { data: memberData, error: memberErr } = await supabase
+          const { data: memberData } = await supabase
             .from("project_members")
             .select(`
               project_space_id,
@@ -484,34 +488,62 @@ export default function Home() {
             `)
             .eq("profile_id", user.id);
 
-          if (!memberErr && memberData && memberData.length > 0) {
-            const dbEvents = memberData.map((m: any) => {
+          const dbEvents: EventItem[] = [];
+          if (memberData && memberData.length > 0) {
+            memberData.forEach((m: any) => {
               const space = m.project_spaces;
               const ev = space?.events;
-              return {
-                id: space?.id || m.project_space_id,
-                title: space?.project_name || ev?.title || "Project Space",
-                deadline: ev?.registration_deadline 
-                  ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) 
-                  : "TBD",
-                location: ev?.location || "online",
-                level: ev?.level || "global",
-                url: ev?.source_url || space?.github_repo || "https://lyndesk.com",
-                status: space?.status || "ideation",
-                stages: ["Ideation", "Development", "Final Submission"]
-              };
-            });
-
-            setEvents(prev => {
-              const merged = [...dbEvents];
-              prev.forEach(p => {
-                if (!merged.some(m => m.id === p.id)) {
-                  merged.push(p);
-                }
-              });
-              return merged;
+              if (space || m.project_space_id) {
+                dbEvents.push({
+                  id: space?.id || m.project_space_id,
+                  title: space?.project_name || ev?.title || "Shared Workspace",
+                  deadline: ev?.registration_deadline 
+                    ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) 
+                    : "Ongoing",
+                  location: ev?.location || "online",
+                  level: ev?.level || "global",
+                  url: ev?.source_url || space?.github_repo || `/workspace/${space?.id || m.project_space_id}`,
+                  status: space?.status || "development",
+                  stages: ["Ideation", "Development", "Final Submission"]
+                });
+              }
             });
           }
+
+          setEvents(prev => {
+            const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
+            const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+            
+            const map = new Map<string, EventItem>();
+            
+            // 1. Add prev state items
+            prev.forEach(item => { if (item && item.id) map.set(item.id, item); });
+
+            // 2. Add DB events
+            dbEvents.forEach(item => { if (item && item.id) map.set(item.id, item); });
+
+            // 3. Add joined workspace IDs from localStorage
+            joinedIds.forEach(id => {
+              if (!map.has(id)) {
+                map.set(id, {
+                  id,
+                  title: `Shared Workspace (${id.substring(0, 8)})`,
+                  deadline: "Ongoing",
+                  location: "online",
+                  level: "global",
+                  url: `/workspace/${id}`,
+                  status: "development",
+                  stages: ["Ideation", "Development", "Final Submission"]
+                });
+              }
+            });
+
+            const mergedList = Array.from(map.values());
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ldk_events", JSON.stringify(mergedList));
+            }
+            return mergedList;
+          });
         } catch (err) {
           console.error("Failed to load live active coworkers/college: ", err);
         }
@@ -519,6 +551,39 @@ export default function Home() {
       fetchCoworkersAndCollege();
     }
   }, [user]);
+
+  const handleSaveWorkspaceTitle = async (workspaceId: string) => {
+    if (!tempWorkspaceTitle || !tempWorkspaceTitle.trim()) return;
+    const cleanTitle = tempWorkspaceTitle.trim();
+    
+    setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, title: cleanTitle } : e));
+    localStorage.setItem(`ldk_workspace_name_${workspaceId}`, cleanTitle);
+    
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const idx = parsed.findIndex(e => e.id === workspaceId);
+        if (idx >= 0) {
+          parsed[idx].title = cleanTitle;
+          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+        }
+      } catch (e) {}
+    }
+
+    if (workspaceId !== "mock") {
+      try {
+        await supabase
+          .from("project_spaces")
+          .update({ project_name: cleanTitle })
+          .eq("id", workspaceId);
+      } catch (e) {
+        console.error("Failed updating workspace title in db", e);
+      }
+    }
+    
+    setEditingWorkspaceId(null);
+  };
 
   const fallbackCoworkers = [
     { name: "Alex Carter", role: "Dev", active: true },
@@ -568,12 +633,17 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) {
-      setError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Login connection error.");
       setLoading(false);
     }
   };
@@ -583,8 +653,34 @@ export default function Home() {
     setLoading(true);
     setError(null);
 
-    // Check recruiter key first
-    if (staffKey.trim().toLowerCase() === "recruit2026") {
+    try {
+      // Check recruiter key first
+      if (staffKey.trim().toLowerCase() === "recruit2026") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
+
+        if (data.user) {
+          localStorage.setItem("company_recruiter_member", JSON.stringify({ name: "Corporate Recruiter", key: "recruit2026" }));
+          try {
+            await supabase.auth.updateUser({
+              data: { company_key: "recruit2026", role: "employee" }
+            });
+          } catch (updateErr) {
+            console.error("Failed updating user metadata:", updateErr);
+          }
+          window.location.href = "/recruiter";
+          return;
+        }
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -596,53 +692,32 @@ export default function Home() {
         return;
       }
 
-      if (data.user) {
-        localStorage.setItem("company_recruiter_member", JSON.stringify({ name: "Corporate Recruiter", key: "recruit2026" }));
-        try {
-          await supabase.auth.updateUser({
-            data: { company_key: "recruit2026", role: "employee" }
-          });
-        } catch (updateErr) {
-          console.error("Failed updating user metadata:", updateErr);
-        }
-        window.location.href = "/recruiter";
+      if (!data.user) {
+        setError("Authentication failed.");
+        setLoading(false);
         return;
       }
-    }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    if (!data.user) {
-      setError("Authentication failed.");
-      setLoading(false);
-      return;
-    }
-
-    const staffList = data.user.user_metadata?.registered_staff || [];
-    if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
-      staffList.push({ name: "Main Administrator", key: "ADMIN" });
-    }
-
-    const matched = staffList.find((s: any) => s.key === staffKey.trim());
-    if (matched) {
-      localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
-      window.location.href = "/coordinator";
-    } else {
-      try {
-        await supabase.auth.signOut();
-      } catch (signOutErr) {
-        console.error("Sign out error:", signOutErr);
+      const staffList = data.user.user_metadata?.registered_staff || [];
+      if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
+        staffList.push({ name: "Main Administrator", key: "ADMIN" });
       }
-      setError("Invalid Staff Key. Access denied.");
+
+      const matched = staffList.find((s: any) => s.key === staffKey.trim());
+      if (matched) {
+        localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
+        window.location.href = "/coordinator";
+      } else {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutErr) {
+          console.error("Sign out error:", signOutErr);
+        }
+        setError("Invalid Staff Key. Access denied.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Faculty authentication connection error.");
       setLoading(false);
     }
   };
@@ -652,16 +727,21 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      setSuccessMessage("Registration successful! Check your email for verification. (If email confirmation is disabled in your Supabase Auth settings, you can sign in immediately).");
-      setPassword("");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        setSuccessMessage("Registration successful! Check your email for verification. (If email confirmation is disabled in your Supabase Auth settings, you can sign in immediately).");
+        setPassword("");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Sign up connection error.");
       setLoading(false);
     }
   };
@@ -669,14 +749,19 @@ export default function Home() {
   const handleOAuthLogin = async (provider: "google" | "github" | "discord" | "linkedin") => {
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: provider === "linkedin" ? "linkedin_oidc" : provider,
-      options: {
-        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-      },
-    });
-    if (error) {
-      setError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === "linkedin" ? "linkedin_oidc" : provider,
+        options: {
+          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "OAuth connection error.");
       setLoading(false);
     }
   };
@@ -829,50 +914,50 @@ export default function Home() {
         });
         setFriendsToInviteHome(friendsList);
       } else {
-        setFriendsToInviteHome([
-          { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter" },
-          { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen" }
-        ]);
+        setFriendsToInviteHome([]);
       }
     } catch (e) {
       console.error(e);
-      setFriendsToInviteHome([
-        { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter" },
-        { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen" }
-      ]);
+      setFriendsToInviteHome([]);
     }
   };
 
   const handleSendInviteFromHome = async (friendId: string, friendName: string) => {
     if (!inviteEventId) return;
     try {
+      const targetUrl = `/workspace/${inviteEventId}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`;
+
       if (user?.id) {
-        await supabase
-          .from("project_members")
-          .insert({
+        try {
+          await supabase
+            .from("project_members")
+            .insert({
+              project_space_id: inviteEventId,
+              profile_id: friendId,
+              role: "member"
+            });
+
+          await supabase.from("chat_messages").insert({
             project_space_id: inviteEventId,
-            profile_id: friendId,
-            role: "member"
+            profile_id: user?.id,
+            content: `Invited ${friendName} to collaborate via Dashboard!`
           });
 
-        await supabase.from("chat_messages").insert({
-          project_space_id: inviteEventId,
-          profile_id: user?.id,
-          content: `Invited ${friendName} to collaborate via Dashboard!`
-        });
-
-        await fetch("/api/notifications/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipientId: friendId,
-            senderId: user.id,
-            title: "Teammate Match Invite",
-            message: `${user.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
-            actionUrl: `/workspace/${inviteEventId}`,
-            type: "invite"
-          })
-        });
+          await fetch("/api/notifications/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipientId: friendId,
+              senderId: user.id,
+              title: "Teammate Match Invite",
+              message: `${user.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
+              actionUrl: targetUrl,
+              type: "invite"
+            })
+          });
+        } catch (e) {
+          console.error("Error in home workspace invite dispatch: ", e);
+        }
       }
 
       // Add to local notification bus for recipient
@@ -890,7 +975,7 @@ export default function Home() {
         time: "Just now",
         read: false,
         actionLabel: "Accept Invite",
-        actionUrl: `/workspace/${inviteEventId}`
+        actionUrl: targetUrl
       });
       localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
       window.dispatchEvent(new Event("ldk_notifications_update"));
@@ -1392,7 +1477,53 @@ export default function Home() {
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col gap-1 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <h3 className="font-display text-base font-semibold text-txt-main truncate">{ev.title}</h3>
+                      {editingWorkspaceId === ev.id ? (
+                        <div className="flex items-center gap-1.5 py-0.5">
+                          <input
+                            type="text"
+                            value={tempWorkspaceTitle}
+                            onChange={(e) => setTempWorkspaceTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
+                              if (e.key === "Escape") setEditingWorkspaceId(null);
+                            }}
+                            className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveWorkspaceTitle(ev.id)}
+                            className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingWorkspaceId(null)}
+                            className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group/title">
+                          <h3 className="font-display text-base font-semibold text-txt-main truncate">
+                            {localStorage.getItem(`ldk_workspace_name_${ev.id}`) || ev.title}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTempWorkspaceTitle(localStorage.getItem(`ldk_workspace_name_${ev.id}`) || ev.title);
+                              setEditingWorkspaceId(ev.id);
+                            }}
+                            className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
+                            title="Rename Workspace"
+                          >
+                            <Edit2 size={10} />
+                            <span>Rename</span>
+                          </button>
+                        </div>
+                      )}
                       <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
                         {ev.level}
                       </span>

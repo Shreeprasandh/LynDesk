@@ -330,28 +330,36 @@ function CoordinatorConsoleContent() {
 
     const updated = [...registeredStaff, { name: newStaffName.trim(), key: newStaffKey.trim() }];
     
-    // Save to Supabase User Metadata
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        registered_staff: updated
-      }
-    });
+    try {
+      // Save to Supabase User Metadata
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          registered_staff: updated
+        }
+      });
 
-    if (error) {
+      if (error) {
+        setModalMessage({
+          isOpen: true,
+          title: "Registration Failed",
+          text: "Failed to register staff: " + error.message
+        });
+      } else {
+        setRegisteredStaff(updated);
+        addAuditLog(`${currentStaff?.name || "Administrator"} registered new staff key: ${newStaffKey.trim()}`);
+        setNewStaffName("");
+        setNewStaffKey("");
+        setModalMessage({
+          isOpen: true,
+          title: "Registration Success",
+          text: `Staff member "${newStaffName}" successfully registered.`
+        });
+      }
+    } catch (err: any) {
       setModalMessage({
         isOpen: true,
         title: "Registration Failed",
-        text: "Failed to register staff: " + error.message
-      });
-    } else {
-      setRegisteredStaff(updated);
-      addAuditLog(`${currentStaff?.name || "Administrator"} registered new staff key: ${newStaffKey.trim()}`);
-      setNewStaffName("");
-      setNewStaffKey("");
-      setModalMessage({
-        isOpen: true,
-        title: "Registration Success",
-        text: `Staff member "${newStaffName}" successfully registered.`
+        text: err?.message || "An unexpected network error occurred."
       });
     }
   };
@@ -373,25 +381,33 @@ function CoordinatorConsoleContent() {
       onConfirm: async () => {
         const updated = registeredStaff.filter(s => s.key !== keyToRemove);
 
-        const { error } = await supabase.auth.updateUser({
-          data: {
-            registered_staff: updated
-          }
-        });
+        try {
+          const { error } = await supabase.auth.updateUser({
+            data: {
+              registered_staff: updated
+            }
+          });
 
-        if (error) {
+          if (error) {
+            setModalMessage({
+              isOpen: true,
+              title: "Revocation Failed",
+              text: "Failed to revoke staff key: " + error.message
+            });
+          } else {
+            setRegisteredStaff(updated);
+            addAuditLog(`${currentStaff?.name || "Administrator"} revoked staff key: ${keyToRemove}`);
+            setModalMessage({
+              isOpen: true,
+              title: "Key Revoked",
+              text: `Staff key "${keyToRemove}" has been revoked.`
+            });
+          }
+        } catch (err: any) {
           setModalMessage({
             isOpen: true,
             title: "Revocation Failed",
-            text: "Failed to update staff keys: " + error.message
-          });
-        } else {
-          setRegisteredStaff(updated);
-          addAuditLog(`${currentStaff?.name || "Administrator"} revoked staff key: ${keyToRemove}`);
-          setModalMessage({
-            isOpen: true,
-            title: "Access Revoked",
-            text: `Staff key "${keyToRemove}" has been successfully revoked.`
+            text: err?.message || "An unexpected network error occurred."
           });
         }
       }
@@ -817,19 +833,14 @@ useEffect(() => {
         }));
         setClaims(formatted);
       } else {
-          // Fallback mock claims
-          const mockClaims: CreditClaim[] = [
-            { id: "c1", student_name: "Alex Carter", student_email: "alexcarter@mit.edu", project_name: "HealthVibe Dashboard", event_title: "MIT HackHarvard 2026", repo_url: "github.com/alexcarter/healthvibe", artifact_name: "HealthVibe_Pitch_v3.pdf", points: 10, status: "pending", created_at: "Oct 13" },
-            { id: "c2", student_name: "Mira Sen", student_email: "mirasen@mit.edu", project_name: "CarbonTrace Portal", event_title: "Google Developer Hackathon", repo_url: "github.com/mirasen/carbontrace", artifact_name: "CarbonTrace_Spec_v2.pdf", points: 10, status: "pending", created_at: "Oct 12" },
-            { id: "c3", student_name: "David Chen", student_email: "dchen@mit.edu", project_name: "EduForge Vault", event_title: "TreeHacks 2026", repo_url: "github.com/dchen/eduforge", artifact_name: "EduForge_Deck_v1.pdf", points: 8, status: "approved", created_at: "Oct 08" }
-          ];
-          setClaims(mockClaims);
-        }
-      } catch (err) {
-        console.error("Claims fetch error: ", err);
-      } finally {
-        setLoading(false);
+        setClaims([]);
       }
+    } catch (err) {
+      console.error("Claims fetch error: ", err);
+      setClaims([]);
+    } finally {
+      setLoading(false);
+    }
     };
 
     fetchClaims();

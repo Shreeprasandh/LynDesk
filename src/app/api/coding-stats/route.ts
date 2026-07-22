@@ -385,10 +385,14 @@ export async function GET(request: Request) {
     }
 
     if (platform === "codeforces") {
-      // try catch error handling safeguard
-      const infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${cleanUsername}&t=${Date.now()}`, {
-        cache: "no-store"
-      });
+      let infoRes: Response;
+      try {
+        infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${cleanUsername}&t=${Date.now()}`, {
+          cache: "no-store"
+        });
+      } catch (err) {
+        return NextResponse.json({ error: "Failed to connect to Codeforces API" }, { status: 502 });
+      }
       if (!infoRes.ok) {
         return NextResponse.json({ error: "Codeforces profile not found" }, { status: 404 });
       }
@@ -452,13 +456,17 @@ export async function GET(request: Request) {
     }
 
     if (platform === "codechef") {
-      // try catch error handling safeguard
-      const response = await fetch(`https://www.codechef.com/users/${cleanUsername}?t=${Date.now()}`, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        },
-        cache: "no-store"
-      });
+      let response: Response;
+      try {
+        response = await fetch(`https://www.codechef.com/users/${cleanUsername}?t=${Date.now()}`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          },
+          cache: "no-store"
+        });
+      } catch (err) {
+        return NextResponse.json({ error: "Failed to connect to CodeChef" }, { status: 502 });
+      }
       if (!response.ok) {
         return NextResponse.json({ error: "CodeChef profile not found" }, { status: 404 });
       }

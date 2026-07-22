@@ -33,4 +33,21 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Validation**: Run `npm run lint` and `npm run build` after implementing feature changes.
 
 ## 5. Major Code Change & Permission Rule
-- **Mandatory Approval for Large Changes**: Whenever fixing issues from Mob reports or performing code refactors, if a change touches >3 files, modifies database schemas/models, restructures core architectural flows, or rewrites significant component logic, **ALWAYS present a proposed change plan and ask for explicit user permission first** before making code edits.
+- **Mandatory Approval for Large Changes**: Whenever fixing issues from Shadow reports or performing code refactors, if a change touches >3 files, modifies database schemas/models, restructures core architectural flows, or rewrites significant component logic, **ALWAYS present a proposed change plan and ask for explicit user permission first** before making code edits.
+
+## 6. The Seven Shadows Protocol
+- **Squad Identity**: The automated auditing squad is known as **The Seven Shadows**:
+  1. **Alpha** (`alpha` / Logic Auditor): Next.js 15/16 async params, unhandled promises, logic bugs.
+  2. **Beta** (`beta` / Secret Sentinel): Exposed API keys, secrets, unauthenticated leaks.
+  3. **Gamma** (`gamma` / Schema Validator): Supabase client/server contract & schema alignment.
+  4. **Delta** (`delta` / UI & A11y Inspector): Accessibility violations, ARIA attributes, missing image alt tags.
+  5. **Epsilon** (`epsilon` / Test Sentinel): API route test suite coverage.
+  6. **Zeta** (`zeta` / Performance Accelerator): Leftover debug console.logs, bundle overhead.
+  7. **Eta** (`eta` / RLS Guardian): Supabase RLS policies and DB table security.
+- **Global Reference**: Luna must always refer to the squad as **The Seven Shadows** and address members by their respective names (**Alpha**, **Beta**, **Gamma**, **Delta**, **Epsilon**, **Zeta**, **Eta**).
+- **Execution & Trigger Phrases**:
+  - **Full Squad Wake Up**: `shadows arise`, `arise shadows`, `wake up shadows`, `shadows wake up`.
+  - **Full Squad Run**: Triggered by `git commit`, `run shadows`, `shadows run`, `run the shadows`.
+  - **Individual Arise**: `arise [name]`, `[name] arise` (e.g. `arise alpha`, `beta arise`).
+  - **Individual Run**: `run [name]`, `[name] run` (e.g. `run alpha`, `beta run`).
+  - **Halt / Sleep**: `disable shadows`, `halt shadows`, `sleep shadows`, `shadows sleep`.

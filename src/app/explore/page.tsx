@@ -85,15 +85,7 @@ export default function ExplorePage() {
               isOpenToTeam: p.is_profile_public ?? true
             }));
           setClassmates(formatted);
-        } else {
-          // Fallback mock data
-          const mocks: ProfileItem[] = [
-            { id: "u1", full_name: "Alex Carter", username: "alexcarter", avatar_url: "", skills: "Rust, WebAssembly, Node.js, C++", bio: "Backend systems optimizer. Building high-throughput servers.", college_name: "Stanford University", department: "Computer Science", isOpenToTeam: true },
-            { id: "u2", full_name: "Mira Sen", username: "mirasen", avatar_url: "", skills: "Figma, React, Tailwind, UI/UX", bio: "Product designer & frontend strategist. Focused on premium minimalism.", college_name: "MIT", department: "Design", isOpenToTeam: true },
-            { id: "u3", full_name: "Nikhil Mehta", username: "nikmehta", avatar_url: "", skills: "Python, PyTorch, LangChain, FastAPI", bio: "Machine Learning researcher. Building AI agents and LLM orchestration layers.", college_name: "IIT Delhi", department: "Computer Science", isOpenToTeam: true },
-            { id: "u4", full_name: "Sophia Vance", username: "sophiav", avatar_url: "", skills: "Solidify, Go, Kubernetes, Docker", bio: "Infrastructure developer. Devops enthusiast.", college_name: "Stanford University", department: "Electrical Engineering", isOpenToTeam: false }
-          ];
-          setClassmates(mocks);
+          setClassmates([]);
         }
 
         // 2. Fetch hackathons
@@ -114,12 +106,7 @@ export default function ExplorePage() {
           }));
           setEvents(formattedEvents);
         } else {
-          const mockEvents: HackathonItem[] = [
-            { id: "ev1", title: "MIT HackHarvard 2026", deadline: "Oct 12, 2026", location: "hybrid", level: "global", url: "https://hackharvard.org", description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability." },
-            { id: "ev2", title: "Google Developer Hackathon", deadline: "Nov 02, 2026", location: "online", level: "national", url: "https://build.google.com", description: "National developer jam leveraging Google Cloud and AI agents." },
-            { id: "ev3", title: "Stanford TreeHacks 2026", deadline: "Feb 18, 2026", location: "in_person", level: "global", url: "https://treehacks.com", description: "Stanford's landmark hackathon focusing on engineering solutions for social good." }
-          ];
-          setEvents(mockEvents);
+          setEvents([]);
         }
 
       } catch (err) {
@@ -159,18 +146,37 @@ export default function ExplorePage() {
       const senderName = user?.user_metadata?.full_name || "A classmate";
       
       try {
-        await fetch("/api/notifications/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipientId: id,
-            senderId: user?.id,
-            title: "Teammate Match Invite",
-            message: `${senderName} invited you to join their project team!`,
-            actionUrl: "/workspace/e1",
-            type: "invite"
-          })
-        });
+        let userSpaceId = "e1";
+        if (user?.id) {
+          const { data: memberSpaces } = await supabase
+            .from("project_members")
+            .select("project_space_id")
+            .eq("profile_id", user.id)
+            .limit(1);
+
+          if (memberSpaces && memberSpaces.length > 0) {
+            userSpaceId = memberSpaces[0].project_space_id;
+          }
+        }
+
+        const targetUrl = `/workspace/${userSpaceId}?acceptInvite=${id}&friendName=${encodeURIComponent(name)}`;
+
+        try {
+          await fetch("/api/notifications/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipientId: id,
+              senderId: user?.id,
+              title: "Teammate Match Invite",
+              message: `${senderName} invited you to join their project team!`,
+              actionUrl: targetUrl,
+              type: "invite"
+            })
+          });
+        } catch (e) {
+          console.error("Error dispatching notification fetch: ", e);
+        }
 
         const recipientKey = `ldk_user_notifications_${id}`;
         const notifStored = localStorage.getItem(recipientKey);
@@ -186,7 +192,7 @@ export default function ExplorePage() {
           time: "Just now",
           read: false,
           actionLabel: "Accept Invite",
-          actionUrl: "/workspace/e1"
+          actionUrl: targetUrl
         });
         localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
         window.dispatchEvent(new Event("ldk_notifications_update"));

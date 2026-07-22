@@ -33,6 +33,8 @@ interface NotificationItem {
   actionLabel?: string;
   actionUrl?: string;
   role?: "student" | "faculty" | "recruiter";
+  senderId?: string;
+  recipientId?: string;
 }
 
 export default function Header() {
@@ -261,81 +263,7 @@ export default function Header() {
 
   // Initialize notifications from localStorage
   useEffect(() => {
-    const defaultNotifications: NotificationItem[] = [
-      { 
-        id: "n1", 
-        title: "Teammate Match Invite", 
-        message: "Alex Carter invited you to join the 'HealthVibe' hackathon project space.", 
-        type: "invite", 
-        category: "alerts",
-        time: "10m ago", 
-        read: false,
-        actionLabel: "Accept Invite",
-        actionUrl: "/explore",
-        role: "student"
-      },
-      { 
-        id: "n2", 
-        title: "Hackathon Deadline Nudge", 
-        message: "Registration for MIT HackHarvard closes in exactly 24 hours. Ensure your team registration is finalized.", 
-        type: "deadline", 
-        category: "alerts",
-        time: "1h ago", 
-        read: false,
-        actionLabel: "View Event Details",
-        actionUrl: "/explore",
-        role: "student"
-      },
-      { 
-        id: "n3", 
-        title: "Academic Credits Verified", 
-        message: "Prof. Davis approved your project credits request. +10 Extracurricular points added to Stanford Leaderboard.", 
-        type: "credit", 
-        category: "alerts",
-        time: "1d ago", 
-        read: true,
-        role: "student"
-      },
-      {
-        id: "n4",
-        title: "Leaderboard Update",
-        message: "MIT Computer Science department has risen to 2nd place on the regional standings board.",
-        type: "system",
-        category: "updates",
-        time: "2h ago",
-        read: false,
-        role: "student"
-      },
-      {
-        id: "n_f1",
-        title: "New Credit Applications",
-        message: "There are 3 new pending credit applications awaiting review.",
-        type: "credit",
-        category: "alerts",
-        time: "15m ago",
-        read: false,
-        role: "faculty"
-      },
-      {
-        id: "n_f2",
-        title: "System Performance",
-        message: "All background cron jobs and nudge workers are executing with nominal latency.",
-        type: "system",
-        category: "updates",
-        time: "1d ago",
-        read: true,
-        role: "faculty"
-      },
-      {
-        id: "n5",
-        title: "Platform Maintenance",
-        message: "Scheduled database migrations and maintenance will take place this Sunday at 2:00 AM EST.",
-        type: "system",
-        category: "updates",
-        time: "1d ago",
-        read: true
-      }
-    ];
+    const defaultNotifications: NotificationItem[] = [];
 
     const loadNotifications = async () => {
       const stored = localStorage.getItem("ldk_global_notifications");
@@ -489,14 +417,72 @@ export default function Header() {
   };
 
   const handleNotificationAction = (id: string, actionUrl?: string) => {
-    const updated = notifications.map(n => {
-      if (n.id === id) {
-        return { ...n, read: true, message: "Invitation accepted. Workspace link activated." };
+    const targetNotif = notifications.find(n => n.id === id);
+    const targetSenderId = targetNotif?.senderId;
+    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
+
+    if (actionUrl) {
+      try {
+        const urlParts = actionUrl.split("?");
+        const workspacePath = urlParts[0];
+        const workspaceId = workspacePath.split("/").pop();
+        if (workspaceId && workspaceId.length > 0) {
+          // Register workspace in ldk_joined_workspaces
+          const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+          const joinedList: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+          if (!joinedList.includes(workspaceId)) {
+            joinedList.push(workspaceId);
+            localStorage.setItem("ldk_joined_workspaces", JSON.stringify(joinedList));
+          }
+
+          // Save workspace card to ldk_events so dashboard renders it immediately
+          const eventsStr = localStorage.getItem("ldk_events");
+          const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
+          if (!eventsList.some(e => e.id === workspaceId)) {
+            eventsList.unshift({
+              id: workspaceId,
+              title: `Shared Workspace (${workspaceId.substring(0, 8)})`,
+              deadline: "Ongoing",
+              location: "online",
+              level: "global",
+              url: `/workspace/${workspaceId}`,
+              status: "development",
+              stages: ["Ideation", "Development", "Final Submission"]
+            });
+            localStorage.setItem("ldk_events", JSON.stringify(eventsList));
+          }
+        }
+      } catch (e) {
+        console.error("Error registering joined workspace on accept: ", e);
       }
-      return n;
-    });
+    }
+
+    // Send outcome notification back to the inviter
+    if (targetSenderId) {
+      fetch("/api/notifications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientId: targetSenderId,
+          senderId: user?.id || "guest",
+          title: "Invitation Accepted",
+          message: `🟢 ${myName} accepted your workspace invitation.`,
+          type: "system",
+          category: "updates",
+          actionUrl: actionUrl || "/explore"
+        })
+      }).catch(() => {});
+    }
+
+    // Dismiss accepted notification from drawer so it disappears
+    const updated = notifications.filter(n => n.id !== id);
     setNotifications(updated);
+    if (user) {
+      localStorage.setItem(`ldk_notifications_${user.id}`, JSON.stringify(updated));
+    }
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    window.dispatchEvent(new Event("ldk_notifications_update"));
+
     if (actionUrl) {
       router.push(actionUrl);
       setIsOpen(false);
@@ -504,13 +490,33 @@ export default function Header() {
   };
 
   const handleNotificationReject = (id: string, actionUrl?: string) => {
-    const updated = notifications.map(n => {
-      if (n.id === id) {
-        return { ...n, read: true, message: "Invitation declined." };
-      }
-      return n;
-    });
+    const targetNotif = notifications.find(n => n.id === id);
+    const targetSenderId = targetNotif?.senderId;
+    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
+
+    // Send outcome notification back to the inviter
+    if (targetSenderId) {
+      fetch("/api/notifications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientId: targetSenderId,
+          senderId: user?.id || "guest",
+          title: "Invitation Declined",
+          message: `🔴 ${myName} declined your workspace invitation.`,
+          type: "warning",
+          category: "updates",
+          actionUrl: "/explore"
+        })
+      }).catch(() => {});
+    }
+
+    // Dismiss declined notification from drawer so it disappears
+    const updated = notifications.filter(n => n.id !== id);
     setNotifications(updated);
+    if (user) {
+      localStorage.setItem(`ldk_notifications_${user.id}`, JSON.stringify(updated));
+    }
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
 
     if (actionUrl) {

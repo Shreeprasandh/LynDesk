@@ -44,61 +44,9 @@ interface Friendship {
   friend: FriendProfile;
 }
 
-// Fallback Mock Data for Demo
-const mockFriends: FriendProfile[] = [
-  {
-    id: "mock_f1",
-    username: "alex_carter",
-    full_name: "Alex Carter",
-    academic_credits: 32,
-    department: "Computer Science",
-    graduation_year: "2027",
-    college_name: "Massachusetts Institute of Technology (MIT)",
-    leetcode_username: "alex_leetcode",
-    codeforces_username: "alex_cf",
-    github_url: "https://github.com/shreeprasandh/healthvibe",
-    linkedin_url: "https://linkedin.com/in/alexcarter",
-    portfolio_url: "https://alexcarter.vercel.app"
-  },
-  {
-    id: "mock_f2",
-    username: "mira_sen",
-    full_name: "Mira Sen",
-    academic_credits: 28,
-    department: "Data Science",
-    graduation_year: "2026",
-    college_name: "Stanford University",
-    leetcode_username: "mira_codes",
-    codeforces_username: "mira_sen_cf",
-    github_url: "https://github.com/shreeprasandh/carbontrace",
-    linkedin_url: "https://linkedin.com/in/mirasen",
-    portfolio_url: "https://mirasen.dev"
-  }
-];
-
-const mockRequestsStatic: FriendProfile[] = [
-  {
-    id: "mock_r1",
-    username: "sofia_r",
-    full_name: "Sofia Rodriguez",
-    academic_credits: 15,
-    department: "AI & Robotics",
-    graduation_year: "2027",
-    college_name: "California Institute of Technology",
-    leetcode_username: "sofia_leetcode",
-    github_url: "https://github.com/sofiar",
-  },
-  {
-    id: "mock_r2",
-    username: "david_chen",
-    full_name: "David Chen",
-    academic_credits: 22,
-    department: "Electrical Engineering",
-    graduation_year: "2026",
-    college_name: "IIT Delhi",
-    codeforces_username: "dchen_cf",
-  }
-];
+// Production empty initial state
+const mockFriends: FriendProfile[] = [];
+const mockRequestsStatic: FriendProfile[] = [];
 
 export default function FriendsPage() {
   const { user } = useAuth();
@@ -296,74 +244,14 @@ export default function FriendsPage() {
         setRequestsList(requests);
         setOutgoingRequestsList(outgoing);
       } else {
-        // Fallback to mock data with local overrides applied
-        let friends: Friendship[] = mockFriends.map(f => ({
-          id: `f_mock_${f.id}`,
-          sender_id: f.id,
-          receiver_id: user.id,
-          status: "accepted" as const,
-          sender_restricted: false,
-          receiver_restricted: false,
-          friend: f
-        }));
-
-        let requests: Friendship[] = mockRequestsStatic.map((r, index) => ({
-          id: `req_${index + 1}`,
-          sender_id: r.id,
-          receiver_id: user.id,
-          status: "pending" as const,
-          sender_restricted: false,
-          receiver_restricted: false,
-          friend: r
-        }));
-
-        friends = friends.filter(f => !deletedMockIds.includes(f.id));
-        requests = requests.filter(r => !deletedMockIds.includes(r.id));
-
-        simulatedFriendships.forEach(sf => {
-          if (sf.status === "accepted") {
-            const index = friends.findIndex(f => f.friend.id === sf.friend.id);
-            if (index !== -1) {
-              friends[index] = sf;
-            } else {
-              friends.push(sf);
-            }
-          } else if (sf.status === "pending") {
-            if (sf.receiver_id === user.id) {
-              const index = requests.findIndex(r => r.friend.id === sf.friend.id);
-              if (index !== -1) {
-                requests[index] = sf;
-              } else {
-                requests.push(sf);
-              }
-            }
-          }
-        });
-
-        setFriendsList(friends);
-        setRequestsList(requests);
-        setOutgoingRequestsList(simulatedFriendships.filter(sf => sf.status === "pending" && sf.sender_id === user.id));
+        setFriendsList([]);
+        setRequestsList([]);
+        setOutgoingRequestsList([]);
       }
     } catch (e) {
       console.error("Failed to load friendships: ", e);
-      setFriendsList(mockFriends.map(f => ({
-        id: `f_mock_${f.id}`,
-        sender_id: f.id,
-        receiver_id: user.id,
-        status: "accepted",
-        sender_restricted: false,
-        receiver_restricted: false,
-        friend: f
-      })));
-      setRequestsList(mockRequestsStatic.map((r, index) => ({
-        id: `req_${index + 1}`,
-        sender_id: r.id,
-        receiver_id: user.id,
-        status: "pending" as const,
-        sender_restricted: false,
-        receiver_restricted: false,
-        friend: r
-      })));
+      setFriendsList([]);
+      setRequestsList([]);
       setOutgoingRequestsList([]);
     } finally {
       setLoadingList(false);

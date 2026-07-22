@@ -24,15 +24,23 @@ import {
   Award,
   Plus,
   X,
-  LogOut
+  LogOut,
+  AlertCircle,
+  Edit2
 } from "lucide-react";
 
 
 
-let globalIdCounter = 0;
 const getUniqueId = (prefix: string = "id") => {
-  globalIdCounter++;
-  return `${prefix}_${globalIdCounter}`;
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+};
+
+const isValidUrl = (urlStr: string): boolean => {
+  if (!urlStr || !urlStr.trim()) return false;
+  const trimmed = urlStr.trim();
+  // Valid URL pattern: requires valid domain like github.com/user/repo or https://example.com
+  const pattern = /^(https?:\/\/)?([\w-]+\.)+[a-z]{2,}(\/[\w-./?%&=#]*)?$/i;
+  return pattern.test(trimmed);
 };
 
 interface FriendProfile {
@@ -77,20 +85,23 @@ interface WorkspaceTask {
   assignee: string;
 }
 
+interface GitLanguage {
+  name: string;
+  bytes: number;
+  percentage: number;
+}
+
 const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
+
   const { id } = use(params);
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
 
   // Workspace Tasks & Milestones State
-  const [tasks, setTasks] = useState<WorkspaceTask[]>([
-    { id: "t1", title: "Setup WebRTC audio & video room connection", status: "done", priority: "high", assignee: "Alex Carter" },
-    { id: "t2", title: "Configure Supabase RLS schema policies", status: "in_progress", priority: "high", assignee: "Mira Sen" },
-    { id: "t3", title: "Design minimal dark glassmorphism dashboard UI", status: "todo", priority: "medium", assignee: "You" }
-  ]);
+  const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
 
@@ -105,8 +116,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [status, setStatus] = useState<"ideation" | "development" | "testing" | "submitted">("development");
   const [githubRepo, setGithubRepo] = useState("");
   const [liveDemo, setLiveDemo] = useState("");
+  const [gitLanguages, setGitLanguages] = useState<GitLanguage[]>([]);
 
-  // Edit Git & Host state variables
+  // Edit Workspace Name, Git & Host state variables
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState("");
   const [isEditingGit, setIsEditingGit] = useState(false);
   const [isEditingDemo, setIsEditingDemo] = useState(false);
   const [tempGit, setTempGit] = useState("");
@@ -144,6 +158,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const localStreamRef = useRef<MediaStream | null>(null);
   const userSessionIdRef = useRef(generateSessionId());
   const signalingChannelRef = useRef<any>(null);
+  const activeChannelRef = useRef<any>(null);
 
   // Guarantee WebRTC media track and peer connection cleanup on component unmount
   useEffect(() => {
@@ -158,6 +173,74 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
     };
   }, []);
+
+  // Browser BroadcastChannel for instant multi-tab sync on same origin
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const bc = new BroadcastChannel(`ldk_bus_${id}`);
+    bc.onmessage = (event) => {
+      const { type, payload } = event.data || {};
+      if (type === "chat_message" && payload) {
+        setChatMessages((prev) => {
+          if (prev.some((m) => m.id === payload.id)) return prev;
+          const updated = [...prev, payload];
+          localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+          return updated;
+        });
+      } else if (type === "member_joined" && payload) {
+        setRoomMembers((prev) => {
+          if (prev.some((m) => m.id === payload.id)) return prev;
+          return [
+            ...prev,
+            { id: payload.id, name: payload.name, avatarUrl: payload.avatarUrl || "", isOnline: true }
+          ];
+        });
+      } else if (type === "tasks_update" && Array.isArray(payload)) {
+        setTasks(payload);
+        localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(payload));
+      } else if (type === "notes_update" && typeof payload === "string") {
+        setWorkspaceNotes(payload);
+        localStorage.setItem(`ldk_workspace_notes_${id}`, payload);
+      } else if (type === "artifacts_update" && Array.isArray(payload)) {
+        setArtifacts(payload);
+        localStorage.setItem(`ldk_workspace_artifacts_${id}`, JSON.stringify(payload));
+      } else if (type === "links_update" && payload) {
+        if (payload.githubRepo) setGithubRepo(payload.githubRepo);
+        if (payload.liveDemo) setLiveDemo(payload.liveDemo);
+      } else if (type === "status_update" && typeof payload === "string") {
+        setStatus(payload as any);
+      } else if (type === "credits_update" && typeof payload === "string") {
+        setClaimStatus(payload as any);
+      } else if (type === "name_update" && typeof payload === "string") {
+        setProjectName(payload);
+      } else if (type === "call_presence" && payload) {
+        setIsCallActiveInRoom(!!payload.active);
+        if (payload.callerName) setCallCallerName(payload.callerName);
+      }
+    };
+    return () => {
+      bc.close();
+    };
+  }, [id]);
+
+  // Live Call Active State for Room
+  const [isCallActiveInRoom, setIsCallActiveInRoom] = useState(false);
+  const [callCallerName, setCallCallerName] = useState("Teammate");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedCallStr = localStorage.getItem(`ldk_active_call_${id}`);
+      if (savedCallStr) {
+        try {
+          const parsed = JSON.parse(savedCallStr);
+          if (parsed && parsed.active) {
+            setIsCallActiveInRoom(true);
+            if (parsed.callerName) setCallCallerName(parsed.callerName);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [id]);
 
   // Chat Feed State
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -230,14 +313,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const storedStr = localStorage.getItem(`ldk_workspace_members_${id}`);
       const storedList: TeamMember[] = storedStr ? JSON.parse(storedStr) : [];
 
-      // Default initial classmates for mock projects
-      const mockTeam: TeamMember[] = id === "e1" ? [
-        { id: "u2", name: "Mira Sen", isOnline: true, avatarUrl: "" },
-        { id: "u1", name: "Alex Carter", isOnline: false, avatarUrl: "" }
-      ] : id === "e2" ? [
-        { id: "u3", name: "Nikhil Mehta", isOnline: true, avatarUrl: "" }
-      ] : [];
-
       // 2. Query real database members from Supabase project_members
       let dbMembersList: TeamMember[] = [];
       try {
@@ -265,8 +340,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         console.error("Error loading project members: ", e);
       }
 
-      // Combine base, stored, mock, and DB members
-      const combined = [...baseMembers, ...storedList, ...dbMembersList, ...mockTeam];
+      // Combine base, stored, and DB members
+      const combined = [...baseMembers, ...storedList, ...dbMembersList];
       const uniqueMap = new Map<string, TeamMember>();
       combined.forEach(m => {
         if (m && m.id) uniqueMap.set(m.id, m);
@@ -329,50 +404,50 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   }, [id, workspaceTrigger]);
 
   // Handle invitation acceptance from notifications query string
+  // Handle invitation acceptance and auto-join for workspace members
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
       const searchParams = new URLSearchParams(window.location.search);
       const inviteId = searchParams.get("acceptInvite");
       const inviteName = searchParams.get("friendName") || "Teammate";
-      
-      if (inviteId) {
-        // Strip parameters from URL for clean navigation
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
+      const isAutoJoin = searchParams.has("join") || !!inviteId;
 
-        const storedKey = `ldk_workspace_members_${id}`;
-        const storedStr = localStorage.getItem(storedKey);
-        const storedList = storedStr ? JSON.parse(storedStr) : [];
+      const storedKey = `ldk_workspace_members_${id}`;
+      const storedStr = localStorage.getItem(storedKey);
+      const storedList: TeamMember[] = storedStr ? JSON.parse(storedStr) : [];
 
-        const joiningUserId = user?.id || inviteId;
-        const joiningUserName = user?.user_metadata?.full_name || decodeURIComponent(inviteName);
+      const joiningUserId = user.id;
+      const joiningUserName = user.user_metadata?.full_name || user.email?.split("@")[0] || (inviteId ? decodeURIComponent(inviteName) : "Collaborator");
+      const userAvatar = getBestAvatarUrl(user);
 
-        // Register member in database project_members table
-        if (user?.id && id !== "e1" && id !== "e2") {
-          supabase.from("project_members").upsert({
-            project_space_id: id,
-            profile_id: user.id,
-            role: "member"
-          }).then(() => {});
-        }
+      // Register member in database project_members table
+      const isUuidWorkspace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuidWorkspace) {
+        supabase.from("project_members").upsert({
+          project_space_id: id,
+          profile_id: joiningUserId,
+          role: "member"
+        }).then(() => {});
+      }
 
-        if (!storedList.some((m: any) => m.id === joiningUserId)) {
-          const newMember = {
-            id: joiningUserId,
-            name: joiningUserName,
-            role: "Collaborator",
-            isOnline: true,
-            avatarUrl: user?.user_metadata?.avatar_url || ""
-          };
-          const updated = [...storedList, newMember];
-          localStorage.setItem(storedKey, JSON.stringify(updated));
+      // Add to local room members list if missing
+      if (!storedList.some((m: any) => m.id === joiningUserId)) {
+        const newMember: TeamMember = {
+          id: joiningUserId,
+          name: joiningUserName,
+          isOnline: true,
+          avatarUrl: userAvatar
+        };
+        const updated = [...storedList, newMember];
+        localStorage.setItem(storedKey, JSON.stringify(updated));
 
-          // Update state and post bot notice in chat
+        // Update state and post bot notice in chat if accepting invite
+        if (inviteId || isAutoJoin) {
           const botNotice: ChatMsg = {
-            id: getUniqueId("sys"),
+            id: getUniqueId("sys_join"),
             sender_name: "LDK:BOT",
             sender_role: "SYSTEM",
-            content: `${joiningUserName} accepted the invite and joined the shared workspace deck.`,
+            content: `🎉 ${joiningUserName} accepted the invite and joined the shared workspace!`,
             created_at: new Date().toISOString(),
             isSystem: true
           };
@@ -388,6 +463,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setWorkspaceTrigger(prev => prev + 1);
           });
         }
+      }
+
+      if (inviteId) {
+        // Strip parameters from URL for clean navigation
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
       }
     }
   }, [user, id]);
@@ -515,36 +596,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     const fetchWorkspaceDetails = async () => {
       // Setup base/default states matching dynamic IDs
       const initialLogs: ChatMsg[] = [
-        { id: "c1", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date(Date.now() - 36000000).toISOString(), isSystem: true },
-        { id: "c2", sender_name: "Mira Sen", sender_role: "Designer", content: "I just uploaded the v1 presentation deck. Let me know if you need changes.", created_at: new Date(Date.now() - 18000000).toISOString() },
-        { id: "c3", sender_name: "Alex Carter", sender_role: "Developer", content: "Awesome, starting integration. Repo is linked.", created_at: new Date(Date.now() - 12000000).toISOString() }
+        { id: "c1", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date().toISOString(), isSystem: true }
       ];
 
-      const initialArtifacts: Artifact[] = [
-        { id: "art1", file_name: "Pitch_Deck_v1.pdf", file_url: "#", version: 1, is_active: true, uploaded_by: "Mira Sen", created_at: new Date(Date.now() - 18000000).toISOString() }
-      ];
-
-      if (id === "e1") {
-        setProjectName("HealthVibe Workspace");
-        setEventTitle("MIT HackHarvard 2026");
-        setStatus("development");
-        setGithubRepo("github.com/shreeprasandh/healthvibe");
-        setLiveDemo("healthvibe.vercel.app");
-        setTempGit("github.com/shreeprasandh/healthvibe");
-        setTempDemo("healthvibe.vercel.app");
-        setChatMessages(initialLogs);
-        setArtifacts(initialArtifacts);
-      } else if (id === "e2") {
-        setProjectName("CarbonTrace Portal");
-        setEventTitle("Google Developer Hackathon");
-        setStatus("ideation");
-        setGithubRepo("github.com/shreeprasandh/carbontrace");
-        setLiveDemo("carbontrace.dev");
-        setTempGit("github.com/shreeprasandh/carbontrace");
-        setTempDemo("carbontrace.dev");
-        setChatMessages(initialLogs);
-        setArtifacts(initialArtifacts);
-      } else {
+      const initialArtifacts: Artifact[] = [];
         // Fetch workspace details from Supabase
         try {
           const { data, error } = await supabase
@@ -566,6 +621,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (data.events) {
               setEventTitle(data.events.title);
             }
+
+            // Sync workspace to ldk_joined_workspaces and ldk_events so home dashboard renders it
+            if (typeof window !== "undefined") {
+              try {
+                const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+                const joinedList: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+                if (!joinedList.includes(id)) {
+                  joinedList.push(id);
+                  localStorage.setItem("ldk_joined_workspaces", JSON.stringify(joinedList));
+                }
+
+                const eventsStr = localStorage.getItem("ldk_events");
+                const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
+                const itemTitle = data.project_name || "Shared Workspace";
+                const existingIdx = eventsList.findIndex(e => e.id === id);
+                const updatedItem = {
+                  id,
+                  title: itemTitle,
+                  deadline: "Ongoing",
+                  location: "online",
+                  level: "global",
+                  url: `/workspace/${id}`,
+                  status: data.status || "development",
+                  stages: ["Ideation", "Development", "Final Submission"]
+                };
+                if (existingIdx >= 0) {
+                  eventsList[existingIdx] = { ...eventsList[existingIdx], ...updatedItem };
+                } else {
+                  eventsList.unshift(updatedItem);
+                }
+                localStorage.setItem("ldk_events", JSON.stringify(eventsList));
+              } catch (e) {
+                console.error("Error saving workspace to local dashboard storage: ", e);
+              }
+            }
           } else {
             // Default mock setup if not found in db
             setProjectName("Student Vault Space");
@@ -579,7 +669,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           setStatus("development");
         }
 
-        // Fetch real chat messages
+        // Fetch real chat messages and merge with persistent local storage
+        const savedChatStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_chat_messages_${id}`) : null;
+        const savedChatList: ChatMsg[] = savedChatStr ? JSON.parse(savedChatStr) : [];
+
         try {
           const { data: dbChat, error: chatError } = await supabase
             .from("chat_messages")
@@ -592,8 +685,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             .eq("project_space_id", id)
             .order("created_at", { ascending: true });
 
+          let loadedChat: ChatMsg[] = [];
           if (!chatError && dbChat && dbChat.length > 0) {
-            const loadedChat: ChatMsg[] = dbChat.map(c => {
+            loadedChat = dbChat.map(c => {
               const profile = c.profiles as any;
               let role = "Developer";
               if (profile?.college_key) role = "Faculty";
@@ -606,16 +700,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 created_at: c.created_at
               };
             });
-            setChatMessages([
-              { id: "c0", sender_name: "LDK:BOT", sender_role: "SYSTEM", content: "Workspace deck initialized successfully.", created_at: new Date(Date.now() - 36000000).toISOString(), isSystem: true },
-              ...loadedChat
-            ]);
-          } else {
-            setChatMessages(initialLogs);
           }
+
+          // Combine DB chat, saved local storage chat, current state, and initial system log
+          setChatMessages(prev => {
+            const combinedChat = [...initialLogs, ...savedChatList, ...loadedChat, ...prev];
+            const uniqueChat = new Map<string, ChatMsg>();
+            combinedChat.forEach(m => {
+              if (m && m.id) uniqueChat.set(m.id, m);
+            });
+            const mergedList = Array.from(uniqueChat.values());
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(mergedList));
+            }
+            return mergedList;
+          });
         } catch (e) {
           console.error("Failed to load chat: ", e);
-          setChatMessages(initialLogs);
+          setChatMessages(prev => {
+            const combinedChat = [...initialLogs, ...savedChatList, ...prev];
+            const uniqueChat = new Map<string, ChatMsg>();
+            combinedChat.forEach(m => {
+              if (m && m.id) uniqueChat.set(m.id, m);
+            });
+            return Array.from(uniqueChat.values());
+          });
         }
 
         // Fetch real artifacts
@@ -673,7 +782,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setClaimStatus("idle");
           }
         }
-      }
     };
 
     fetchWorkspaceDetails();
@@ -681,7 +789,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   // Real-time Chat subscription
   useEffect(() => {
-    // Subscribe to chat message inserts in Supabase for this project space
+    // Subscribe to chat message inserts & real-time member joins/chat in Supabase for this project space
     const channel = supabase
       .channel(`project_chat:${id}`)
       .on(
@@ -711,13 +819,123 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             created_at: payload.new.created_at,
           };
 
-          setChatMessages((prev) => [...prev, incomingMsg]);
+          setChatMessages((prev) => {
+            if (prev.some((m) => m.id === incomingMsg.id)) return prev;
+            const updated = [...prev, incomingMsg];
+            localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+            return updated;
+          });
         }
       )
-      .subscribe();
+      .on(
+        "broadcast",
+        { event: "chat_message" },
+        (payload) => {
+          const incoming = payload.payload;
+          if (incoming && incoming.id) {
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === incoming.id)) return prev;
+              const updated = [...prev, incoming];
+              localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "workspace_sync" },
+        (payload) => {
+          const sync = payload.payload;
+          if (!sync) return;
+          const action = sync.action;
+          const data = sync.data || sync;
+
+          if (action === "links") {
+            if (data.githubRepo) setGithubRepo(data.githubRepo);
+            if (data.liveDemo) setLiveDemo(data.liveDemo);
+          } else if (action === "tasks" && Array.isArray(data)) {
+            setTasks(data);
+            localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data));
+          } else if (action === "notes" && typeof data === "string") {
+            setWorkspaceNotes(data);
+            localStorage.setItem(`ldk_workspace_notes_${id}`, data);
+          } else if (action === "artifacts" && Array.isArray(data)) {
+            setArtifacts(data);
+            localStorage.setItem(`ldk_workspace_artifacts_${id}`, JSON.stringify(data));
+          } else if (action === "status" && typeof data === "string") {
+            setStatus(data as any);
+          } else if (action === "credits" && typeof data === "string") {
+            setClaimStatus(data as any);
+          } else if (action === "name" && data.projectName) {
+            setProjectName(data.projectName);
+          } else if (action === "call_presence" && data) {
+            setIsCallActiveInRoom(!!data.active);
+            if (data.callerName) setCallCallerName(data.callerName);
+          }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "member_joined" },
+        (payload) => {
+          const newMember = payload.payload;
+          if (newMember && newMember.id && newMember.id !== user?.id) {
+            setRoomMembers((prev) => {
+              if (prev.some((m) => m.id === newMember.id)) return prev;
+              const updated = [
+                ...prev,
+                {
+                  id: newMember.id,
+                  name: newMember.name,
+                  avatarUrl: newMember.avatarUrl || "",
+                  isOnline: true
+                }
+              ];
+              localStorage.setItem(`ldk_workspace_members_${id}`, JSON.stringify(updated));
+              return updated;
+            });
+
+            setChatMessages((prev) => {
+              const noticeId = `sys_rt_${newMember.id}`;
+              if (prev.some((m) => m.id === noticeId)) return prev;
+              const updated = [
+                ...prev,
+                {
+                  id: noticeId,
+                  sender_name: "LDK:BOT",
+                  sender_role: "SYSTEM",
+                  content: `🎉 ${newMember.name} joined the shared workspace!`,
+                  created_at: new Date().toISOString(),
+                  isSystem: true
+                }
+              ];
+              localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED" && user) {
+          const myName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Collaborator";
+          channel.send({
+            type: "broadcast",
+            event: "member_joined",
+            payload: {
+              id: user.id,
+              name: myName,
+              avatarUrl: getBestAvatarUrl(user)
+            }
+          });
+        }
+      });
+
+    activeChannelRef.current = channel;
 
     return () => {
       supabase.removeChannel(channel);
+      activeChannelRef.current = null;
     };
   }, [id, user]);
 
@@ -730,21 +948,50 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     e.preventDefault();
     if (!newMsg.trim()) return;
 
-    const myName = user?.email?.split("@")[0] || "You";
+    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
     const localMsg: ChatMsg = {
-      id: getUniqueId("local"),
+      id: getUniqueId("msg"),
       sender_name: myName,
       sender_role: "Collaborator",
       content: newMsg.trim(),
       created_at: new Date().toISOString(),
     };
 
-    // Update state locally first (optimistic)
-    setChatMessages((prev) => [...prev, localMsg]);
+    // 1. Update state locally first & save to persistent localStorage
+    setChatMessages((prev) => {
+      const updated = [...prev, localMsg];
+      localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+      return updated;
+    });
     setNewMsg("");
 
-    // Send to Supabase DB if user session exists and project is not in mocks
-    if (user && id !== "e1" && id !== "e2") {
+    // 2. Broadcast message over Supabase WebSocket channel
+    if (activeChannelRef.current) {
+      try {
+        activeChannelRef.current.send({
+          type: "broadcast",
+          event: "chat_message",
+          payload: localMsg
+        });
+      } catch (err) {
+        console.warn("WebSocket broadcast chat message error: ", err);
+      }
+    }
+
+    // 3. Broadcast message over browser BroadcastChannel for instant same-origin tab sync
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        const bc = new BroadcastChannel(`ldk_bus_${id}`);
+        bc.postMessage({ type: "chat_message", payload: localMsg });
+        bc.close();
+      } catch (err) {
+        console.warn("BroadcastChannel error: ", err);
+      }
+    }
+
+    // 4. Send to Supabase DB if user session exists and valid UUID workspace
+    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (user && isUuidSpace) {
       try {
         await supabase.from("chat_messages").insert({
           project_space_id: id,
@@ -752,27 +999,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           content: localMsg.content,
         });
       } catch (err) {
-        console.error("Failed to sync chat message: ", err);
+        console.error("Failed to sync chat message to DB: ", err);
       }
-    } else {
-      // Simulate classmate responder in mock mode
-      setTimeout(() => {
-        const responses = [
-          "Got it! I will check the commit history.",
-          "Looks solid. I will review the artifacts shortly.",
-          "Can we sync on the slide deck version?",
-          "I am running local dev test now. Everything seems compiled!"
-        ];
-        const randomResp = responses[Math.floor(Math.random() * responses.length)];
-        const systemResp: ChatMsg = {
-          id: getUniqueId("bot"),
-          sender_name: "Alex Carter",
-          sender_role: "Developer",
-          content: randomResp,
-          created_at: new Date().toISOString(),
-        };
-        setChatMessages(prev => [...prev, systemResp]);
-      }, 1500);
     }
   };
 
@@ -825,23 +1053,42 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         track.enabled = isVideoOn;
       });
 
+      // Seamlessly update video/audio tracks on active RTCRtpSenders without disconnecting call
+      if (peerConnectionRef.current) {
+        const senders = peerConnectionRef.current.getSenders();
+        const videoTrack = localStreamRef.current.getVideoTracks()[0];
+        const videoSender = senders.find(s => s.track?.kind === "video");
+        if (videoSender && videoTrack) {
+          videoSender.replaceTrack(isVideoOn ? videoTrack : null).catch(() => {});
+        }
+        const audioTrack = localStreamRef.current.getAudioTracks()[0];
+        const audioSender = senders.find(s => s.track?.kind === "audio");
+        if (audioSender && audioTrack) {
+          audioSender.replaceTrack(!isMuted ? audioTrack : null).catch(() => {});
+        }
+      }
+
       if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: "broadcast",
-          event: "media-state",
-          payload: { 
-            from: userSessionIdRef.current, 
-            isMuted, 
-            isVideoOn 
-          }
-        });
+        try {
+          signalingChannelRef.current.send({
+            type: "broadcast",
+            event: "media-state",
+            payload: { 
+              from: userSessionIdRef.current, 
+              isMuted, 
+              isVideoOn 
+            }
+          });
+        } catch (e) {}
       }
     }
   }, [isMuted, isVideoOn]);
 
   const createPeerConnection = (channel: any, peerSessionId: string) => {
     if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
+      try {
+        peerConnectionRef.current.close();
+      } catch (e) {}
     }
 
     const pc = new RTCPeerConnection({
@@ -863,20 +1110,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     pc.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         setRemoteStream(event.streams[0]);
+      } else if (event.track) {
+        const inboundStream = new MediaStream([event.track]);
+        setRemoteStream(inboundStream);
       }
     };
 
     pc.onicecandidate = (event) => {
       if (event.candidate && channel) {
-        channel.send({
-          type: "broadcast",
-          event: "ice-candidate",
-          payload: { 
-            candidate: event.candidate, 
-            from: userSessionIdRef.current,
-            target: peerSessionId
-          }
-        });
+        try {
+          channel.send({
+            type: "broadcast",
+            event: "ice-candidate",
+            payload: { 
+              candidate: event.candidate, 
+              from: userSessionIdRef.current,
+              target: peerSessionId
+            }
+          });
+        } catch (e) {}
       }
     };
 
@@ -888,7 +1140,62 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setInRoom(nextInRoom);
 
     if (nextInRoom) {
-      const myName = user?.email?.split("@")[0] || "You";
+      const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
+
+      setIsCallActiveInRoom(true);
+      setCallCallerName(myName);
+      localStorage.setItem(`ldk_active_call_${id}`, JSON.stringify({ active: true, callerName: myName }));
+
+      // Broadcast call_presence to all active workspace teammates
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "call_presence", active: true, callerName: myName }
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "call_presence", payload: { active: true, callerName: myName } });
+          bc.close();
+        } catch (e) {}
+      }
+
+      // Post system notice to chat section & broadcast to all teammates
+      const callNotice: ChatMsg = {
+        id: getUniqueId("sys_call"),
+        sender_name: "LDK:BOT",
+        sender_role: "SYSTEM",
+        content: `🔊 ${myName} joined the call.`,
+        created_at: new Date().toISOString(),
+        isSystem: true
+      };
+
+      setChatMessages(prev => {
+        const updated = [...prev, callNotice];
+        localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "chat_message",
+            payload: callNotice
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "chat_message", payload: callNotice });
+          bc.close();
+        } catch (e) {}
+      }
       
       setRoomMembers(prev => [
         ...prev,
@@ -1004,7 +1311,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (payload.from !== userSessionIdRef.current) {
             setRemoteStream(null);
             if (peerConnectionRef.current) {
-              peerConnectionRef.current.close();
+              try {
+                peerConnectionRef.current.close();
+              } catch (e) {}
               peerConnectionRef.current = null;
             }
             setRoomMembers(prev => prev.filter(m => m.id !== payload.from));
@@ -1032,15 +1341,70 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setRoomMembers(prev => prev.filter(m => m.id !== "user-session"));
       }
     } else {
+      setIsCallActiveInRoom(false);
+      localStorage.removeItem(`ldk_active_call_${id}`);
+
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "call_presence", active: false }
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "call_presence", payload: { active: false } });
+          bc.close();
+        } catch (e) {}
+      }
+
       if (signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: "broadcast",
-          event: "leave",
-          payload: { from: userSessionIdRef.current }
-        });
+        try {
+          signalingChannelRef.current.send({
+            type: "broadcast",
+            event: "leave",
+            payload: { from: userSessionIdRef.current }
+          });
+        } catch (e) {}
       }
 
       cleanUpCall();
+      const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
+      const leaveNotice: ChatMsg = {
+        id: getUniqueId("sys_leave"),
+        sender_name: "LDK:BOT",
+        sender_role: "SYSTEM",
+        content: `🔇 ${myName} left the call.`,
+        created_at: new Date().toISOString(),
+        isSystem: true
+      };
+
+      setChatMessages(prev => {
+        const updated = [...prev, leaveNotice];
+        localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+        return updated;
+      });
+
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "chat_message",
+            payload: leaveNotice
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "chat_message", payload: leaveNotice });
+          bc.close();
+        } catch (e) {}
+      }
+
       setRoomMembers(prev => prev.filter(member => member.id !== "user-session"));
       setIsMuted(false);
       setIsVideoOn(false);
@@ -1135,7 +1499,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         created_at: new Date().toISOString()
       };
 
-      return [newArtifact, ...deactivated];
+      const updated = [newArtifact, ...deactivated];
+      localStorage.setItem(`ldk_workspace_artifacts_${id}`, JSON.stringify(updated));
+
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "artifacts", data: updated }
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "artifacts_update", payload: updated });
+          bc.close();
+        } catch (e) {}
+      }
+
+      return updated;
     });
 
     // Auto-post notification message in chat
@@ -1210,12 +1594,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         };
         setChatMessages(prev => [...prev, systemNotice]);
 
-        // try catch error handling safeguard
-        await supabase.from("chat_messages").insert({
+        const { error: chatErr } = await supabase.from("chat_messages").insert({
           project_space_id: id,
           profile_id: user.id,
           content: `Submitted academic credit claim for this project space.`
         });
+        if (chatErr) {
+          console.error("Supabase claim chat insert error: ", chatErr);
+        }
+        setMessage({ text: "Academic credit claim submitted successfully!", type: "success" });
+      } else {
         console.error("Supabase claim submission error: ", error);
         setMessage({ text: "Failed to submit claim. Make sure you are registered to this project space.", type: "error" });
       }
@@ -1296,14 +1684,35 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const [gitUrlError, setGitUrlError] = useState<string | null>(null);
+  const [demoUrlError, setDemoUrlError] = useState<string | null>(null);
+
   const saveGitRepo = async () => {
-    setGithubRepo(tempGit);
+    if (!tempGit.trim() || !isValidUrl(tempGit)) {
+      setGitUrlError("⚠️ Invalid URL. Format e.g. https://github.com/username/project");
+      return;
+    }
+    setGitUrlError(null);
+    const cleanGit = tempGit.trim();
+    setGithubRepo(cleanGit);
     setIsEditingGit(false);
+
+    localStorage.setItem(`ldk_workspace_git_${id}`, cleanGit);
+    if (activeChannelRef.current) {
+      try {
+        activeChannelRef.current.send({
+          type: "broadcast",
+          event: "workspace_sync",
+          payload: { action: "links", githubRepo: cleanGit, liveDemo }
+        });
+      } catch (e) {}
+    }
+
     if (id !== "mock") {
       try {
         await supabase
           .from("project_spaces")
-          .update({ github_repo: tempGit })
+          .update({ github_repo: cleanGit })
           .eq("id", id);
       } catch (e) {
         console.error("Failed to save git repo: ", e);
@@ -1312,13 +1721,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   };
 
   const saveLiveDemo = async () => {
-    setLiveDemo(tempDemo);
+    if (!tempDemo.trim() || !isValidUrl(tempDemo)) {
+      setDemoUrlError("⚠️ Invalid URL. Format e.g. https://my-app.vercel.app");
+      return;
+    }
+    setDemoUrlError(null);
+    const cleanDemo = tempDemo.trim();
+    setLiveDemo(cleanDemo);
     setIsEditingDemo(false);
+
+    localStorage.setItem(`ldk_workspace_demo_${id}`, cleanDemo);
+    if (activeChannelRef.current) {
+      try {
+        activeChannelRef.current.send({
+          type: "broadcast",
+          event: "workspace_sync",
+          payload: { action: "links", githubRepo, liveDemo: cleanDemo }
+        });
+      } catch (e) {}
+    }
+
     if (id !== "mock") {
       try {
         await supabase
           .from("project_spaces")
-          .update({ live_demo_url: tempDemo })
+          .update({ live_demo_url: cleanDemo })
           .eq("id", id);
       } catch (e) {
         console.error("Failed to save live demo: ", e);
@@ -1326,27 +1753,93 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   };
 
+  const saveProjectName = async () => {
+    if (!tempName || !tempName.trim()) return;
+    const cleanName = tempName.trim();
+    setProjectName(cleanName);
+    setIsEditingName(false);
+
+    localStorage.setItem(`ldk_workspace_name_${id}`, cleanName);
+
+    if (typeof window !== "undefined") {
+      try {
+        const eventsStr = localStorage.getItem("ldk_events");
+        const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
+        const idx = eventsList.findIndex(e => e.id === id);
+        if (idx >= 0) {
+          eventsList[idx].title = cleanName;
+        } else {
+          eventsList.unshift({
+            id,
+            title: cleanName,
+            deadline: "Ongoing",
+            location: "online",
+            level: "global",
+            url: `/workspace/${id}`,
+            status: status || "development",
+            stages: ["Ideation", "Development", "Final Submission"]
+          });
+        }
+        localStorage.setItem("ldk_events", JSON.stringify(eventsList));
+        window.dispatchEvent(new Event("ldk_events_update"));
+      } catch (e) {}
+    }
+
+    if (activeChannelRef.current) {
+      try {
+        activeChannelRef.current.send({
+          type: "broadcast",
+          event: "workspace_sync",
+          payload: { action: "name", projectName: cleanName }
+        });
+      } catch (e) {}
+    }
+
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        const bc = new BroadcastChannel(`ldk_bus_${id}`);
+        bc.postMessage({ type: "name_update", payload: cleanName });
+        bc.close();
+      } catch (e) {}
+    }
+
+    if (id !== "mock") {
+      try {
+        await supabase
+          .from("project_spaces")
+          .update({ project_name: cleanName })
+          .eq("id", id);
+      } catch (e) {
+        console.error("Failed updating workspace name in db", e);
+      }
+    }
+  };
+
   const fetchCommits = useCallback(async () => {
+    if (!githubRepo || !githubRepo.trim()) {
+      setCommits([]);
+      return;
+    }
+
     let fetched = false;
 
-    // 1. Try GitHub public API if a custom repository link is configured
+    // Fetch live commits from GitHub public REST API
     try {
       const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
       if (githubMatch) {
         const owner = githubMatch[1];
         const repo = githubMatch[2].replace(/\.git$/, "");
-        // try catch error handling safeguard
         const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=5`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
             const parsed = data.map((item: any) => {
-              const dateObj = new Date(item.commit.author.date);
+              const dateObj = new Date(item.commit?.author?.date || item.commit?.committer?.date);
               const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
               return {
-                hash: item.sha.substring(0, 7),
-                author: item.commit.author.name || "GitHub Dev",
-                message: item.commit.message.split("\n")[0],
+                hash: item.sha ? item.sha.substring(0, 7) : "commit",
+                author: item.commit?.author?.name || item.commit?.committer?.name || "GitHub Dev",
+                message: item.commit?.message ? item.commit.message.split("\n")[0] : "Update codebase",
                 time: relative
               };
             });
@@ -1359,56 +1852,129 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       // Ignore network / rate-limit errors when fetching external GitHub API
     }
 
-    if (fetched) return;
-
-    // 2. Try local git commits API route
-    try {
-      const res = await fetch("/api/git/commits");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.commits && Array.isArray(data.commits)) {
-          setCommits(data.commits);
-          fetched = true;
-        }
-      }
-    } catch {
-      // Ignore local fetch errors
-    }
-
     if (!fetched) {
-      // 3. Fallback mock commits if offline or network unavailable
-      setCommits([
-        { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
-        { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
-        { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
-      ]);
+      setCommits([]);
     }
   }, [githubRepo]);
+
+  const fetchGitLanguages = useCallback(async () => {
+    if (!githubRepo || !githubRepo.trim()) {
+      setGitLanguages([]);
+      return;
+    }
+    const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
+    if (githubMatch) {
+      const owner = githubMatch[1];
+      const repo = githubMatch[2].replace(/\.git$/, "");
+      try {
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`);
+        if (res.ok) {
+          const data = await res.json();
+          const total = Object.values(data).reduce((acc: number, val: any) => acc + Number(val), 0) as number;
+          if (total > 0) {
+            const parsed: GitLanguage[] = Object.entries(data).map(([name, bytes]) => ({
+              name,
+              bytes: Number(bytes),
+              percentage: Number(((Number(bytes) / total) * 100).toFixed(1))
+            })).sort((a, b) => b.bytes - a.bytes);
+            setGitLanguages(parsed);
+            localStorage.setItem(`ldk_workspace_langs_${id}`, JSON.stringify(parsed));
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Failed fetching repo languages: ", e);
+      }
+    }
+    setGitLanguages([]);
+  }, [githubRepo, id]);
 
   useEffect(() => {
     setTimeout(() => {
       fetchCommits();
+      fetchGitLanguages();
     }, 0);
-    const interval = setInterval(fetchCommits, 10000);
+    const interval = setInterval(() => {
+      fetchCommits();
+      fetchGitLanguages();
+    }, 10000);
     return () => clearInterval(interval);
-  }, [fetchCommits]);
+  }, [fetchCommits, fetchGitLanguages]);
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
+    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
     const newTask: WorkspaceTask = {
       id: getUniqueId("task"),
       title: newTaskTitle.trim(),
       status: "todo",
       priority: newTaskPriority,
-      assignee: user?.user_metadata?.full_name || user?.user_metadata?.username || "You"
+      assignee: myName
     };
-    setTasks(prev => [...prev, newTask]);
+    setTasks(prev => {
+      const updated = [...prev, newTask];
+      localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(updated));
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "tasks", data: updated }
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "tasks_update", payload: updated });
+          bc.close();
+        } catch (e) {}
+      }
+      return updated;
+    });
     setNewTaskTitle("");
   };
 
   const handleUpdateTaskStatus = (taskId: string, newStatus: "todo" | "in_progress" | "done") => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
+    setTasks(prev => {
+      const target = prev.find(t => t.id === taskId);
+      if (target && newStatus === "done" && target.status !== "done") {
+        const noticeMsg: ChatMsg = {
+          id: getUniqueId("sys_task"),
+          sender_name: "LDK:BOT",
+          sender_role: "SYSTEM",
+          content: `✅ ${myName} completed task: "${target.title}"`,
+          created_at: new Date().toISOString(),
+          isSystem: true
+        };
+        setChatMessages(chatPrev => {
+          const updatedChat = [...chatPrev, noticeMsg];
+          localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updatedChat));
+          return updatedChat;
+        });
+      }
+      const updatedTasks = prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+      localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(updatedTasks));
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "tasks", data: updatedTasks }
+          });
+        } catch (e) {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "tasks_update", payload: updatedTasks });
+          bc.close();
+        } catch (e) {}
+      }
+      return updatedTasks;
+    });
   };
 
   return (
@@ -1442,9 +2008,57 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </button>
           </div>
 
-          <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
+          <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">{eventTitle}</span>
-            <h2 className="font-display text-lg font-light text-txt-main truncate">{projectName}</h2>
+            
+            {!isEditingName ? (
+              <div className="flex items-center justify-between gap-2 group">
+                <h2 className="font-display text-lg font-light text-txt-main truncate">{projectName}</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempName(projectName);
+                    setIsEditingName(true);
+                  }}
+                  className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 lg:opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-surface px-1.5 py-0.5 rounded border border-border-main/50"
+                  title="Rename Workspace"
+                >
+                  <Edit2 size={10} />
+                  <span>Rename</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5 pt-0.5">
+                <input
+                  type="text"
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveProjectName();
+                    if (e.key === "Escape") setIsEditingName(false);
+                  }}
+                  className="h-8 px-2 bg-bg-base border border-accent-main text-txt-main text-sm font-display rounded-sm focus:outline-none"
+                  placeholder="Enter workspace name..."
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(false)}
+                    className="text-[9px] font-mono text-txt-muted hover:underline uppercase cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveProjectName}
+                    className="text-[9px] font-mono text-accent-main font-bold hover:underline uppercase cursor-pointer"
+                  >
+                    Save Name
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Vertical Node Line */}
@@ -1496,33 +2110,47 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             })}
           </div>
 
-          {/* Project Specification & Tech Stack Panel */}
+          {/* Project Specification & Repository Languages Panel */}
           <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
             <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-              <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted">Project Specification</span>
+              <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted">Repository Specs</span>
               <Terminal size={11} className="text-accent-main animate-pulse" />
             </div>
             
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Tech Stack</span>
-              <div className="flex flex-wrap gap-1">
-                {["Next.js 16", "Supabase", "TailwindCSS", "Google Gemini"].map((tech) => (
-                  <span key={tech} className="text-[8px] font-mono uppercase bg-bg-base border border-border-main/50 px-1.5 py-0.5 rounded text-txt-main">
-                    {tech}
-                  </span>
-                ))}
-              </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Languages</span>
+              {gitLanguages.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {gitLanguages.map((lang) => (
+                    <div key={lang.name} className="flex flex-col gap-1 font-mono">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-txt-main font-semibold">{lang.name}</span>
+                        <span className="text-txt-muted font-bold">{lang.percentage}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-bg-base rounded-full overflow-hidden border border-border-main/40">
+                        <div className="h-full bg-accent-main rounded-full" style={{ width: `${lang.percentage}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[10px] font-mono text-txt-muted/70 italic py-1 leading-relaxed">
+                  {githubRepo ? "Fetching repository language data..." : "No Git repository linked yet. Click 'Edit' above to attach your project's GitHub URL."}
+                </span>
+              )}
             </div>
 
             <div className="flex flex-col gap-1 border-t border-border-main/30 pt-2.5">
               <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Workspace Health</span>
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
                 <span>Milestones</span>
-                <span className="text-emerald-500 font-bold">3 / 5 Complete</span>
+                <span className="text-emerald-500 font-bold">
+                  {tasks.filter(t => t.status === "done").length} / {tasks.length || 1} Complete
+                </span>
               </div>
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
                 <span>Repository</span>
-                <span className={githubRepo ? "text-emerald-500" : "text-coral font-bold text-red-500"}>
+                <span className={githubRepo ? "text-emerald-500 font-bold" : "text-red-400 font-bold"}>
                   {githubRepo ? "Connected" : "Not Linked"}
                 </span>
               </div>
@@ -1572,10 +2200,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   >
                     {member.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img 
-                        src={member.avatarUrl} 
-                        alt={member.name} 
-                        className="w-full h-full object-cover" 
+                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" 
                         onError={(e) => { 
                           (e.target as HTMLImageElement).style.display = 'none';
                         }} 
@@ -1588,6 +2213,39 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               </div>
             </div>
           </div>
+
+          {/* Visual Live Active Call Indicator Banner */}
+          {(isCallActiveInRoom || inRoom || remoteStream !== null) && (
+            <div className="bg-emerald-950/40 border-b border-emerald-500/30 px-5 py-2.5 flex items-center justify-between flex-shrink-0 animate-fade-in backdrop-blur-sm shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="flex items-end gap-0.5 h-3.5 select-none">
+                  <span className="w-1 h-3 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1 h-4 bg-emerald-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1 h-2 bg-emerald-400 rounded-full animate-bounce" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    Live Call in Progress
+                  </span>
+                  <span className="text-[9px] font-mono text-txt-sub">
+                    ({callCallerName || "Teammate"} is in the call)
+                  </span>
+                </div>
+              </div>
+
+              {!inRoom && (
+                <button
+                  type="button"
+                  onClick={handleJoinRoom}
+                  className="h-6 px-3 bg-emerald-500 hover:bg-emerald-400 text-bg-base font-mono text-[9px] font-bold uppercase tracking-wider rounded flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Video size={10} />
+                  Join Call Now
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Active room controls */}
           {inRoom && (
@@ -1619,9 +2277,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
           {/* WebRTC Video Streaming Grid */}
           {inRoom && (
-            <div className="border-b border-border-main/50 bg-bg-surface/10 p-4 flex flex-col sm:flex-row gap-4 flex-shrink-0 animate-fade-in">
+            <motion.div 
+              layout
+              className="border-b border-border-main/50 bg-bg-surface/10 p-4 flex flex-col sm:flex-row items-center justify-center gap-4 flex-shrink-0 animate-fade-in transition-all duration-300"
+            >
               {/* Local Video Frame */}
-              <div className="flex-1 aspect-video relative border border-border-main/60 bg-bg-surface rounded overflow-hidden flex items-center justify-center">
+              <motion.div 
+                layout
+                className={`aspect-video relative border border-border-main/60 bg-bg-surface rounded-sm overflow-hidden flex items-center justify-center transition-all duration-300 ${
+                  (remoteStream !== null || roomMembers.some(m => m.id !== "user-session"))
+                    ? "w-full sm:w-1/2" 
+                    : "w-full max-w-sm sm:max-w-md"
+                }`}
+              >
                 <video 
                   ref={localVideoRef} 
                   autoPlay 
@@ -1631,7 +2299,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 />
                 
                 {!isVideoOn && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/80">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/90">
                     <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/50 flex items-center justify-center font-mono font-bold text-sm text-txt-main">
                       {(user?.email?.split("@")[0] || "Y").toUpperCase().charAt(0)}
                     </div>
@@ -1644,71 +2312,95 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   <span>You {isMuted && "(Muted)"}</span>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* Remote Video Frame */}
-              <div className="flex-1 aspect-video relative border border-border-main/60 bg-bg-surface rounded overflow-hidden flex items-center justify-center">
-                <video 
-                  ref={remoteVideoRef} 
-                  autoPlay 
-                  playsInline 
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${remoteStream && remoteIsVideoOn ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
-                />
+              {/* Remote Video Frame (Rendered dynamically when teammate joins) */}
+              {(remoteStream !== null || roomMembers.some(m => m.id !== "user-session")) && (
+                <motion.div 
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.25 }}
+                  className="w-full sm:w-1/2 aspect-video relative border border-border-main/60 bg-bg-surface rounded-sm overflow-hidden flex items-center justify-center"
+                >
+                  <video 
+                    ref={remoteVideoRef} 
+                    autoPlay 
+                    playsInline 
+                    className={`w-full h-full object-cover transition-opacity duration-300 ${remoteStream && remoteIsVideoOn ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
+                  />
 
-                {(!remoteStream || !remoteIsVideoOn) && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/80">
-                    <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/50 flex items-center justify-center font-mono font-bold text-sm text-txt-main">
-                      {remoteName.toUpperCase().charAt(0)}
+                  {(!remoteStream || !remoteIsVideoOn) && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center gap-2 bg-bg-base/90">
+                      <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/50 flex items-center justify-center font-mono font-bold text-sm text-txt-main">
+                        {remoteName.toUpperCase().charAt(0)}
+                      </div>
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">
+                        {!remoteStream ? "Connecting Call..." : "Peer Camera Off"}
+                      </span>
                     </div>
-                    <span className="text-[9px] font-mono text-txt-muted uppercase">
-                      {!remoteStream ? "Awaiting peer..." : "Peer Camera Off"}
-                    </span>
-                  </div>
-                )}
+                  )}
 
-                {/* Labels overlay */}
-                <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[8px] font-mono text-white flex items-center gap-1.5 select-none">
-                  <span className={`w-1.5 h-1.5 rounded-full ${remoteStream ? "bg-emerald-500 animate-pulse" : "bg-txt-muted"}`} />
-                  <span>{remoteName} {remoteIsMuted && "(Muted)"}</span>
-                </div>
-              </div>
-            </div>
+                  {/* Labels overlay */}
+                  <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[8px] font-mono text-white flex items-center gap-1.5 select-none">
+                    <span className={`w-1.5 h-1.5 rounded-full ${remoteStream ? "bg-emerald-500 animate-pulse" : "bg-yellow-400"}`} />
+                    <span>{remoteName} {remoteIsMuted && "(Muted)"}</span>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
           )}
 
           {/* Main Chat Stream */}
           <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
-            {chatMessages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex flex-col max-w-[85%] ${
-                  msg.isSystem 
-                    ? "self-center text-center py-1.5" 
-                    : msg.sender_name === (user?.email?.split("@")[0] || "You") 
-                    ? "self-end items-end" 
-                    : "self-start items-start"
-                }`}
-              >
-                {msg.isSystem ? (
-                  <span className="text-[9px] font-mono tracking-widest text-txt-muted bg-bg-surface/50 border border-border-main/60 px-2.5 py-0.5 rounded uppercase">
-                    {msg.content}
-                  </span>
-                ) : (
-                  <>
-                    <div className="flex items-baseline gap-2 mb-1 px-1">
-                      <span className="text-[10px] font-mono font-semibold text-txt-main">{msg.sender_name}</span>
-                      <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">{msg.sender_role}</span>
-                    </div>
-                    <div className={`p-3 rounded-md text-xs leading-relaxed ${
-                      msg.sender_name === (user?.email?.split("@")[0] || "You") 
-                        ? "bg-accent-main text-bg-base rounded-tr-none font-normal" 
-                        : "bg-bg-surface border border-border-main/70 text-txt-main rounded-tl-none font-light"
-                    }`}>
+            {chatMessages.map((msg) => {
+              const myFullName = user?.user_metadata?.full_name;
+              const myEmailPrefix = user?.email?.split("@")[0];
+              const isMe = !msg.isSystem && (
+                msg.sender_name === "You" ||
+                (myFullName && msg.sender_name === myFullName) ||
+                (myEmailPrefix && msg.sender_name === myEmailPrefix) ||
+                (user?.id && (msg as any).profile_id === user.id)
+              );
+
+              return (
+                <div 
+                  key={msg.id} 
+                  className={`flex flex-col max-w-[85%] ${
+                    msg.isSystem 
+                      ? "self-center text-center py-1.5" 
+                      : isMe 
+                      ? "self-end items-end" 
+                      : "self-start items-start"
+                  }`}
+                >
+                  {msg.isSystem ? (
+                    <span className="text-[8px] font-mono text-txt-muted/70 bg-bg-surface/30 border border-border-main/30 px-2 py-0.5 rounded-full opacity-60 hover:opacity-100 transition-opacity select-none my-0.5">
                       {msg.content}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                    </span>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-2 mb-1 px-1">
+                        <span className={`text-[10px] font-mono font-semibold ${isMe ? "text-accent-main" : "text-txt-main"}`}>
+                          {isMe ? "You" : msg.sender_name}
+                        </span>
+                        {msg.sender_role && msg.sender_role !== "Collaborator" && msg.sender_role !== "Developer" && (
+                          <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">{msg.sender_role}</span>
+                        )}
+                      </div>
+                      <div className={`p-3 rounded-md text-xs leading-relaxed ${
+                        isMe 
+                          ? "bg-accent-main text-bg-base rounded-tr-none font-normal shadow-sm" 
+                          : "bg-bg-surface border border-border-main/70 text-txt-main rounded-tl-none font-light"
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
             <div ref={chatEndRef} />
           </div>
 
@@ -1825,12 +2517,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       type="text"
                       placeholder="github.com/username/project"
                       value={tempGit}
-                      onChange={(e) => setTempGit(e.target.value)}
+                      onChange={(e) => {
+                        setTempGit(e.target.value);
+                        if (gitUrlError) setGitUrlError(null);
+                      }}
                       className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveGitRepo();
                       }}
                     />
+                    {gitUrlError && (
+                      <span className="text-[10px] font-mono text-red-400/80 bg-red-950/20 border border-red-500/20 px-2 py-0.5 rounded flex items-center gap-1.5 select-none">
+                        <AlertCircle size={10} className="text-red-400/70 shrink-0" />
+                        {gitUrlError}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -1889,12 +2590,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       type="text"
                       placeholder="project-demo.vercel.app"
                       value={tempDemo}
-                      onChange={(e) => setTempDemo(e.target.value)}
+                      onChange={(e) => {
+                        setTempDemo(e.target.value);
+                        if (demoUrlError) setDemoUrlError(null);
+                      }}
                       className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveLiveDemo();
                       }}
                     />
+                    {demoUrlError && (
+                      <span className="text-[10px] font-mono text-red-400/80 bg-red-950/20 border border-red-500/20 px-2 py-0.5 rounded flex items-center gap-1.5 select-none">
+                        <AlertCircle size={10} className="text-red-400/70 shrink-0" />
+                        {demoUrlError}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -1906,16 +2616,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   <Clock size={11} className="text-txt-main animate-pulse" />
                 </div>
                 <div className="flex flex-col gap-3">
-                  {commits.map((c, idx) => (
-                    <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
-                      <div className="flex justify-between items-center text-txt-main font-semibold">
-                        <span className="text-txt-muted font-normal">[{c.hash}]</span>
-                        <span>{c.author}</span>
+                  {commits.length > 0 ? (
+                    commits.map((c, idx) => (
+                      <div key={idx} className="flex flex-col gap-0.5 font-mono text-[10px]">
+                        <div className="flex justify-between items-center text-txt-main font-semibold">
+                          <span className="text-txt-muted font-normal">[{c.hash}]</span>
+                          <span>{c.author}</span>
+                        </div>
+                        <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
+                        <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
                       </div>
-                      <p className="text-[9px] text-txt-sub leading-normal truncate">{c.message}</p>
-                      <span className="text-[8px] text-txt-muted self-end mt-0.5">{c.time}</span>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <span className="text-[10px] font-mono text-txt-muted/70 italic py-1 leading-relaxed">
+                      {githubRepo ? "No public commit history found for this repository." : "No Git repository linked yet. Click 'Edit' above to attach your project's GitHub URL."}
+                    </span>
+                  )}
                 </div>
               </div>
             </>
@@ -2086,7 +2802,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <textarea
                 rows={16}
                 value={workspaceNotes}
-                onChange={(e) => setWorkspaceNotes(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWorkspaceNotes(val);
+                  localStorage.setItem(`ldk_workspace_notes_${id}`, val);
+                  if (activeChannelRef.current) {
+                    try {
+                      activeChannelRef.current.send({
+                        type: "broadcast",
+                        event: "workspace_sync",
+                        payload: { action: "notes", data: val }
+                      });
+                    } catch (err) {}
+                  }
+                  if (typeof BroadcastChannel !== "undefined") {
+                    try {
+                      const bc = new BroadcastChannel(`ldk_bus_${id}`);
+                      bc.postMessage({ type: "notes_update", payload: val });
+                      bc.close();
+                    } catch (err) {}
+                  }
+                }}
                 placeholder="Write team notes, API specs, architectural decisions..."
                 className="w-full p-3 bg-bg-surface border border-border-main/70 rounded-sm text-xs font-mono text-txt-main focus:outline-none focus:border-txt-main leading-relaxed"
               />
@@ -2259,10 +2995,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     }`}>
                       {member.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img 
-                          src={member.avatarUrl} 
-                          alt={member.name} 
-                          className="w-full h-full object-cover" 
+                        <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" 
                           onError={(e) => { 
                             (e.target as HTMLImageElement).style.display = 'none';
                           }} 
