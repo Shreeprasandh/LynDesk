@@ -2282,24 +2282,24 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           </div>
 
           {/* Project Specification & Repository Languages Panel */}
-          <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
-              <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted">Repository Specs</span>
-              <Terminal size={11} className="text-accent-main animate-pulse" />
+          <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-4 rounded-sm flex flex-col gap-3 mt-auto">
+            <div className="flex items-center justify-between border-b border-border-main/30 pb-2">
+              <span className="font-mono text-[9px] tracking-widest uppercase text-txt-muted font-semibold">Repository Specs</span>
+              <Terminal size={11} className="text-accent-main/80" />
             </div>
             
             <div className="flex flex-col gap-2">
-              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Languages</span>
+              <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Language Breakdown</span>
               {gitLanguages.length > 0 ? (
                 <div className="flex flex-col gap-2">
                   {gitLanguages.map((lang) => (
                     <div key={lang.name} className="flex flex-col gap-1 font-mono">
                       <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-txt-main font-semibold">{lang.name}</span>
-                        <span className="text-txt-muted font-bold">{lang.percentage}%</span>
+                        <span className="text-txt-main font-medium">{lang.name}</span>
+                        <span className="text-txt-muted font-semibold">{lang.percentage}%</span>
                       </div>
-                      <div className="w-full h-1.5 bg-bg-base rounded-full overflow-hidden border border-border-main/40">
-                        <div className="h-full bg-accent-main rounded-full" style={{ width: `${lang.percentage}%` }} />
+                      <div className="w-full h-1 bg-bg-base rounded-full overflow-hidden border border-border-main/30">
+                        <div className="h-full bg-accent-main/90 rounded-full transition-all duration-500" style={{ width: `${lang.percentage}%` }} />
                       </div>
                     </div>
                   ))}
@@ -2311,18 +2311,24 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               )}
             </div>
 
-            <div className="flex flex-col gap-1 border-t border-border-main/30 pt-2.5">
-              <span className="text-[9px] font-mono text-txt-muted uppercase font-bold">Workspace Health</span>
+            <div className="flex flex-col gap-1.5 border-t border-border-main/30 pt-2.5">
+              <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Workspace Health</span>
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
                 <span>Milestones</span>
-                <span className="text-emerald-500 font-bold">
+                <span className="text-emerald-400 font-semibold">
                   {tasks.filter(t => t.status === "done").length} / {tasks.length || 1} Complete
                 </span>
               </div>
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
                 <span>Repository</span>
-                <span className={githubRepo ? "text-emerald-500 font-bold" : "text-red-400 font-bold"}>
-                  {githubRepo ? "Connected" : "Not Linked"}
+                <span className={githubRepo ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                  {githubRepo ? "Connected" : "Unlinked"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
+                <span>Live Demo</span>
+                <span className={liveDemo ? "text-accent-main font-semibold" : "text-txt-muted"}>
+                  {liveDemo ? "Active" : "Pending"}
                 </span>
               </div>
             </div>
