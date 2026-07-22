@@ -386,7 +386,7 @@ export default function Home() {
       const loadLocalWorkspaces = () => {
         const stored = localStorage.getItem("ldk_events");
         const joinedStr = localStorage.getItem("ldk_joined_workspaces");
-        let parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
+        const parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
 
         // Check if any joined workspace is missing from parsedEvents
@@ -964,8 +964,9 @@ export default function Home() {
       const recipientKey = `ldk_user_notifications_${friendId}`;
       const notifStored = localStorage.getItem(recipientKey);
       const notifList = notifStored ? JSON.parse(notifStored) : [];
+      const uniqueNotifId = typeof crypto !== "undefined" && crypto.randomUUID ? `n_invite_${crypto.randomUUID()}` : `n_invite_${friendId}_${notifList.length + 1}`;
       notifList.unshift({
-        id: `n_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        id: uniqueNotifId,
         recipientId: friendId,
         senderId: user?.id,
         title: "Teammate Match Invite",

@@ -23,13 +23,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const resolveRole = (u: User | null): UserRole => {
+    const metaRole = u?.user_metadata?.role;
+    if (metaRole === "recruiter" || metaRole === "employee" || u?.user_metadata?.company_key) return "recruiter";
+    if (metaRole === "coordinator" || metaRole === "faculty" || u?.user_metadata?.registered_staff) return "coordinator";
+
     if (typeof window !== "undefined") {
-      if (localStorage.getItem("company_recruiter_member") === "true") return "recruiter";
-      if (localStorage.getItem("faculty_staff_member") === "true") return "coordinator";
+      const rec = localStorage.getItem("company_recruiter_member");
+      if (rec && rec !== "false") return "recruiter";
+      const fac = localStorage.getItem("faculty_staff_member");
+      if (fac && fac !== "false") return "coordinator";
     }
-    const r = u?.user_metadata?.role;
-    if (r === "recruiter") return "recruiter";
-    if (r === "coordinator" || r === "faculty") return "coordinator";
     return "student";
   };
 

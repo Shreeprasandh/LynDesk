@@ -39,7 +39,7 @@ interface NotificationItem {
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { user, loading, signOut } = useAuth();
+  const { user, userRole, loading, signOut } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -52,15 +52,9 @@ export default function Header() {
   const router = useRouter();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isStaff = !!localStorage.getItem("faculty_staff_member");
-      const isRec = !!localStorage.getItem("company_recruiter_member") || (user && (user.user_metadata?.role === "employee" || !!user.user_metadata?.company_key));
-      setTimeout(() => {
-        setIsFaculty(isStaff);
-        setIsRecruiter(!!isRec);
-      }, 0);
-    }
-  }, [user, pathname]);
+    setIsFaculty(userRole === "coordinator");
+    setIsRecruiter(userRole === "recruiter");
+  }, [userRole, pathname]);
 
   // Global authentication route guard: redirects unauthorized sessions immediately to landing page
   useEffect(() => {
@@ -72,9 +66,9 @@ export default function Header() {
   }, [user, loading, pathname, router]);
 
   // Derived state for notifications based on the current user's role
-  const userRole = isFaculty ? "faculty" : isRecruiter ? "recruiter" : "student";
+  const activeNotifRole = isFaculty ? "faculty" : isRecruiter ? "recruiter" : "student";
   const filteredNotifications = notifications.filter(n => {
-    if (n.role && n.role !== userRole) return false;
+    if (n.role && n.role !== activeNotifRole) return false;
     return true;
   });
 

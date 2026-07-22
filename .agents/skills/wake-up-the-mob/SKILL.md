@@ -7,31 +7,22 @@ description: Magic setup command. Manages The Seven Shadows - an automated squad
 
 This skill manages **The Seven Shadows** - an automated squad of 7 specialized READ-ONLY AI auditors.
 
-## 🔮 Flexible Magic Wake-Up Phrases
-Saying **ANY** of these phrases will wake up/arise The Seven Shadows and remove any pause flag:
-- `shadows arise` / `arise shadows`
-- `wake up shadows` / `shadows wake up`
-- `wake up mob` / `wakeup mob`
+## 🔮 Flexible Magic Wake-Up Phrases (Enable / Unpause)
+Saying **ANY** of these phrases will wake up/enable The Seven Shadows and remove any pause flag:
+- **Full Squad Wake Up**: `wake up shadows` / `shadows wake up` / `wake up mob`
+- **Individual Shadow Wake Up**: `wake up [name]` / `[name] wake up` (e.g. `wake up alpha`, `beta wake up`)
 
-### 👤 Individual Shadow Arise Phrases
-- **Alpha**: `arise alpha` / `alpha arise`
-- **Beta**: `arise beta` / `beta arise`
-- **Gamma**: `arise gamma` / `gamma arise`
-- **Delta**: `arise delta` / `delta arise`
-- **Epsilon**: `arise epsilon` / `epsilon arise`
-- **Zeta**: `arise zeta` / `zeta arise`
-- **Eta**: `arise eta` / `eta arise`
-
-## 🏃 Run Commands
-- **Full Squad Run**: `git commit` (pre-commit trigger), `run shadows`, `shadows run`, `run the shadows`, `run mob`.
+## 🏃 Audit Execution & Arise Commands (Run Audit)
+Saying **ANY** of these phrases will trigger an immediate audit run:
+- **Full Squad Run**: `arise shadows` / `shadows arise`, `git commit` (pre-commit trigger), `run shadows` / `shadows run`.
 - **Individual Shadow Run**:
-  - `run alpha` / `alpha run` (Logic Auditor)
-  - `run beta` / `beta run` (Secret Sentinel)
-  - `run gamma` / `gamma run` (Schema Validator)
-  - `run delta` / `delta run` (UI & A11y Inspector)
-  - `run epsilon` / `epsilon run` (Test Sentinel)
-  - `run zeta` / `zeta run` (Performance Accelerator)
-  - `run eta` / `eta run` (RLS & DB Security Guardian)
+  - `arise alpha` / `alpha arise` / `run alpha` / `alpha run` (Logic Auditor)
+  - `arise beta` / `beta arise` / `run beta` / `beta run` (Secret Sentinel)
+  - `arise gamma` / `gamma arise` / `run gamma` / `gamma run` (Schema Validator)
+  - `arise delta` / `delta arise` / `run delta` / `delta run` (UI & A11y Inspector)
+  - `arise epsilon` / `epsilon arise` / `run epsilon` / `epsilon run` (Test Sentinel)
+  - `arise zeta` / `zeta arise` / `run zeta` / `zeta run` (Performance Accelerator)
+  - `arise eta` / `eta arise` / `run eta` / `eta run` (RLS & DB Security Guardian)
 
 ## ⏸️ Disable / Halt Phrases
 Saying **ANY** of these phrases will pause auditing until re-awakened:

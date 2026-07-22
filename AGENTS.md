@@ -46,8 +46,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
   7. **Eta** (`eta` / RLS Guardian): Supabase RLS policies and DB table security.
 - **Global Reference**: Luna must always refer to the squad as **The Seven Shadows** and address members by their respective names (**Alpha**, **Beta**, **Gamma**, **Delta**, **Epsilon**, **Zeta**, **Eta**).
 - **Execution & Trigger Phrases**:
-  - **Full Squad Wake Up**: `shadows arise`, `arise shadows`, `wake up shadows`, `shadows wake up`.
-  - **Full Squad Run**: Triggered by `git commit`, `run shadows`, `shadows run`, `run the shadows`.
-  - **Individual Arise**: `arise [name]`, `[name] arise` (e.g. `arise alpha`, `beta arise`).
-  - **Individual Run**: `run [name]`, `[name] run` (e.g. `run alpha`, `beta run`).
+  - **Wake Up / Unpause (Full Squad)**: `wake up shadows`, `shadows wake up`.
+  - **Wake Up / Unpause (Individual)**: `wake up [name]`, `[name] wake up` (e.g. `wake up alpha`, `beta wake up`).
+  - **Audit Execution / Run (Full Squad)**: `arise shadows`, `shadows arise` (or `git commit`, `run shadows`, `shadows run`).
+  - **Audit Execution / Run (Individual)**: `arise [name]`, `[name] arise` (or `run [name]`, `[name] run`) (e.g. `arise alpha`, `beta arise`).
   - **Halt / Sleep**: `disable shadows`, `halt shadows`, `sleep shadows`, `shadows sleep`.

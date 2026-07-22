@@ -21,7 +21,7 @@ function runSevenShadows() {
 
   // Check if The Seven Shadows are currently asleep/halted
   if (fs.existsSync(disabledFlagPath)) {
-    console.log('⚡ [THE SEVEN SHADOWS ARE ASLEEP] Auditing is currently disabled. Say "shadows arise" or "arise shadows" to re-enable.\n');
+    console.log('⚡ [THE SEVEN SHADOWS ARE ASLEEP] Auditing is currently disabled. Say "wake up shadows" or "shadows wake up" to re-enable.\n');
     return;
   }
 

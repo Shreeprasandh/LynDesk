@@ -174,6 +174,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
   }, []);
 
+  // Live Call Active State for Room
+  const [isCallActiveInRoom, setIsCallActiveInRoom] = useState(false);
+  const [callCallerName, setCallCallerName] = useState("Teammate");
+
+  // Chat Feed State
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [newMsg, setNewMsg] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Artifacts State
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Claim Academic Credits State
+  const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
+  const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
+
+  // Invite Classmates Modal States
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+
   // Browser BroadcastChannel for instant multi-tab sync on same origin
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
@@ -223,12 +244,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
   }, [id]);
 
-  // Live Call Active State for Room
-  const [isCallActiveInRoom, setIsCallActiveInRoom] = useState(false);
-  const [callCallerName, setCallCallerName] = useState("Teammate");
-
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
       const savedCallStr = localStorage.getItem(`ldk_active_call_${id}`);
       if (savedCallStr) {
         try {
@@ -241,23 +258,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
     }
   }, [id]);
-
-  // Chat Feed State
-  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
-  const [newMsg, setNewMsg] = useState("");
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Artifacts State
-  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Claim Academic Credits State
-  const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
-  const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
-
-  // Invite Classmates Modal States
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [friendsToInvite, setFriendsToInvite] = useState<FriendProfile[]>([]);
   const [invitingFriendId, setInvitingFriendId] = useState<string | null>(null);
@@ -1644,8 +1644,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       );
 
       if (!alreadyInvited) {
+        const uniqueInviteId = typeof crypto !== "undefined" && crypto.randomUUID ? `n_invite_${crypto.randomUUID()}` : `n_invite_${friendId}_${notifList.length + 1}`;
         notifList.unshift({
-          id: `n_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          id: uniqueInviteId,
           recipientId: friendId,
           senderId: user?.id,
           title: "Workspace Invite",
