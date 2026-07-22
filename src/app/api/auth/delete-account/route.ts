@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     if (!supabaseAdmin) {
       if (action === "request") {
         const fallbackCode = "123456";
-        console.log(`\n===============================================\n[DELETE ACCOUNT OTP CODE (FALLBACK)]: ${fallbackCode}\n===============================================\n`);
+        // console.log(`[DELETE ACCOUNT OTP CODE (FALLBACK)]: ${fallbackCode}`);
         
         // Try to send email anyway if SMTP is configured
         const emailSent = await sendOtpEmail("shreecode.service@gmail.com", fallbackCode);
@@ -109,8 +109,7 @@ export async function POST(request: Request) {
     if (action === "request") {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Print OTP code directly to terminal console for local testing
-      console.log(`\n===============================================\n[DELETE ACCOUNT OTP CODE for ${user.email}]: ${code}\n===============================================\n`);
+      // console.log(`[DELETE ACCOUNT OTP CODE for ${user.email}]: ${code}`);
 
       // Store verification code in user metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {

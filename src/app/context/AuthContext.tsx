@@ -43,14 +43,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       setUserRole(resolveRole(session?.user ?? null));
       setLoading(false);
+
+      if (session && typeof window !== "undefined") {
+        if (window.location.search.includes("code=") || window.location.hash.includes("access_token=")) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      }
     });
 
     // 2. Listen for authentication state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setUserRole(resolveRole(session?.user ?? null));
-      setLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        setUserRole(resolveRole(session.user));
+        setLoading(false);
+        if (typeof window !== "undefined") {
+          if (window.location.search.includes("code=") || window.location.hash.includes("access_token=")) {
+            window.history.replaceState(null, "", window.location.pathname);
+          }
+        }
+      } else if (event === "SIGNED_OUT") {
+        setSession(null);
+        setUser(null);
+        setUserRole("student");
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
     });
 
     return () => {
