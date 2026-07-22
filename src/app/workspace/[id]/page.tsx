@@ -26,7 +26,8 @@ import {
   X,
   LogOut,
   AlertCircle,
-  Edit2
+  Edit2,
+  Sparkles
 } from "lucide-react";
 
 
@@ -142,6 +143,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
+  // Event Details & Brief Modal States
+  const [showBriefModal, setShowBriefModal] = useState(false);
+  const [eventMetadata, setEventMetadata] = useState<{
+    title: string;
+    description: string;
+    organization: string;
+    prizes: string;
+    rules: string;
+    deadline: string;
+    url: string;
+  }>({
+    title: "Adobe University Hackathon 2026",
+    description: "Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.",
+    organization: "Adobe Systems & Campus Track",
+    prizes: "$15,000 Prize Pool & Internship Fast-Track Offers",
+    rules: "1. All project code must be developed during the official hackathon timeline.\n2. Teams must submit a working live demo link and public GitHub repository.\n3. Projects must adhere to academic integrity guidelines.",
+    deadline: "Nov 02, 2026",
+    url: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333"
+  });
+
   const router = useRouter();
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
 
@@ -2082,24 +2103,49 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </button>
           </div>
 
-          <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
+          <div className="flex flex-col gap-2 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">{eventTitle}</span>
             
             {!isEditingName ? (
-              <div className="flex items-center justify-between gap-2 group">
-                <h2 className="font-display text-lg font-light text-txt-main truncate">{projectName}</h2>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTempName(projectName);
-                    setIsEditingName(true);
-                  }}
-                  className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 lg:opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-surface px-1.5 py-0.5 rounded border border-border-main/50"
-                  title="Rename Workspace"
-                >
-                  <Edit2 size={10} />
-                  <span>Rename</span>
-                </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2 group">
+                  <h2 className="font-display text-lg font-light text-txt-main truncate">{projectName}</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTempName(projectName);
+                      setIsEditingName(true);
+                    }}
+                    className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 lg:opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-surface px-1.5 py-0.5 rounded border border-border-main/50"
+                    title="Rename Workspace"
+                  >
+                    <Edit2 size={10} />
+                    <span>Rename</span>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                  <a
+                    href={eventMetadata.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/70 hover:text-accent-main opacity-60 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer bg-bg-surface/80 px-2 py-0.5 rounded border border-border-main/50 w-fit"
+                    title="Open official event registration page"
+                  >
+                    <span>Visit Event Page</span>
+                    <ExternalLink size={10} />
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowBriefModal(true)}
+                    className="text-[9px] font-mono tracking-wider uppercase text-accent-main hover:underline flex items-center gap-1 cursor-pointer bg-accent-main/10 px-2 py-0.5 rounded border border-accent-main/30 w-fit font-semibold"
+                    title="View scraped rules, prize pool, and stage briefs"
+                  >
+                    <Sparkles size={10} className="text-accent-main animate-pulse" />
+                    <span>Event Brief & Rules</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col gap-1.5 pt-0.5">
@@ -2135,7 +2181,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             )}
           </div>
 
-          {/* Vertical Node Line */}
+          {/* Vertical Node Line Masterpiece */}
           <div className="relative flex flex-col gap-6 pl-4 py-2 flex-grow">
             <div className="absolute top-0 bottom-0 left-[21px] w-[1px] bg-border-main/60 z-0" />
             
@@ -2149,7 +2195,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               return (
                 <motion.div 
                   key={idx} 
-                  whileHover={{ x: 2 }}
+                  whileHover={{ x: 3 }}
                   onClick={async () => {
                     const newStatus = stgLower as "ideation" | "development" | "testing" | "submitted";
                     setStatus(newStatus);
@@ -2188,19 +2234,37 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       }
                     }
                   }}
-                  className="relative z-10 flex gap-4 group cursor-pointer"
+                  className="relative z-10 flex gap-3.5 group cursor-pointer p-1.5 rounded hover:bg-bg-surface/60 transition-colors"
                 >
-                  <div className={`h-4 w-4 rounded-full border-2 bg-bg-base flex items-center justify-center translate-y-0.5 transition-colors duration-200 ${
+                  <div className={`h-4.5 w-4.5 rounded-full border-2 bg-bg-base flex items-center justify-center translate-y-0.5 transition-all duration-300 ${
                     isActive 
-                      ? "border-accent-main ring-4 ring-accent-main/10" 
+                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-110" 
                       : isPast 
                       ? "border-accent-main bg-accent-main" 
                       : "border-border-main group-hover:border-accent-main/60"
                   }`}>
-                    {isPast && <CheckCircle2 size={10} className="text-bg-base fill-accent-main" />}
+                    {isPast ? (
+                      <CheckCircle2 size={11} className="text-bg-base fill-accent-main" />
+                    ) : isActive ? (
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent-main animate-ping" />
+                    ) : (
+                      <div className="w-1 h-1 rounded-full bg-txt-muted/40 group-hover:bg-accent-main/60" />
+                    )}
                   </div>
+
                   <div className="flex flex-col gap-0.5">
-                    <span className={`text-xs font-semibold ${isActive ? "text-txt-main font-bold" : "text-txt-sub"}`}>{stg}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-semibold ${isActive ? "text-accent-main font-bold" : "text-txt-main"}`}>{stg}</span>
+                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.2 rounded border ${
+                        isPast
+                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold"
+                          : isActive
+                          ? "bg-accent-main/20 border-accent-main/40 text-accent-main font-bold"
+                          : "bg-bg-base border-border-main/50 text-txt-muted"
+                      }`}>
+                        {isPast ? "Completed" : isActive ? "Active" : "Target"}
+                      </span>
+                    </div>
                     <span className="text-[10px] text-txt-muted font-mono">{stageDeadlines[idx]}</span>
                   </div>
                 </motion.div>
@@ -3204,6 +3268,123 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               >
                 Leave
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Event Details & Stage Briefs Custom Modal */}
+      {showBriefModal && (
+        <div className="fixed inset-0 z-[10000] overflow-hidden font-sans">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowBriefModal(false)} />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="bg-bg-surface border border-border-main/80 max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 rounded-md flex flex-col gap-6 shadow-2xl animate-fade-in text-left">
+              
+              <div className="flex justify-between items-start border-b border-border-main/40 pb-4">
+                <div className="flex flex-col gap-1">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-semibold">
+                    {eventMetadata.organization} • Official Brief
+                  </span>
+                  <h2 className="text-xl font-display font-light text-txt-main">{eventMetadata.title}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowBriefModal(false)}
+                  className="p-1 rounded hover:bg-bg-base text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Prize & Deadline Highlights */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-3.5 bg-bg-base/60 border border-emerald-500/30 rounded flex flex-col gap-1">
+                  <span className="text-[9px] font-mono uppercase tracking-wider text-emerald-400 font-bold">Prize Pool & Rewards</span>
+                  <span className="text-xs font-semibold text-txt-main font-display">{eventMetadata.prizes}</span>
+                </div>
+                <div className="p-3.5 bg-bg-base/60 border border-accent-main/30 rounded flex flex-col gap-1">
+                  <span className="text-[9px] font-mono uppercase tracking-wider text-accent-main font-bold">Final Target Deadline</span>
+                  <span className="text-xs font-semibold text-txt-main font-mono">{eventMetadata.deadline}</span>
+                </div>
+              </div>
+
+              {/* Description & Guidelines */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-txt-muted font-bold">Event Description & Rules</span>
+                <p className="text-xs text-txt-sub font-light leading-relaxed bg-bg-base/40 p-4 rounded border border-border-main/50 whitespace-pre-line">
+                  {eventMetadata.description}
+                  {"\n\n"}
+                  <strong className="text-txt-main font-semibold">Official Guidelines & Rules:</strong>
+                  {"\n"}
+                  {eventMetadata.rules}
+                </p>
+              </div>
+
+              {/* Stage-by-Stage Detailed Briefs */}
+              <div className="flex flex-col gap-3">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-txt-muted font-bold">Stage-by-Stage Timeline & Briefs</span>
+                
+                <div className="flex flex-col gap-3">
+                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-txt-main font-display">1. Ideation & Proposal</span>
+                      <span className="text-[9px] font-mono text-emerald-400 font-bold uppercase">Completed Oct 08</span>
+                    </div>
+                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                      Problem statement selection, team role assignment, technical architecture deck draft submission.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-bg-base/50 border border-accent-main/40 rounded flex flex-col gap-1 ring-1 ring-accent-main/20">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-accent-main font-display">2. Prototype Development</span>
+                      <span className="text-[9px] font-mono text-accent-main font-bold uppercase">Active (Target Oct 12)</span>
+                    </div>
+                    <p className="text-[11px] text-txt-sub font-light leading-relaxed">
+                      Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-txt-main font-display">3. QA & User Testing</span>
+                      <span className="text-[9px] font-mono text-txt-muted font-bold uppercase">Target Oct 24</span>
+                    </div>
+                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                      Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-txt-main font-display">4. Final Submission</span>
+                      <span className="text-[9px] font-mono text-txt-muted font-bold uppercase">Final submission Nov 02</span>
+                    </div>
+                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                      Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex justify-end items-center gap-3 pt-2 border-t border-border-main/40">
+                <a
+                  href={eventMetadata.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-8 px-4 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono uppercase font-bold rounded-sm flex items-center gap-1.5 transition-opacity"
+                >
+                  Open Official Event Link <ExternalLink size={10} />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowBriefModal(false)}
+                  className="h-8 px-4 border border-border-main/80 hover:bg-bg-base text-txt-main text-[10px] font-mono uppercase rounded-sm transition-colors cursor-pointer"
+                >
+                  Close Brief
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
