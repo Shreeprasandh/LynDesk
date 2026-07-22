@@ -2182,8 +2182,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           </div>
 
           {/* Vertical Node Line Masterpiece */}
-          <div className="relative flex flex-col gap-6 pl-4 py-2 flex-grow">
-            <div className="absolute top-0 bottom-0 left-[21px] w-[1px] bg-border-main/60 z-0" />
+          <div className="relative flex flex-col gap-5 pl-2 py-2 flex-grow">
+            {/* Centered Vertical Connector Line */}
+            <div className="absolute top-4 bottom-4 left-[17px] w-[2px] bg-border-main/60 rounded-full -z-0" />
             
             {stages.map((stg, idx) => {
               const currentStageLower = status.toLowerCase();
@@ -2191,6 +2192,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               const currentIdx = stages.findIndex(s => s.toLowerCase() === currentStageLower);
               const isActive = currentStageLower === stgLower;
               const isPast = idx < (currentIdx >= 0 ? currentIdx : 0);
+
+              // Clean formatted deadline date string without duplicate status words
+              const rawDate = stageDeadlines[idx];
+              const cleanDate = rawDate
+                .replace(/^Completed\s*/i, "")
+                .replace(/^Active\s*\(/i, "(")
+                .replace(/^Final submission\s*/i, "");
               
               return (
                 <motion.div 
@@ -2234,28 +2242,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       }
                     }
                   }}
-                  className="relative z-10 flex gap-3.5 group cursor-pointer p-1.5 rounded hover:bg-bg-surface/60 transition-colors"
+                  className="relative z-10 flex items-start gap-3.5 group cursor-pointer p-1.5 rounded hover:bg-bg-surface/60 transition-colors"
                 >
-                  <div className={`h-4.5 w-4.5 rounded-full border-2 bg-bg-base flex items-center justify-center translate-y-0.5 transition-all duration-300 ${
+                  {/* Perfectly Centered Node Circle */}
+                  <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
                     isActive 
-                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-110" 
+                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105" 
                       : isPast 
                       ? "border-accent-main bg-accent-main" 
                       : "border-border-main group-hover:border-accent-main/60"
                   }`}>
                     {isPast ? (
-                      <CheckCircle2 size={11} className="text-bg-base fill-accent-main" />
+                      <CheckCircle2 size={12} className="text-bg-base fill-accent-main" />
                     ) : isActive ? (
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent-main animate-ping" />
+                      <div className="w-2 h-2 rounded-full bg-accent-main animate-pulse" />
                     ) : (
-                      <div className="w-1 h-1 rounded-full bg-txt-muted/40 group-hover:bg-accent-main/60" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-txt-muted/40 group-hover:bg-accent-main/60" />
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 pt-0.5">
                     <div className="flex items-center gap-2">
                       <span className={`text-xs font-semibold ${isActive ? "text-accent-main font-bold" : "text-txt-main"}`}>{stg}</span>
-                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.2 rounded border ${
+                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
                         isPast
                           ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold"
                           : isActive
@@ -2265,7 +2274,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         {isPast ? "Completed" : isActive ? "Active" : "Target"}
                       </span>
                     </div>
-                    <span className="text-[10px] text-txt-muted font-mono">{stageDeadlines[idx]}</span>
+                    <span className="text-[10px] text-txt-muted font-mono tracking-tight">{cleanDate}</span>
                   </div>
                 </motion.div>
               );
