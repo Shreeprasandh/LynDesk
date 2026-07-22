@@ -606,6 +606,9 @@ export default function Home() {
       }
       if (user) {
         setAuthStep("success");
+        if (typeof window !== "undefined" && (window.location.hash.includes("access_token") || window.location.search.includes("code"))) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       } else {
         setAuthStep("idle");
       }
