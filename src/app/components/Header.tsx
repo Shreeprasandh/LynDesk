@@ -345,6 +345,41 @@ export default function Header() {
       });
 
       setNotifications(finalNotifs);
+
+      // Check live LeetCode daily challenge status for streak warning
+      const lcHandle = user?.user_metadata?.leetcode_username || (typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") : "");
+      if (lcHandle) {
+        try {
+          const res = await fetch(`/api/coding-stats?platform=leetcode&username=${lcHandle}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.dailyChallenge && !data.dailyChallenge.completed) {
+              const todayStr = new Date().toISOString().split("T")[0];
+              const streakNotifId = `notif_streak_warning_${todayStr}`;
+              const title = data.dailyChallenge.title || "Daily Challenge";
+              const diff = data.dailyChallenge.difficulty || "Medium";
+              const streak = data.leetcodeStreak || 0;
+
+              const streakNotif: NotificationItem = {
+                id: streakNotifId,
+                title: "🔥 LeetCode Streak at Risk!",
+                message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
+                type: "deadline",
+                category: "alerts",
+                time: "Today",
+                read: false,
+                actionLabel: "Solve Challenge",
+                actionUrl: "/coding-deck"
+              };
+
+              setNotifications(prev => {
+                if (prev.some(n => n.id === streakNotifId)) return prev;
+                return [streakNotif, ...prev];
+              });
+            }
+          }
+        } catch (e) {}
+      }
     };
 
     loadNotifications();

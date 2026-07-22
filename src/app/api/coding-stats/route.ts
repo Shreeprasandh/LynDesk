@@ -126,35 +126,25 @@ export async function GET(request: Request) {
         const dailyDate = dailyChallengeData.date; // e.g. "2026-07-21"
         const dailySlug = dailyChallengeData.question?.titleSlug;
         const dailyTitle = dailyChallengeData.question?.title;
+
+        const todayUTC = new Date().toISOString().split("T")[0];
+        const todayLocal = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
         
-        // Check if exact daily challenge problem was solved
+        // Check if exact daily challenge problem was solved today
         const hasSolvedExactDaily = recentSubmissions.some((sub: any) => {
           const matchSlug = sub.titleSlug && dailySlug && sub.titleSlug.toLowerCase() === dailySlug.toLowerCase();
           const matchTitle = sub.title && dailyTitle && sub.title.toLowerCase() === dailyTitle.toLowerCase();
           if (!matchSlug && !matchTitle) return false;
           
           const subDate = new Date(parseInt(sub.timestamp) * 1000);
-          const timeDiffHours = Math.abs(Date.now() - subDate.getTime()) / (1000 * 60 * 60);
-          
           const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
           const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
           
-          return timeDiffHours <= 48 || subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate;
+          return subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate || subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
         });
 
-        // Also check if ANY problem was solved on LeetCode today
-        const hasSolvedAnyToday = recentSubmissions.some((sub: any) => {
-          const subDate = new Date(parseInt(sub.timestamp) * 1000);
-          const timeDiffHours = Math.abs(Date.now() - subDate.getTime()) / (1000 * 60 * 60);
-          const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
-          const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
-          const todayUTC = new Date().toISOString().split("T")[0];
-          const todayLocal = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
-
-          return timeDiffHours <= 30 || subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
-        });
-
-        dailyChallengeCompleted = hasSolvedExactDaily || hasSolvedAnyToday;
+        // Daily Challenge completion requires solving the EXACT unique daily question assigned by LeetCode today
+        dailyChallengeCompleted = hasSolvedExactDaily;
         dailyChallengeInfo = {
           title: dailyChallengeData.question?.title,
           link: `https://leetcode.com${dailyChallengeData.link}`,

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
 import Link from "next/link";
 import { 
@@ -59,6 +60,28 @@ export default function CodingDeckPage() {
   const [codechefUser, setCodechefUser] = useState("");
   const [unstopUser, setUnstopUser] = useState("");
   const [hack2skillUser, setHack2skillUser] = useState("");
+
+  // Inline handle input state
+  const [inputLcHandle, setInputLcHandle] = useState("");
+
+  const handleSaveInlineHandle = async () => {
+    if (!inputLcHandle.trim()) return;
+    const cleanHandle = inputLcHandle.trim();
+    setLeetcodeUser(cleanHandle);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_leetcode_handle", cleanHandle);
+    }
+
+    if (user) {
+      try {
+        await supabase.auth.updateUser({
+          data: { ...user.user_metadata, leetcode_username: cleanHandle }
+        });
+      } catch (e) {}
+    }
+
+    setMessage({ text: `Successfully linked LeetCode handle @${cleanHandle}! Syncing live stats...`, type: "success" });
+  };
 
 
 
@@ -187,23 +210,27 @@ export default function CodingDeckPage() {
     }
   }, [stats.leetcode?.dailyChallenge?.completed, prevCompleted]);
 
-  // Load platform details from Supabase Auth user metadata
+  // Load platform details from Supabase Auth user metadata & localStorage
   useEffect(() => {
-    if (!user) return;
-
     const loadPlatformData = async () => {
       try {
         if (isFirstLoadRef.current) {
           setLoading(true);
           isFirstLoadRef.current = false;
         }
-        const meta = user.user_metadata || {};
+        const meta = user?.user_metadata || {};
         
-        const lc = meta.leetcode_username || "";
-        const cf = meta.codeforces_username || "";
-        const cc = meta.codechef_username || "";
-        const un = meta.unstop_username || "";
-        const h2s = meta.hack2skill_username || "";
+        const localLc = typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") || "" : "";
+        const localCf = typeof window !== "undefined" ? localStorage.getItem("ldk_codeforces_handle") || "" : "";
+        const localCc = typeof window !== "undefined" ? localStorage.getItem("ldk_codechef_handle") || "" : "";
+        const localUn = typeof window !== "undefined" ? localStorage.getItem("ldk_unstop_handle") || "" : "";
+        const localH2s = typeof window !== "undefined" ? localStorage.getItem("ldk_hack2skill_handle") || "" : "";
+
+        const lc = meta.leetcode_username || localLc;
+        const cf = meta.codeforces_username || localCf;
+        const cc = meta.codechef_username || localCc;
+        const un = meta.unstop_username || localUn;
+        const h2s = meta.hack2skill_username || localH2s;
 
         setLeetcodeUser(lc);
         setCodeforcesUser(cf);
@@ -211,7 +238,6 @@ export default function CodingDeckPage() {
         setUnstopUser(un);
         setHack2skillUser(h2s);
 
-        
         const fetchStats = async (platform: string, username: string, year?: number | null) => {
           if (!username) return null;
           try {
@@ -247,6 +273,38 @@ export default function CodingDeckPage() {
           unstop: un ? { registered: 6, completed: 4, rank: 42 } : null,
           hack2skill: h2s ? { registered: 3, completed: 3, rank: 12 } : null,
         };
+
+        setStats(updatedStats);
+
+        // Auto-emit streak warning notification to global header drawer if daily problem is pending
+        if (leetcodeStats?.dailyChallenge && !leetcodeStats.dailyChallenge.completed) {
+          const todayStr = new Date().toISOString().split("T")[0];
+          const notifId = `notif_streak_warning_${todayStr}`;
+          const title = leetcodeStats.dailyChallenge.title || "Daily Challenge";
+          const diff = leetcodeStats.dailyChallenge.difficulty || "Medium";
+          const streak = leetcodeStats.leetcodeStreak || 0;
+
+          if (typeof window !== "undefined") {
+            const userKey = user ? `ldk_user_notifications_${user.id}` : "ldk_global_notifications";
+            const stored = localStorage.getItem(userKey);
+            const list = stored ? JSON.parse(stored) : [];
+            if (!list.some((n: any) => n.id === notifId)) {
+              list.unshift({
+                id: notifId,
+                title: "🔥 LeetCode Streak at Risk!",
+                message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
+                type: "deadline",
+                category: "alerts",
+                time: "Just now",
+                read: false,
+                actionLabel: "Solve Challenge",
+                actionUrl: "/coding-deck"
+              });
+              localStorage.setItem(userKey, JSON.stringify(list.slice(0, 100)));
+              window.dispatchEvent(new Event("ldk_notifications_update"));
+            }
+          }
+        }
 
         setStats(updatedStats);
         if (typeof window !== "undefined" && user?.id) {
@@ -769,9 +827,28 @@ export default function CodingDeckPage() {
                 </div>
 
                 {!leetcodeUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
-                    <span>LeetCode account is not linked.</span>
-                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 font-mono text-xs text-txt-muted flex flex-col sm:flex-row items-center justify-between gap-4 py-6">
+                    <div className="flex flex-col gap-1 text-left">
+                      <span className="font-semibold text-txt-main">LeetCode handle is not linked yet.</span>
+                      <span className="text-[10px] text-txt-sub">Enter your LeetCode username below to sync daily challenge streak & stats.</span>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <input
+                        type="text"
+                        value={inputLcHandle}
+                        onChange={(e) => setInputLcHandle(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveInlineHandle(); }}
+                        placeholder="e.g. your_leetcode_id"
+                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveInlineHandle}
+                        className="h-8 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold rounded hover:opacity-90 transition-all shrink-0 cursor-pointer"
+                      >
+                        Link & Sync
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6 pt-2">
