@@ -2183,8 +2183,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
           {/* Vertical Node Line Masterpiece */}
           <div className="relative flex flex-col gap-5 pl-2 py-2 flex-grow">
-            {/* Centered Vertical Connector Line */}
-            <div className="absolute top-4 bottom-4 left-[17px] w-[2px] bg-border-main/60 rounded-full -z-0" />
+            {/* Subtle Low-Opacity Left Guide Line */}
+            <div className="absolute top-4 bottom-4 left-[6px] w-[1px] bg-border-main/40 opacity-20 rounded-full z-0" />
             
             {stages.map((stg, idx) => {
               const currentStageLower = status.toLowerCase();
