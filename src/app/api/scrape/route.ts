@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     };
 
     // Clean title and format details
-    let rawTitle = extractMeta("og:title") || extractTitle() || "";
+    const rawTitle = extractMeta("og:title") || extractTitle() || "";
     let cleanTitle = rawTitle.replace(/\s*\|.*/, "").replace(/\s*- Unstop.*/i, "").replace(/\s*- Devpost.*/i, "").trim();
     
     if (!cleanTitle && url) {

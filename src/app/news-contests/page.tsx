@@ -2,16 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
-import { useAuth } from "../context/AuthContext";
 import { 
   Search, 
   ExternalLink, 
   Sparkles, 
   Trophy, 
-  Newspaper, 
   Filter, 
-  Calendar,
-  Flame
+  Calendar
 } from "lucide-react";
 
 interface OpportunityItem {
@@ -28,7 +25,6 @@ interface OpportunityItem {
 }
 
 export default function NewsContestsPage() {
-  const { user, loading: authLoading } = useAuth();
   const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
   const [searchOppQuery, setSearchOppQuery] = useState("");
   const [filterOppCategory, setFilterOppCategory] = useState("");

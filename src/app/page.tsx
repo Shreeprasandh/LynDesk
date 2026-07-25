@@ -174,11 +174,8 @@ export default function Home() {
   const [isInviteHomeModalOpen, setIsInviteHomeModalOpen] = useState(false);
 
   // News and Opportunities States
-  const [dashTab, setDashTab] = useState<"workspaces" | "opportunities">("workspaces");
+  const [dashTab] = useState<"workspaces" | "opportunities">("workspaces");
   const [opportunities, setOpportunities] = useState<any[]>([]);
-  const [searchOppQuery, setSearchOppQuery] = useState("");
-  const [filterOppCategory, setFilterOppCategory] = useState("");
-  const [filterOppLocation, setFilterOppLocation] = useState("");
 
   // Real-time Coding Platform Overview Stats
   const [codingStats, setCodingStats] = useState<{
@@ -568,7 +565,7 @@ export default function Home() {
           parsed[idx].title = cleanTitle;
           localStorage.setItem("ldk_events", JSON.stringify(parsed));
         }
-      } catch (e) {}
+      } catch {}
     }
 
     if (workspaceId !== "mock") {

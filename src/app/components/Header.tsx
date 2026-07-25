@@ -45,16 +45,11 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
-  const [isFaculty, setIsFaculty] = useState(false);
-  const [isRecruiter, setIsRecruiter] = useState(false);
+  const isFaculty = userRole === "coordinator";
+  const isRecruiter = userRole === "recruiter";
 
   const pathname = usePathname();
   const router = useRouter();
-
-  useEffect(() => {
-    setIsFaculty(userRole === "coordinator");
-    setIsRecruiter(userRole === "recruiter");
-  }, [userRole, pathname]);
 
   // Global authentication route guard: redirects unauthorized sessions immediately to landing page
   useEffect(() => {
@@ -374,7 +369,7 @@ export default function Header() {
                       const parsed = JSON.parse(globalStored);
                       const cleaned = parsed.filter((n: any) => !n.title?.includes("Streak at Risk") && !n.id?.startsWith("notif_streak_warning_"));
                       localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
-                    } catch (e) {}
+                    } catch {}
                   }
                 }
               } else {
@@ -403,7 +398,7 @@ export default function Header() {
               }
             }
           }
-        } catch (e) {}
+        } catch {}
       }
     };
 
@@ -481,7 +476,7 @@ export default function Header() {
           const parsed = JSON.parse(userStored);
           const cleaned = parsed.filter((n: any) => n.id !== id);
           localStorage.setItem(userKey, JSON.stringify(cleaned));
-        } catch (e) {}
+        } catch {}
       }
     }
     window.dispatchEvent(new Event("ldk_notifications_update"));

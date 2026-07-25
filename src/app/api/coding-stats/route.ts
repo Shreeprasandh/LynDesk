@@ -205,7 +205,7 @@ export async function GET(request: Request) {
 
               // Dynamic consecutive streak calculation
               let dynamicStreak = 0;
-              let checkDate = new Date();
+              const checkDate = new Date();
               const todayKey = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}-${String(checkDate.getUTCDate()).padStart(2, "0")}`;
               if (!submissionCalendar[todayKey]) {
                 checkDate.setDate(checkDate.getDate() - 1);
@@ -380,7 +380,7 @@ export async function GET(request: Request) {
         infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${cleanUsername}&t=${Date.now()}`, {
           cache: "no-store"
         });
-      } catch (err) {
+      } catch (_err) {
         return NextResponse.json({ error: "Failed to connect to Codeforces API" }, { status: 502 });
       }
       if (!infoRes.ok) {
@@ -454,7 +454,7 @@ export async function GET(request: Request) {
           },
           cache: "no-store"
         });
-      } catch (err) {
+      } catch (_err) {
         return NextResponse.json({ error: "Failed to connect to CodeChef" }, { status: 502 });
       }
       if (!response.ok) {

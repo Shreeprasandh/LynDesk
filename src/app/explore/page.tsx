@@ -117,7 +117,7 @@ export default function ExplorePage() {
     };
 
     fetchData();
-  }, []);
+  }, [user?.id]);
 
   const handleConnect = (id: string) => {
     setConnectionStates(prev => ({

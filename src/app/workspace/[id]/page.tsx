@@ -145,7 +145,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
   // Event Details & Brief Modal States
   const [showBriefModal, setShowBriefModal] = useState(false);
-  const [eventMetadata, setEventMetadata] = useState<{
+  const [eventMetadata] = useState<{
     title: string;
     description: string;
     organization: string;
@@ -272,10 +272,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         try {
           const parsed = JSON.parse(savedCallStr);
           if (parsed && parsed.active) {
-            setIsCallActiveInRoom(true);
-            if (parsed.callerName) setCallCallerName(parsed.callerName);
+            queueMicrotask(() => {
+              setIsCallActiveInRoom(true);
+              if (parsed.callerName) setCallCallerName(parsed.callerName);
+            });
           }
-        } catch (e) {}
+        } catch {}
       }
     }
   }, [id]);
