@@ -1,6 +1,6 @@
 "use client";
 
-import React, { use, useState, useEffect, useRef, useCallback } from "react";
+import React, { use, useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../lib/supabase";
@@ -100,6 +100,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
+  const [, startTabTransition] = useTransition();
+
+  const handleTabChange = useCallback((nextTab: "workspace" | "tasks" | "artifacts" | "notes" | "credits") => {
+    startTabTransition(() => {
+      setActiveTab(nextTab);
+    });
+  }, []);
 
   // Workspace Tasks & Milestones State
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
@@ -212,6 +219,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Claim Academic Credits State
   const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
+
+  // Memoized Array Computation Performance Optimization
+  const activeArtifacts = useMemo(() => artifacts.filter(a => a.is_active), [artifacts]);
+  const archivedArtifacts = useMemo(() => artifacts.filter(a => !a.is_active), [artifacts]);
+  const onlineMembers = useMemo(() => roomMembers.filter(m => m.isOnline), [roomMembers]);
+  const completedTasksCount = useMemo(() => tasks.filter(t => t.status === "done").length, [tasks]);
 
   // Invite Classmates Modal States
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -2312,7 +2325,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
                 <span>Milestones</span>
                 <span className="text-emerald-400 font-semibold">
-                  {tasks.filter(t => t.status === "done").length} / {tasks.length || 1} Complete
+                  {completedTasksCount} / {tasks.length || 1} Complete
                 </span>
               </div>
               <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
@@ -2363,7 +2376,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             >
               <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider hidden sm:inline">Active:</span>
               <div className="flex -space-x-2">
-                {roomMembers.filter(m => m.isOnline).map(member => (
+                {onlineMembers.map(member => (
                   <div 
                     key={member.id} 
                     className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 ${
@@ -2617,7 +2630,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <button
                 key={tab}
                 type="button"
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleTabChange(tab)}
                 className={`px-1 py-1.5 rounded-sm cursor-pointer transition-colors text-center truncate ${
                   activeTab === tab 
                     ? "bg-accent-main text-bg-base font-bold" 
@@ -2893,7 +2906,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  {artifacts.filter(a => a.is_active).map(art => (
+                  {activeArtifacts.map(art => (
                     <div key={art.id} className="border border-border-main/60 p-3 rounded-sm flex flex-col gap-1.5 hover:bg-bg-card transition-colors duration-150 relative group">
                       <div className="flex justify-between items-start gap-2">
                         <span className="text-xs text-txt-main font-semibold truncate max-w-[80%]">{art.file_name}</span>
@@ -2909,7 +2922,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     </div>
                   ))}
 
-                  {artifacts.length === 0 && (
+                  {activeArtifacts.length === 0 && (
                     <span className="text-[10px] text-txt-muted font-light italic">No files uploaded yet.</span>
                   )}
                 </div>
@@ -2946,7 +2959,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
                 <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Version History</span>
                 <div className="flex flex-col gap-2">
-                  {artifacts.filter(a => !a.is_active).map(art => (
+                  {archivedArtifacts.map(art => (
                     <div key={art.id} className="flex items-center justify-between border-b border-border-main/40 pb-2 text-[10px] font-mono">
                       <div className="flex flex-col min-w-0">
                         <span className="text-txt-sub truncate">{art.file_name}</span>
@@ -2958,7 +2971,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     </div>
                   ))}
 
-                  {artifacts.filter(a => !a.is_active).length === 0 && (
+                  {archivedArtifacts.length === 0 && (
                     <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions.</span>
                   )}
                 </div>

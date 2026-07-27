@@ -64,32 +64,67 @@ export async function POST(request: Request) {
       return "";
     };
 
-    // Clean title and format details
-    const rawTitle = extractMeta("og:title") || extractTitle() || "";
+    // Generic site landing titles to reject in favor of URL slug parsing
+    const genericTitleRegex = /unstop\s*-\s*competitions|devpost\s*-\s*hackathons|hackerearth\s*-\s*challenges|kaggle\s*-\s*competitions|competitions,?\s*quizzes,?\s*hackathons/i;
+
+    let rawTitle = extractMeta("og:title") || extractTitle() || "";
+    if (genericTitleRegex.test(rawTitle)) {
+      rawTitle = "";
+    }
+
     let cleanTitle = rawTitle.replace(/\s*\|.*/, "").replace(/\s*- Unstop.*/i, "").replace(/\s*- Devpost.*/i, "").trim();
     
-    if (!cleanTitle && url) {
+    // Intelligently extract and format title from URL slug when HTML yields a generic SPA wrapper
+    if (!cleanTitle || cleanTitle.toLowerCase() === "unstop" || cleanTitle.toLowerCase() === "devpost") {
       try {
         const parsedUrl = new URL(url);
-        const namePart = parsedUrl.pathname.split("/").pop() || parsedUrl.hostname.replace("www.", "").split(".")[0];
-        cleanTitle = namePart.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        const segments = parsedUrl.pathname.split("/").filter(Boolean);
+        const lastSegment = segments.pop() || "";
+        
+        // Remove trailing numeric ID (e.g. "-1715333" from unstop URLs)
+        const slug = lastSegment.replace(/-\d+$/, "");
+        
+        // Split slug into capitalized words with acronym recognition
+        const words = slug.split(/[-_]/).filter(Boolean).map(word => {
+          const wLower = word.toLowerCase();
+          if (wLower === "crp") return "CRP";
+          if (wLower === "mit") return "MIT";
+          if (wLower === "iit") return "IIT";
+          if (wLower === "ai") return "AI";
+          if (wLower === "api") return "API";
+          return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        });
+
+        // Deduplicate consecutive identical words (e.g. "Adobe ... Adobe")
+        const dedupedWords: string[] = [];
+        words.forEach(w => {
+          if (dedupedWords.length === 0 || dedupedWords[dedupedWords.length - 1].toLowerCase() !== w.toLowerCase()) {
+            dedupedWords.push(w);
+          }
+        });
+        
+        cleanTitle = dedupedWords.join(" ").trim();
       } catch {
         cleanTitle = "Campus Hackathon Challenge";
       }
     }
 
-    const description = extractMeta("og:description") || extractMeta("description") || "Participate in this official hackathon challenge. Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.";
+    const rawDesc = extractMeta("og:description") || extractMeta("description") || "";
+    const description = (rawDesc && !genericTitleRegex.test(rawDesc)) 
+      ? rawDesc 
+      : `Official ${cleanTitle} challenge. Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.`;
+
     const deadline = extractDeadline() || "Nov 02, 2026";
 
-    // Extract organization / host
+    // Extract organization / host dynamically
     let organization = "Global Tech Track";
-    if (/adobe/i.test(url) || /adobe/i.test(html)) organization = "Adobe Systems";
-    else if (/google/i.test(url) || /google/i.test(html)) organization = "Google Developer Student Clubs";
-    else if (/mit/i.test(url) || /mit/i.test(html)) organization = "MIT HackHarvard";
+    if (/adobe/i.test(url) || /adobe/i.test(cleanTitle) || /adobe/i.test(html)) organization = "Adobe Systems";
+    else if (/google/i.test(url) || /google/i.test(cleanTitle) || /google/i.test(html)) organization = "Google Developer Student Clubs";
+    else if (/mit/i.test(url) || /mit/i.test(cleanTitle) || /mit/i.test(html)) organization = "MIT HackHarvard";
     else if (/unstop/i.test(url)) organization = "Unstop University Track";
 
     // Extract prize pool info
-    let prizes = "$10,000 Prize Pool & Certificate of Excellence";
+    let prizes = "$15,000 Prize Pool & Certificate of Excellence";
     if (/prize|reward|\$/i.test(html)) {
       const prizeMatch = html.match(/\$[\d,]+\b|₹[\d,]+\b|\b\d+\s*lakh\b/i);
       if (prizeMatch) prizes = `${prizeMatch[0]} Prize Pool & Internship Fast-track`;
