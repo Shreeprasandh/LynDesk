@@ -1053,8 +1053,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (finalDemo) localStorage.setItem(`ldk_workspace_demo_${id}`, finalDemo);
           }
 
-          // If DB was missing git/demo URL but local storage had it, sync DB
-          if ((!data.github_repo && finalGit) || (!data.live_demo_url && finalDemo)) {
+          // If DB was missing git/demo URL but local storage had it, sync DB (only for authenticated users)
+          if (user && ((!data.github_repo && finalGit) || (!data.live_demo_url && finalDemo))) {
             (async () => {
               try {
                 await supabase.from("project_spaces").upsert({
@@ -1105,7 +1105,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               console.error("Error saving workspace to local dashboard storage: ", e);
             }
           }
-        } else if (error) {
+        } else if (error && user) {
           // If project space row doesn't exist in Supabase DB yet, auto-create it under workspaceUuid
           const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
           const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
