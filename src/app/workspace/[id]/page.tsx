@@ -31,7 +31,11 @@ import {
   Eye,
   Edit3,
   Check,
-  FileText
+  FileText,
+  Monitor,
+  Tablet,
+  Smartphone,
+  RefreshCw
 } from "lucide-react";
 
 
@@ -140,6 +144,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [tempGit, setTempGit] = useState("");
   const [tempDemo, setTempDemo] = useState("");
 
+  // Live Prototype Preview Simulator state
+  const [showDemoPreviewModal, setShowDemoPreviewModal] = useState(false);
+  const [isInlineDemoPreviewOpen, setIsInlineDemoPreviewOpen] = useState(false);
+  const [demoViewportMode, setDemoViewportMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [demoIframeKey, setDemoIframeKey] = useState(0);
   // Timeline / Stages
   const stages = ["Ideation", "Development", "Testing", "Submitted"];
   const stageDeadlines = [
@@ -294,10 +303,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (textExts.includes(ext) && art.file_url && art.file_url !== "#") {
       setIsPreviewLoading(true);
       try {
-        const res = await fetch(art.file_url);
-        if (res.ok) {
-          const text = await res.text();
-          setPreviewContent(text);
+        if (art.file_url.startsWith("data:")) {
+          const parts = art.file_url.split(",");
+          if (parts[1]) {
+            try {
+              const decoded = atob(parts[1]);
+              setPreviewContent(decoded);
+            } catch {
+              setPreviewContent(decodeURIComponent(parts[1]));
+            }
+          }
+        } else {
+          const res = await fetch(art.file_url);
+          if (res.ok) {
+            const text = await res.text();
+            setPreviewContent(text);
+          }
         }
       } catch {}
       setIsPreviewLoading(false);
@@ -597,12 +618,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   }, [user, id]);
 
-  // Git Commits (live simulation list)
-  const [commits, setCommits] = useState([
-    { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
-    { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
-    { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
-  ]);
+  // Git Commits (live simulation list with local storage cache)
+  const [commits, setCommits] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`ldk_workspace_commits_${id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return [
+      { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
+      { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
+      { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
+    ];
+  });
 
   // speaking simulation loop
   useEffect(() => {
@@ -1597,7 +1629,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     const currentHighestVersion = slotArtifacts.reduce((max, a) => Math.max(max, a.version), 0);
     const nextVersion = currentHighestVersion + 1;
 
-    let fileUrl = "#";
+    const readFileAsDataUrl = (f: File): Promise<string> => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(f);
+      });
+    };
+
+    const dataUrl = await readFileAsDataUrl(file);
+    let fileUrl = dataUrl || "#";
+    try {
+      if (!fileUrl || fileUrl === "#") {
+        fileUrl = URL.createObjectURL(file);
+      }
+    } catch {}
 
     // If user logged in and not mock workspace
     if (user && id !== "e1" && id !== "e2") {
@@ -1638,7 +1685,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             console.error("DB Artifact insert error: ", dbError);
           }
         } else {
-          console.warn("Storage bucket upload failed, using fallback mock URL: ", uploadError);
+          console.warn("Storage bucket upload failed, using persistent Data URL fallback: ", uploadError);
         }
       } catch (err) {
         console.error("Supabase Storage error: ", err);
@@ -2034,45 +2081,103 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const fetchCommits = useCallback(async () => {
     if (!githubRepo || !githubRepo.trim()) {
-      setCommits([]);
       return;
     }
 
     let fetched = false;
+    const cleanUrl = githubRepo.trim().replace(/\/$/, "");
 
-    // Fetch live commits from GitHub public REST API
-    try {
-      const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
-      if (githubMatch) {
-        const owner = githubMatch[1];
-        const repo = githubMatch[2].replace(/\.git$/, "");
+    // 1. Try matching owner/repo (e.g. https://github.com/Shreeprasandh/LynDesk)
+    const repoMatch = cleanUrl.match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)$/);
+    if (repoMatch) {
+      const owner = repoMatch[1];
+      const repo = repoMatch[2].replace(/\.git$/, "");
+      try {
         const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=5`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data)) {
+          if (Array.isArray(data) && data.length > 0) {
             const parsed = data.map((item: any) => {
               const dateObj = new Date(item.commit?.author?.date || item.commit?.committer?.date);
               const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
               return {
                 hash: item.sha ? item.sha.substring(0, 7) : "commit",
-                author: item.commit?.author?.name || item.commit?.committer?.name || "GitHub Dev",
+                author: item.commit?.author?.name || item.commit?.committer?.name || owner,
                 message: item.commit?.message ? item.commit.message.split("\n")[0] : "Update codebase",
                 time: relative
               };
             });
             setCommits(parsed);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(parsed));
+            }
             fetched = true;
           }
         }
-      }
-    } catch {
-      // Ignore network / rate-limit errors when fetching external GitHub API
+      } catch {}
     }
 
+    // 2. If not repo or repo fetch failed, try Profile URL (e.g. https://github.com/Shreeprasandh)
     if (!fetched) {
-      setCommits([]);
+      const profileMatch = cleanUrl.match(/(?:github\.com\/)?([^\/]+)$/);
+      if (profileMatch && profileMatch[1] && profileMatch[1] !== "github.com") {
+        const username = profileMatch[1];
+        try {
+          const res = await fetch(`https://api.github.com/users/${username}/events/public`);
+          if (res.ok) {
+            const events = await res.json();
+            if (Array.isArray(events)) {
+              const pushEvents = events.filter((e: any) => e.type === "PushEvent");
+              const parsedCommits: any[] = [];
+              
+              pushEvents.forEach((ev: any) => {
+                const repoName = ev.repo?.name ? ev.repo.name.split("/")[1] || ev.repo.name : "";
+                const dateObj = new Date(ev.created_at);
+                const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+                if (Array.isArray(ev.payload?.commits)) {
+                  ev.payload.commits.forEach((c: any) => {
+                    if (parsedCommits.length < 5) {
+                      parsedCommits.push({
+                        hash: c.sha ? c.sha.substring(0, 7) : "commit",
+                        author: ev.actor?.display_login || ev.actor?.login || username,
+                        message: `${repoName ? `[${repoName}] ` : ""}${c.message ? c.message.split("\n")[0] : "Pushed code"}`,
+                        time: relative
+                      });
+                    }
+                  });
+                }
+              });
+
+              if (parsedCommits.length > 0) {
+                setCommits(parsedCommits);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(parsedCommits));
+                }
+                fetched = true;
+              }
+            }
+          }
+        } catch {}
+      }
     }
-  }, [githubRepo]);
+
+    // 3. Fallback to /api/git/commits if no live GitHub commits could be fetched and no cache exists
+    if (!fetched) {
+      const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
+      if (!savedCommitsStr) {
+        try {
+          const res = await fetch("/api/git/commits");
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.commits) {
+              setCommits(data.commits);
+            }
+          }
+        } catch {}
+      }
+    }
+  }, [githubRepo, id]);
 
   const fetchGitLanguages = useCallback(async () => {
     if (!githubRepo || !githubRepo.trim()) {
@@ -2311,17 +2416,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             {stages.map((stg, idx) => {
               const currentStageLower = status.toLowerCase();
               const stgLower = stg.toLowerCase();
-              const currentIdx = stages.findIndex(s => s.toLowerCase() === currentStageLower);
-              const isActive = currentStageLower === stgLower;
-              const isPast = idx < (currentIdx >= 0 ? currentIdx : 0);
+              const isActiveFocus = currentStageLower === stgLower;
 
-              // Clean formatted deadline date string without duplicate status words
-              const rawDate = stageDeadlines[idx];
-              const cleanDate = rawDate
-                .replace(/^Completed\s*/i, "")
-                .replace(/^Active\s*\(/i, "(")
-                .replace(/^Final submission\s*/i, "");
-              
+              const rawDate = stageDeadlines[idx] || "";
+              const isEventCompleted = rawDate.toLowerCase().includes("completed");
+
               return (
                 <motion.div 
                   key={idx} 
@@ -2366,17 +2465,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   }}
                   className="relative z-10 flex items-start gap-3.5 group cursor-pointer p-1.5 rounded hover:bg-bg-surface/60 transition-colors"
                 >
-                  {/* Perfectly Centered Node Circle */}
+                  {/* Node Circle */}
                   <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                    isActive 
-                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105" 
-                      : isPast 
-                      ? "border-accent-main bg-accent-main" 
+                    isEventCompleted
+                      ? isActiveFocus
+                        ? "border-emerald-500 ring-4 ring-emerald-500/25 bg-emerald-500/20 scale-105"
+                        : "border-emerald-500 bg-emerald-500"
+                      : isActiveFocus
+                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105"
                       : "border-border-main group-hover:border-accent-main/60"
                   }`}>
-                    {isPast ? (
-                      <CheckCircle2 size={12} className="text-bg-base fill-accent-main" />
-                    ) : isActive ? (
+                    {isEventCompleted ? (
+                      <CheckCircle2 size={12} className={isActiveFocus ? "text-emerald-400 fill-emerald-500/30" : "text-bg-base fill-emerald-500"} />
+                    ) : isActiveFocus ? (
                       <div className="w-2 h-2 rounded-full bg-accent-main animate-pulse" />
                     ) : (
                       <div className="w-1.5 h-1.5 rounded-full bg-txt-muted/40 group-hover:bg-accent-main/60" />
@@ -2384,19 +2485,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   </div>
 
                   <div className="flex flex-col gap-0.5 pt-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold ${isActive ? "text-accent-main font-bold" : "text-txt-main"}`}>{stg}</span>
-                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
-                        isPast
-                          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold"
-                          : isActive
-                          ? "bg-accent-main/20 border-accent-main/40 text-accent-main font-bold"
-                          : "bg-bg-base border-border-main/50 text-txt-muted"
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-xs font-semibold ${
+                        isEventCompleted
+                          ? "text-emerald-400 font-bold"
+                          : isActiveFocus
+                          ? "text-accent-main font-bold"
+                          : "text-txt-main"
                       }`}>
-                        {isPast ? "Completed" : isActive ? "Active" : "Target"}
+                        {stg}
                       </span>
+                      
+                      {/* Teammate Active Workspace Focus Badge */}
+                      {isActiveFocus && (
+                        <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border bg-accent-main/20 border-accent-main/40 text-accent-main font-bold animate-pulse">
+                          ● Active Focus
+                        </span>
+                      )}
                     </div>
-                    <span className="text-[10px] text-txt-muted font-mono tracking-tight">{cleanDate}</span>
+                    <span className={`text-[10px] font-mono tracking-tight ${isEventCompleted ? "text-emerald-400/80 font-medium" : "text-txt-muted"}`}>
+                      {rawDate}
+                    </span>
                   </div>
                 </motion.div>
               );
@@ -2855,15 +2964,55 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       {liveDemo || "Not hosted"}
                     </span>
                     {liveDemo && (
-                      <a 
-                        href={formatUrl(liveDemo)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-                      >
-                        Launch Prototype
-                        <ExternalLink size={10} />
-                      </a>
+                      <div className="flex flex-col gap-2 pt-1 border-t border-border-main/20">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button 
+                            type="button"
+                            onClick={() => setShowDemoPreviewModal(true)}
+                            className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 bg-accent-main/5 border border-accent-main/30 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer font-bold"
+                          >
+                            <Eye size={11} />
+                            Live Web Preview
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsInlineDemoPreviewOpen(prev => !prev)}
+                            className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Monitor size={11} />
+                            {isInlineDemoPreviewOpen ? "Hide Frame" : "Inline Frame"}
+                          </button>
+
+                          <a 
+                            href={formatUrl(liveDemo)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 transition-colors ml-auto"
+                          >
+                            <span>Launch</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        </div>
+
+                        {isInlineDemoPreviewOpen && (
+                          <div className="mt-2 border border-border-main/60 rounded overflow-hidden bg-bg-base flex flex-col shadow-inner">
+                            <div className="flex justify-between items-center bg-bg-surface px-2.5 py-1 border-b border-border-main/40 text-[9px] font-mono text-txt-muted">
+                              <span className="truncate max-w-[200px]">{formatUrl(liveDemo)}</span>
+                              <button onClick={() => setDemoIframeKey(k => k + 1)} className="hover:text-txt-main p-0.5 cursor-pointer" title="Refresh frame">
+                                <RefreshCw size={10} />
+                              </button>
+                            </div>
+                            <iframe
+                              key={demoIframeKey}
+                              src={formatUrl(liveDemo)}
+                              title="Inline Live Demo Preview"
+                              className="w-full h-[280px] bg-white border-0"
+                              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                            />
+                          </div>
+                        )}
+                      </div>
                     )}
                   </>
                 ) : (
@@ -3022,49 +3171,49 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </span>
               </div>
 
-              {/* 4 Slot Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* 4 Slot Cards Stacked List (One After Another Layout) */}
+              <div className="flex flex-col gap-3.5 w-full">
                 {[0, 1, 2, 3].map(slotIdx => {
                   const slotArtifact = activeSlotArtifacts[slotIdx];
                   const defaultSlotTitle = slotNames[slotIdx] || `Slot ${slotIdx + 1}`;
                   const isEditingThisSlot = editingSlotIndex === slotIdx;
 
                   return (
-                    <div key={slotIdx} className="border border-border-main/70 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-2.5 relative group">
+                    <div key={slotIdx} className="border border-border-main/70 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-3 relative group w-full overflow-hidden">
                       {/* Slot Name Header & Edit */}
-                      <div className="flex justify-between items-center gap-2 border-b border-border-main/30 pb-2">
+                      <div className="flex justify-between items-center gap-2 border-b border-border-main/30 pb-2 w-full min-w-0">
                         {isEditingThisSlot ? (
-                          <div className="flex items-center gap-1.5 w-full">
+                          <div className="flex items-center gap-2 w-full min-w-0">
                             <input
                               type="text"
                               value={tempSlotName}
                               onChange={(e) => setTempSlotName(e.target.value)}
-                              className="bg-bg-card border border-accent-main/50 px-2 py-0.5 text-xs text-txt-main rounded-sm focus:outline-none w-full font-mono"
+                              className="bg-bg-card border border-accent-main/50 px-2.5 py-1 text-xs text-txt-main rounded-sm focus:outline-none w-full font-mono min-w-0"
                               placeholder="Enter slot name..."
                               autoFocus
                             />
-                            <button onClick={() => saveSlotName(slotIdx)} className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer">
-                              <Check size={13} />
+                            <button onClick={() => saveSlotName(slotIdx)} className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer shrink-0">
+                              <Check size={14} />
                             </button>
-                            <button onClick={() => setEditingSlotIndex(null)} className="p-1 text-txt-muted hover:bg-bg-card rounded cursor-pointer">
-                              <X size={13} />
+                            <button onClick={() => setEditingSlotIndex(null)} className="p-1 text-txt-muted hover:bg-bg-card rounded cursor-pointer shrink-0">
+                              <X size={14} />
                             </button>
                           </div>
                         ) : (
                           <>
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span className="font-mono text-[9px] text-accent-main font-bold">SLOT {slotIdx + 1}:</span>
-                              <span className="text-xs font-semibold text-txt-main truncate">{defaultSlotTitle}</span>
+                            <div className="flex items-center gap-2 min-w-0 shrink flex-1">
+                              <span className="font-mono text-[9px] text-accent-main font-bold shrink-0 bg-accent-main/10 border border-accent-main/30 px-1.5 py-0.5 rounded">SLOT {slotIdx + 1}</span>
+                              <span className="text-xs font-semibold text-txt-main truncate min-w-0">{defaultSlotTitle}</span>
                             </div>
                             <button
                               onClick={() => {
                                 setEditingSlotIndex(slotIdx);
                                 setTempSlotName(defaultSlotTitle);
                               }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-txt-muted hover:text-txt-main p-1 cursor-pointer"
+                              className="opacity-80 lg:opacity-0 group-hover:opacity-100 transition-opacity text-txt-muted hover:text-txt-main p-1 cursor-pointer shrink-0"
                               title="Rename Slot"
                             >
-                              <Edit3 size={11} />
+                              <Edit3 size={12} />
                             </button>
                           </>
                         )}
@@ -3072,27 +3221,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
                       {/* Slot Content */}
                       {slotArtifact ? (
-                        <div className="flex flex-col gap-2 bg-bg-card/40 p-2.5 rounded-sm border border-border-main/50">
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="text-xs text-txt-main font-medium truncate max-w-[75%]">{slotArtifact.file_name}</span>
-                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase font-bold">v{slotArtifact.version}</span>
+                        <div className="flex flex-col gap-2.5 bg-bg-card/40 p-3 rounded-sm border border-border-main/50 w-full min-w-0 overflow-hidden">
+                          <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText size={14} className="text-accent-main shrink-0" />
+                              <span className="text-xs text-txt-main font-medium truncate min-w-0" title={slotArtifact.file_name}>
+                                {slotArtifact.file_name}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold shrink-0">
+                              v{slotArtifact.version}
+                            </span>
                           </div>
 
-                          <div className="flex justify-between items-center text-[9px] text-txt-muted font-mono pt-1 border-t border-border-main/20">
-                            <span>by {slotArtifact.uploaded_by}</span>
+                          <div className="flex items-center justify-between text-[9px] text-txt-muted font-mono pt-2 border-t border-border-main/20 gap-2 min-w-0 w-full flex-wrap">
+                            <span className="truncate max-w-[180px]">Uploaded by {slotArtifact.uploaded_by}</span>
                             
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                               <button
                                 onClick={() => handleOpenPreview(slotArtifact)}
-                                className="text-accent-main hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                                className="text-accent-main hover:underline flex items-center gap-1 cursor-pointer font-semibold bg-accent-main/10 border border-accent-main/30 px-2 py-0.5 rounded"
                               >
                                 <Eye size={11} />
-                                View
+                                View File
                               </button>
                               <a
                                 href={slotArtifact.file_url}
                                 download
-                                className="text-txt-sub hover:text-txt-main flex items-center gap-1 hover:underline"
+                                className="text-txt-sub hover:text-txt-main flex items-center gap-1 hover:underline bg-bg-surface border border-border-main/50 px-2 py-0.5 rounded"
                               >
                                 <FolderDown size={11} />
                                 Download
@@ -3103,19 +3259,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           <button
                             onClick={() => triggerSlotUpload(slotIdx)}
                             disabled={isUploading}
-                            className="mt-1 w-full h-7 border border-border-main/60 border-dashed text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1 transition-colors cursor-pointer text-txt-muted hover:text-txt-main"
+                            className="mt-1 w-full h-7 border border-border-main/60 border-dashed text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-txt-muted hover:text-txt-main"
                           >
                             <CloudUpload size={11} />
-                            Replace (Upload New Version)
+                            Replace File (Upload v{slotArtifact.version + 1})
                           </button>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center gap-2 py-4 border border-dashed border-border-main/50 bg-bg-base/40 rounded-sm">
-                          <span className="text-[10px] text-txt-muted font-light italic">Slot Empty</span>
+                        <div className="flex flex-col items-center justify-center gap-2 py-5 border border-dashed border-border-main/50 bg-bg-base/40 rounded-sm w-full">
+                          <span className="text-[10px] text-txt-muted font-light italic">Slot Empty — No active deliverable attached</span>
                           <button
                             onClick={() => triggerSlotUpload(slotIdx)}
                             disabled={isUploading}
-                            className="h-7 px-3 bg-accent-main/10 border border-accent-main/40 text-accent-main hover:bg-accent-main hover:text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 transition-all cursor-pointer font-bold"
+                            className="h-7 px-3 bg-accent-main/10 border border-accent-main/40 text-accent-main hover:bg-accent-main hover:text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1.5 transition-all cursor-pointer font-bold"
                           >
                             <CloudUpload size={11} />
                             Upload to Slot {slotIdx + 1}
@@ -3666,6 +3822,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </div>
               ) : (
                 (() => {
+                  const url = previewArtifact.file_url;
+                  const isInvalidUrl = !url || url === "#";
+
+                  if (isInvalidUrl) {
+                    return (
+                      <div className="flex flex-col items-center justify-center text-center gap-3 p-8 border border-border-main/60 bg-bg-surface rounded-sm max-w-md">
+                        <FileText size={40} className="text-yellow-400" />
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-semibold text-txt-main">{previewArtifact.file_name}</span>
+                          <span className="text-xs text-txt-muted">Preview unavailable for mock/placeholder URL. Please click &quot;Replace File&quot; in the slot to attach a live document.</span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const ext = previewArtifact.file_name.split(".").pop()?.toLowerCase() || "";
                   const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
                   const isPdf = ext === "pdf";
@@ -3720,6 +3891,102 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   );
                 })()
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Device Simulator Modal for Prototype Demo URL */}
+      {showDemoPreviewModal && liveDemo && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-3 sm:p-6">
+          <div className="bg-bg-surface border border-border-main/80 rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden">
+            {/* Modal Header Bar */}
+            <div className="px-4 py-3 border-b border-border-main/50 bg-bg-base flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main bg-accent-main/10 border border-accent-main/30 px-2 py-0.5 rounded font-bold shrink-0">
+                  LIVE PROTOTYPE SIMULATOR
+                </span>
+                <span className="text-xs font-mono text-txt-main truncate min-w-0">{formatUrl(liveDemo)}</span>
+              </div>
+
+              {/* Viewport Switcher */}
+              <div className="flex items-center gap-1 bg-bg-surface p-1 rounded border border-border-main/50 shrink-0">
+                <button
+                  onClick={() => setDemoViewportMode("desktop")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    demoViewportMode === "desktop" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
+                  }`}
+                  title="Desktop Mode (Full Width)"
+                >
+                  <Monitor size={12} />
+                  <span className="hidden sm:inline">Desktop</span>
+                </button>
+                <button
+                  onClick={() => setDemoViewportMode("tablet")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    demoViewportMode === "tablet" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
+                  }`}
+                  title="Tablet Mode (768px)"
+                >
+                  <Tablet size={12} />
+                  <span className="hidden sm:inline">Tablet</span>
+                </button>
+                <button
+                  onClick={() => setDemoViewportMode("mobile")}
+                  className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    demoViewportMode === "mobile" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
+                  }`}
+                  title="Mobile Mode (375px)"
+                >
+                  <Smartphone size={12} />
+                  <span className="hidden sm:inline">Mobile</span>
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setDemoIframeKey(k => k + 1)}
+                  className="p-1.5 text-txt-muted hover:text-txt-main hover:bg-bg-surface rounded transition-colors cursor-pointer"
+                  title="Reload Frame"
+                >
+                  <RefreshCw size={14} />
+                </button>
+                <a
+                  href={formatUrl(liveDemo)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-1.5 text-txt-muted hover:text-txt-main hover:bg-bg-surface rounded transition-colors"
+                  title="Open in New Tab"
+                >
+                  <ExternalLink size={14} />
+                </a>
+                <button
+                  onClick={() => setShowDemoPreviewModal(false)}
+                  className="p-1.5 text-txt-muted hover:text-txt-main hover:bg-bg-surface rounded transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Device Frame Viewport Body */}
+            <div className="flex-1 bg-bg-base/90 p-4 flex items-center justify-center overflow-auto">
+              <div className={`transition-all duration-300 flex items-center justify-center h-full w-full ${
+                demoViewportMode === "mobile"
+                  ? "max-w-[375px] max-h-[667px]"
+                  : demoViewportMode === "tablet"
+                  ? "max-w-[768px] max-h-[750px]"
+                  : "max-w-full h-full"
+              }`}>
+                <iframe
+                  key={demoIframeKey}
+                  src={formatUrl(liveDemo)}
+                  title="Live Prototype Demo Preview"
+                  className="w-full h-full rounded border border-border-main/60 bg-white shadow-2xl"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              </div>
             </div>
           </div>
         </div>
