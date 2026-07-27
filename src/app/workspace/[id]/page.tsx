@@ -27,7 +27,11 @@ import {
   LogOut,
   AlertCircle,
   Edit2,
-  Sparkles
+  Sparkles,
+  Eye,
+  Edit3,
+  Check,
+  FileText
 } from "lucide-react";
 
 
@@ -70,6 +74,8 @@ interface ChatMsg {
 
 interface Artifact {
   id: string;
+  slot_index?: number;
+  slot_name?: string;
   file_name: string;
   file_url: string;
   version: number;
@@ -236,9 +242,75 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [claimStatus, setClaimStatus] = useState<"idle" | "pending" | "approved" | "rejected">("idle");
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
 
+  // 4 Active Artifact Slots & Preview Modal State
+  const [slotNames, setSlotNames] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const savedSlots = localStorage.getItem(`ldk_workspace_slot_names_${id}`);
+      if (savedSlots) {
+        try {
+          const parsed = JSON.parse(savedSlots);
+          if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+        } catch {}
+      }
+    }
+    return [
+      "Presentation Pitch Deck",
+      "Architecture Specification",
+      "UI/UX Design Mockups",
+      "Source Code & Deliverables"
+    ];
+  });
+  const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
+  const [tempSlotName, setTempSlotName] = useState("");
+  const [targetUploadSlot, setTargetUploadSlot] = useState<number>(0);
+
+  const [previewArtifact, setPreviewArtifact] = useState<Artifact | null>(null);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState<boolean>(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
+
+  const saveSlotName = (index: number) => {
+    if (!tempSlotName.trim()) return;
+    const updated = [...slotNames];
+    updated[index] = tempSlotName.trim();
+    setSlotNames(updated);
+    localStorage.setItem(`ldk_workspace_slot_names_${id}`, JSON.stringify(updated));
+    setEditingSlotIndex(null);
+  };
+
+  const triggerSlotUpload = (slotIndex: number) => {
+    setTargetUploadSlot(slotIndex);
+    fileInputRef.current?.click();
+  };
+
+  const handleOpenPreview = async (art: Artifact) => {
+    setPreviewArtifact(art);
+    setPreviewContent(null);
+    setIsPreviewOpen(true);
+
+    const ext = art.file_name.split(".").pop()?.toLowerCase() || "";
+    const textExts = ["txt", "md", "json", "js", "ts", "jsx", "tsx", "py", "csv", "html", "css"];
+
+    if (textExts.includes(ext) && art.file_url && art.file_url !== "#") {
+      setIsPreviewLoading(true);
+      try {
+        const res = await fetch(art.file_url);
+        if (res.ok) {
+          const text = await res.text();
+          setPreviewContent(text);
+        }
+      } catch {}
+      setIsPreviewLoading(false);
+    }
+  };
+
   // Memoized Array Computation Performance Optimization
-  const activeArtifacts = useMemo(() => artifacts.filter(a => a.is_active), [artifacts]);
   const archivedArtifacts = useMemo(() => artifacts.filter(a => !a.is_active), [artifacts]);
+  const activeSlotArtifacts = useMemo(() => {
+    return [0, 1, 2, 3].map(slotIdx => {
+      return artifacts.find(a => a.is_active && (a.slot_index === slotIdx || a.slot_name === slotNames[slotIdx])) || null;
+    });
+  }, [artifacts, slotNames]);
   const onlineMembers = useMemo(() => roomMembers.filter(m => m.isOnline), [roomMembers]);
   const completedTasksCount = useMemo(() => tasks.filter(t => t.status === "done").length, [tasks]);
 
@@ -1518,10 +1590,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setIsUploading(true);
 
     const myName = user?.email?.split("@")[0] || "You";
-    const currentHighestVersion = artifacts
-      .filter(a => a.file_name.split(".").pop() === file.name.split(".").pop())
-      .reduce((max, a) => Math.max(max, a.version), 0);
+    const slotIdx = targetUploadSlot;
+    const slotName = slotNames[slotIdx] || `Slot ${slotIdx + 1}`;
 
+    const slotArtifacts = artifacts.filter(a => a.slot_index === slotIdx || a.slot_name === slotName);
+    const currentHighestVersion = slotArtifacts.reduce((max, a) => Math.max(max, a.version), 0);
     const nextVersion = currentHighestVersion + 1;
 
     let fileUrl = "#";
@@ -1575,7 +1648,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     // Update state locally
     setArtifacts(prev => {
       const deactivated = prev.map(art => {
-        if (art.file_name.split(".").pop() === file.name.split(".").pop()) {
+        if (art.slot_index === slotIdx || art.slot_name === slotName) {
           return { ...art, is_active: false };
         }
         return art;
@@ -1583,6 +1656,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
       const newArtifact: Artifact = {
         id: getUniqueId("art"),
+        slot_index: slotIdx,
+        slot_name: slotName,
         file_name: file.name,
         file_url: fileUrl,
         version: nextVersion,
@@ -2936,81 +3011,169 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
           {activeTab === "artifacts" && (
             <>
-              {/* Active Artifact Card */}
+              {/* 4 Active Artifact Slots Header */}
+              <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Project Artifact Vault (Max 4 Active Slots)</span>
+                  <h3 className="font-display text-sm font-light text-txt-main">Active Deliverable Decks</h3>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                  {activeSlotArtifacts.filter(Boolean).length} / 4 Slots Filled
+                </span>
+              </div>
+
+              {/* 4 Slot Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[0, 1, 2, 3].map(slotIdx => {
+                  const slotArtifact = activeSlotArtifacts[slotIdx];
+                  const defaultSlotTitle = slotNames[slotIdx] || `Slot ${slotIdx + 1}`;
+                  const isEditingThisSlot = editingSlotIndex === slotIdx;
+
+                  return (
+                    <div key={slotIdx} className="border border-border-main/70 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-2.5 relative group">
+                      {/* Slot Name Header & Edit */}
+                      <div className="flex justify-between items-center gap-2 border-b border-border-main/30 pb-2">
+                        {isEditingThisSlot ? (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <input
+                              type="text"
+                              value={tempSlotName}
+                              onChange={(e) => setTempSlotName(e.target.value)}
+                              className="bg-bg-card border border-accent-main/50 px-2 py-0.5 text-xs text-txt-main rounded-sm focus:outline-none w-full font-mono"
+                              placeholder="Enter slot name..."
+                              autoFocus
+                            />
+                            <button onClick={() => saveSlotName(slotIdx)} className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer">
+                              <Check size={13} />
+                            </button>
+                            <button onClick={() => setEditingSlotIndex(null)} className="p-1 text-txt-muted hover:bg-bg-card rounded cursor-pointer">
+                              <X size={13} />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-mono text-[9px] text-accent-main font-bold">SLOT {slotIdx + 1}:</span>
+                              <span className="text-xs font-semibold text-txt-main truncate">{defaultSlotTitle}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingSlotIndex(slotIdx);
+                                setTempSlotName(defaultSlotTitle);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity text-txt-muted hover:text-txt-main p-1 cursor-pointer"
+                              title="Rename Slot"
+                            >
+                              <Edit3 size={11} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Slot Content */}
+                      {slotArtifact ? (
+                        <div className="flex flex-col gap-2 bg-bg-card/40 p-2.5 rounded-sm border border-border-main/50">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-xs text-txt-main font-medium truncate max-w-[75%]">{slotArtifact.file_name}</span>
+                            <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded uppercase font-bold">v{slotArtifact.version}</span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-[9px] text-txt-muted font-mono pt-1 border-t border-border-main/20">
+                            <span>by {slotArtifact.uploaded_by}</span>
+                            
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenPreview(slotArtifact)}
+                                className="text-accent-main hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                              >
+                                <Eye size={11} />
+                                View
+                              </button>
+                              <a
+                                href={slotArtifact.file_url}
+                                download
+                                className="text-txt-sub hover:text-txt-main flex items-center gap-1 hover:underline"
+                              >
+                                <FolderDown size={11} />
+                                Download
+                              </a>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => triggerSlotUpload(slotIdx)}
+                            disabled={isUploading}
+                            className="mt-1 w-full h-7 border border-border-main/60 border-dashed text-[9px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1 transition-colors cursor-pointer text-txt-muted hover:text-txt-main"
+                          >
+                            <CloudUpload size={11} />
+                            Replace (Upload New Version)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2 py-4 border border-dashed border-border-main/50 bg-bg-base/40 rounded-sm">
+                          <span className="text-[10px] text-txt-muted font-light italic">Slot Empty</span>
+                          <button
+                            onClick={() => triggerSlotUpload(slotIdx)}
+                            disabled={isUploading}
+                            className="h-7 px-3 bg-accent-main/10 border border-accent-main/40 text-accent-main hover:bg-accent-main hover:text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 transition-all cursor-pointer font-bold"
+                          >
+                            <CloudUpload size={11} />
+                            Upload to Slot {slotIdx + 1}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* File upload hidden input */}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                className="hidden" 
+                accept=".pdf,.ppt,.pptx,.doc,.docx,.png,.jpg,.jpeg,.svg,.webp,.txt,.json,.zip"
+              />
+
+              {/* Version History Drawer List */}
               <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Artifacts</span>
-                  <FolderDown size={14} className="text-txt-main" />
+                <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Slot-Grouped Version History</span>
+                  <span className="text-[9px] font-mono text-txt-muted">{archivedArtifacts.length} Archived Versions</span>
                 </div>
 
                 <div className="flex flex-col gap-2.5">
-                  {activeArtifacts.map(art => (
-                    <div key={art.id} className="border border-border-main/60 p-3 rounded-sm flex flex-col gap-1.5 hover:bg-bg-card transition-colors duration-150 relative group">
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="text-xs text-txt-main font-semibold truncate max-w-[80%]">{art.file_name}</span>
-                        <span className="text-[9px] font-mono text-txt-muted uppercase">v{art.version}</span>
+                  {archivedArtifacts.map(art => (
+                    <div key={art.id} className="flex items-center justify-between border-b border-border-main/40 pb-2 text-[10px] font-mono">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-txt-main font-semibold truncate">{art.file_name}</span>
+                          <span className="text-[8px] text-txt-muted bg-bg-card border border-border-main px-1 rounded">v{art.version}</span>
+                          {art.slot_name && (
+                            <span className="text-[8px] text-accent-main font-mono">[{art.slot_name}]</span>
+                          )}
+                        </div>
+                        <span className="text-[8px] text-txt-muted">by {art.uploaded_by} • {new Date(art.created_at).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex justify-between items-center text-[9px] text-txt-muted font-mono">
-                        <span>by {art.uploaded_by}</span>
-                        <a href={art.file_url} className="text-txt-main hover:underline flex items-center gap-1">
-                          Download
-                          <FolderDown size={9} />
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleOpenPreview(art)}
+                          className="text-accent-main hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                        >
+                          <Eye size={11} />
+                          View
+                        </button>
+                        <a href={art.file_url} download className="text-txt-sub hover:underline flex items-center gap-1">
+                          Get
                         </a>
                       </div>
                     </div>
                   ))}
 
-                  {activeArtifacts.length === 0 && (
-                    <span className="text-[10px] text-txt-muted font-light italic">No files uploaded yet.</span>
-                  )}
-                </div>
-
-                {/* File upload hidden input */}
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileUpload} 
-                  className="hidden" 
-                  accept=".pdf,.ppt,.pptx,.doc,.docx"
-                />
-
-                <button 
-                  onClick={triggerFileUpload}
-                  disabled={isUploading}
-                  className="w-full h-8 border border-border-main/80 border-dashed text-[10px] font-mono tracking-wider uppercase rounded-sm hover:bg-bg-card flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {isUploading ? (
-                    <>
-                      <span className="h-3 w-3 rounded-full border border-txt-main/30 border-t-txt-main animate-spin" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <CloudUpload size={12} />
-                      Upload Deck/PDF
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* History drawer list */}
-              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Version History</span>
-                <div className="flex flex-col gap-2">
-                  {archivedArtifacts.map(art => (
-                    <div key={art.id} className="flex items-center justify-between border-b border-border-main/40 pb-2 text-[10px] font-mono">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-txt-sub truncate">{art.file_name}</span>
-                        <span className="text-[8px] text-txt-muted">v{art.version} • {art.uploaded_by}</span>
-                      </div>
-                      <a href={art.file_url} className="text-txt-main hover:underline flex-shrink-0">
-                        Get
-                      </a>
-                    </div>
-                  ))}
-
                   {archivedArtifacts.length === 0 && (
-                    <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions.</span>
+                    <span className="text-[10px] text-txt-muted font-light italic text-center py-2">No archived versions yet.</span>
                   )}
                 </div>
               </div>
@@ -3447,6 +3610,116 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </button>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-Browser Document Preview Modal */}
+      {isPreviewOpen && previewArtifact && (
+        <div className="fixed inset-0 z-[180] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="bg-bg-surface border border-border-main/80 rounded-sm w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-main/50 bg-bg-base">
+              <div className="flex items-center gap-2 truncate">
+                <Eye size={15} className="text-accent-main" />
+                <span className="font-mono text-xs font-semibold text-txt-main truncate">{previewArtifact.file_name}</span>
+                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold">v{previewArtifact.version}</span>
+                {previewArtifact.slot_name && (
+                  <span className="text-[9px] font-mono text-accent-main bg-accent-main/10 border border-accent-main/30 px-1.5 py-0.5 rounded font-bold truncate max-w-[180px]">[{previewArtifact.slot_name}]</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewArtifact.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-7 px-2.5 bg-bg-card hover:bg-border-main/50 text-txt-main text-[10px] font-mono rounded flex items-center gap-1 transition-colors"
+                >
+                  <ExternalLink size={12} />
+                  Open Tab
+                </a>
+                <a
+                  href={previewArtifact.file_url}
+                  download
+                  className="h-7 px-2.5 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono rounded flex items-center gap-1 font-bold transition-opacity"
+                >
+                  <FolderDown size={12} />
+                  Download
+                </a>
+                <button
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="p-1 text-txt-muted hover:text-txt-main hover:bg-bg-card rounded cursor-pointer transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Viewer Body */}
+            <div className="p-4 flex-1 overflow-auto bg-bg-base/80 min-h-[400px] flex items-center justify-center">
+              {isPreviewLoading ? (
+                <div className="flex flex-col items-center gap-2">
+                  <span className="h-6 w-6 rounded-full border-2 border-accent-main/30 border-t-accent-main animate-spin" />
+                  <span className="text-xs font-mono text-txt-muted">Loading document preview...</span>
+                </div>
+              ) : (
+                (() => {
+                  const ext = previewArtifact.file_name.split(".").pop()?.toLowerCase() || "";
+                  const isImage = ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(ext);
+                  const isPdf = ext === "pdf";
+                  const isText = ["txt", "md", "json", "js", "ts", "jsx", "tsx", "py", "csv", "html", "css"].includes(ext);
+
+                  if (isImage) {
+                    return (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={previewArtifact.file_url}
+                        alt={previewArtifact.file_name}
+                        className="max-h-[70vh] max-w-full object-contain mx-auto rounded border border-border-main/40 shadow-lg"
+                      />
+                    );
+                  }
+
+                  if (isPdf) {
+                    return (
+                      <iframe
+                        src={previewArtifact.file_url}
+                        title={previewArtifact.file_name}
+                        className="w-full h-[70vh] rounded border border-border-main/50 shadow-inner bg-white"
+                      />
+                    );
+                  }
+
+                  if (isText && previewContent) {
+                    return (
+                      <pre className="w-full max-h-[70vh] overflow-auto p-4 bg-bg-surface border border-border-main/60 rounded text-xs font-mono text-txt-main whitespace-pre-wrap leading-relaxed">
+                        {previewContent}
+                      </pre>
+                    );
+                  }
+
+                  return (
+                    <div className="flex flex-col items-center justify-center text-center gap-3 p-8 border border-border-main/60 bg-bg-surface rounded-sm max-w-md">
+                      <FileText size={40} className="text-txt-muted" />
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-semibold text-txt-main">{previewArtifact.file_name}</span>
+                        <span className="text-xs text-txt-muted">Binary file format (.{ext}). Download or open in tab to inspect.</span>
+                      </div>
+                      <a
+                        href={previewArtifact.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-8 px-4 bg-accent-main text-bg-base text-xs font-mono font-bold rounded flex items-center gap-1.5 hover:opacity-90 transition-opacity"
+                      >
+                        <ExternalLink size={13} />
+                        Open in New Window
+                      </a>
+                    </div>
+                  );
+                })()
+              )}
             </div>
           </div>
         </div>
