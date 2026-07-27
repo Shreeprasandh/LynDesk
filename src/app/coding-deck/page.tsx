@@ -77,7 +77,7 @@ export default function CodingDeckPage() {
         await supabase.auth.updateUser({
           data: { ...user.user_metadata, leetcode_username: cleanHandle }
         });
-      } catch (e) {}
+      } catch {}
     }
 
     setMessage({ text: `Successfully linked LeetCode handle @${cleanHandle}! Syncing live stats...`, type: "success" });

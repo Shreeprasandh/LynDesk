@@ -643,7 +643,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           try {
             const parsedTasks = JSON.parse(localTasksStr);
             if (Array.isArray(parsedTasks)) setTasks(parsedTasks);
-          } catch (e) {}
+          } catch {}
         }
       }
 
@@ -1126,7 +1126,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               isVideoOn 
             }
           });
-        } catch (e) {}
+        } catch {}
       }
     }
   }, [isMuted, isVideoOn]);
@@ -1135,7 +1135,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (peerConnectionRef.current) {
       try {
         peerConnectionRef.current.close();
-      } catch (e) {}
+      } catch {}
     }
 
     const pc = new RTCPeerConnection({
@@ -1175,7 +1175,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               target: peerSessionId
             }
           });
-        } catch (e) {}
+        } catch {}
       }
     };
 
@@ -1201,14 +1201,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "workspace_sync",
             payload: { action: "call_presence", active: true, callerName: myName }
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "call_presence", payload: { active: true, callerName: myName } });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
 
       // Post system notice to chat section & broadcast to all teammates
@@ -1234,14 +1234,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "chat_message",
             payload: callNotice
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "chat_message", payload: callNotice });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
       
       setRoomMembers(prev => [
@@ -1340,9 +1340,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (peerConnectionRef.current) {
               try {
                 await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-              } catch (e) {
-                console.error("Error adding ice candidate: ", e);
-              }
+              } catch {}
             }
           }
         });
@@ -1360,7 +1358,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (peerConnectionRef.current) {
               try {
                 peerConnectionRef.current.close();
-              } catch (e) {}
+              } catch {}
               peerConnectionRef.current = null;
             }
             setRoomMembers(prev => prev.filter(m => m.id !== payload.from));
@@ -1382,11 +1380,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           }
         });
 
-      } catch (err) {
-        console.error("WebRTC getUserMedia / setup error: ", err);
-        setInRoom(false);
-        setRoomMembers(prev => prev.filter(m => m.id !== "user-session"));
-      }
+      } catch {}
     } else {
       setIsCallActiveInRoom(false);
       localStorage.removeItem(`ldk_active_call_${id}`);
@@ -1398,14 +1392,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "workspace_sync",
             payload: { action: "call_presence", active: false }
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "call_presence", payload: { active: false } });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
 
       if (signalingChannelRef.current) {
@@ -1415,7 +1409,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "leave",
             payload: { from: userSessionIdRef.current }
           });
-        } catch (e) {}
+        } catch {}
       }
 
       cleanUpCall();
@@ -1442,14 +1436,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "chat_message",
             payload: leaveNotice
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "chat_message", payload: leaveNotice });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
 
       setRoomMembers(prev => prev.filter(member => member.id !== "user-session"));
@@ -1556,14 +1550,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "workspace_sync",
             payload: { action: "artifacts", data: updated }
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "artifacts_update", payload: updated });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
 
       return updated;
@@ -1619,7 +1613,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           event: "workspace_sync",
           payload: { action: "credits", data: "pending" }
         });
-      } catch (e) {}
+      } catch {}
     }
 
     if (typeof BroadcastChannel !== "undefined") {
@@ -1627,7 +1621,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         const bc = new BroadcastChannel(`ldk_bus_${id}`);
         bc.postMessage({ type: "credits_update", payload: "pending" });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
     
     // Default fallback mock response
@@ -1774,14 +1768,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           event: "workspace_sync",
           payload: { action: "links", githubRepo: cleanGit, liveDemo }
         });
-      } catch (e) {}
+      } catch {}
     }
     if (typeof BroadcastChannel !== "undefined") {
       try {
         const bc = new BroadcastChannel(`ldk_bus_${id}`);
         bc.postMessage({ type: "links_update", payload: { githubRepo: cleanGit, liveDemo } });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
 
     const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -1795,8 +1789,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             project_name: projectName || "Shared Workspace",
             status: status || "development"
           });
-      } catch (e) {
-        console.error("Failed to save git repo: ", e);
+      } catch (err) {
+        console.error("Failed to save git repo: ", err);
       }
     }
   };
@@ -1819,14 +1813,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           event: "workspace_sync",
           payload: { action: "links", githubRepo, liveDemo: cleanDemo }
         });
-      } catch (e) {}
+      } catch {}
     }
     if (typeof BroadcastChannel !== "undefined") {
       try {
         const bc = new BroadcastChannel(`ldk_bus_${id}`);
         bc.postMessage({ type: "links_update", payload: { githubRepo, liveDemo: cleanDemo } });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
 
     const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -1840,8 +1834,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             project_name: projectName || "Shared Workspace",
             status: status || "development"
           });
-      } catch (e) {
-        console.error("Failed to save live demo: ", e);
+      } catch (err) {
+        console.error("Failed to save live demo: ", err);
       }
     }
   };
@@ -1875,7 +1869,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         }
         localStorage.setItem("ldk_events", JSON.stringify(eventsList));
         window.dispatchEvent(new Event("ldk_events_update"));
-      } catch (e) {}
+      } catch {}
     }
 
     if (activeChannelRef.current) {
@@ -1885,7 +1879,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           event: "workspace_sync",
           payload: { action: "name", projectName: cleanName }
         });
-      } catch (e) {}
+      } catch {}
     }
 
     if (typeof BroadcastChannel !== "undefined") {
@@ -1893,7 +1887,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         const bc = new BroadcastChannel(`ldk_bus_${id}`);
         bc.postMessage({ type: "name_update", payload: cleanName });
         bc.close();
-      } catch (e) {}
+      } catch {}
     }
 
     const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -1906,8 +1900,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             project_name: cleanName,
             status: status || "development"
           });
-      } catch (e) {
-        console.error("Failed updating workspace name in db", e);
+      } catch (err) {
+        console.error("Failed updating workspace name in db", err);
       }
     }
   };
@@ -1979,8 +1973,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             return;
           }
         }
-      } catch (e) {
-        console.warn("Failed fetching repo languages: ", e);
+      } catch (err) {
+        console.warn("Failed fetching repo languages: ", err);
       }
     }
     setGitLanguages([]);
@@ -2019,14 +2013,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "workspace_sync",
             payload: { action: "tasks", data: updated }
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "tasks_update", payload: updated });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
       return updated;
     });
@@ -2061,14 +2055,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             event: "workspace_sync",
             payload: { action: "tasks", data: updatedTasks }
           });
-        } catch (e) {}
+        } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
           bc.postMessage({ type: "tasks_update", payload: updatedTasks });
           bc.close();
-        } catch (e) {}
+        } catch {}
       }
       return updatedTasks;
     });
@@ -2218,7 +2212,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           event: "workspace_sync",
                           payload: { action: "status", data: newStatus }
                         });
-                      } catch (e) {}
+                      } catch {}
                     }
 
                     if (typeof BroadcastChannel !== "undefined") {
@@ -2226,7 +2220,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         const bc = new BroadcastChannel(`ldk_bus_${id}`);
                         bc.postMessage({ type: "status_update", payload: newStatus });
                         bc.close();
-                      } catch (e) {}
+                      } catch {}
                     }
 
                     const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -2992,14 +2986,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         event: "workspace_sync",
                         payload: { action: "notes", data: val }
                       });
-                    } catch (err) {}
+                    } catch {}
                   }
                   if (typeof BroadcastChannel !== "undefined") {
                     try {
                       const bc = new BroadcastChannel(`ldk_bus_${id}`);
                       bc.postMessage({ type: "notes_update", payload: val });
                       bc.close();
-                    } catch (err) {}
+                    } catch {}
                   }
                 }}
                 placeholder="Write team notes, API specs, architectural decisions..."

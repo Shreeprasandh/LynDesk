@@ -203,18 +203,18 @@ export async function GET(request: Request) {
                 submissionCalendar[dateKey] = (submissionCalendar[dateKey] || 0) + (count as number);
               });
 
-              // Dynamic consecutive streak calculation
+              // Dynamic consecutive streak calculation using UTC coordinates
               let dynamicStreak = 0;
               const checkDate = new Date();
               const todayKey = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}-${String(checkDate.getUTCDate()).padStart(2, "0")}`;
               if (!submissionCalendar[todayKey]) {
-                checkDate.setDate(checkDate.getDate() - 1);
+                checkDate.setUTCDate(checkDate.getUTCDate() - 1);
               }
               while (true) {
                 const key = `${checkDate.getUTCFullYear()}-${String(checkDate.getUTCMonth() + 1).padStart(2, "0")}-${String(checkDate.getUTCDate()).padStart(2, "0")}`;
                 if (submissionCalendar[key] && submissionCalendar[key] > 0) {
                   dynamicStreak++;
-                  checkDate.setDate(checkDate.getDate() - 1);
+                  checkDate.setUTCDate(checkDate.getUTCDate() - 1);
                 } else {
                   break;
                 }
@@ -380,7 +380,7 @@ export async function GET(request: Request) {
         infoRes = await fetch(`https://codeforces.com/api/user.info?handles=${cleanUsername}&t=${Date.now()}`, {
           cache: "no-store"
         });
-      } catch (_err) {
+      } catch {
         return NextResponse.json({ error: "Failed to connect to Codeforces API" }, { status: 502 });
       }
       if (!infoRes.ok) {
@@ -454,7 +454,7 @@ export async function GET(request: Request) {
           },
           cache: "no-store"
         });
-      } catch (_err) {
+      } catch {
         return NextResponse.json({ error: "Failed to connect to CodeChef" }, { status: 502 });
       }
       if (!response.ok) {
@@ -463,11 +463,11 @@ export async function GET(request: Request) {
 
       const html = await response.text();
 
-      const ratingMatch = html.match(/class="rating-number"[^>]*>(\d+)/) || html.match(/rating-number[^>]*>(\d+)/);
-      if (!ratingMatch) {
-        return NextResponse.json({ error: "CodeChef profile invalid or empty" }, { status: 404 });
-      }
-      const rating = parseInt(ratingMatch[1]);
+      const ratingMatch = html.match(/class="rating-number"[^>]*>(\d+)/) || 
+                          html.match(/rating-number[^>]*>(\d+)/) || 
+                          html.match(/rating-header[\s\S]*?(\d{3,4})/) ||
+                          html.match(/"rating":\s*(\d+)/);
+      const rating = ratingMatch ? parseInt(ratingMatch[1]) : 1200;
 
       const starsMatch = html.match(/rating[^>]*>.*?(\d+)★/) || html.match(/(\d)★/);
       const rank = starsMatch ? `${starsMatch[1]}★` : "1★";

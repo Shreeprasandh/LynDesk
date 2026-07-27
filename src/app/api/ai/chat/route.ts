@@ -35,10 +35,7 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Format chat history into Gemini format
-    const contents = [];
-    
-    // Add context setup
+    // Format chat history into Gemini format ensuring strict role alternation (user <-> model)
     const contextPrompt = `
       You are LynAI, the elite portfolio co-pilot and coding assistant on LynDesk.
       User Profile Context:
@@ -56,24 +53,32 @@ export async function POST(req: NextRequest) {
       Respond directly to the user's prompt as a highly capable AI assistant agent. Be concise, professional, and use markdown formatting.
     `;
 
-    contents.push({ role: "user", parts: [{ text: contextPrompt }] });
-    contents.push({ role: "model", parts: [{ text: "Understood. I will act as LynAI with the provided profile and workspace contexts." }] });
+    const rawHistory: Array<{ role: "user" | "model"; text: string }> = [
+      { role: "user", text: contextPrompt },
+      { role: "model", text: "Understood. I will act as LynAI with the provided profile and workspace contexts." }
+    ];
 
-    // Add recent history messages
     if (Array.isArray(messages)) {
       messages.forEach((msg: any) => {
+        if (!msg || !msg.text) return;
         const role = msg.sender === "user" ? "user" : "model";
-        contents.push({
-          role: role,
-          parts: [{ text: msg.text }]
-        });
+        rawHistory.push({ role, text: msg.text });
       });
     }
 
-    // Add final prompt
-    contents.push({
-      role: "user",
-      parts: [{ text: userPrompt }]
+    rawHistory.push({ role: "user", text: userPrompt });
+
+    // Merge consecutive messages of the same role to strictly satisfy Gemini API contract
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    rawHistory.forEach((item) => {
+      if (contents.length > 0 && contents[contents.length - 1].role === item.role) {
+        contents[contents.length - 1].parts[0].text += `\n${item.text}`;
+      } else {
+        contents.push({
+          role: item.role,
+          parts: [{ text: item.text }]
+        });
+      }
     });
 
     const result = await model.generateContent({

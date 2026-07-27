@@ -78,25 +78,9 @@ export async function POST(request: Request) {
     
     // Check fallback mode (if local DB is completely offline or keys are missing)
     if (!supabaseAdmin) {
-      if (action === "request") {
-        const fallbackCode = "123456";
-        // console.log(`[DELETE ACCOUNT OTP CODE (FALLBACK)]: ${fallbackCode}`);
-        
-        // Try to send email anyway if SMTP is configured
-        const emailSent = await sendOtpEmail("shreecode.service@gmail.com", fallbackCode);
-        
-        return NextResponse.json({ 
-          success: true, 
-          message: emailSent 
-            ? "Verification code sent to email (Fallback active)." 
-            : "Verification code generated (Check local terminal logs)." 
-        });
-      } else {
-        if (otp === "123456") {
-          return NextResponse.json({ success: true, message: "Account verified (Mock Delete)." });
-        }
-        return NextResponse.json({ error: "Invalid verification code." }, { status: 400 });
-      }
+      return NextResponse.json({ 
+        error: "Server configuration missing: Admin database authorization is required to process secure account deletion operations." 
+      }, { status: 503 });
     }
 
     // 2. Validate user identity using session token

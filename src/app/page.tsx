@@ -1441,7 +1441,7 @@ export default function Home() {
             <div className="flex items-center justify-between border-b border-border-main/50 pb-4">
               <div className="flex flex-col gap-0.5">
                 <h2 className="font-display text-xl font-light text-txt-main">
-                  {dashTab === "workspaces" ? "Event Registry" : "Opportunities Board"}
+                  {dashTab === "workspaces" ? "Event Registry" : `Opportunities Board (${opportunities.length})`}
                 </h2>
                 <p className="text-[10px] text-txt-muted font-light">
                   {dashTab === "workspaces" ? "Tracked project desks and submission stages." : "Faculty-recommended contests, hackathons, and news."}
