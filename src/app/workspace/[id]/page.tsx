@@ -146,7 +146,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Voice/Video Room State
   const [inRoom, setInRoom] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(true);
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
@@ -176,18 +176,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // WebRTC real-time voice and video variables
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [remoteIsVideoOn, setRemoteIsVideoOn] = useState(false);
+  const [remoteIsVideoOn, setRemoteIsVideoOn] = useState(true);
   const [remoteIsMuted, setRemoteIsMuted] = useState(false);
-  const [remoteName, setRemoteName] = useState("Classmate");
+  const [remoteName, setRemoteName] = useState<string>("Classmate");
 
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const userSessionIdRef = useRef(generateSessionId());
   const signalingChannelRef = useRef<any>(null);
+  const userSessionIdRef = useRef<string>(generateSessionId());
   const activeChannelRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const iceCandidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
 
+  // Reliable callback refs for video HTML element srcObject assignment
+  const setLocalVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    localVideoRef.current = node;
+    if (node && localStream) {
+      node.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  const setRemoteVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    remoteVideoRef.current = node;
+    if (node && remoteStream) {
+      node.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+  
   // Guarantee WebRTC media track and peer connection cleanup on component unmount
   useEffect(() => {
     return () => {
@@ -1325,6 +1341,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             const pc = createPeerConnection(channel, payload.from);
             await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
             
+            // Drain buffered ICE candidates after setting remote description
+            while (iceCandidatesQueueRef.current.length > 0) {
+              const cand = iceCandidatesQueueRef.current.shift();
+              if (cand && pc) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch {}
+              }
+            }
+
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
@@ -1344,16 +1370,28 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
             if (peerConnectionRef.current) {
               await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+              
+              // Drain buffered ICE candidates after setting remote description
+              while (iceCandidatesQueueRef.current.length > 0) {
+                const cand = iceCandidatesQueueRef.current.shift();
+                if (cand && peerConnectionRef.current) {
+                  try {
+                    await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(cand));
+                  } catch {}
+                }
+              }
             }
           }
         });
 
         channel.on("broadcast", { event: "ice-candidate" }, async ({ payload }) => {
           if (payload.from !== userSessionIdRef.current && payload.target === userSessionIdRef.current) {
-            if (peerConnectionRef.current) {
+            if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
               try {
                 await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
               } catch {}
+            } else {
+              iceCandidatesQueueRef.current.push(payload.candidate);
             }
           }
         });
@@ -2477,7 +2515,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 }`}
               >
                 <video 
-                  ref={localVideoRef} 
+                  ref={setLocalVideoNode} 
                   autoPlay 
                   playsInline 
                   muted 
@@ -2511,7 +2549,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   className="w-full sm:w-1/2 aspect-video relative border border-border-main/60 bg-bg-surface rounded-sm overflow-hidden flex items-center justify-center"
                 >
                   <video 
-                    ref={remoteVideoRef} 
+                    ref={setRemoteVideoNode} 
                     autoPlay 
                     playsInline 
                     className={`w-full h-full object-cover transition-opacity duration-300 ${remoteStream && remoteIsVideoOn ? "opacity-100" : "opacity-0 pointer-events-none"}`} 
