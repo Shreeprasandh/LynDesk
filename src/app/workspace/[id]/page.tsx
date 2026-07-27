@@ -2158,6 +2158,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const fetchCommits = useCallback(async () => {
     if (!githubRepo || !githubRepo.trim()) {
+      const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
+      if (savedCommitsStr) {
+        try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
+      }
       return;
     }
 
@@ -2242,7 +2246,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     // 3. Fallback to /api/git/commits if no live GitHub commits could be fetched and no cache exists
     if (!fetched) {
       const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
-      if (!savedCommitsStr) {
+      if (savedCommitsStr) {
+        try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
+      } else {
         try {
           const res = await fetch("/api/git/commits");
           if (res.ok) {
@@ -2258,7 +2264,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const fetchGitLanguages = useCallback(async () => {
     if (!githubRepo || !githubRepo.trim()) {
-      setGitLanguages([]);
+      const savedLangsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_langs_${id}`) : null;
+      if (savedLangsStr) {
+        try { setGitLanguages(JSON.parse(savedLangsStr)); } catch {}
+      }
       return;
     }
     const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
@@ -2285,19 +2294,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         console.warn("Failed fetching repo languages: ", err);
       }
     }
-    setGitLanguages([]);
+    const savedLangsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_langs_${id}`) : null;
+    if (savedLangsStr) {
+      try { setGitLanguages(JSON.parse(savedLangsStr)); } catch {}
+    }
   }, [githubRepo, id]);
 
   useEffect(() => {
-    setTimeout(() => {
-      fetchCommits();
-      fetchGitLanguages();
-    }, 0);
-    const interval = setInterval(() => {
-      fetchCommits();
-      fetchGitLanguages();
-    }, 10000);
-    return () => clearInterval(interval);
+    let active = true;
+    (async () => {
+      if (active) {
+        await fetchCommits();
+        await fetchGitLanguages();
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [fetchCommits, fetchGitLanguages]);
 
   const handleAddTask = (e: React.FormEvent) => {
