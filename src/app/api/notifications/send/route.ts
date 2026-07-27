@@ -18,9 +18,9 @@ export async function POST(req: Request) {
         auth: { persistSession: false }
       });
 
-      // 1. Try inserting notification into notifications table
+      // 1. Try inserting notification into database notifications table
       try {
-        const { error: insertErr } = await supabaseAdmin.from("notifications").insert({
+        await supabaseAdmin.from("notifications").insert({
           user_id: recipientId,
           sender_id: senderId || null,
           title: title,
@@ -30,11 +30,8 @@ export async function POST(req: Request) {
           is_read: false,
           created_at: new Date().toISOString()
         });
-        if (insertErr) {
-          console.warn("Database notifications table insert notice:", insertErr.message);
-        }
-      } catch (dbErr) {
-        console.warn("Database notifications insert exception:", dbErr);
+      } catch {
+        // Table not migrated yet, safe fallback to websocket broadcast
       }
 
       // 2. Broadcast via Supabase Realtime WebSocket to recipient channel & global bus

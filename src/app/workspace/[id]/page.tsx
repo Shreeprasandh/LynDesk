@@ -44,12 +44,29 @@ const getUniqueId = (prefix: string = "id") => {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 };
 
-const isValidUrl = (urlStr: string): boolean => {
-  if (!urlStr || !urlStr.trim()) return false;
-  const trimmed = urlStr.trim();
-  // Valid URL pattern: requires valid domain like github.com/user/repo or https://example.com
-  const pattern = /^(https?:\/\/)?([\w-]+\.)+[a-z]{2,}(\/[\w-./?%&=#]*)?$/i;
-  return pattern.test(trimmed);
+const getWorkspaceUuid = (rawId: string): string => {
+  if (!rawId) return "00000000-0000-4000-8000-000000000000";
+  const trimmed = rawId.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 16777619);
+    h2 = Math.imul(h2 ^ code, 2246822519);
+  }
+  const hex1 = Math.abs(h1).toString(16).padStart(8, "0");
+  const hex2 = Math.abs(h2).toString(16).padStart(8, "0");
+  const combined = (hex1 + hex2 + hex1 + hex2).substring(0, 32);
+
+  const p1 = combined.substring(0, 8);
+  const p2 = combined.substring(8, 12);
+  const p3 = "4" + combined.substring(13, 16);
+  const p4 = "8" + combined.substring(17, 20);
+  const p5 = combined.substring(20, 32);
+  return `${p1}-${p2}-${p3}-${p4}-${p5}`;
 };
 
 interface FriendProfile {
@@ -107,6 +124,7 @@ const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
 
   const { id } = use(params);
+  const workspaceUuid = useMemo(() => getWorkspaceUuid(id), [id]);
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
@@ -252,23 +270,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
 
   // 4 Active Artifact Slots & Preview Modal State
-  const [slotNames, setSlotNames] = useState<string[]>(() => {
+  const [slotNames, setSlotNames] = useState<string[]>([
+    "Presentation Pitch Deck",
+    "Architecture Specification",
+    "UI/UX Design Mockups",
+    "Source Code & Deliverables"
+  ]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const savedSlots = localStorage.getItem(`ldk_workspace_slot_names_${id}`);
       if (savedSlots) {
         try {
           const parsed = JSON.parse(savedSlots);
-          if (Array.isArray(parsed) && parsed.length === 4) return parsed;
+          if (Array.isArray(parsed) && parsed.length === 4) {
+            setTimeout(() => setSlotNames(parsed), 0);
+          }
         } catch {}
       }
     }
-    return [
-      "Presentation Pitch Deck",
-      "Architecture Specification",
-      "UI/UX Design Mockups",
-      "Source Code & Deliverables"
-    ];
-  });
+  }, [id]);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
   const [tempSlotName, setTempSlotName] = useState("");
   const [targetUploadSlot, setTargetUploadSlot] = useState<number>(0);
@@ -369,8 +390,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setArtifacts(payload);
         localStorage.setItem(`ldk_workspace_artifacts_${id}`, JSON.stringify(payload));
       } else if (type === "links_update" && payload) {
-        if (payload.githubRepo) setGithubRepo(payload.githubRepo);
-        if (payload.liveDemo) setLiveDemo(payload.liveDemo);
+        const git = payload.githubRepo || payload.github_repo;
+        const demo = payload.liveDemo || payload.live_demo_url;
+        if (git) {
+          setGithubRepo(git);
+          if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_git_${id}`, git);
+        }
+        if (demo) {
+          setLiveDemo(demo);
+          if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_demo_${id}`, demo);
+        }
       } else if (type === "status_update" && typeof payload === "string") {
         setStatus(payload as any);
       } else if (type === "credits_update" && typeof payload === "string") {
@@ -467,7 +496,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             role,
             profile:profile_id ( * )
           `)
-          .eq("project_space_id", id);
+          .eq("project_space_id", workspaceUuid);
         
         if (!error && data && data.length > 0) {
           dbMembersList = data.map((item: any) => {
@@ -525,7 +554,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (user) {
       loadMembers();
     }
-  }, [id, user, workspaceTrigger]);
+  }, [id, user, workspaceTrigger, workspaceUuid]);
 
   // Load sent invites from local storage
   useEffect(() => {
@@ -619,22 +648,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   }, [user, id]);
 
   // Git Commits (live simulation list with local storage cache)
-  const [commits, setCommits] = useState<any[]>(() => {
+  const [commits, setCommits] = useState<any[]>([
+    { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
+    { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
+    { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
+  ]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`ldk_workspace_commits_${id}`);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTimeout(() => setCommits(parsed), 0);
+          }
         } catch {}
       }
     }
-    return [
-      { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
-      { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
-      { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
-    ];
-  });
+  }, [id]);
 
   // speaking simulation loop
   useEffect(() => {
@@ -656,9 +688,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return () => clearInterval(interval);
   }, [inRoom]);
 
-  // Join workspace check on mount (URLSearchParams // await searchParams)
   useEffect(() => {
-    if (typeof window !== "undefined" && user && id !== "e1" && id !== "e2") {
+    if (typeof window !== "undefined" && user) {
       const searchParams = new URLSearchParams(window.location.search);
       if (searchParams.has("join")) {
         const autoJoin = async () => {
@@ -666,35 +697,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             const { data } = await supabase
               .from("project_members")
               .select("id")
-              .eq("project_space_id", id)
+              .eq("project_space_id", workspaceUuid)
               .eq("profile_id", user.id);
             
             if (!data || data.length === 0) {
               await supabase
                 .from("project_members")
                 .insert({
-                  project_space_id: id,
+                  project_space_id: workspaceUuid,
                   profile_id: user.id,
                   role: "member"
                 });
 
-              // try catch error handling safeguard
               await supabase.from("chat_messages").insert({
-                project_space_id: id,
+                project_space_id: workspaceUuid,
                 profile_id: user.id,
                 content: `Joined the workspace via share link!`
               });
-
-              setWorkspaceTrigger(prev => prev + 1);
             }
-          } catch (e) {
-            console.error("Auto join failure: ", e);
+          } catch (err) {
+            console.error("Auto-join error:", err);
           }
         };
         autoJoin();
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
       }
     }
-  }, [user, id]);
+  }, [user, id, workspaceUuid]);
 
   // Fetch classmates to invite
   useEffect(() => {
@@ -788,18 +818,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             *,
             events ( title )
           `)
-          .eq("id", id)
-          .single();
+          .eq("id", workspaceUuid)
+          .maybeSingle();
 
         if (!error && data) {
-          setProjectName(data.project_name);
-          setStatus(data.status);
-          const gitVal = data.github_repo || (typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) : "") || "";
-          const demoVal = data.live_demo_url || (typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) : "") || "";
-          setGithubRepo(gitVal);
-          setLiveDemo(demoVal);
-          setTempGit(gitVal);
-          setTempDemo(demoVal);
+          if (data.project_name) setProjectName(data.project_name);
+          if (data.status) setStatus(data.status);
+
+          const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
+          const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
+
+          const finalGit = data.github_repo?.trim() || localGit;
+          const finalDemo = data.live_demo_url?.trim() || localDemo;
+
+          setGithubRepo(finalGit);
+          setLiveDemo(finalDemo);
+          setTempGit(finalGit);
+          setTempDemo(finalDemo);
+
+          if (typeof window !== "undefined") {
+            if (finalGit) localStorage.setItem(`ldk_workspace_git_${id}`, finalGit);
+            if (finalDemo) localStorage.setItem(`ldk_workspace_demo_${id}`, finalDemo);
+          }
+
+          // If DB was missing git/demo URL but local storage had it, sync DB
+          if ((!data.github_repo && finalGit) || (!data.live_demo_url && finalDemo)) {
+            (async () => {
+              try {
+                await supabase.from("project_spaces").upsert({
+                  id: workspaceUuid,
+                  github_repo: finalGit,
+                  live_demo_url: finalDemo
+                });
+              } catch {}
+            })();
+          }
           if (data.events) {
             setEventTitle(data.events.title);
           }
@@ -838,6 +891,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               console.error("Error saving workspace to local dashboard storage: ", e);
             }
           }
+        } else if (error) {
+          // If project space row doesn't exist in Supabase DB yet, auto-create it under workspaceUuid
+          const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
+          const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
+          (async () => {
+            try {
+              await supabase.from("project_spaces").upsert({
+                id: workspaceUuid,
+                project_name: projectName || "Shared Workspace",
+                github_repo: localGit || githubRepo || null,
+                live_demo_url: localDemo || liveDemo || null,
+                status: status || "development"
+              });
+            } catch {}
+          })();
         }
       } catch (e) {
         console.error("Workspace fetch error: ", e);
@@ -856,7 +924,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             created_at,
             profiles ( username, college_key, company_key )
           `)
-          .eq("project_space_id", id)
+          .eq("project_space_id", workspaceUuid)
           .order("created_at", { ascending: true });
 
         let loadedChat: ChatMsg[] = [];
@@ -917,7 +985,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             created_at,
             profiles ( username )
           `)
-          .eq("project_space_id", id)
+          .eq("project_space_id", workspaceUuid)
           .order("created_at", { ascending: false });
 
         if (!artError && dbArtifacts && dbArtifacts.length > 0) {
@@ -948,9 +1016,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const { data: claim, error: claimErr } = await supabase
             .from("credit_applications")
             .select("status")
-            .eq("project_space_id", id)
+            .eq("project_space_id", workspaceUuid)
             .eq("student_id", user.id)
-            .single();
+            .maybeSingle();
 
           if (!claimErr && claim) {
             setClaimStatus(claim.status);
@@ -965,20 +1033,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     };
 
     fetchWorkspaceDetails();
-  }, [id, user, workspaceTrigger]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, user, workspaceTrigger, workspaceUuid]);
 
   // Real-time Chat subscription
   useEffect(() => {
     // Subscribe to chat message inserts & real-time member joins/chat in Supabase for this project space
     const channel = supabase
-      .channel(`project_chat:${id}`)
+      .channel(`project_chat:${workspaceUuid}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "chat_messages",
-          filter: `project_space_id=eq.${id}`,
+          filter: `project_space_id=eq.${workspaceUuid}`,
         },
         async (payload) => {
           // Skip if this message was sent by the current user (already added optimistically)
@@ -989,7 +1058,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             .from("profiles")
             .select("username")
             .eq("id", payload.new.profile_id)
-            .single();
+            .maybeSingle();
 
           const incomingMsg: ChatMsg = {
             id: payload.new.id,
@@ -1032,8 +1101,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const data = sync.data || sync;
 
           if (action === "links") {
-            if (data.githubRepo) setGithubRepo(data.githubRepo);
-            if (data.liveDemo) setLiveDemo(data.liveDemo);
+            const git = data.githubRepo || data.github_repo;
+            const demo = data.liveDemo || data.live_demo_url;
+            if (git) {
+              setGithubRepo(git);
+              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_git_${id}`, git);
+            }
+            if (demo) {
+              setLiveDemo(demo);
+              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_demo_${id}`, demo);
+            }
           } else if (action === "tasks" && Array.isArray(data)) {
             setTasks(data);
             localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data));
@@ -1117,7 +1194,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       supabase.removeChannel(channel);
       activeChannelRef.current = null;
     };
-  }, [id, user]);
+  }, [id, user, workspaceUuid]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -1924,16 +2001,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [demoUrlError, setDemoUrlError] = useState<string | null>(null);
 
   const saveGitRepo = async () => {
-    if (!tempGit.trim() || !isValidUrl(tempGit)) {
-      setGitUrlError("⚠️ Invalid URL. Format e.g. https://github.com/username/project");
+    const rawInput = tempGit.trim();
+    if (!rawInput) {
+      setGitUrlError("⚠️ Please enter a GitHub repository or profile URL");
       return;
     }
+    const cleanGit = formatUrl(rawInput);
     setGitUrlError(null);
-    const cleanGit = tempGit.trim();
     setGithubRepo(cleanGit);
     setIsEditingGit(false);
 
-    localStorage.setItem(`ldk_workspace_git_${id}`, cleanGit);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_workspace_git_${id}`, cleanGit);
+    }
     if (activeChannelRef.current) {
       try {
         activeChannelRef.current.send({
@@ -1951,34 +2031,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (isUuidSpace) {
-      try {
-        await supabase
-          .from("project_spaces")
-          .upsert({
-            id: id,
-            github_repo: cleanGit,
-            project_name: projectName || "Shared Workspace",
-            status: status || "development"
-          });
-      } catch (err) {
-        console.error("Failed to save git repo: ", err);
-      }
+    try {
+      await supabase
+        .from("project_spaces")
+        .upsert({
+          id: workspaceUuid,
+          github_repo: cleanGit,
+          project_name: projectName || "Shared Workspace",
+          status: status || "development"
+        });
+    } catch (err) {
+      console.error("Failed to save git repo: ", err);
     }
   };
 
   const saveLiveDemo = async () => {
-    if (!tempDemo.trim() || !isValidUrl(tempDemo)) {
-      setDemoUrlError("⚠️ Invalid URL. Format e.g. https://my-app.vercel.app");
+    const rawInput = tempDemo.trim();
+    if (!rawInput) {
+      setDemoUrlError("⚠️ Please enter a Prototype Demo URL");
       return;
     }
+    const cleanDemo = formatUrl(rawInput);
     setDemoUrlError(null);
-    const cleanDemo = tempDemo.trim();
     setLiveDemo(cleanDemo);
     setIsEditingDemo(false);
 
-    localStorage.setItem(`ldk_workspace_demo_${id}`, cleanDemo);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_workspace_demo_${id}`, cleanDemo);
+    }
     if (activeChannelRef.current) {
       try {
         activeChannelRef.current.send({
@@ -1996,20 +2076,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (isUuidSpace) {
-      try {
-        await supabase
-          .from("project_spaces")
-          .upsert({
-            id: id,
-            live_demo_url: cleanDemo,
-            project_name: projectName || "Shared Workspace",
-            status: status || "development"
-          });
-      } catch (err) {
-        console.error("Failed to save live demo: ", err);
-      }
+    try {
+      await supabase
+        .from("project_spaces")
+        .upsert({
+          id: workspaceUuid,
+          live_demo_url: cleanDemo,
+          project_name: projectName || "Shared Workspace",
+          status: status || "development"
+        });
+    } catch (err) {
+      console.error("Failed to save live demo: ", err);
     }
   };
 
@@ -3625,11 +3702,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 onClick={async () => {
                   setShowLeaveConfirmModal(false);
                   try {
-                    if (user && id !== "e1" && id !== "e2") {
+                    if (user) {
                       await supabase
                         .from("project_members")
                         .delete()
-                        .eq("project_space_id", id)
+                        .eq("project_space_id", workspaceUuid)
                         .eq("profile_id", user.id);
                     }
                     const storedKey = `ldk_workspace_members_${id}`;

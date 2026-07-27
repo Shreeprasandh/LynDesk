@@ -171,37 +171,37 @@ CREATE POLICY "Allow authenticated insert access to events"
     WITH CHECK (true);
 
 -- Project Spaces Policies
-CREATE POLICY "Allow members read access to project spaces" 
+CREATE POLICY "Allow authenticated read access to project spaces" 
     ON public.project_spaces FOR SELECT 
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.project_members 
-            WHERE project_members.project_space_id = id 
-            AND project_members.profile_id = auth.uid()
-        )
-    );
+    TO authenticated 
+    USING (true);
 
-CREATE POLICY "Allow team leaders to update project spaces" 
+CREATE POLICY "Allow authenticated users to create project spaces" 
+    ON public.project_spaces FOR INSERT 
+    TO authenticated 
+    WITH CHECK (true);
+
+CREATE POLICY "Allow team members to update project spaces" 
     ON public.project_spaces FOR UPDATE 
+    TO authenticated 
     USING (
         EXISTS (
             SELECT 1 FROM public.project_members 
             WHERE project_members.project_space_id = id 
             AND project_members.profile_id = auth.uid()
-            AND project_members.role = 'leader'::role_type
         )
     );
 
 -- Project Members Policies
-CREATE POLICY "Allow team members to view membership list" 
+CREATE POLICY "Allow authenticated read access to project members" 
     ON public.project_members FOR SELECT 
-    USING (
-        EXISTS (
-            SELECT 1 FROM public.project_members AS internal
-            WHERE internal.project_space_id = project_space_id 
-            AND internal.profile_id = auth.uid()
-        )
-    );
+    TO authenticated 
+    USING (true);
+
+CREATE POLICY "Allow authenticated users to insert project members" 
+    ON public.project_members FOR INSERT 
+    TO authenticated 
+    WITH CHECK (true);
 
 -- Chat Messages Policies
 CREATE POLICY "Allow team members to view chat messages" 
@@ -371,4 +371,44 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS portfolio_url TEXT;
 -- Add restriction settings to friendships table
 ALTER TABLE public.friendships ADD COLUMN IF NOT EXISTS sender_restricted BOOLEAN DEFAULT false NOT NULL;
 ALTER TABLE public.friendships ADD COLUMN IF NOT EXISTS receiver_restricted BOOLEAN DEFAULT false NOT NULL;
+
+
+-- 12. NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    sender_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    link_url TEXT DEFAULT '/explore',
+    type TEXT DEFAULT 'invite' NOT NULL,
+    is_read BOOLEAN DEFAULT false NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS on Notifications
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view their own notifications
+CREATE POLICY "Allow users to view their own notifications" 
+    ON public.notifications FOR SELECT 
+    USING (auth.uid() = user_id);
+
+-- Allow authenticated users & service role to send notifications
+CREATE POLICY "Allow authenticated users to send notifications" 
+    ON public.notifications FOR INSERT 
+    WITH CHECK (true);
+
+-- Allow users to update their own notifications (e.g. mark as read)
+CREATE POLICY "Allow users to update their own notifications" 
+    ON public.notifications FOR UPDATE 
+    USING (auth.uid() = user_id);
+
+-- Allow users to delete their own notifications
+CREATE POLICY "Allow users to delete their own notifications" 
+    ON public.notifications FOR DELETE 
+    USING (auth.uid() = user_id);
+
+-- High-performance index for user notification lookup
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id, created_at DESC);
 

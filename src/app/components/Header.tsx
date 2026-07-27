@@ -300,17 +300,17 @@ export default function Header() {
         }
       }
 
-      // Fetch real database notifications for recipient from Supabase
+      // Fetch real database notifications for recipient from Supabase if table exists
       let dbNotifs: NotificationItem[] = [];
       if (user?.id) {
         try {
-          const { data: dbData } = await supabase
+          const { data: dbData, error: dbErr } = await supabase
             .from("notifications")
             .select("*")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
 
-          if (dbData && dbData.length > 0) {
+          if (!dbErr && dbData && dbData.length > 0) {
             dbNotifs = dbData.map((d: any) => ({
               id: d.id,
               title: d.title || "Notification",
@@ -323,15 +323,14 @@ export default function Header() {
               actionUrl: d.link_url || "/explore"
             }));
           }
-        } catch (e) {
-          console.warn("DB notification fetch fallback:", e);
-        }
+        } catch {}
       }
 
       // Filter out duplicate invites for workspaces the user has already joined
       const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
       const joinedWorkspaces: string[] = joinedStr ? JSON.parse(joinedStr) : [];
 
+      // Combine database notifications, user-specific notifications, and global notifications
       const combined = [...dbNotifs, ...userLocalNotifs, ...localList];
       const uniqueSet = new Set<string>();
       const finalNotifs = combined.filter((n: any) => {
@@ -410,13 +409,6 @@ export default function Header() {
     if (user?.id) {
       channel = supabase
         .channel("ldk_global_realtime_bus")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-          () => {
-            loadNotifications();
-          }
-        )
         .on(
           "broadcast",
           { event: "ldk_invite_sent" },

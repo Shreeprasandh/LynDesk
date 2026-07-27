@@ -47,22 +47,6 @@ export default function RootLayout({
       className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
       suppressHydrationWarning={true}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var savedTheme = localStorage.getItem('lyndesk-theme');
-                  var systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  var theme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-                  document.documentElement.setAttribute('data-theme', theme);
-                } catch (e) {}
-              })();
-            `
-          }}
-        />
-      </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <ThemeProvider>
