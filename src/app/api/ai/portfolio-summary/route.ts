@@ -40,8 +40,12 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // Use gemini-1.5-flash for fast and free inference
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    let model;
+    try {
+      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    } catch {
+      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    }
 
     const statsPrompt = `
       You are a senior tech recruiter and elite coding coach. Analyze this student's coding portfolio statistics and generate a premium, concise profile summary.

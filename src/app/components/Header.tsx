@@ -255,6 +255,7 @@ export default function Header() {
     const defaultNotifications: NotificationItem[] = [];
 
     const loadNotifications = async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
       const stored = localStorage.getItem("ldk_global_notifications");
       let localList: NotificationItem[] = [];
 
@@ -264,11 +265,23 @@ export default function Header() {
           if (Array.isArray(parsed)) {
             const seen = new Set<string>();
             localList = parsed.map((n: any) => {
+              const isDeclinedOrAccepted = n.title?.toLowerCase().includes("declined") || n.title?.toLowerCase().includes("accepted");
+              if (isDeclinedOrAccepted) {
+                return { ...n, actionLabel: undefined, type: n.type === "invite" ? "warning" : (n.type || "warning") };
+              }
               if (n.type === "invite" && (n.actionLabel === "Open Workspace" || !n.actionLabel)) {
                 return { ...n, actionLabel: "Accept Invite" };
               }
               return n;
             }).filter((n: any) => {
+              // Purge stale streak risk notifications from previous days
+              if (n.id?.startsWith("notif_streak_warning_")) {
+                if (!n.id.endsWith(todayStr)) return false;
+              }
+              if (n.title?.includes("Streak at Risk") && n.id && !n.id.includes(todayStr)) {
+                return false;
+              }
+
               // Always purge outgoing/invite entries from the general global list
               if (n.type === "invite") return false;
               if (n.message && (n.message.includes("sent a team") || n.message.startsWith("You sent"))) return false;
@@ -293,7 +306,30 @@ export default function Header() {
         const userStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
         if (userStored) {
           try {
-            userLocalNotifs = JSON.parse(userStored);
+            const parsedUser = JSON.parse(userStored);
+            if (Array.isArray(parsedUser)) {
+              userLocalNotifs = parsedUser.map((n: any) => {
+                const isDeclinedOrAccepted = n.title?.toLowerCase().includes("declined") || n.title?.toLowerCase().includes("accepted");
+                if (isDeclinedOrAccepted) {
+                  return { ...n, actionLabel: undefined, type: n.type === "invite" ? "warning" : (n.type || "warning") };
+                }
+                return n;
+              }).filter((n: any) => {
+                // Purge stale streak warnings from previous days
+                if (n.id?.startsWith("notif_streak_warning_") && !n.id.endsWith(todayStr)) {
+                  return false;
+                }
+                if (n.title?.includes("Streak at Risk") && n.id && !n.id.includes(todayStr)) {
+                  return false;
+                }
+                return true;
+              });
+
+              // Clean up local storage if stale items were purged
+              if (userLocalNotifs.length !== parsedUser.length) {
+                localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(userLocalNotifs));
+              }
+            }
           } catch (e) {
             console.error("Error parsing user notifications", e);
           }
@@ -311,17 +347,20 @@ export default function Header() {
             .order("created_at", { ascending: false });
 
           if (!dbErr && dbData && dbData.length > 0) {
-            dbNotifs = dbData.map((d: any) => ({
-              id: d.id,
-              title: d.title || "Notification",
-              message: d.content || d.message || "",
-              type: d.type || "invite",
-              category: "alerts",
-              time: "Just now",
-              read: d.is_read ?? false,
-              actionLabel: "Accept Invite",
-              actionUrl: d.link_url || "/explore"
-            }));
+            dbNotifs = dbData.map((d: any) => {
+              const isRealInvite = d.type === "invite" && !d.title?.toLowerCase().includes("declined") && !d.title?.toLowerCase().includes("accepted");
+              return {
+                id: d.id,
+                title: d.title || "Notification",
+                message: d.content || d.message || "",
+                type: isRealInvite ? "invite" : (d.type || "warning"),
+                category: "alerts",
+                time: "Just now",
+                read: d.is_read ?? false,
+                actionLabel: isRealInvite ? "Accept Invite" : undefined,
+                actionUrl: d.link_url || "/explore"
+              };
+            });
           }
         } catch {}
       }
@@ -370,9 +409,18 @@ export default function Header() {
                       localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
                     } catch {}
                   }
+                  if (user?.id) {
+                    const uStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
+                    if (uStored) {
+                      try {
+                        const parsedU = JSON.parse(uStored);
+                        const cleanedU = parsedU.filter((n: any) => !n.title?.includes("Streak at Risk") && !n.id?.startsWith("notif_streak_warning_"));
+                        localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(cleanedU));
+                      } catch {}
+                    }
+                  }
                 }
               } else {
-                const todayStr = new Date().toISOString().split("T")[0];
                 const streakNotifId = `notif_streak_warning_${todayStr}`;
                 const title = data.dailyChallenge.title || "Daily Challenge";
                 const diff = data.dailyChallenge.difficulty || "Medium";
@@ -391,8 +439,9 @@ export default function Header() {
                 };
 
                 setNotifications(prev => {
-                  if (prev.some(n => n.id === streakNotifId)) return prev;
-                  return [streakNotif, ...prev];
+                  const filtered = prev.filter(n => !n.id.startsWith("notif_streak_warning_") || n.id === streakNotifId);
+                  if (filtered.some(n => n.id === streakNotifId)) return filtered;
+                  return [streakNotif, ...filtered];
                 });
               }
             }
@@ -419,17 +468,19 @@ export default function Header() {
               const userKey = `ldk_user_notifications_${user.id}`;
               const userStored = localStorage.getItem(userKey);
               const notifList = userStored ? JSON.parse(userStored) : [];
+              const isRealInvite = (data.type === "invite" || !data.type) && !data.title?.toLowerCase().includes("declined") && !data.title?.toLowerCase().includes("accepted");
+
               notifList.unshift({
                 id: `n_rt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                 recipientId: user.id,
                 senderId: data.senderId,
                 title: data.title || "Teammate Match Invite",
                 message: data.message || "You received a new team invite!",
-                type: data.type || "invite",
+                type: isRealInvite ? "invite" : (data.type || "warning"),
                 category: "alerts",
                 time: "Just now",
                 read: false,
-                actionLabel: "Accept Invite",
+                actionLabel: isRealInvite ? (data.actionLabel || "Accept Invite") : undefined,
                 actionUrl: data.actionUrl || "/explore"
               });
               localStorage.setItem(userKey, JSON.stringify(notifList.slice(0, 100)));
@@ -928,7 +979,7 @@ export default function Header() {
                         {item.message}
                       </p>
 
-                      {item.actionLabel && !item.read && (
+                      {item.actionLabel && !item.read && !item.title?.toLowerCase().includes("declined") && !item.title?.toLowerCase().includes("accepted") && (
                         <div className="flex gap-2 justify-end pt-1">
                           {item.type === "invite" && (
                             <button

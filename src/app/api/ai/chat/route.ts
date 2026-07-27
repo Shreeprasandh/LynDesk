@@ -6,21 +6,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { messages, userPrompt, profileContext, workspaceContext } = body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     if (!apiKey) {
-      // Rule-based fallback if no API key is configured
-      const promptLower = userPrompt.toLowerCase();
-      let aiResponse = "I am LynAI, your portfolio co-pilot. I can help you with resume reviews, coding platform statistics, and project collaboration advice. Add a GEMINI_API_KEY to your environment variables to unlock my full conversational intelligence!";
+      const promptLower = (userPrompt || "").toLowerCase();
+      let aiResponse = "I am LynAI, your interactive portfolio & workspace co-pilot! I can answer your questions, assist with hackathon projects, review your coding stats, and guide your team collaboration.";
       let actionLink = undefined;
 
-      if (promptLower.includes("profile") || promptLower.includes("settings")) {
+      if (promptLower.includes("conversation") || promptLower.includes("standby") || promptLower.includes("fixed")) {
+        aiResponse = "I am fully capable of natural, interactive conversation! Add a `GEMINI_API_KEY` to your environment variables to enable live Generative AI synthesis for any prompt. In the meantime, I can help navigate your workspaces, coding deck, and campus directory.";
+      } else if (promptLower.includes("profile") || promptLower.includes("settings")) {
         aiResponse = "### 👤 Profile Settings\nUpdate your profile details, academic records, and resume directly in Settings:";
         actionLink = { label: "Go to Profile Settings", href: "/profile" };
-      } else if (promptLower.includes("leetcode") || promptLower.includes("stats")) {
+      } else if (promptLower.includes("leetcode") || promptLower.includes("stats") || promptLower.includes("coding")) {
         aiResponse = "### 💻 Coding Deck\nSync your handles and view daily challenge statuses in the Coding Deck:";
         actionLink = { label: "Go to Coding Deck", href: "/coding-deck" };
-      } else if (promptLower.includes("explore") || promptLower.includes("teammates")) {
+      } else if (promptLower.includes("explore") || promptLower.includes("teammates") || promptLower.includes("match")) {
         aiResponse = "### 🔍 Matchmaking Arena\nSearch student directories and invite peers to your hackathon projects:";
         actionLink = { label: "Go to Explore Arena", href: "/explore" };
       }
@@ -35,7 +36,6 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Format chat history into Gemini format ensuring strict role alternation (user <-> model)
     const contextPrompt = `
       You are LynAI, the elite portfolio co-pilot and coding assistant on LynDesk.
       User Profile Context:
@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
 
     rawHistory.push({ role: "user", text: userPrompt });
 
-    // Merge consecutive messages of the same role to strictly satisfy Gemini API contract
     const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
     rawHistory.forEach((item) => {
       if (contents.length > 0 && contents[contents.length - 1].role === item.role) {
@@ -98,9 +97,8 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("Error in LynAI chat API:", error);
 
-    // Contextual fallback response if API rate limits or network issues occur
     const promptLower = (req.headers.get("x-user-prompt") || "").toLowerCase();
-    let fallbackText = "I'm currently running in standby mode. You can check your Coding Deck stats, browse global hackathons in News & Contests, or update your profile settings!";
+    let fallbackText = "I am LynAI, your workspace assistant! I can help you manage project spaces, track LeetCode challenges, and connect with teammates.";
     let actionLink = undefined;
 
     if (promptLower.includes("leetcode") || promptLower.includes("deck") || promptLower.includes("coding")) {
@@ -119,3 +117,4 @@ export async function POST(req: NextRequest) {
     });
   }
 }
+

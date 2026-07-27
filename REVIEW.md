@@ -1,165 +1,143 @@
-## Current status
+i created a workspace . and scraped this link 
+https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333
 
-I reviewed the project as requested and did not change anything. I verified the current health with fresh runs:
 
-- Build check: `npm run build` completed successfully and the app compiled.
-- Lint check: `npm run lint` reported 0 errors and 33 warnings, mostly unused variables in [src/app/workspace/[id]/page.tsx](src/app/workspace/[id]/page.tsx).
+i got the data in Event Brief & Rules as 
+Adobe Systems & Campus Track • Official Brief
+Adobe University Hackathon 2026
 
-That means the app is in a good state already, and the remaining work is mostly about refinement, resilience, and polish rather than fixing major blockers.
+Prize Pool & Rewards
+$15,000 Prize Pool & Internship Fast-Track Offers
+Final Target Deadline
+Nov 02, 2026
+Event Description & Rules
+Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.
 
----
+Official Guidelines & Rules:
+1. All project code must be developed during the official hackathon timeline.
+2. Teams must submit a working live demo link and public GitHub repository.
+3. Projects must adhere to academic integrity guidelines.
 
-## What looks improved already
+Stage-by-Stage Timeline & Briefs
+1. Ideation & Proposal
+Completed Oct 08
+Problem statement selection, team role assignment, technical architecture deck draft submission.
 
-The recent changes you made are directionally strong. The most meaningful improvements I can see are:
+2. Prototype Development
+Active (Target Oct 12)
+Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync.
 
-- Better security in the delete-account flow in route.ts
-  - The fallback mock-delete behavior was removed, which is a good move.
-  - This makes the system safer and more production-ready.
+3. QA & User Testing
+Target Oct 24
+Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations.
 
-- Better AI prompt handling in route.ts
-  - The conversation formatting is more robust.
-  - This should reduce issues with malformed or inconsistent chat history.
+4. Final Submission
+Final submission Nov 02
+Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry.
 
-- Better resilience in coding stats parsing in route.ts
-  - The UTC-based streak logic is more correct.
-  - The CodeChef parsing is more forgiving, which helps with external API variability.
 
-- Small UI polish in page.tsx and page.tsx
-  - These make the product feel a bit more finished.
+this is real data which is in there 
 
-So yes: the improvements already made are good, and they are the right kind of changes.
+Adobe University Hackathon 2026
+Adobe
+Team Size
+2 - 3 Members
+Adobe University Hackathon 2026 / hackathons
+Pre-Placement InterviewsPrize Icon
+Eligibility
+Open to engineering students across all years and branches
+Stages and Timelines
+9
+Aug
+09 Aug 26, 02:00 PM IST
+--> 09 Aug 26, 10:00 PM IST
+Round 1 - Online Assessment (MCQ + Coding + Case Study on Brand Visibility)
+In this round, participants are required to attempt a 2-hour online assessment comprising 15 multiple-choice questions (15 minutes), 1 coding challenge (30 minutes), and 1 Case Study on Brand Visibility (45 minutes). The team’s final score will be calculated based on the average score of all its members. 
 
----
 
-## What should be improved next
+Guidelines
+16
+Aug
+16 Aug 26, 04:00 PM IST
+--> 06 Sep 26, 11:59 PM IST
+Round 2 - Development Round
+All shortlisted teams will receive the detailed problem statement once the round goes live. Teams will be required to build a solution as outlined in the problem brief and submit it following the prescribed guidelines. Submission requirements, including the GitHub repository link and any supporting documents, along with detailed instructions, will be shared with the shortlisted teams before the round begins.
 
-### 1. Remove the remaining warnings and code noise
-This is the easiest high-value improvement.
 
-The biggest issue right now is the warning-heavy code in [src/app/workspace/[id]/page.tsx](src/app/workspace/[id]/page.tsx). The warnings are mostly about unused variables like `e` and `err`.
+Live Launch Session
+In this interactive session, shortlisted teams will be introduced to the problem statement by industry leaders. The session will include a detailed briefing on the case, expectations from submissions, and key guidelines. Participants will also have the opportunity to ask questions and gain valuable insights to help shape their approach to the challenge.
 
-Why this matters:
-- It makes the codebase feel less clean.
-- It increases maintenance cost.
-- It can hide future issues when the file grows.
 
-What to do:
-- Remove unused parameters or rename them to `_e` / `_err` where intentional.
-- Clean up any dead code branches.
-- Aim for a fully warning-free lint state.
+13
+Sep
+13 Sep 26, 04:00 PM IST
+--> 27 Sep 26, 11:59 PM IST
+Round 3 - Prototype Showcase
+In this round, shortlisted teams will build a working prototype of their solution idea. Building on the previous round, teams must create an interface that allows users to explore, interact with, and gain meaningful insights from their solution. The prototype should highlight core user experience elements such as ease of navigation, smooth interactions, and the overall value it delivers to the user.
 
----
+Team leaders must submit their solution as per the guidelines shared, along with any supporting evaluation materials. Full details will be provided in the official problem statement.
 
-### 2. Make the app more resilient to API failures
-This is probably the biggest product-quality improvement.
 
-The app depends on multiple external services and data sources, especially in:
-- route.ts
-- route.ts
-- page.tsx
+Round 4 - Grand Finale
+The top-qualifying teams will get the exclusive opportunity to present their solutions to Adobe’s leadership at the company’s headquarters in Noida. Adobe will take care of all travel and accommodation arrangements for the finalists, ensuring a seamless and memorable experience as they showcase their ideas on a national stage.
 
-Right now, the experience may still feel brittle if a service is slow or unavailable.
 
-What to improve:
-- Add explicit loading states for all data-driven widgets.
-- Add empty states when no data is returned.
-- Add retry buttons or “Try again” actions.
-- Show friendly messages like “Couldn’t load stats right now” instead of silent failures.
+All that you need to know about Adobe University Hackathon 2026
+Welcome to Adobe University Hackathon 2026!
+Speak to Agents: The new language of Brand Visibility
+The way we interact with technology is changing. From intelligent assistants to autonomous agents, the next wave of innovation is being built by those who dare to think differently.
 
-This would make the app feel much more polished and user-friendly.
+At Adobe University Hackathon 2026, you'll take on a challenge that pushes the boundaries of AI, creativity, and problem-solving. The problem statement is coming soon - but one thing is certain: your ideas have the power to shape what's next.
 
----
+Click here to learn more about Adobe.
 
-### 3. Improve the user experience on large pages
-The pages that feel most important are:
-- page.tsx
-- page.tsx
-- [src/app/workspace/[id]/page.tsx](src/app/workspace/[id]/page.tsx)
+Compete with the brightest innovators from across the country, win exciting rewards, and stand a chance to earn an internship opportunity with Adobe India.
 
-These are likely where users spend most time, so they need to feel smooth.
+Eligibility Criteria:
 
-What to add:
-- Skeleton loaders instead of blank areas.
-- Better spacing and visual hierarchy.
-- Consistent success/error toast messages.
-- Clearer action buttons for “save”, “sync”, “refresh”, and “invite”.
+Open to engineering students across all years and branches
+Participants must register in teams of 2-3 members.
+Cross-college teams are not allowed.
+Cross-year teams are allowed.
+Cross-specialisation teams are allowed.
+Rules and Guidelines:
 
-If you want this to feel like a premium product, this is where the biggest visual payoff comes from.
+All members of the team have to register with their WhatsApp numbers.
+All members of the team must register with their official university ID. In case you do not have one, you can register with your Gmail ID.
+All members of a team should be from the same institute/university.
+One student cannot be a part of more than one team.
+Rounds and Stages:
 
----
+Round 1 - Online Assessment (MCQ + Coding + Case Study on Brand Visibility)
 
-### 4. Strengthen the AI assistant experience
-The AI feature is already there and has a good foundation, but it can become much better.
+The assessment comprises 15 MCQs (Algorithms, DSA & Programming Logic), 1 Coding Question, and 1 Case Study on Brand Visibility to be completed within 90 minutes.
+Each participant is allowed only one attempt.
+The assessment must be completed in one sitting before the timer expires.
+Round 2 - Development Round
 
-What to improve:
-- Add better conversation memory and context handling.
-- Add a “clear chat” confirmation flow.
-- Add typing indicators with better UX.
-- Add fallback suggestions when the AI service fails.
-- Add a small “quick actions” panel for common prompts.
+All shortlisted teams will receive the detailed problem statement once the round goes live.
+Teams will be required to build a solution based on the problem statement and submit it as per the prescribed guidelines.
+Submission requirements, including the GitHub repository link and any supporting documents, will be communicated before the round begins.
+Detailed submission instructions and timelines will be shared with all shortlisted teams prior to the start of the round.
+Round 3 - Prototype Showcase
 
-This is one of the most valuable areas to improve because it directly affects the product’s personality.
+Shortlisted teams will build a functional prototype based on their solution from the previous round.
+The prototype should demonstrate the core user experience and the features outlined in the problem statement.
+The team leader must submit the prototype along with any supporting documents, as per the submission guidelines.
+Complete submission details will be shared with the shortlisted teams.
+Only the team leader can make the submission.
+Round 4 - Grand Finale
 
----
+The top teams will present their solutions to the Adobe leadership at the Adobe headquarters in Noida.
+Adobe will cover the travel and accommodation expenses for all students qualifying for the Grand Finale.
+Rewards and Prizes:
 
-### 5. Add stronger protections around server-side operations
-The delete-account route is better now, but it should still be hardened further.
+1st Prize - Each member of the Winning team will receive a MacBook Pro
+2nd Prize - Each member of the Winning team will receive a MacBook Neo
+Top 50 participants to get PPIs and a chance to intern with Adobe with a stipend of INR 1,10,000 per month
+National Finalists to get exclusive Adobe merchandise and a chance for a fully sponsored Adobe office visit
+50 shortlisted teams to get certificates from Adobe
+Note: Only the 2028 batch is eligible for PPIs for an Internship.
 
-What to add:
-- Rate limiting on sensitive endpoints.
-- Clear audit logging for account actions.
-- Stronger validation on incoming payloads.
-- More explicit error states for auth/session failures.
 
-This is especially important if the app is going to be used by real users beyond local testing.
-
----
-
-### 6. Add tests for the most critical user flows
-You already have tests in __tests__, which is excellent. The next step is to cover the paths users care about most.
-
-High-priority test targets:
-- AI chat route
-- delete-account flow
-- coding stats route
-- workspace page interactions
-
-Why this matters:
-- It prevents regressions.
-- It gives confidence when you make future updates.
-- It makes the app feel more mature and stable.
-
----
-
-### 7. Improve the “product feel” with a few thoughtful additions
-These are not mandatory, but they would make the app feel much more complete.
-
-Good additions would be:
-- A “last updated” indicator for stats and integrations.
-- A “workspace activity timeline” or recent updates feed.
-- Better search and filtering for opportunities, workspaces, and friends.
-- A profile completion progress bar.
-- A lightweight onboarding flow for first-time users.
-
-These features make the app feel more alive and more useful.
-
----
-
-## What should probably change or be updated right away
-
-If I had to prioritize only a few things, I would focus on these first:
-
-1. Clean up the warnings in [src/app/workspace/[id]/page.tsx](src/app/workspace/[id]/page.tsx)
-2. Add better loading and error states across the main pages
-3. Improve API failure handling in route.ts and route.ts
-4. Add more polished UX for the AI assistant
-5. Add tests for critical flows
-
----
-
-## Bottom line
-
-The app is already in a solid state. The recent improvements are meaningful, and the next level is not just “more features” but “better reliability, cleaner code, stronger UX, and more confidence under real-world conditions.”
-
-If you want, I can next give you a more structured “priority roadmap” for the next 2 weeks, ranked from easiest wins to biggest impact.
+is the data crt and find me if there the is crt if not make the data scraping better and reactive since each event can have have different structure and such so find the responive way to handle them

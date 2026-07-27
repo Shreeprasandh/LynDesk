@@ -21,13 +21,7 @@ export async function GET() {
 
     return NextResponse.json({ commits });
   } catch {
-    // Fallback static mock commits in case Git is not installed/initialized in workspace environment
-    return NextResponse.json({ 
-      commits: [
-        { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
-        { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
-        { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
-      ] 
-    });
+    // Return empty commits list if Git is not initialized or accessible
+    return NextResponse.json({ commits: [] });
   }
 }

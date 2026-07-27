@@ -23,7 +23,14 @@ import {
   Eye,
   EyeOff,
   RotateCw,
-  Edit2
+  Edit2,
+  Layers,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  ArrowUpDown,
+  Trash2,
+  LogOut
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -38,6 +45,31 @@ const GithubIcon = ({ size = 14 }: { size?: number }) => (
     <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
   </svg>
 );
+
+const getWorkspaceUuid = (rawId: string): string => {
+  if (!rawId) return "00000000-0000-4000-8000-000000000000";
+  const trimmed = rawId.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 16777619);
+    h2 = Math.imul(h2 ^ code, 2246822519);
+  }
+  const hex1 = Math.abs(h1).toString(16).padStart(8, "0");
+  const hex2 = Math.abs(h2).toString(16).padStart(8, "0");
+  const combined = (hex1 + hex2 + hex1 + hex2).substring(0, 32);
+
+  const p1 = combined.substring(0, 8);
+  const p2 = combined.substring(8, 12);
+  const p3 = "4" + combined.substring(13, 16);
+  const p4 = "8" + combined.substring(17, 20);
+  const p5 = combined.substring(20, 32);
+  return `${p1}-${p2}-${p3}-${p4}-${p5}`;
+};
 
 
 
@@ -155,6 +187,7 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [scraperUrl, setScraperUrl] = useState("");
   const [scraping, setScraping] = useState(false);
+  const [scrapedData, setScrapedData] = useState<any>(null);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventDeadline, setNewEventDeadline] = useState("");
   const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
@@ -165,8 +198,10 @@ export default function Home() {
   const [tempWorkspaceTitle, setTempWorkspaceTitle] = useState("");
 
   // Active Co-workers live list state
-  const [coworkers, setCoworkers] = useState<{ name: string; role: string; active: boolean }[]>([]);
+  const [coworkers, setCoworkers] = useState<{ id?: string; name: string; role: string; active: boolean }[]>([]);
   const [collegeName, setCollegeName] = useState("");
+  const [isReordering, setIsReordering] = useState(false);
+  const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
 
   // Home Invite Friends States
   const [inviteEventId, setInviteEventId] = useState<string | null>(null);
@@ -377,7 +412,7 @@ export default function Home() {
     return () => window.removeEventListener("ldk_coding_stats_update", handleStatsUpdate);
   }, [user]);
 
-  // Load events and joined workspaces from localStorage on mount
+  // Load events and joined workspaces from localStorage on mount with live status & name enrichment
   useEffect(() => {
     if (typeof window !== "undefined") {
       const loadLocalWorkspaces = () => {
@@ -386,30 +421,81 @@ export default function Home() {
         const parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
 
-        // Check if any joined workspace is missing from parsedEvents
+        // Enrich parsed events with local workspace overrides
+        const enrichedEvents = parsedEvents.map(e => {
+          const customName = localStorage.getItem(`ldk_workspace_name_${e.id}`);
+          const customStatus = localStorage.getItem(`ldk_workspace_status_${e.id}`);
+          const metaStr = localStorage.getItem(`ldk_workspace_meta_${e.id}`);
+          
+          let finalTitle = e.title;
+          if (customName && !customName.startsWith("Loading Project")) {
+            finalTitle = customName;
+          } else if (metaStr) {
+            try {
+              const meta = JSON.parse(metaStr);
+              if (meta && meta.title) finalTitle = `${meta.title} Workspace`;
+            } catch {}
+          }
+
+          let finalStages = e.stages;
+          if (metaStr) {
+            try {
+              const meta = JSON.parse(metaStr);
+              if (meta && meta.stages && meta.stages.length > 0) {
+                finalStages = meta.stages.map((s: { stage: string }) => s.stage);
+              }
+            } catch {}
+          }
+
+          return {
+            ...e,
+            title: finalTitle,
+            status: (customStatus as any) || e.status,
+            stages: finalStages || ["Ideation", "Development", "Testing", "Submitted"]
+          };
+        });
+
         joinedIds.forEach(id => {
-          if (!parsedEvents.some(e => e.id === id)) {
-            parsedEvents.unshift({
+          if (!enrichedEvents.some(e => e.id === id)) {
+            const customName = localStorage.getItem(`ldk_workspace_name_${id}`);
+            const customStatus = localStorage.getItem(`ldk_workspace_status_${id}`);
+            const metaStr = localStorage.getItem(`ldk_workspace_meta_${id}`);
+            
+            let title = `Shared Workspace (${id.substring(0, 8)})`;
+            if (customName && !customName.startsWith("Loading Project")) {
+              title = customName;
+            } else if (metaStr) {
+              try {
+                const meta = JSON.parse(metaStr);
+                if (meta && meta.title) title = `${meta.title} Workspace`;
+              } catch {}
+            }
+
+            enrichedEvents.unshift({
               id,
-              title: `Shared Workspace (${id.substring(0, 8)})`,
+              title,
               deadline: "Ongoing",
               location: "online",
               level: "global",
               url: `/workspace/${id}`,
-              status: "development",
-              stages: ["Ideation", "Development", "Final Submission"]
+              status: (customStatus as any) || "development",
+              stages: ["Ideation", "Development", "Testing", "Submitted"]
             });
           }
         });
 
-        if (parsedEvents.length > 0) {
-          setEvents(parsedEvents);
+        if (enrichedEvents.length > 0) {
+          setEvents(enrichedEvents);
         }
       };
 
       loadLocalWorkspaces();
       window.addEventListener("ldk_events_update", loadLocalWorkspaces);
-      return () => window.removeEventListener("ldk_events_update", loadLocalWorkspaces);
+      window.addEventListener("storage", loadLocalWorkspaces);
+      return () => {
+        window.removeEventListener("ldk_events_update", loadLocalWorkspaces);
+        window.removeEventListener("storage", loadLocalWorkspaces);
+      };
     }
   }, []);
 
@@ -424,29 +510,7 @@ export default function Home() {
     if (user) {
       const fetchCoworkersAndCollege = async () => {
         try {
-          const currentUserName = user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split("@")[0] || "";
-          const { data: cowData, error: cowErr } = await supabase
-            .from("profiles")
-            .select("id, full_name, department")
-            .limit(10);
-          
-          if (!cowErr && cowData && cowData.length > 0) {
-            const list = cowData
-              .filter((p: any) => {
-                if (p.id && p.id === user.id) return false;
-                if (p.full_name && currentUserName && p.full_name.toLowerCase() === currentUserName.toLowerCase()) return false;
-                if (p.full_name && p.full_name.toLowerCase() === "kaizzcer") return false;
-                return true;
-              })
-              .slice(0, 3)
-              .map((p, index) => ({
-                name: p.full_name || "Developer",
-                role: p.department || "Engineer",
-                active: index % 2 === 0
-              }));
-            setCoworkers(list);
-          }
-
+          // Fetch institute/college name
           const { data: profData, error: profErr } = await supabase
             .from("profiles")
             .select(`
@@ -484,6 +548,64 @@ export default function Home() {
               )
             `)
             .eq("profile_id", user.id);
+
+          const mySpaceIds: string[] = (memberData || []).map((m: any) => m.project_space_id).filter(Boolean);
+
+          const { data: wmMemberData } = await supabase
+            .from("workspace_members")
+            .select("project_space_id")
+            .eq("user_id", user.id);
+          
+          if (wmMemberData) {
+            wmMemberData.forEach((wm: any) => {
+              if (wm.project_space_id && !mySpaceIds.includes(wm.project_space_id)) {
+                mySpaceIds.push(wm.project_space_id);
+              }
+            });
+          }
+
+          // Fetch fellow members ONLY from shared workspaces who are currently ONLINE
+          let onlineTeammates: { id?: string; name: string; role: string; active: boolean }[] = [];
+
+          if (mySpaceIds.length > 0) {
+            const { data: teammateMembers } = await supabase
+              .from("project_members")
+              .select("profile_id, profiles(id, full_name, username, department, updated_at)")
+              .in("project_space_id", mySpaceIds)
+              .neq("profile_id", user.id);
+
+            const { data: wmTeammates } = await supabase
+              .from("workspace_members")
+              .select("user_id, profiles:user_id(id, full_name, username, department, updated_at)")
+              .in("project_space_id", mySpaceIds)
+              .neq("user_id", user.id);
+
+            const profileMap = new Map<string, any>();
+            (teammateMembers || []).forEach((tm: any) => {
+              const p = tm.profiles;
+              if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
+            });
+            (wmTeammates || []).forEach((tm: any) => {
+              const p = tm.profiles;
+              if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
+            });
+
+            const now = Date.now();
+            onlineTeammates = Array.from(profileMap.values())
+              .filter(p => {
+                if (!p.updated_at) return true; // Recently active
+                const lastActive = new Date(p.updated_at).getTime();
+                return (now - lastActive) < 30 * 60 * 1000; // Online in last 30 min
+              })
+              .map(p => ({
+                id: p.id,
+                name: p.full_name || p.username || "Collaborator",
+                role: p.department || "Teammate",
+                active: true
+              }));
+          }
+
+          setCoworkers(onlineTeammates);
 
           const dbEvents: EventItem[] = [];
           if (memberData && memberData.length > 0) {
@@ -546,6 +668,17 @@ export default function Home() {
         }
       };
       fetchCoworkersAndCollege();
+
+      const profileChannel = supabase
+        .channel("public:profiles_home")
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+          fetchCoworkersAndCollege();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(profileChannel);
+      };
     }
   }, [user]);
 
@@ -568,18 +701,125 @@ export default function Home() {
       } catch {}
     }
 
+    const targetUuid = getWorkspaceUuid(workspaceId);
     if (workspaceId !== "mock") {
       try {
         await supabase
           .from("project_spaces")
-          .update({ project_name: cleanTitle })
-          .eq("id", workspaceId);
+          .upsert({
+            id: targetUuid,
+            project_name: cleanTitle
+          });
       } catch (e) {
         console.error("Failed updating workspace title in db", e);
       }
     }
     
     setEditingWorkspaceId(null);
+  };
+
+  const handleUpdateWorkspaceStatus = async (workspaceId: string, newStatus: "ideation" | "development" | "testing" | "submitted") => {
+    setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, status: newStatus } : e));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_workspace_status_${workspaceId}`, newStatus);
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const idx = parsed.findIndex(e => e.id === workspaceId);
+        if (idx >= 0) {
+          parsed[idx].status = newStatus;
+          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+        }
+      } catch {}
+      window.dispatchEvent(new CustomEvent("ldk_events_update"));
+    }
+
+    const targetUuid = getWorkspaceUuid(workspaceId);
+    if (workspaceId !== "mock") {
+      try {
+        await supabase
+          .from("project_spaces")
+          .upsert({
+            id: targetUuid,
+            status: newStatus
+          });
+      } catch (e) {
+        console.error("Failed updating workspace status in db", e);
+      }
+    }
+  };
+
+  const handleMoveWorkspace = (index: number, direction: "up" | "down") => {
+    const newEvents = [...events];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newEvents.length) return;
+    
+    const temp = newEvents[index];
+    newEvents[index] = newEvents[targetIndex];
+    newEvents[targetIndex] = temp;
+
+    setEvents(newEvents);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_events", JSON.stringify(newEvents));
+      window.dispatchEvent(new CustomEvent("ldk_events_update"));
+    }
+  };
+
+  const handleConfirmLeaveWorkspace = async () => {
+    if (!confirmLeaveId) return;
+    const idToRemove = confirmLeaveId;
+    setConfirmLeaveId(null);
+
+    // Smoothly remove item from state for AnimatePresence transition
+    setEvents(prev => prev.filter(e => e.id !== idToRemove));
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const filteredEvents = parsed.filter(e => e.id !== idToRemove);
+        localStorage.setItem("ldk_events", JSON.stringify(filteredEvents));
+
+        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+        const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+        const filteredJoined = joinedIds.filter(id => id !== idToRemove);
+        localStorage.setItem("ldk_joined_workspaces", JSON.stringify(filteredJoined));
+
+        localStorage.removeItem(`ldk_workspace_name_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_status_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_meta_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_git_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_demo_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_tasks_${idToRemove}`);
+        localStorage.removeItem(`ldk_chat_messages_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_members_${idToRemove}`);
+
+        window.dispatchEvent(new CustomEvent("ldk_events_update"));
+      } catch (err) {
+        console.error("Failed leaving workspace:", err);
+      }
+    }
+
+    if (idToRemove !== "mock") {
+      try {
+        const targetUuid = getWorkspaceUuid(idToRemove);
+        if (user) {
+          await supabase
+            .from("workspace_members")
+            .delete()
+            .eq("project_space_id", targetUuid)
+            .eq("user_id", user.id);
+
+          await supabase
+            .from("project_members")
+            .delete()
+            .eq("project_space_id", targetUuid)
+            .eq("profile_id", user.id);
+        }
+      } catch (e) {
+        console.error("Failed removing membership in DB:", e);
+      }
+    }
   };
 
   const fallbackCoworkers = [
@@ -784,6 +1024,7 @@ export default function Home() {
       
       const data = await response.json();
       if (response.ok) {
+        setScrapedData(data);
         setNewEventTitle(data.title || "");
         setNewEventDeadline(data.deadline || "");
       } else {
@@ -799,11 +1040,12 @@ export default function Home() {
 
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventTitle || !scraperUrl) {
-      setModalError("Event Title and Link are required fields.");
+    if (!newEventTitle.trim()) {
+      setModalError("Event Title is required.");
       return;
     }
 
+    const finalUrl = scraperUrl.trim() || `https://eventtracker.local/custom-${Date.now()}`;
     let eventId = `e_${Date.now()}`;
     let spaceId = eventId;
 
@@ -822,7 +1064,7 @@ export default function Home() {
           .from("events")
           .insert({
             title: newEventTitle,
-            source_url: scraperUrl,
+            source_url: finalUrl,
             registration_deadline: formattedDeadline,
             location: newEventLocation,
             level: "global"
@@ -862,20 +1104,45 @@ export default function Home() {
       }
     }
 
+    const initialMeta = scrapedData || {
+      title: newEventTitle,
+      description: `Official workspace for ${newEventTitle}. Collaborate with your team, assign tasks, and track stage milestones.`,
+      organization: "Campus / Custom Host",
+      prizes: "Certificate of Excellence & Awards",
+      rules: "1. Develop your project prototype during the hackathon timeline.\n2. Submit project demo and source repository before the deadline.",
+      deadline: newEventDeadline.trim() || "TBD",
+      team_size: "2 - 4 Members",
+      eligibility: "Open to student participants",
+      stages: [
+        { stage: "Ideation & Proposal", deadline: "Target Active", brief: "Problem selection, team assignment, and architecture draft." },
+        { stage: "Prototype Development", deadline: "Target Active", brief: "Implement core MVP components and features." },
+        { stage: "QA & User Testing", deadline: "Target Active", brief: "User testing, bug fixes, and polish." },
+        { stage: "Final Submission", deadline: newEventDeadline.trim() || "TBD", brief: "Publish live demo and GitHub repository." }
+      ],
+      url: finalUrl
+    };
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`ldk_workspace_meta_${spaceId}`, JSON.stringify(initialMeta));
+      } catch {}
+    }
+
     const newObj = {
       id: spaceId,
       title: newEventTitle,
       deadline: newEventDeadline.trim() || "TBD",
       location: newEventLocation,
       level: "global" as const,
-      url: scraperUrl,
+      url: finalUrl,
       status: "ideation" as const,
-      stages: ["Ideation", "Development", "Final Submission"]
+      stages: initialMeta.stages?.map((s: { stage: string }) => s.stage) || ["Ideation", "Development", "Final Submission"]
     };
 
     setEvents([newObj, ...events]);
     setIsModalOpen(false);
     setScraperUrl("");
+    setScrapedData(null);
     setNewEventTitle("");
     setNewEventDeadline("");
     setModalError(null);
@@ -931,11 +1198,14 @@ export default function Home() {
         try {
           await supabase
             .from("project_members")
-            .insert({
-              project_space_id: inviteEventId,
-              profile_id: friendId,
-              role: "member"
-            });
+            .upsert(
+              {
+                project_space_id: inviteEventId,
+                profile_id: friendId,
+                role: "member"
+              },
+              { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
+            );
 
           await supabase.from("chat_messages").insert({
             project_space_id: inviteEventId,
@@ -1418,17 +1688,27 @@ export default function Home() {
 
             {/* Teammates List */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Active Co-Workers</span>
-              <div className="flex flex-col gap-3">
-                {activeCoworkers.map((cw, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${cw.active ? "bg-emerald-500" : "bg-border-main"}`} />
-                      <span className="text-xs text-txt-main font-light">{cw.name}</span>
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Active Co-Workers</span>
+                {coworkers.length > 0 && (
+                  <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50 font-bold">
+                    {coworkers.length} Online
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {coworkers.length > 0 ? (
+                  coworkers.map((cw, i) => (
+                    <div key={cw.id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
+                      <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
+                      <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50">{cw.role}</span>
                     </div>
-                    <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">{cw.role}</span>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <span className="text-[10px] font-mono text-txt-muted/60 py-1 text-center block uppercase tracking-wider">
+                    None online
+                  </span>
+                )}
               </div>
             </div>
 
@@ -1460,9 +1740,26 @@ export default function Home() {
 
             {/* My Active Workspaces Section Header */}
             <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
-              <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
-                My Active Workspaces
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
+                  My Active Workspaces
+                </span>
+                {events.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReordering(!isReordering)}
+                    className={`text-[9px] font-mono uppercase tracking-wider transition-all flex items-center gap-1 px-2 py-0.5 rounded border cursor-pointer ${
+                      isReordering 
+                        ? "bg-accent-main/15 text-accent-main border-accent-main/40 font-bold opacity-100" 
+                        : "bg-bg-card text-txt-muted/70 hover:text-txt-main opacity-60 hover:opacity-100 border-border-main/60"
+                    }`}
+                    title="Toggle workspace order mode"
+                  >
+                    <ArrowUpDown size={10} />
+                    <span>{isReordering ? "Done Reordering" : "Reorder Workspaces"}</span>
+                  </button>
+                )}
+              </div>
               <span className="text-[9px] font-mono text-txt-muted uppercase">
                 {events.length} Active {events.length === 1 ? "Project" : "Projects"}
               </span>
@@ -1470,138 +1767,242 @@ export default function Home() {
 
             {/* List of active events / workspaces */}
             <div className="flex flex-col gap-5">
-              {events.map((ev) => (
-              <div 
-                key={ev.id}
-                className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      {editingWorkspaceId === ev.id ? (
-                        <div className="flex items-center gap-1.5 py-0.5">
-                          <input
-                            type="text"
-                            value={tempWorkspaceTitle}
-                            onChange={(e) => setTempWorkspaceTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
-                              if (e.key === "Escape") setEditingWorkspaceId(null);
-                            }}
-                            className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveWorkspaceTitle(ev.id)}
-                            className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingWorkspaceId(null)}
-                            className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 group/title">
-                          <h3 className="font-display text-base font-semibold text-txt-main truncate">
-                            {localStorage.getItem(`ldk_workspace_name_${ev.id}`) || ev.title}
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTempWorkspaceTitle(localStorage.getItem(`ldk_workspace_name_${ev.id}`) || ev.title);
-                              setEditingWorkspaceId(ev.id);
-                            }}
-                            className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
-                            title="Rename Workspace"
-                          >
-                            <Edit2 size={10} />
-                            <span>Rename</span>
-                          </button>
-                        </div>
-                      )}
-                      <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-                        {ev.level}
-                      </span>
-                    </div>
-                    <a 
-                      href={ev.url} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
-                    >
-                      {ev.url}
-                      <ExternalLink size={10} />
-                    </a>
-                  </div>
+              <AnimatePresence mode="popLayout">
+                {events.map((ev, evIndex) => {
+                  const resolvedTitle = (() => {
+                    const localName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${ev.id}`) : null;
+                    if (localName && !localName.startsWith("Loading Project")) return localName;
+                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                    if (metaStr) {
+                      try {
+                        const meta = JSON.parse(metaStr);
+                        if (meta && meta.title) return meta.title;
+                      } catch {}
+                    }
+                    return (ev.title && !ev.title.startsWith("Loading Project")) ? ev.title : "Hackathon Event";
+                  })();
 
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                    <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
-                  </div>
-                </div>
+                  const stageObjects = (() => {
+                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                    if (metaStr) {
+                      try {
+                        const meta = JSON.parse(metaStr);
+                        if (meta && meta.stages && meta.stages.length > 0) {
+                          return meta.stages as { stage: string; deadline: string }[];
+                        }
+                      } catch {}
+                    }
+                    return ev.stages.map((s, i) => ({
+                      stage: s,
+                      deadline: i === 0 ? "09 Aug 2026" : i === 1 ? "06 Sep 2026" : i === 2 ? "27 Sep 2026" : "Nov 02 2026"
+                    }));
+                  })();
 
-                {/* Horizontal Stage Progress line */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-txt-muted uppercase">
-                    <span>Timeline Stages</span>
-                    <span className="text-txt-main font-bold">Active: {ev.status}</span>
-                  </div>
-                  
-                  <div className="relative flex justify-between items-center py-2">
-                    <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-border-main/50 -translate-y-1/2 z-0" />
+                  const activeIdx = ev.status === "submitted" ? 3 : ev.status === "testing" ? 2 : ev.status === "development" ? 1 : 0;
+                  const maxIdx = Math.max(stageObjects.length - 1, 1);
+                  const progressPct = `${Math.min(100, Math.max(0, Math.round((activeIdx / maxIdx) * 100)))}%`;
+
+                  return (
                     <motion.div 
-                      className="absolute top-1/2 left-0 h-[2px] bg-accent-main -translate-y-1/2 z-0"
-                      initial={false}
-                      animate={{ width: ev.status === "ideation" ? "33%" : ev.status === "development" ? "66%" : "100%" }}
-                      transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                    />
-                    
-                    {ev.stages.map((stg, idx) => (
-                      <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5">
-                        <div className={`h-4 w-4 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-colors duration-200 ${
-                          idx === 0 || (idx === 1 && ev.status !== "ideation") || (idx === 2 && ev.status === "submitted")
-                            ? "border-accent-main text-accent-main" 
-                            : "border-border-main"
-                        }`}>
-                          {(idx === 0 || (idx === 1 && ev.status !== "ideation")) && <CheckCircle2 size={10} className="fill-accent-main text-bg-surface" />}
+                      key={ev.id}
+                      layout
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0, padding: 0, overflow: "hidden" }}
+                      transition={{ duration: 0.35, ease: "easeInOut" }}
+                      className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            {editingWorkspaceId === ev.id ? (
+                              <div className="flex items-center gap-1.5 py-0.5">
+                                <input
+                                  type="text"
+                                  value={tempWorkspaceTitle}
+                                  onChange={(e) => setTempWorkspaceTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
+                                    if (e.key === "Escape") setEditingWorkspaceId(null);
+                                  }}
+                                  className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveWorkspaceTitle(ev.id)}
+                                  className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingWorkspaceId(null)}
+                                  className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group/title">
+                                <h3 className="font-display text-base font-semibold text-txt-main truncate">
+                                  {resolvedTitle}
+                                </h3>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTempWorkspaceTitle(resolvedTitle);
+                                    setEditingWorkspaceId(ev.id);
+                                  }}
+                                  className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
+                                  title="Rename Workspace"
+                                >
+                                  <Edit2 size={10} />
+                                  <span>Rename</span>
+                                </button>
+                              </div>
+                            )}
+                            <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
+                              {ev.level}
+                            </span>
+                          </div>
+                          {ev.url && (() => {
+                            const cleanDisplayUrl = ev.url.startsWith("/workspace/") 
+                              ? `Workspace Desk (${ev.id.substring(0, 8)})` 
+                              : ev.url.replace(/^https?:\/\/(www\.)?/, "");
+                            return (
+                              <a 
+                                href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono flex items-center gap-1.5 self-start max-w-[260px] sm:max-w-[400px] md:max-w-[500px] transition-colors group/link py-0.5"
+                                title={ev.url}
+                              >
+                                <span className="truncate leading-none">{cleanDisplayUrl}</span>
+                                <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
+                              </a>
+                            );
+                          })()}
                         </div>
-                        <span className="text-[9px] font-light text-txt-sub">{stg}</span>
+
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {isReordering && events.length > 1 && (
+                            <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40" title="Reorder Workspace">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveWorkspace(evIndex, "up")}
+                                disabled={evIndex === 0}
+                                className={`p-1 rounded transition-colors ${
+                                  evIndex === 0 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                }`}
+                                title="Move Workspace Up"
+                              >
+                                <ChevronUp size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveWorkspace(evIndex, "down")}
+                                disabled={evIndex === events.length - 1}
+                                className={`p-1 rounded transition-colors ${
+                                  evIndex === events.length - 1 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                }`}
+                                title="Move Workspace Down"
+                              >
+                                <ChevronDown size={13} />
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
+                            <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Actions row */}
-                <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                  <div className="flex items-center gap-1 text-[10px] text-txt-muted">
-                    <MapPin size={11} />
-                    <span className="uppercase font-mono">{ev.location}</span>
+                      {/* Timeline Stages & Milestone Diagram */}
+                      <div className="flex flex-col gap-3 shadow-xs bg-bg-base/30 p-4 rounded-md border border-border-main/40">
+                        <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-txt-muted uppercase">
+                          <span className="font-medium flex items-center gap-1.5 text-txt-muted/65 opacity-70">
+                            <Layers size={11} className="text-txt-muted/80" /> Timeline Stages & Milestone Diagram
+                          </span>
+                          <span className="text-txt-muted/65 font-medium bg-bg-card/40 px-2 py-0.5 rounded border border-border-main/40 opacity-70">
+                            Active: {ev.status}
+                          </span>
+                        </div>
+                        
+                        <div className="relative flex justify-between items-start pt-2 pb-1 px-2 gap-2 overflow-x-auto">
+                          <div className="absolute top-[18px] left-4 right-4 h-[2px] bg-border-main/50 z-0" />
+                          <motion.div 
+                            className="absolute top-[18px] left-4 h-[2px] bg-accent-main z-0"
+                            initial={false}
+                            animate={{ width: progressPct }}
+                            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                          />
+                          
+                          {stageObjects.map((stgObj, idx) => {
+                            const isDone = idx <= activeIdx;
+                            const isCurrent = idx === activeIdx;
+                            return (
+                              <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[110px]">
+                                <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                                  isCurrent ? "border-accent-main text-accent-main ring-4 ring-accent-main/20 scale-110" :
+                                  isDone ? "border-accent-main text-accent-main bg-accent-main/10" : "border-border-main text-txt-muted"
+                                }`}>
+                                  {isDone ? <CheckCircle2 size={11} className="text-accent-main" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                </div>
+
+                                <span className={`text-[10px] font-display font-medium leading-tight max-w-[120px] ${
+                                  isCurrent ? "text-accent-main font-semibold" : isDone ? "text-txt-main" : "text-txt-muted"
+                                }`}>
+                                  {stgObj.stage}
+                                </span>
+
+                                <span className="text-[9px] font-mono text-txt-muted">
+                                  {stgObj.deadline}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                  {/* Actions row */}
+                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                    <div className="flex items-center gap-1 text-[10px] text-txt-muted">
+                      <MapPin size={11} />
+                      <span className="uppercase font-mono">{ev.location}</span>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setConfirmLeaveId(ev.id)}
+                        className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
+                        title="Leave or Remove Workspace"
+                      >
+                        <Trash2 size={11} />
+                        <span>Leave</span>
+                      </button>
+                      <button 
+                        onClick={() => handleOpenInviteModal(ev.id)}
+                        className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                      >
+                        Invite
+                      </button>
+                      <Link 
+                        href={`/workspace/${ev.id}`}
+                        className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                      >
+                        Enter Workspace →
+                      </Link>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => handleOpenInviteModal(ev.id)}
-                      className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
-                    >
-                      Invite
-                    </button>
-                    <Link 
-                      href={`/workspace/${ev.id}`}
-                      className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
-                    >
-                      Enter Workspace →
-                    </Link>
-                  </div>
-                </div>
-
-              </div>
-            ))}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
           </div>
 
           </section>
@@ -1783,19 +2184,18 @@ export default function Home() {
               {/* Scraper Input */}
               <form onSubmit={handleScrape} className="flex gap-2 items-center">
                 <input 
-                  type="url"
-                  required
-                  placeholder="https://devpost.com/hackathon-name"
+                  type="text"
+                  placeholder="Event Link (e.g. Unstop/Devpost URL or custom link)"
                   value={scraperUrl}
                   onChange={(e) => setScraperUrl(e.target.value)}
                   className="flex-1 h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
                 />
                 <button 
                   type="submit"
-                  disabled={scraping}
-                  className="h-10 px-4 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-xs font-mono uppercase tracking-wider transition-opacity cursor-pointer flex items-center justify-center"
+                  disabled={scraping || !scraperUrl.trim()}
+                  className="h-10 px-4 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-xs font-mono uppercase tracking-wider transition-opacity cursor-pointer flex items-center justify-center shrink-0"
                 >
-                  {scraping ? "Parsing..." : "Auto-Scrape"}
+                  {scraping ? "Extracting..." : "Auto-Extract"}
                 </button>
               </form>
 
@@ -1905,11 +2305,56 @@ export default function Home() {
                   )}
                 </div>
               </div>
-
             </div>
           </div>
         </div>
       )}
+
+      {/* Leave Workspace Confirmation Modal */}
+      <AnimatePresence>
+        {confirmLeaveId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] overflow-hidden font-sans text-left bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="max-w-xs w-full border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 relative z-[160]"
+            >
+              <div className="flex flex-col gap-1.5 text-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-red-400 font-bold flex items-center justify-center gap-1">
+                  <LogOut size={11} /> Leave Workspace
+                </span>
+                <h3 className="font-display text-base font-semibold text-txt-main">Leave this workspace?</h3>
+                <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                  Are you sure you want to leave and delete this workspace for your account? You will be removed from the active member roster and your local workspace desk access will be deleted.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmLeaveId(null)}
+                  className="flex-1 h-8 rounded bg-bg-card border border-border-main/80 text-txt-muted hover:text-txt-main text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmLeaveWorkspace}
+                  className="flex-1 h-8 rounded bg-red-500/90 hover:bg-red-500 text-white text-xs font-mono uppercase tracking-wider font-bold transition-opacity cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                >
+                  Confirm & Leave
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

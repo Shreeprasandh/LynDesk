@@ -100,7 +100,12 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    let model;
+    try {
+      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    } catch {
+      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    }
 
     const systemPrompt = `
       You are a data analyst AI for university faculty. You are given a list of students with stats and a natural language query requesting a specific report or download.

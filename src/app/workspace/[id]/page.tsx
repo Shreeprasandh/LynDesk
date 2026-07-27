@@ -32,10 +32,17 @@ import {
   Edit3,
   Check,
   FileText,
+  Download,
   Monitor,
   Tablet,
   Smartphone,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  User,
+  Users,
+  Layers,
+  Lock,
+  Unlock
 } from "lucide-react";
 
 
@@ -91,6 +98,10 @@ interface ChatMsg {
   content: string;
   created_at: string;
   isSystem?: boolean;
+  file_url?: string;
+  file_name?: string;
+  file_type?: "image" | "file";
+  file_size?: string;
 }
 
 interface Artifact {
@@ -111,6 +122,8 @@ interface WorkspaceTask {
   status: "todo" | "in_progress" | "done";
   priority: "high" | "medium" | "low";
   assignee: string;
+  scope: "team" | "self";
+  created_by?: string;
 }
 
 interface GitLanguage {
@@ -136,10 +149,114 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     });
   }, []);
 
-  // Workspace Tasks & Milestones State
+  // Mouse Drag Resizer State & Persistence
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isResizing, setIsResizing] = useState<"left-center" | "center-right" | null>(null);
+  const [isLayoutLocked, setIsLayoutLocked] = useState(false);
+  const [panelWidths, setPanelWidths] = useState<{ left: number; chat: number; right: number }>({
+    left: 25,
+    chat: 41.67,
+    right: 33.33
+  });
+
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`ldk_workspace_widths_${id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.left === "number" && typeof parsed.chat === "number" && typeof parsed.right === "number") {
+            setPanelWidths(parsed);
+          }
+        } catch {}
+      }
+      const savedLock = localStorage.getItem(`ldk_workspace_layout_locked_${id}`);
+      if (savedLock !== null) {
+        setIsLayoutLocked(savedLock === "true");
+      }
+    }
+  }, [id]);
+
+  const toggleLayoutLock = () => {
+    setIsLayoutLocked(prev => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`ldk_workspace_layout_locked_${id}`, String(next));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!isResizing || isLayoutLocked) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalWidth = rect.width;
+      const mouseX = e.clientX - rect.left;
+      const mousePercent = (mouseX / totalWidth) * 100;
+
+      if (isResizing === "left-center") {
+        const newLeft = Math.max(15, Math.min(40, mousePercent));
+        const remaining = 100 - newLeft;
+        const currentChatRatio = panelWidths.chat / (panelWidths.chat + panelWidths.right);
+        const newChat = Math.max(25, Math.min(60, remaining * currentChatRatio));
+        const newRight = 100 - newLeft - newChat;
+        if (newRight >= 20 && newRight <= 55) {
+          const updated = { left: newLeft, chat: newChat, right: newRight };
+          setPanelWidths(updated);
+          localStorage.setItem(`ldk_workspace_widths_${id}`, JSON.stringify(updated));
+        }
+      } else if (isResizing === "center-right") {
+        const remaining = 100 - panelWidths.left;
+        const chatMousePercent = mousePercent - panelWidths.left;
+        const newChat = Math.max(25, Math.min(60, chatMousePercent));
+        const newRight = remaining - newChat;
+        if (newRight >= 20 && newRight <= 55) {
+          const updated = { left: panelWidths.left, chat: newChat, right: newRight };
+          setPanelWidths(updated);
+          localStorage.setItem(`ldk_workspace_widths_${id}`, JSON.stringify(updated));
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(null);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, isLayoutLocked, panelWidths, id]);
+
+  const handleResetWidths = () => {
+    const defaultWidths = { left: 25, chat: 41.67, right: 33.33 };
+    setPanelWidths(defaultWidths);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_workspace_widths_${id}`, JSON.stringify(defaultWidths));
+    }
+  };
+
+  // Workspace Tasks & Milestones State (Team vs Self)
   const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
+  const [newTaskScope, setNewTaskScope] = useState<"team" | "self">("team");
+  const [taskFilter, setTaskFilter] = useState<"all" | "team" | "self">("all");
 
   // Collaborative Scratchpad Notes State
   const [workspaceNotes, setWorkspaceNotes] = useState(
@@ -167,22 +284,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isInlineDemoPreviewOpen, setIsInlineDemoPreviewOpen] = useState(false);
   const [demoViewportMode, setDemoViewportMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [demoIframeKey, setDemoIframeKey] = useState(0);
-  // Timeline / Stages
-  const stages = ["Ideation", "Development", "Testing", "Submitted"];
-  const stageDeadlines = [
-    "Completed Oct 08",
-    "Active (Target Oct 12)",
-    "Target Oct 24",
-    "Final submission Nov 02"
-  ];
-
-  // Voice/Video Room State
-  const [inRoom, setInRoom] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
-  const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
-  const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
   // Event Details & Brief Modal States
   const [showBriefModal, setShowBriefModal] = useState(false);
   const [eventMetadata] = useState<{
@@ -198,10 +299,68 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     description: "Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.",
     organization: "Adobe Systems & Campus Track",
     prizes: "$15,000 Prize Pool & Internship Fast-Track Offers",
-    rules: "1. All project code must be developed during the official hackathon timeline.\n2. Teams must submit a working live demo link and public GitHub repository.\n3. Projects must adhere to academic integrity guidelines.",
+    rules: "1. All code must be submitted before deadline.\n2. Teams can have up to 4 members.\n3. Original projects only.",
     deadline: "Nov 02, 2026",
     url: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333"
   });
+
+  // Timeline / Stages (Fetched live from event URL or fallback)
+  const stages = ["Ideation", "Development", "Testing", "Submitted"];
+  const stageOrder = ["ideation", "development", "testing", "submitted"];
+  const [liveStageDates, setLiveStageDates] = useState<string[]>([
+    "09 Aug 2026",
+    "06 Sep 2026",
+    "27 Sep 2026",
+    "02 Nov 2026"
+  ]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`ldk_workspace_live_dates_${id}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length >= 4) {
+            setLiveStageDates(parsed);
+          }
+        } catch {}
+      }
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (!eventMetadata?.url) return;
+    const fetchLiveWebDates = async () => {
+      try {
+        const res = await fetch("/api/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: eventMetadata.url })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.stages) && data.stages.length >= 4) {
+            const extracted = data.stages.slice(0, 4).map((s: { deadline?: string }) => s.deadline || "Target Active");
+            setLiveStageDates(extracted);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_live_dates_${id}`, JSON.stringify(extracted));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed fetching live web dates:", err);
+      }
+    };
+    fetchLiveWebDates();
+  }, [id, eventMetadata?.url]);
+
+  // Voice/Video Room State
+  const [inRoom, setInRoom] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOn, setIsVideoOn] = useState(true);
+  const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
+  const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
+  const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
 
   const router = useRouter();
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
@@ -258,7 +417,53 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Chat Feed State
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [newMsg, setNewMsg] = useState("");
+  // Collaborative Chat State & File Attachments
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const [chatAttachment, setChatAttachment] = useState<{
+    file: File;
+    previewUrl: string;
+    type: "image" | "file";
+    name: string;
+    sizeStr: string;
+  } | null>(null);
+  const [isUploadingChatFile, setIsUploadingChatFile] = useState(false);
+  const [chatImagePreviewUrl, setChatImagePreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && chatImagePreviewUrl) {
+        setChatImagePreviewUrl(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [chatImagePreviewUrl]);
+
+  const handleChatFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    const isImg = file.type.startsWith("image/");
+    const previewUrl = isImg ? URL.createObjectURL(file) : "";
+    
+    const bytes = file.size;
+    let sizeStr = `${bytes} B`;
+    if (bytes >= 1024 * 1024) {
+      sizeStr = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    } else if (bytes >= 1024) {
+      sizeStr = `${(bytes / 1024).toFixed(0)} KB`;
+    }
+
+    setChatAttachment({
+      file,
+      previewUrl,
+      type: isImg ? "image" : "file",
+      name: file.name,
+      sizeStr
+    });
+  };
 
   // Artifacts State
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -581,10 +786,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Handle invitation acceptance and auto-join for workspace members
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
-      const searchParams = new URLSearchParams(window.location.search);
-      const inviteId = searchParams.get("acceptInvite");
-      const inviteName = searchParams.get("friendName") || "Teammate";
-      const isAutoJoin = searchParams.has("join") || !!inviteId;
+      const urlSearchParams = new URLSearchParams(window.location.search);
+      const inviteId = urlSearchParams.get("acceptInvite");
+      const inviteName = urlSearchParams.get("friendName") || "Teammate";
+      const isAutoJoin = urlSearchParams.has("join") || !!inviteId;
 
       const storedKey = `ldk_workspace_members_${id}`;
       const storedStr = localStorage.getItem(storedKey);
@@ -595,13 +800,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const userAvatar = getBestAvatarUrl(user);
 
       // Register member in database project_members table
-      const isUuidWorkspace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-      if (isUuidWorkspace) {
-        supabase.from("project_members").upsert({
-          project_space_id: id,
-          profile_id: joiningUserId,
-          role: "member"
-        }).then(() => {});
+      const isUuidWorkspace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !!workspaceUuid;
+      if (workspaceUuid) {
+        (async () => {
+          try {
+            await supabase.from("project_members").upsert(
+              {
+                project_space_id: workspaceUuid,
+                profile_id: joiningUserId,
+                role: "member"
+              },
+              { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
+            );
+          } catch {}
+        })();
       }
 
       // Add to local room members list if missing
@@ -690,8 +902,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   useEffect(() => {
     if (typeof window !== "undefined" && user) {
-      const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.has("join")) {
+      const urlSearchParams = new URLSearchParams(window.location.search);
+      if (urlSearchParams.has("join")) {
         const autoJoin = async () => {
           try {
             const { data } = await supabase
@@ -847,8 +1059,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               try {
                 await supabase.from("project_spaces").upsert({
                   id: workspaceUuid,
+                  project_name: data.project_name || projectName || "Shared Workspace",
                   github_repo: finalGit,
-                  live_demo_url: finalDemo
+                  live_demo_url: finalDemo,
+                  status: data.status || status || "development"
                 });
               } catch {}
             })();
@@ -934,22 +1148,59 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             let role = "Developer";
             if (profile?.college_key) role = "Faculty";
             else if (profile?.company_key) role = "Recruiter";
+
+            let textContent = c.content;
+            let fileUrl = undefined;
+            let fileName = undefined;
+            let fileType: "image" | "file" | undefined = undefined;
+            let fileSize = undefined;
+
+            try {
+              if (c.content && c.content.trim().startsWith("{")) {
+                const parsed = JSON.parse(c.content);
+                if (parsed.file_url || parsed.text !== undefined) {
+                  textContent = parsed.text || "";
+                  fileUrl = parsed.file_url;
+                  fileName = parsed.file_name;
+                  fileType = parsed.file_type;
+                  fileSize = parsed.file_size;
+                }
+              }
+            } catch {}
+
             return {
               id: c.id,
               sender_name: profile?.username || "Teammate",
               sender_role: role,
-              content: c.content,
-              created_at: c.created_at
+              content: textContent,
+              created_at: c.created_at,
+              file_url: fileUrl,
+              file_name: fileName,
+              file_type: fileType,
+              file_size: fileSize
             };
           });
         }
 
         // Combine DB chat, saved local storage chat, current state, and initial system log
         setChatMessages(prev => {
-          const combinedChat = [...initialLogs, ...savedChatList, ...loadedChat, ...prev];
+          const combinedChat = [...initialLogs, ...savedChatList, ...prev, ...loadedChat];
           const uniqueChat = new Map<string, ChatMsg>();
           combinedChat.forEach(m => {
-            if (m && m.id) uniqueChat.set(m.id, m);
+            if (!m || !m.id) return;
+            if (!m.isSystem && !m.content && !m.file_url) return;
+            const existing = uniqueChat.get(m.id);
+            if (existing) {
+              uniqueChat.set(m.id, {
+                ...m,
+                file_url: existing.file_url || m.file_url,
+                file_name: existing.file_name || m.file_name,
+                file_type: existing.file_type || m.file_type,
+                file_size: existing.file_size || m.file_size
+              });
+            } else {
+              uniqueChat.set(m.id, m);
+            }
           });
           const mergedList = Array.from(uniqueChat.values());
           if (typeof window !== "undefined") {
@@ -1060,15 +1311,39 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             .eq("id", payload.new.profile_id)
             .maybeSingle();
 
+          let textContent = payload.new.content;
+          let fileUrl = undefined;
+          let fileName = undefined;
+          let fileType: "image" | "file" | undefined = undefined;
+          let fileSize = undefined;
+
+          try {
+            if (payload.new.content && payload.new.content.trim().startsWith("{")) {
+              const parsed = JSON.parse(payload.new.content);
+              if (parsed.file_url || parsed.text !== undefined) {
+                textContent = parsed.text || "";
+                fileUrl = parsed.file_url;
+                fileName = parsed.file_name;
+                fileType = parsed.file_type;
+                fileSize = parsed.file_size;
+              }
+            }
+          } catch {}
+
           const incomingMsg: ChatMsg = {
             id: payload.new.id,
             sender_name: profile?.username || "Teammate",
             sender_role: "Developer",
-            content: payload.new.content,
+            content: textContent,
             created_at: payload.new.created_at,
+            file_url: fileUrl,
+            file_name: fileName,
+            file_type: fileType,
+            file_size: fileSize
           };
 
           setChatMessages((prev) => {
+            if (!incomingMsg.content && !incomingMsg.file_url) return prev;
             if (prev.some((m) => m.id === incomingMsg.id)) return prev;
             const updated = [...prev, incomingMsg];
             localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
@@ -1203,7 +1478,50 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMsg.trim()) return;
+    if (!newMsg.trim() && !chatAttachment) return;
+
+    setIsUploadingChatFile(true);
+    let attachedFileUrl = "";
+    let attachedFileName = "";
+    let attachedFileType: "image" | "file" | undefined = undefined;
+    let attachedFileSize = "";
+
+    if (chatAttachment) {
+      attachedFileName = chatAttachment.name;
+      attachedFileType = chatAttachment.type;
+      attachedFileSize = chatAttachment.sizeStr;
+
+      const readFileAsDataUrl = (f: File): Promise<string> => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(f);
+        });
+      };
+
+      const dataUrl = await readFileAsDataUrl(chatAttachment.file);
+      attachedFileUrl = dataUrl || chatAttachment.previewUrl || "#";
+
+      if (user && id !== "e1" && id !== "e2") {
+        try {
+          const fileExt = chatAttachment.file.name.split(".").pop();
+          const fileName = `chat/${id}/${getUniqueId("chat")}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from("project-vaults")
+            .upload(fileName, chatAttachment.file, { upsert: true });
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from("project-vaults")
+              .getPublicUrl(fileName);
+            if (urlData?.publicUrl) {
+              attachedFileUrl = urlData.publicUrl;
+            }
+          }
+        } catch {}
+      }
+    }
 
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
     const localMsg: ChatMsg = {
@@ -1212,6 +1530,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       sender_role: "Collaborator",
       content: newMsg.trim(),
       created_at: new Date().toISOString(),
+      file_url: attachedFileUrl || undefined,
+      file_name: attachedFileName || undefined,
+      file_type: attachedFileType,
+      file_size: attachedFileSize || undefined,
     };
 
     // 1. Update state locally first & save to persistent localStorage
@@ -1221,6 +1543,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       return updated;
     });
     setNewMsg("");
+    setChatAttachment(null);
+    setIsUploadingChatFile(false);
+    if (chatFileInputRef.current) chatFileInputRef.current.value = "";
 
     // 2. Broadcast message over Supabase WebSocket channel
     if (activeChannelRef.current) {
@@ -1247,13 +1572,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
 
     // 4. Send to Supabase DB if user session exists and valid UUID workspace
-    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (user && isUuidSpace) {
+    if (user && workspaceUuid) {
       try {
+        let dbContent = localMsg.content;
+        if (localMsg.file_url) {
+          dbContent = JSON.stringify({
+            text: localMsg.content || "",
+            file_url: localMsg.file_url,
+            file_name: localMsg.file_name,
+            file_type: localMsg.file_type,
+            file_size: localMsg.file_size
+          });
+        }
+
         await supabase.from("chat_messages").insert({
-          project_space_id: id,
+          project_space_id: workspaceUuid,
           profile_id: user.id,
-          content: localMsg.content,
+          content: dbContent,
         });
       } catch (err) {
         console.error("Failed to sync chat message to DB: ", err);
@@ -1750,7 +2085,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const { error: dbError } = await supabase
             .from("project_artifacts")
             .insert({
-              project_space_id: id,
+              project_space_id: workspaceUuid,
               file_name: file.name,
               file_url: fileUrl,
               version: nextVersion,
@@ -1825,10 +2160,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setChatMessages(prev => [...prev, systemNotice]);
 
     // Save chat message notice to database
-    if (user && id !== "e1" && id !== "e2") {
+    if (user && workspaceUuid) {
       try {
         await supabase.from("chat_messages").insert({
-          project_space_id: id,
+          project_space_id: workspaceUuid,
           profile_id: user.id,
           content: `Uploaded artifact: ${file.name} (v${nextVersion})`
         });
@@ -1887,7 +2222,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const { error } = await supabase
         .from("credit_applications")
         .insert({
-          project_space_id: id,
+          project_space_id: workspaceUuid,
           student_id: user.id,
           credit_points: 10,
           status: "pending"
@@ -1907,7 +2242,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setChatMessages(prev => [...prev, systemNotice]);
 
         const { error: chatErr } = await supabase.from("chat_messages").insert({
-          project_space_id: id,
+          project_space_id: workspaceUuid,
           profile_id: user.id,
           content: `Submitted academic credit claim for this project space.`
         });
@@ -2322,26 +2657,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       title: newTaskTitle.trim(),
       status: "todo",
       priority: newTaskPriority,
-      assignee: myName
+      assignee: myName,
+      scope: newTaskScope,
+      created_by: user?.id
     };
     setTasks(prev => {
       const updated = [...prev, newTask];
       localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(updated));
-      if (activeChannelRef.current) {
-        try {
-          activeChannelRef.current.send({
-            type: "broadcast",
-            event: "workspace_sync",
-            payload: { action: "tasks", data: updated }
-          });
-        } catch {}
-      }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "tasks_update", payload: updated });
-          bc.close();
-        } catch {}
+      const teamTasksOnly = updated.filter(t => t.scope !== "self");
+      if (newTaskScope === "team") {
+        if (activeChannelRef.current) {
+          try {
+            activeChannelRef.current.send({
+              type: "broadcast",
+              event: "workspace_sync",
+              payload: { action: "tasks", data: teamTasksOnly }
+            });
+          } catch {}
+        }
+        if (typeof BroadcastChannel !== "undefined") {
+          try {
+            const bc = new BroadcastChannel(`ldk_bus_${id}`);
+            bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
+            bc.close();
+          } catch {}
+        }
       }
       return updated;
     });
@@ -2369,19 +2709,45 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
       const updatedTasks = prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
       localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(updatedTasks));
+      const teamTasksOnly = updatedTasks.filter(t => t.scope !== "self");
       if (activeChannelRef.current) {
         try {
           activeChannelRef.current.send({
             type: "broadcast",
             event: "workspace_sync",
-            payload: { action: "tasks", data: updatedTasks }
+            payload: { action: "tasks", data: teamTasksOnly }
           });
         } catch {}
       }
       if (typeof BroadcastChannel !== "undefined") {
         try {
           const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "tasks_update", payload: updatedTasks });
+          bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
+          bc.close();
+        } catch {}
+      }
+      return updatedTasks;
+    });
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks(prev => {
+      const updatedTasks = prev.filter(t => t.id !== taskId);
+      localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(updatedTasks));
+      const teamTasksOnly = updatedTasks.filter(t => t.scope !== "self");
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "tasks", data: teamTasksOnly }
+          });
+        } catch {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
           bc.close();
         } catch {}
       }
@@ -2396,10 +2762,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       <Header />
 
       {/* Main split workspace grid */}
-      <main className="flex-1 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+      <main ref={containerRef} className={`flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-0 ${isResizing ? "select-none" : ""}`}>
         
-        {/* ================= COLUMN 1: STAGE TRACKER (3 Columns) ================= */}
-        <section className="lg:col-span-3 border-b lg:border-b-0 lg:border-r border-border-main/50 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
+        {/* ================= COLUMN 1: STAGE TRACKER (Left Specs Panel) ================= */}
+        <section 
+          className="w-full border-b lg:border-b-0 lg:border-r border-border-main/50 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6 shrink-0 transition-all duration-75"
+          style={{ width: isDesktop ? `${panelWidths.left}%` : undefined }}
+        >
           <div className="flex items-center justify-between gap-2">
             <Link 
               href="/"
@@ -2409,15 +2778,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               Back to Registry
             </Link>
 
-            <button
-              type="button"
-              onClick={() => setShowLeaveConfirmModal(true)}
-              className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/50 hover:text-red-400 opacity-40 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer font-bold px-1.5 py-0.5 rounded hover:bg-red-500/10"
-              title="Leave Workspace"
-            >
-              <LogOut size={10} />
-              <span>Leave</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={toggleLayoutLock}
+                className="opacity-50 hover:opacity-100 transition-opacity text-[9px] font-mono tracking-wider uppercase text-txt-muted hover:text-txt-main flex items-center gap-1 cursor-pointer bg-bg-card/70 border border-border-main/60 px-1.5 py-0.5 rounded select-none"
+                title={isLayoutLocked ? "Layout is locked. Click to enable mouse dragging" : "Layout is drag-adjustable. Click to lock layout in place"}
+              >
+                {isLayoutLocked ? (
+                  <Lock size={10} className="shrink-0 text-txt-muted" />
+                ) : (
+                  <Unlock size={10} className="shrink-0 text-txt-muted" />
+                )}
+                <span>Layout</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirmModal(true)}
+                className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/50 hover:text-red-400 opacity-40 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer font-bold px-1.5 py-0.5 rounded hover:bg-red-500/10"
+                title="Leave Workspace"
+              >
+                <LogOut size={10} />
+                <span>Leave</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-2 border-b border-border-main/40 pb-4">
@@ -2504,19 +2889,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div className="absolute top-4 bottom-4 left-[6px] w-[1px] bg-border-main/40 opacity-20 rounded-full z-0" />
             
             {stages.map((stg, idx) => {
-              const currentStageLower = status.toLowerCase();
-              const stgLower = stg.toLowerCase();
-              const isActiveFocus = currentStageLower === stgLower;
+              const currentIdx = stageOrder.indexOf(status.toLowerCase());
+              const isCompleted = idx < currentIdx;
+              const isActiveFocus = idx === currentIdx;
+              const liveDate = liveStageDates[idx] || "Target Active";
 
-              const rawDate = stageDeadlines[idx] || "";
-              const isEventCompleted = rawDate.toLowerCase().includes("completed");
+              const displayDate = isCompleted
+                ? `Completed (${liveDate})`
+                : isActiveFocus
+                ? `Active (Target ${liveDate})`
+                : `Target ${liveDate}`;
 
               return (
                 <motion.div 
                   key={idx} 
                   whileHover={{ x: 3 }}
                   onClick={async () => {
-                    const newStatus = stgLower as "ideation" | "development" | "testing" | "submitted";
+                    const newStatus = stageOrder[idx] as "ideation" | "development" | "testing" | "submitted";
                     setStatus(newStatus);
                     localStorage.setItem(`ldk_workspace_status_${id}`, newStatus);
 
@@ -2557,16 +2946,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 >
                   {/* Node Circle */}
                   <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                    isEventCompleted
-                      ? isActiveFocus
-                        ? "border-emerald-500 ring-4 ring-emerald-500/25 bg-emerald-500/20 scale-105"
-                        : "border-emerald-500 bg-emerald-500"
+                    isCompleted
+                      ? "border-emerald-500 bg-emerald-500/20"
                       : isActiveFocus
                       ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105"
                       : "border-border-main group-hover:border-accent-main/60"
                   }`}>
-                    {isEventCompleted ? (
-                      <CheckCircle2 size={12} className={isActiveFocus ? "text-emerald-400 fill-emerald-500/30" : "text-bg-base fill-emerald-500"} />
+                    {isCompleted ? (
+                      <CheckCircle2 size={12} className="text-emerald-400 fill-emerald-500/30" />
                     ) : isActiveFocus ? (
                       <div className="w-2 h-2 rounded-full bg-accent-main animate-pulse" />
                     ) : (
@@ -2577,7 +2964,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   <div className="flex flex-col gap-0.5 pt-0.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={`text-xs font-semibold ${
-                        isEventCompleted
+                        isCompleted
                           ? "text-emerald-400 font-bold"
                           : isActiveFocus
                           ? "text-accent-main font-bold"
@@ -2593,8 +2980,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         </span>
                       )}
                     </div>
-                    <span className={`text-[10px] font-mono tracking-tight ${isEventCompleted ? "text-emerald-400/80 font-medium" : "text-txt-muted"}`}>
-                      {rawDate}
+                    <span className={`text-[10px] font-mono tracking-tight ${
+                      isCompleted 
+                        ? "text-emerald-400/80 font-medium" 
+                        : isActiveFocus 
+                        ? "text-accent-main/80 font-medium" 
+                        : "text-txt-muted"
+                    }`}>
+                      {displayDate}
                     </span>
                   </div>
                 </motion.div>
@@ -2610,20 +3003,43 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
             
             <div className="flex flex-col gap-2">
-              <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Language Breakdown</span>
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Language Breakdown</span>
+                {gitLanguages.length > 0 && (
+                  <span className="text-[8px] font-mono text-txt-muted/70">{gitLanguages.length} Languages</span>
+                )}
+              </div>
+              
               {gitLanguages.length > 0 ? (
                 <div className="flex flex-col gap-2">
-                  {gitLanguages.map((lang) => (
-                    <div key={lang.name} className="flex flex-col gap-1 font-mono">
-                      <div className="flex justify-between items-center text-[10px]">
-                        <span className="text-txt-main font-medium">{lang.name}</span>
-                        <span className="text-txt-muted font-semibold">{lang.percentage}%</span>
-                      </div>
-                      <div className="w-full h-1 bg-bg-base rounded-full overflow-hidden border border-border-main/30">
-                        <div className="h-full bg-accent-main/90 rounded-full transition-all duration-500" style={{ width: `${lang.percentage}%` }} />
-                      </div>
-                    </div>
-                  ))}
+                  {/* Single Unified Multi-Segment Language Bar */}
+                  <div className="w-full h-1.5 bg-bg-base rounded-full overflow-hidden flex border border-border-main/30">
+                    {gitLanguages.map((lang, idx) => {
+                      const colors = ["bg-accent-main", "bg-yellow-400", "bg-purple-400", "bg-emerald-400", "bg-sky-400"];
+                      return (
+                        <div
+                          key={lang.name}
+                          className={`h-full ${colors[idx % colors.length]}`}
+                          style={{ width: `${lang.percentage}%` }}
+                          title={`${lang.name}: ${lang.percentage}%`}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Compact Inline Legend Badges */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[9px]">
+                    {gitLanguages.map((lang, idx) => {
+                      const dotColors = ["bg-accent-main", "bg-yellow-400", "bg-purple-400", "bg-emerald-400", "bg-sky-400"];
+                      return (
+                        <div key={lang.name} className="flex items-center gap-1">
+                          <span className={`w-1.5 h-1.5 rounded-full ${dotColors[idx % dotColors.length]}`} />
+                          <span className="text-txt-main font-medium">{lang.name}</span>
+                          <span className="text-txt-muted/70 text-[8px]">{lang.percentage}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <span className="text-[10px] font-mono text-txt-muted/70 italic py-1 leading-relaxed">
@@ -2631,33 +3047,28 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </span>
               )}
             </div>
-
-            <div className="flex flex-col gap-1.5 border-t border-border-main/30 pt-2.5">
-              <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Workspace Health</span>
-              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                <span>Milestones</span>
-                <span className="text-emerald-400 font-semibold">
-                  {completedTasksCount} / {tasks.length || 1} Complete
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                <span>Repository</span>
-                <span className={githubRepo ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                  {githubRepo ? "Connected" : "Unlinked"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
-                <span>Live Demo</span>
-                <span className={liveDemo ? "text-accent-main font-semibold" : "text-txt-muted"}>
-                  {liveDemo ? "Active" : "Pending"}
-                </span>
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* ================= COLUMN 2: COLLABORATIVE CHAT & AUDIO (6 Columns) ================= */}
-        <section className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden">
+        {/* Mouse Drag Resizer Handle 1 (Left / Chat) */}
+        {!isLayoutLocked && (
+          <div
+            onMouseDown={() => setIsResizing("left-center")}
+            onDoubleClick={handleResetWidths}
+            className={`hidden lg:flex w-1.5 hover:w-2 bg-border-main/30 hover:bg-accent-main/80 active:bg-accent-main transition-all cursor-col-resize z-30 shrink-0 items-center justify-center group relative select-none ${
+              isResizing === "left-center" ? "bg-accent-main w-2" : ""
+            }`}
+            title="Drag to resize Left & Chat panels (Double-click to reset default)"
+          >
+            <div className="w-0.5 h-6 bg-border-main/60 group-hover:bg-bg-base rounded-full" />
+          </div>
+        )}
+
+        {/* ================= COLUMN 2: COLLABORATIVE CHAT & AUDIO (Center Panel) ================= */}
+        <section 
+          className="w-full border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden shrink-0 transition-all duration-75"
+          style={{ width: isDesktop ? `${panelWidths.chat}%` : undefined }}
+        >
           
           {/* Header strip: Voice channels & members */}
           <div className="h-14 border-b border-border-main/50 bg-bg-surface/50 backdrop-blur px-5 flex items-center justify-between flex-shrink-0">
@@ -2853,6 +3264,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           {/* Main Chat Stream */}
           <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
             {chatMessages.map((msg) => {
+              if (!msg.isSystem && !msg.content && !msg.file_url) return null;
+
               const myFullName = user?.user_metadata?.full_name;
               const myEmailPrefix = user?.email?.split("@")[0];
               const isMe = !msg.isSystem && (
@@ -2887,12 +3300,52 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider">{msg.sender_role}</span>
                         )}
                       </div>
-                      <div className={`p-3 rounded-md text-xs leading-relaxed ${
+                      <div className={`p-3 rounded-md text-xs leading-relaxed flex flex-col gap-2 ${
                         isMe 
                           ? "bg-accent-main text-bg-base rounded-tr-none font-normal shadow-sm" 
                           : "bg-bg-surface border border-border-main/70 text-txt-main rounded-tl-none font-light"
                       }`}>
-                        {msg.content}
+                        {msg.content && <span>{msg.content}</span>}
+
+                        {/* Image Attachment Card */}
+                        {msg.file_url && msg.file_type === "image" && (
+                          <button 
+                            type="button"
+                            onClick={() => setChatImagePreviewUrl(msg.file_url!)}
+                            className="block mt-1 overflow-hidden rounded border border-border-main/40 max-w-xs group relative text-left cursor-pointer"
+                          >
+                            <img 
+                              src={msg.file_url} 
+                              alt={msg.file_name || "Attachment"} 
+                              className="max-h-52 w-full object-cover rounded hover:scale-105 transition-transform duration-300" 
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-mono gap-1 font-semibold">
+                              <Eye size={12} /> View Full Image
+                            </div>
+                          </button>
+                        )}
+
+                        {/* Document/Archive/File Attachment Card */}
+                        {msg.file_url && msg.file_type === "file" && (
+                          <a 
+                            href={msg.file_url} 
+                            download={msg.file_name} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className={`mt-1 flex items-center gap-2.5 p-2.5 rounded border transition-colors ${
+                              isMe 
+                                ? "bg-bg-base/20 border-bg-base/30 text-bg-base hover:bg-bg-base/30" 
+                                : "bg-bg-base/50 border-border-main/60 text-txt-main hover:bg-bg-base"
+                            }`}
+                          >
+                            <FileText size={16} className={isMe ? "text-bg-base shrink-0" : "text-accent-main shrink-0"} />
+                            <div className="flex flex-col min-w-0 flex-1 font-mono text-[10px]">
+                              <span className="font-semibold truncate">{msg.file_name || "Attachment File"}</span>
+                              {msg.file_size && <span className="opacity-70 text-[8px]">{msg.file_size}</span>}
+                            </div>
+                            <Download size={13} className="shrink-0 opacity-80 hover:opacity-100" />
+                          </a>
+                        )}
                       </div>
                     </>
                   )}
@@ -2902,21 +3355,59 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div ref={chatEndRef} />
           </div>
 
+          {/* Hidden Chat File Attachment Input */}
+          <input 
+            type="file" 
+            ref={chatFileInputRef}
+            onChange={handleChatFileSelected}
+            className="hidden"
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt,.json,.js,.ts,.tsx,.py"
+          />
+
+          {/* Attached File Preview Bar */}
+          {chatAttachment && (
+            <div className="px-4 py-2 bg-bg-surface border-t border-border-main/50 flex items-center justify-between gap-2 text-xs font-mono">
+              <div className="flex items-center gap-2 truncate">
+                {chatAttachment.type === "image" ? (
+                  <img src={chatAttachment.previewUrl} alt="Preview" className="w-8 h-8 rounded object-cover border border-border-main/50 shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded bg-bg-card border border-border-main/50 flex items-center justify-center shrink-0 text-accent-main">
+                    <FileText size={14} />
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-txt-main font-medium truncate text-[11px]">{chatAttachment.name}</span>
+                  <span className="text-txt-muted text-[9px]">{chatAttachment.sizeStr}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setChatAttachment(null)}
+                className="p-1 rounded text-txt-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                title="Remove attachment"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
           {/* Chat input box */}
           <form onSubmit={handleSendMessage} className="p-4 bg-bg-surface/30 border-t border-border-main/50 flex gap-2 flex-shrink-0 items-center">
             <button 
               type="button" 
-              onClick={triggerFileUpload}
-              className="p-2.5 rounded border border-border-main/80 text-txt-muted hover:text-txt-main hover:bg-bg-card transition-colors focus:outline-none"
-              title="Attach File"
+              onClick={() => chatFileInputRef.current?.click()}
+              className={`p-2.5 rounded border transition-colors focus:outline-none cursor-pointer ${
+                chatAttachment ? "border-accent-main bg-accent-main/10 text-accent-main" : "border-border-main/80 text-txt-muted hover:text-txt-main hover:bg-bg-card"
+              }`}
+              title="Attach File or Image"
             >
               <Paperclip size={14} />
             </button>
             
             <input 
               type="text" 
-              required
-              placeholder="Send message to room deck..."
+              placeholder={chatAttachment ? "Add optional caption..." : "Send message to room deck..."}
               value={newMsg}
               onChange={(e) => setNewMsg(e.target.value)}
               className="flex-1 h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
@@ -2924,17 +3415,39 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             
             <button 
               type="submit" 
-              className="h-10 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-opacity"
+              disabled={isUploadingChatFile}
+              className="h-10 px-4 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center justify-center gap-1.5 transition-opacity cursor-pointer font-bold"
             >
-              <Send size={12} />
-              <span className="hidden sm:inline">Send</span>
+              {isUploadingChatFile ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <Send size={12} />
+              )}
+              <span className="hidden sm:inline">{isUploadingChatFile ? "Sending..." : "Send"}</span>
             </button>
           </form>
 
         </section>
 
-        {/* ================= COLUMN 3: ARTIFACT DECK & VERIFICATIONS (3 Columns) ================= */}
-        <section className="lg:col-span-3 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
+        {/* Mouse Drag Resizer Handle 2 (Chat / Workbench) */}
+        {!isLayoutLocked && (
+          <div
+            onMouseDown={() => setIsResizing("center-right")}
+            onDoubleClick={handleResetWidths}
+            className={`hidden lg:flex w-1.5 hover:w-2 bg-border-main/30 hover:bg-accent-main/80 active:bg-accent-main transition-all cursor-col-resize z-30 shrink-0 items-center justify-center group relative select-none ${
+              isResizing === "center-right" ? "bg-accent-main w-2" : ""
+            }`}
+            title="Drag to resize Chat & Workbench panels (Double-click to reset default)"
+          >
+            <div className="w-0.5 h-6 bg-border-main/60 group-hover:bg-bg-base rounded-full" />
+          </div>
+        )}
+
+        {/* ================= COLUMN 3: ARTIFACT DECK & VERIFICATIONS (Right Workbench Panel) ================= */}
+        <section 
+          className="w-full bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6 flex-1 min-w-0 transition-all duration-75"
+          style={{ width: isDesktop ? `${panelWidths.right}%` : undefined }}
+        >
           
           {/* Tab Navigation Header - 5-column grid alignment */}
           <div className="grid grid-cols-5 border-b border-border-main/50 pb-2.5 gap-1 font-mono text-[9px] uppercase tracking-wider text-center">
@@ -3175,78 +3688,210 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </>
           )}
 
-          {activeTab === "tasks" && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-3">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Kanban Tasks</span>
-                <h2 className="font-display text-lg font-light text-txt-main">Milestone Tracker</h2>
-              </div>
+          {activeTab === "tasks" && (() => {
+            const teamTasksList = tasks.filter(t => t.scope !== "self");
+            const selfTasksList = tasks.filter(t => t.scope === "self");
 
-              {/* Add Task Form */}
-              <form onSubmit={handleAddTask} className="flex flex-col gap-2.5 bg-bg-surface border border-border-main/70 p-3 rounded-sm">
-                <input
-                  type="text"
-                  placeholder="Task title..."
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="h-8 px-2.5 bg-bg-base border border-border-main/80 rounded-sm text-xs text-txt-main placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-sans"
-                />
-                <div className="flex justify-between items-center gap-2">
-                  <select
-                    value={newTaskPriority}
-                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
-                    className="h-7 px-2 bg-bg-base border border-border-main/80 rounded-sm text-[10px] font-mono text-txt-main focus:outline-none"
-                  >
-                    <option value="high">High Priority</option>
-                    <option value="medium">Medium Priority</option>
-                    <option value="low">Low Priority</option>
-                  </select>
+            const renderTaskCard = (t: WorkspaceTask) => (
+              <div key={t.id} className="border border-border-main/70 bg-bg-surface p-3 rounded-sm flex flex-col gap-2 relative group hover:border-border-main transition-colors">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className={`text-xs text-txt-main font-medium truncate ${t.status === "done" ? "line-through text-txt-muted/70" : ""}`}>
+                      {t.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                      t.scope === "self" 
+                        ? "bg-purple-500/10 border-purple-500/30 text-purple-400" 
+                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    }`}>
+                      {t.scope === "self" ? "Self" : "Team"}
+                    </span>
+                    <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                      t.priority === "high" ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-bg-card border-border-main/50 text-txt-muted"
+                    }`}>
+                      {t.priority}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(t.id)}
+                      className="p-1 text-txt-muted/50 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                      title="Delete Task"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted pt-1.5 border-t border-border-main/30">
+                  <span className="flex items-center gap-1 text-txt-muted/80">
+                    {t.scope === "self" ? <User size={10} className="text-purple-400" /> : <Users size={10} className="text-emerald-400" />}
+                    {t.assignee}
+                  </span>
+                  <div className="flex gap-1">
+                    {(["todo", "in_progress", "done"] as const).map(st => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => handleUpdateTaskStatus(t.id, st)}
+                        className={`px-1.5 py-0.5 rounded uppercase cursor-pointer transition-colors ${
+                          t.status === st ? "bg-accent-main text-bg-base font-bold" : "hover:text-txt-main text-txt-muted"
+                        }`}
+                      >
+                        {st === "in_progress" ? "doing" : st}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+
+            return (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Task & Milestone Manager</span>
+                    <span className="text-[9px] font-mono text-txt-muted/70 bg-bg-card/50 border border-border-main/40 px-2 py-0.5 rounded">
+                      {completedTasksCount} / {tasks.length || 1} Done
+                    </span>
+                  </div>
+                  <h2 className="font-display text-lg font-light text-txt-main">Workspace Action Items</h2>
+                </div>
+
+                {/* Scope Filter Tabs */}
+                <div className="flex items-center gap-1 bg-bg-card p-1 rounded border border-border-main/60 font-mono text-[9px] uppercase tracking-wider overflow-x-auto">
                   <button
-                    type="submit"
-                    className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider rounded-sm font-bold hover:opacity-90 transition-opacity cursor-pointer"
+                    type="button"
+                    onClick={() => setTaskFilter("all")}
+                    className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
+                      taskFilter === "all" ? "bg-bg-surface text-txt-main font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                    }`}
                   >
-                    Add Task
+                    <Layers size={10} className="shrink-0" />
+                    <span className="whitespace-nowrap">All Tasks ({tasks.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFilter("team")}
+                    className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
+                      taskFilter === "team" ? "bg-bg-surface text-emerald-400 font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                    }`}
+                  >
+                    <Users size={10} className="shrink-0 text-emerald-400" />
+                    <span className="whitespace-nowrap">Team ({teamTasksList.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFilter("self")}
+                    className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
+                      taskFilter === "self" ? "bg-bg-surface text-purple-400 font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                    }`}
+                  >
+                    <User size={10} className="shrink-0 text-purple-400" />
+                    <span className="whitespace-nowrap">Self ({selfTasksList.length})</span>
                   </button>
                 </div>
-              </form>
 
-              {/* Tasks List */}
-              <div className="flex flex-col gap-2.5">
-                {tasks.map(t => (
-                  <div key={t.id} className="border border-border-main/70 bg-bg-surface p-3 rounded-sm flex flex-col gap-2">
-                    <div className="flex justify-between items-start gap-2">
-                      <span className={`text-xs text-txt-main font-medium ${t.status === "done" ? "line-through text-txt-muted" : ""}`}>
-                        {t.title}
-                      </span>
-                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border ${
-                        t.priority === "high" ? "bg-red-500/10 border-red-500/30 text-red-400" : "bg-bg-card border-border-main/50 text-txt-muted"
-                      }`}>
-                        {t.priority}
-                      </span>
+                {/* Add Task Form */}
+                <form onSubmit={handleAddTask} className="flex flex-col gap-2.5 bg-bg-surface border border-border-main/70 p-3 rounded-sm">
+                  <input
+                    type="text"
+                    placeholder="Add a new task title..."
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    className="h-8 px-2.5 bg-bg-base border border-border-main/80 rounded-sm text-xs text-txt-main placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-sans"
+                  />
+                  
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    {/* Task Scope Selector Pill */}
+                    <div className="flex items-center gap-1 bg-bg-base p-0.5 border border-border-main/80 rounded-sm font-mono text-[9px] uppercase">
+                      <button
+                        type="button"
+                        onClick={() => setNewTaskScope("team")}
+                        className={`px-2 py-1 rounded-xs transition-colors flex items-center gap-1 cursor-pointer ${
+                          newTaskScope === "team" ? "bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30" : "text-txt-muted hover:text-txt-main"
+                        }`}
+                      >
+                        <Users size={9} /> Team
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewTaskScope("self")}
+                        className={`px-2 py-1 rounded-xs transition-colors flex items-center gap-1 cursor-pointer ${
+                          newTaskScope === "self" ? "bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30" : "text-txt-muted hover:text-txt-main"
+                        }`}
+                      >
+                        <User size={9} /> Self
+                      </button>
                     </div>
 
-                    <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted pt-1 border-t border-border-main/30">
-                      <span>{t.assignee}</span>
-                      <div className="flex gap-1">
-                        {(["todo", "in_progress", "done"] as const).map(st => (
-                          <button
-                            key={st}
-                            type="button"
-                            onClick={() => handleUpdateTaskStatus(t.id, st)}
-                            className={`px-1.5 py-0.5 rounded uppercase cursor-pointer ${
-                              t.status === st ? "bg-accent-main text-bg-base font-bold" : "hover:text-txt-main text-txt-muted"
-                            }`}
-                          >
-                            {st === "in_progress" ? "doing" : st}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                        className="h-7 px-2 bg-bg-base border border-border-main/80 rounded-sm text-[10px] font-mono text-txt-main focus:outline-none cursor-pointer"
+                      >
+                        <option value="high">High Priority</option>
+                        <option value="medium">Medium Priority</option>
+                        <option value="low">Low Priority</option>
+                      </select>
+                      <button
+                        type="submit"
+                        className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider rounded-sm font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus size={11} /> Add Task
+                      </button>
                     </div>
                   </div>
-                ))}
+                </form>
+
+                {/* Team Tasks Section */}
+                {(taskFilter === "all" || taskFilter === "team") && (
+                  <div className="flex flex-col gap-2 border border-border-main/50 bg-bg-surface/30 p-3 rounded-sm">
+                    <div className="flex items-center justify-between border-b border-border-main/30 pb-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-emerald-400 font-bold flex items-center gap-1.5">
+                        <Users size={11} /> Workspace Team ({teamTasksList.length})
+                      </span>
+                      <span className="text-[8px] font-mono text-txt-muted/70 uppercase">Shared with teammates</span>
+                    </div>
+
+                    {teamTasksList.length > 0 ? (
+                      <div className="flex flex-col gap-2 mt-1">
+                        {teamTasksList.map(renderTaskCard)}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-mono text-txt-muted/60 italic py-2 text-center">
+                        No team tasks created yet. Create one above for your teammates!
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Self Tasks Section */}
+                {(taskFilter === "all" || taskFilter === "self") && (
+                  <div className="flex flex-col gap-2 border border-border-main/50 bg-bg-surface/30 p-3 rounded-sm">
+                    <div className="flex items-center justify-between border-b border-border-main/30 pb-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-purple-400 font-bold flex items-center gap-1.5">
+                        <User size={11} /> Personal Self ({selfTasksList.length})
+                      </span>
+                      <span className="text-[8px] font-mono text-txt-muted/70 uppercase">Private to you</span>
+                    </div>
+
+                    {selfTasksList.length > 0 ? (
+                      <div className="flex flex-col gap-2 mt-1">
+                        {selfTasksList.map(renderTaskCard)}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-mono text-txt-muted/60 italic py-2 text-center">
+                        No personal tasks yet. Add a self task above for your private checklist.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {activeTab === "artifacts" && (
             <>
@@ -4078,6 +4723,43 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 />
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Chat Image Lightbox Modal */}
+      {chatImagePreviewUrl && (
+        <div 
+          onClick={() => setChatImagePreviewUrl(null)}
+          className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 animate-fadeIn select-none"
+        >
+          <div className="absolute top-4 right-4 flex items-center gap-3 z-10" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={chatImagePreviewUrl}
+              download="chat_image_preview"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded bg-bg-surface/90 border border-border-main/60 text-txt-main hover:text-accent-main text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Download size={13} />
+              <span>Download Image</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setChatImagePreviewUrl(null)}
+              className="p-2 rounded bg-bg-surface/90 border border-border-main/60 text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
+              title="Close Preview (Esc)"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="relative max-w-5xl max-h-[85vh] flex items-center justify-center p-2" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={chatImagePreviewUrl} 
+              alt="Full Image Preview" 
+              className="max-h-[80vh] max-w-full object-contain rounded border border-border-main/40 shadow-2xl" 
+            />
           </div>
         </div>
       )}
