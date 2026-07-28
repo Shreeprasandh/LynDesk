@@ -134,6 +134,37 @@ interface GitLanguage {
 
 const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 
+function isDatePassed(dateStr?: string | null): boolean {
+  if (!dateStr) return false;
+  const clean = dateStr.trim().toLowerCase();
+  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none")) {
+    return false;
+  }
+
+  try {
+    let raw = dateStr.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
+    if (!raw) return false;
+
+    raw = raw.replace(/Sept/i, "Sep");
+
+    let parsedTime = Date.parse(raw);
+
+    if (isNaN(parsedTime)) {
+      const currentYear = new Date().getFullYear();
+      raw = `${raw}, ${currentYear}`;
+      parsedTime = Date.parse(raw);
+    }
+
+    if (!isNaN(parsedTime)) {
+      const targetDate = new Date(parsedTime);
+      targetDate.setHours(23, 59, 59, 999);
+      return new Date().getTime() > targetDate.getTime();
+    }
+  } catch {}
+
+  return false;
+}
+
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
 
   const { id } = use(params);
@@ -2366,17 +2397,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    try {
-      await supabase
-        .from("project_spaces")
-        .upsert({
-          id: workspaceUuid,
-          github_repo: cleanGit,
-          project_name: projectName || "Shared Workspace",
-          status: status || "development"
-        });
-    } catch (err) {
-      console.error("Failed to save git repo: ", err);
+    if (user && workspaceUuid) {
+      try {
+        const { error: updateErr } = await supabase
+          .from("project_spaces")
+          .update({ github_repo: cleanGit })
+          .eq("id", workspaceUuid);
+
+        if (updateErr) {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: workspaceUuid,
+              github_repo: cleanGit,
+              project_name: projectName || "Shared Workspace",
+              status: status || "development"
+            });
+        }
+      } catch (err) {
+        console.error("Failed to save git repo: ", err);
+      }
     }
   };
 
@@ -2411,17 +2451,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    try {
-      await supabase
-        .from("project_spaces")
-        .upsert({
-          id: workspaceUuid,
-          live_demo_url: cleanDemo,
-          project_name: projectName || "Shared Workspace",
-          status: status || "development"
-        });
-    } catch (err) {
-      console.error("Failed to save live demo: ", err);
+    if (user && workspaceUuid) {
+      try {
+        const { error: updateErr } = await supabase
+          .from("project_spaces")
+          .update({ live_demo_url: cleanDemo })
+          .eq("id", workspaceUuid);
+
+        if (updateErr) {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: workspaceUuid,
+              live_demo_url: cleanDemo,
+              project_name: projectName || "Shared Workspace",
+              status: status || "development"
+            });
+        }
+      } catch (err) {
+        console.error("Failed to save live demo: ", err);
+      }
     }
   };
 
@@ -2475,16 +2524,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (isUuidSpace) {
+    if (user && workspaceUuid) {
       try {
-        await supabase
+        const { error: updateErr } = await supabase
           .from("project_spaces")
-          .upsert({
-            id: id,
-            project_name: cleanName,
-            status: status || "development"
-          });
+          .update({ project_name: cleanName })
+          .eq("id", workspaceUuid);
+
+        if (updateErr) {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: workspaceUuid,
+              project_name: cleanName,
+              status: status || "development"
+            });
+        }
       } catch (err) {
         console.error("Failed updating workspace name in db", err);
       }
@@ -2890,9 +2945,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             
             {stages.map((stg, idx) => {
               const currentIdx = stageOrder.indexOf(status.toLowerCase());
-              const isCompleted = idx < currentIdx;
-              const isActiveFocus = idx === currentIdx;
               const liveDate = liveStageDates[idx] || "Target Active";
+              const isCompleted = isDatePassed(liveDate);
+              const isActiveFocus = idx === currentIdx;
 
               const displayDate = isCompleted
                 ? `Completed (${liveDate})`
@@ -2927,16 +2982,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       } catch {}
                     }
 
-                    const isUuidSpace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-                    if (isUuidSpace) {
+                    if (user && workspaceUuid) {
                       try {
-                        await supabase
+                        const { error: updateErr } = await supabase
                           .from("project_spaces")
-                          .upsert({
-                            id: id,
-                            status: newStatus,
-                            project_name: projectName || "Shared Workspace"
-                          });
+                          .update({ status: newStatus })
+                          .eq("id", workspaceUuid);
+
+                        if (updateErr) {
+                          await supabase
+                            .from("project_spaces")
+                            .insert({
+                              id: workspaceUuid,
+                              status: newStatus,
+                              project_name: projectName || "Shared Workspace"
+                            });
+                        }
                       } catch (err) {
                         console.error("Failed updating stage status", err);
                       }

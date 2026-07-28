@@ -144,6 +144,37 @@ function LandingSkeleton() {
   );
 }
 
+function isDatePassed(dateStr?: string | null): boolean {
+  if (!dateStr) return false;
+  const clean = dateStr.trim().toLowerCase();
+  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none")) {
+    return false;
+  }
+
+  try {
+    let raw = dateStr.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
+    if (!raw) return false;
+
+    raw = raw.replace(/Sept/i, "Sep");
+
+    let parsedTime = Date.parse(raw);
+
+    if (isNaN(parsedTime)) {
+      const currentYear = new Date().getFullYear();
+      raw = `${raw}, ${currentYear}`;
+      parsedTime = Date.parse(raw);
+    }
+
+    if (!isNaN(parsedTime)) {
+      const targetDate = new Date(parsedTime);
+      targetDate.setHours(23, 59, 59, 999);
+      return new Date().getTime() > targetDate.getTime();
+    }
+  } catch {}
+
+  return false;
+}
+
 interface EventItem {
   id: string;
   title: string;
@@ -702,14 +733,22 @@ export default function Home() {
     }
 
     const targetUuid = getWorkspaceUuid(workspaceId);
-    if (workspaceId !== "mock") {
+    if (user && workspaceId !== "mock" && targetUuid) {
       try {
-        await supabase
+        const { error: updateErr } = await supabase
           .from("project_spaces")
-          .upsert({
-            id: targetUuid,
-            project_name: cleanTitle
-          });
+          .update({ project_name: cleanTitle })
+          .eq("id", targetUuid);
+
+        if (updateErr) {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: targetUuid,
+              project_name: cleanTitle,
+              status: "development"
+            });
+        }
       } catch (e) {
         console.error("Failed updating workspace title in db", e);
       }
@@ -735,14 +774,22 @@ export default function Home() {
     }
 
     const targetUuid = getWorkspaceUuid(workspaceId);
-    if (workspaceId !== "mock") {
+    if (user && workspaceId !== "mock" && targetUuid) {
       try {
-        await supabase
+        const { error: updateErr } = await supabase
           .from("project_spaces")
-          .upsert({
-            id: targetUuid,
-            status: newStatus
-          });
+          .update({ status: newStatus })
+          .eq("id", targetUuid);
+
+        if (updateErr) {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: targetUuid,
+              status: newStatus,
+              project_name: "Shared Workspace"
+            });
+        }
       } catch (e) {
         console.error("Failed updating workspace status in db", e);
       }
@@ -1927,7 +1974,7 @@ export default function Home() {
                             <Layers size={11} className="text-txt-muted/80" /> Timeline Stages & Milestone Diagram
                           </span>
                           <span className="text-txt-muted/65 font-medium bg-bg-card/40 px-2 py-0.5 rounded border border-border-main/40 opacity-70">
-                            Active: {ev.status}
+                            {isDatePassed(ev.deadline) ? "Status: Completed" : `Active: ${ev.status}`}
                           </span>
                         </div>
                         
@@ -1941,25 +1988,28 @@ export default function Home() {
                           />
                           
                           {stageObjects.map((stgObj, idx) => {
-                            const isDone = idx <= activeIdx;
+                            const isStagePassed = isDatePassed(stgObj.deadline);
                             const isCurrent = idx === activeIdx;
                             return (
                               <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[110px]">
                                 <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                                  isCurrent ? "border-accent-main text-accent-main ring-4 ring-accent-main/20 scale-110" :
-                                  isDone ? "border-accent-main text-accent-main bg-accent-main/10" : "border-border-main text-txt-muted"
+                                  isStagePassed
+                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                                    : isCurrent
+                                    ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
+                                    : "border-border-main text-txt-muted"
                                 }`}>
-                                  {isDone ? <CheckCircle2 size={11} className="text-accent-main" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                  {isStagePassed ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
                                 </div>
 
                                 <span className={`text-[10px] font-display font-medium leading-tight max-w-[120px] ${
-                                  isCurrent ? "text-accent-main font-semibold" : isDone ? "text-txt-main" : "text-txt-muted"
+                                  isCurrent ? "text-accent-main font-semibold" : isStagePassed ? "text-txt-main" : "text-txt-muted"
                                 }`}>
                                   {stgObj.stage}
                                 </span>
 
-                                <span className="text-[9px] font-mono text-txt-muted">
-                                  {stgObj.deadline}
+                                <span className={`text-[9px] font-mono ${isStagePassed ? "text-emerald-400/80 font-medium" : "text-txt-muted"}`}>
+                                  {isStagePassed ? `Completed (${stgObj.deadline})` : stgObj.deadline}
                                 </span>
                               </div>
                             );
