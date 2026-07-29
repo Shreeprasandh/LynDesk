@@ -165,11 +165,72 @@ function isDatePassed(dateStr?: string | null): boolean {
   return false;
 }
 
+function mergeChatMessages(prev: ChatMsg[], incoming: ChatMsg, currentUsername?: string): ChatMsg[] {
+  if (!incoming || (!incoming.isSystem && !incoming.content && !incoming.file_url)) return prev;
+
+  const existingIdx = prev.findIndex(m => m.id === incoming.id);
+  if (existingIdx >= 0) {
+    const updated = [...prev];
+    updated[existingIdx] = {
+      ...updated[existingIdx],
+      ...incoming,
+      file_url: incoming.file_url || updated[existingIdx].file_url,
+      file_name: incoming.file_name || updated[existingIdx].file_name,
+      file_type: incoming.file_type || updated[existingIdx].file_type,
+      file_size: incoming.file_size || updated[existingIdx].file_size
+    };
+    return updated;
+  }
+
+  const matchIdx = prev.findIndex(m => {
+    if (m.isSystem) return false;
+    const sameContent = (m.content || "").trim() === (incoming.content || "").trim();
+    const sameUrl = (m.file_url || "") === (incoming.file_url || "");
+    const timeDiff = Math.abs(new Date(m.created_at).getTime() - new Date(incoming.created_at).getTime());
+
+    const isMineA = m.sender_name === "You" || 
+                    (currentUsername && m.sender_name.toLowerCase() === currentUsername.toLowerCase());
+    const isMineB = incoming.sender_name === "You" || 
+                    (currentUsername && incoming.sender_name.toLowerCase() === currentUsername.toLowerCase());
+    const sameSender = (isMineA && isMineB) || m.sender_name.toLowerCase() === incoming.sender_name.toLowerCase();
+
+    return sameSender && sameContent && sameUrl && timeDiff < 35000;
+  });
+
+  if (matchIdx >= 0) {
+    const updated = [...prev];
+    updated[matchIdx] = {
+      ...incoming,
+      file_url: incoming.file_url || prev[matchIdx].file_url,
+      file_name: incoming.file_name || prev[matchIdx].file_name,
+      file_type: incoming.file_type || prev[matchIdx].file_type,
+      file_size: incoming.file_size || prev[matchIdx].file_size
+    };
+    return updated;
+  }
+
+  return [...prev, incoming];
+}
+
 export default function WorkspacePage({ params }: { params: Promise<{ id: string }> }) {
 
   const { id } = use(params);
   const workspaceUuid = useMemo(() => getWorkspaceUuid(id), [id]);
   const { user } = useAuth();
+  const [userUsername, setUserUsername] = useState<string>("");
+
+  useEffect(() => {
+    if (user?.id) {
+      supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.username) setUserUsername(data.username);
+        });
+    }
+  }, [user?.id]);
 
   const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
   const [, startTabTransition] = useTransition();
@@ -603,8 +664,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const { type, payload } = event.data || {};
       if (type === "chat_message" && payload) {
         setChatMessages((prev) => {
-          if (prev.some((m) => m.id === payload.id)) return prev;
-          const updated = [...prev, payload];
+          const updated = mergeChatMessages(prev, payload, userUsername);
           localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
           return updated;
         });
@@ -1053,6 +1113,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         }
       }
 
+      // Ensure user is recorded in project_members so RLS policies pass
+      if (user && workspaceUuid) {
+        try {
+          await supabase
+            .from("project_members")
+            .upsert(
+              {
+                project_space_id: workspaceUuid,
+                profile_id: user.id,
+                role: "member"
+              },
+              { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
+            );
+        } catch {}
+      }
+
       // Fetch workspace details from Supabase project_spaces
       try {
         const { data, error } = await supabase
@@ -1066,7 +1142,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
         if (!error && data) {
           if (data.project_name) setProjectName(data.project_name);
-          if (data.status) setStatus(data.status);
+          const savedLocalStatus = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_status_${id}`) : null;
+          if (savedLocalStatus && savedLocalStatus !== data.status && user && workspaceUuid) {
+            setStatus(savedLocalStatus as any);
+            (async () => {
+              try {
+                await supabase
+                  .from("project_spaces")
+                  .update({ status: savedLocalStatus })
+                  .eq("id", workspaceUuid);
+              } catch {}
+            })();
+          } else if (data.status) {
+            setStatus(data.status);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_status_${id}`, data.status);
+            }
+          }
 
           const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
           const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
@@ -1088,13 +1180,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (user && ((!data.github_repo && finalGit) || (!data.live_demo_url && finalDemo))) {
             (async () => {
               try {
-                await supabase.from("project_spaces").upsert({
-                  id: workspaceUuid,
-                  project_name: data.project_name || projectName || "Shared Workspace",
-                  github_repo: finalGit,
-                  live_demo_url: finalDemo,
-                  status: data.status || status || "development"
-                });
+                await supabase
+                  .from("project_spaces")
+                  .update({
+                    project_name: data.project_name || projectName || "Shared Workspace",
+                    github_repo: finalGit,
+                    live_demo_url: finalDemo,
+                    status: data.status || status || "development"
+                  })
+                  .eq("id", workspaceUuid);
               } catch {}
             })();
           }
@@ -1142,13 +1236,25 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
           (async () => {
             try {
-              await supabase.from("project_spaces").upsert({
-                id: workspaceUuid,
-                project_name: projectName || "Shared Workspace",
-                github_repo: localGit || githubRepo || null,
-                live_demo_url: localDemo || liveDemo || null,
-                status: status || "development"
-              });
+              const { error: updateErr } = await supabase
+                .from("project_spaces")
+                .update({
+                  project_name: projectName || "Shared Workspace",
+                  github_repo: localGit || githubRepo || null,
+                  live_demo_url: localDemo || liveDemo || null,
+                  status: status || "development"
+                })
+                .eq("id", workspaceUuid);
+
+              if (updateErr) {
+                await supabase.from("project_spaces").insert({
+                  id: workspaceUuid,
+                  project_name: projectName || "Shared Workspace",
+                  github_repo: localGit || githubRepo || null,
+                  live_demo_url: localDemo || liveDemo || null,
+                  status: status || "development"
+                });
+              }
             } catch {}
           })();
         }
@@ -1216,24 +1322,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         // Combine DB chat, saved local storage chat, current state, and initial system log
         setChatMessages(prev => {
           const combinedChat = [...initialLogs, ...savedChatList, ...prev, ...loadedChat];
-          const uniqueChat = new Map<string, ChatMsg>();
+          let mergedList: ChatMsg[] = [];
           combinedChat.forEach(m => {
-            if (!m || !m.id) return;
-            if (!m.isSystem && !m.content && !m.file_url) return;
-            const existing = uniqueChat.get(m.id);
-            if (existing) {
-              uniqueChat.set(m.id, {
-                ...m,
-                file_url: existing.file_url || m.file_url,
-                file_name: existing.file_name || m.file_name,
-                file_type: existing.file_type || m.file_type,
-                file_size: existing.file_size || m.file_size
-              });
-            } else {
-              uniqueChat.set(m.id, m);
-            }
+            mergedList = mergeChatMessages(mergedList, m, userUsername);
           });
-          const mergedList = Array.from(uniqueChat.values());
           if (typeof window !== "undefined") {
             localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(mergedList));
           }
@@ -1374,12 +1466,33 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           };
 
           setChatMessages((prev) => {
-            if (!incomingMsg.content && !incomingMsg.file_url) return prev;
-            if (prev.some((m) => m.id === incomingMsg.id)) return prev;
-            const updated = [...prev, incomingMsg];
+            const updated = mergeChatMessages(prev, incomingMsg, userUsername);
             localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
             return updated;
           });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "project_spaces",
+          filter: `id=eq.${workspaceUuid}`,
+        },
+        (payload) => {
+          if (payload.new && payload.new.status) {
+            setStatus(payload.new.status);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_status_${id}`, payload.new.status);
+            }
+          }
+          if (payload.new && payload.new.project_name) {
+            setProjectName(payload.new.project_name);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_name_${id}`, payload.new.project_name);
+            }
+          }
         }
       )
       .on(
@@ -1389,8 +1502,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           const incoming = payload.payload;
           if (incoming && incoming.id) {
             setChatMessages((prev) => {
-              if (prev.some((m) => m.id === incoming.id)) return prev;
-              const updated = [...prev, incoming];
+              const updated = mergeChatMessages(prev, incoming, userUsername);
               localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
               return updated;
             });
@@ -1428,6 +1540,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             localStorage.setItem(`ldk_workspace_artifacts_${id}`, JSON.stringify(data));
           } else if (action === "status" && typeof data === "string") {
             setStatus(data as any);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_status_${id}`, data);
+            }
           } else if (action === "credits" && typeof data === "string") {
             setClaimStatus(data as any);
           } else if (action === "name" && data.projectName) {
@@ -1554,7 +1669,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
     }
 
-    const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
+    const myName = userUsername || user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "You";
     const localMsg: ChatMsg = {
       id: getUniqueId("msg"),
       sender_name: myName,
@@ -2399,12 +2514,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     if (user && workspaceUuid) {
       try {
-        const { error: updateErr } = await supabase
+        const { data: existing } = await supabase
           .from("project_spaces")
-          .update({ github_repo: cleanGit })
-          .eq("id", workspaceUuid);
+          .select("id")
+          .eq("id", workspaceUuid)
+          .maybeSingle();
 
-        if (updateErr) {
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ github_repo: cleanGit })
+            .eq("id", workspaceUuid);
+        } else {
           await supabase
             .from("project_spaces")
             .insert({
@@ -2453,12 +2574,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     if (user && workspaceUuid) {
       try {
-        const { error: updateErr } = await supabase
+        const { data: existing } = await supabase
           .from("project_spaces")
-          .update({ live_demo_url: cleanDemo })
-          .eq("id", workspaceUuid);
+          .select("id")
+          .eq("id", workspaceUuid)
+          .maybeSingle();
 
-        if (updateErr) {
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ live_demo_url: cleanDemo })
+            .eq("id", workspaceUuid);
+        } else {
           await supabase
             .from("project_spaces")
             .insert({
@@ -2526,12 +2653,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
     if (user && workspaceUuid) {
       try {
-        const { error: updateErr } = await supabase
+        const { data: existing } = await supabase
           .from("project_spaces")
-          .update({ project_name: cleanName })
-          .eq("id", workspaceUuid);
+          .select("id")
+          .eq("id", workspaceUuid)
+          .maybeSingle();
 
-        if (updateErr) {
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ project_name: cleanName })
+            .eq("id", workspaceUuid);
+        } else {
           await supabase
             .from("project_spaces")
             .insert({
@@ -2962,7 +3095,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   onClick={async () => {
                     const newStatus = stageOrder[idx] as "ideation" | "development" | "testing" | "submitted";
                     setStatus(newStatus);
-                    localStorage.setItem(`ldk_workspace_status_${id}`, newStatus);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem(`ldk_workspace_status_${id}`, newStatus);
+                      try {
+                        const eventsStr = localStorage.getItem("ldk_events");
+                        const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
+                        const existingIdx = eventsList.findIndex(e => e.id === id);
+                        if (existingIdx >= 0) {
+                          eventsList[existingIdx].status = newStatus;
+                          localStorage.setItem("ldk_events", JSON.stringify(eventsList));
+                        }
+                      } catch {}
+                    }
 
                     if (activeChannelRef.current) {
                       try {
@@ -2984,12 +3128,29 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
                     if (user && workspaceUuid) {
                       try {
-                        const { error: updateErr } = await supabase
-                          .from("project_spaces")
-                          .update({ status: newStatus })
-                          .eq("id", workspaceUuid);
+                        await supabase
+                          .from("project_members")
+                          .upsert(
+                            {
+                              project_space_id: workspaceUuid,
+                              profile_id: user.id,
+                              role: "member"
+                            },
+                            { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
+                          );
 
-                        if (updateErr) {
+                        const { data: existing } = await supabase
+                          .from("project_spaces")
+                          .select("id")
+                          .eq("id", workspaceUuid)
+                          .maybeSingle();
+
+                        if (existing) {
+                          await supabase
+                            .from("project_spaces")
+                            .update({ status: newStatus })
+                            .eq("id", workspaceUuid);
+                        } else {
                           await supabase
                             .from("project_spaces")
                             .insert({
@@ -3331,6 +3492,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               const myEmailPrefix = user?.email?.split("@")[0];
               const isMe = !msg.isSystem && (
                 msg.sender_name === "You" ||
+                (userUsername && msg.sender_name === userUsername) ||
                 (myFullName && msg.sender_name === myFullName) ||
                 (myEmailPrefix && msg.sender_name === myEmailPrefix) ||
                 (user?.id && (msg as any).profile_id === user.id)

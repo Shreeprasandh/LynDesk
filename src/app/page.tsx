@@ -582,19 +582,6 @@ export default function Home() {
 
           const mySpaceIds: string[] = (memberData || []).map((m: any) => m.project_space_id).filter(Boolean);
 
-          const { data: wmMemberData } = await supabase
-            .from("workspace_members")
-            .select("project_space_id")
-            .eq("user_id", user.id);
-          
-          if (wmMemberData) {
-            wmMemberData.forEach((wm: any) => {
-              if (wm.project_space_id && !mySpaceIds.includes(wm.project_space_id)) {
-                mySpaceIds.push(wm.project_space_id);
-              }
-            });
-          }
-
           // Fetch fellow members ONLY from shared workspaces who are currently ONLINE
           let onlineTeammates: { id?: string; name: string; role: string; active: boolean }[] = [];
 
@@ -605,18 +592,8 @@ export default function Home() {
               .in("project_space_id", mySpaceIds)
               .neq("profile_id", user.id);
 
-            const { data: wmTeammates } = await supabase
-              .from("workspace_members")
-              .select("user_id, profiles:user_id(id, full_name, username, department, updated_at)")
-              .in("project_space_id", mySpaceIds)
-              .neq("user_id", user.id);
-
             const profileMap = new Map<string, any>();
             (teammateMembers || []).forEach((tm: any) => {
-              const p = tm.profiles;
-              if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
-            });
-            (wmTeammates || []).forEach((tm: any) => {
               const p = tm.profiles;
               if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
             });
@@ -735,12 +712,18 @@ export default function Home() {
     const targetUuid = getWorkspaceUuid(workspaceId);
     if (user && workspaceId !== "mock" && targetUuid) {
       try {
-        const { error: updateErr } = await supabase
+        const { data: existing } = await supabase
           .from("project_spaces")
-          .update({ project_name: cleanTitle })
-          .eq("id", targetUuid);
+          .select("id")
+          .eq("id", targetUuid)
+          .maybeSingle();
 
-        if (updateErr) {
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ project_name: cleanTitle })
+            .eq("id", targetUuid);
+        } else {
           await supabase
             .from("project_spaces")
             .insert({
@@ -776,12 +759,18 @@ export default function Home() {
     const targetUuid = getWorkspaceUuid(workspaceId);
     if (user && workspaceId !== "mock" && targetUuid) {
       try {
-        const { error: updateErr } = await supabase
+        const { data: existing } = await supabase
           .from("project_spaces")
-          .update({ status: newStatus })
-          .eq("id", targetUuid);
+          .select("id")
+          .eq("id", targetUuid)
+          .maybeSingle();
 
-        if (updateErr) {
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ status: newStatus })
+            .eq("id", targetUuid);
+        } else {
           await supabase
             .from("project_spaces")
             .insert({
@@ -851,12 +840,6 @@ export default function Home() {
       try {
         const targetUuid = getWorkspaceUuid(idToRemove);
         if (user) {
-          await supabase
-            .from("workspace_members")
-            .delete()
-            .eq("project_space_id", targetUuid)
-            .eq("user_id", user.id);
-
           await supabase
             .from("project_members")
             .delete()

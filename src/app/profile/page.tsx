@@ -276,6 +276,9 @@ export default function ProfilePage() {
 
         // 2. Fetch detailed record metadata from Auth user metadata as fallback/extension
         const meta = user.user_metadata || {};
+        const bestAvatar = meta.avatar_url || meta.picture || profile?.avatar_url || "";
+        if (bestAvatar) setAvatarUrl(bestAvatar);
+
         setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
         setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
         setCodechefUsername(meta.codechef_username || profile?.codechef_username || "");
@@ -714,25 +717,8 @@ export default function ProfilePage() {
           .update({
             username: cleanUsername,
             full_name: cleanFullName,
-            avatar_url: avatarUrl,
-            is_profile_public: isPublic,
             department: cleanDept,
-            graduation_year: gradYear.trim(),
-            github_url: githubUrl.trim(),
-            linkedin_url: linkedinUrl.trim(),
-            portfolio_url: portfolioUrl.trim(),
-            college_key: collegeKey.trim(),
-            college_name: cleanCollege,
-            leetcode_username: leetcodeUsername.trim(),
-            codeforces_username: codeforcesUsername.trim(),
-            codechef_username: codechefUsername.trim(),
-            unstop_username: unstopUsername.trim(),
-            hack2skill_username: hack2skillUsername.trim(),
-            leetcode_verified: nextLcVerified,
-            codeforces_verified: nextCfVerified,
-            codechef_verified: nextCcVerified,
-            unstop_verified: nextUsVerified,
-            hack2skill_verified: nextH2sVerified,
+            college_key: collegeKey.trim() || null,
             updated_at: new Date().toISOString()
           })
           .eq("id", user.id);
