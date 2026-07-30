@@ -580,12 +580,16 @@ export default function Home() {
             `)
             .eq("profile_id", user.id);
 
+          // 0. Update current user's profile timestamp so teammates see user as active
+          supabase.from("profiles").update({ updated_at: new Date().toISOString() }).eq("id", user.id).then(() => {});
+
           const mySpaceIds: string[] = (memberData || []).map((m: any) => m.project_space_id).filter(Boolean);
 
           // Fetch fellow members ONLY from shared workspaces who are currently ONLINE
           let onlineTeammates: { id?: string; name: string; role: string; active: boolean }[] = [];
 
           if (mySpaceIds.length > 0) {
+            // 1. Fetch teammate profiles
             const { data: teammateMembers } = await supabase
               .from("project_members")
               .select("profile_id, profiles(id, full_name, username, department, updated_at)")
@@ -601,9 +605,9 @@ export default function Home() {
             const now = Date.now();
             onlineTeammates = Array.from(profileMap.values())
               .filter(p => {
-                if (!p.updated_at) return true; // Recently active
+                if (!p.updated_at) return true;
                 const lastActive = new Date(p.updated_at).getTime();
-                return (now - lastActive) < 30 * 60 * 1000; // Online in last 30 min
+                return (now - lastActive) < 15 * 60 * 1000; // Online in last 15 min
               })
               .map(p => ({
                 id: p.id,
@@ -621,15 +625,19 @@ export default function Home() {
               const space = m.project_spaces;
               const ev = space?.events;
               if (space || m.project_space_id) {
+                const spaceId = space?.id || m.project_space_id;
+                const localWorkspaceName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${spaceId}`) : null;
+                const resolvedTitle = localWorkspaceName || space?.project_name || ev?.title || "Shared Workspace";
+
                 dbEvents.push({
-                  id: space?.id || m.project_space_id,
-                  title: space?.project_name || ev?.title || "Shared Workspace",
+                  id: spaceId,
+                  title: resolvedTitle,
                   deadline: ev?.registration_deadline 
                     ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) 
                     : "Ongoing",
                   location: ev?.location || "online",
                   level: ev?.level || "global",
-                  url: ev?.source_url || space?.github_repo || `/workspace/${space?.id || m.project_space_id}`,
+                  url: ev?.source_url || space?.github_repo || `/workspace/${spaceId}`,
                   status: space?.status || "development",
                   stages: ["Ideation", "Development", "Final Submission"]
                 });
@@ -1730,7 +1738,10 @@ export default function Home() {
                 {coworkers.length > 0 ? (
                   coworkers.map((cw, i) => (
                     <div key={cw.id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
-                      <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
+                      </div>
                       <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50">{cw.role}</span>
                     </div>
                   ))
@@ -1783,7 +1794,6 @@ export default function Home() {
                         ? "bg-accent-main/15 text-accent-main border-accent-main/40 font-bold opacity-100" 
                         : "bg-bg-card text-txt-muted/70 hover:text-txt-main opacity-60 hover:opacity-100 border-border-main/60"
                     }`}
-                    title="Toggle workspace order mode"
                   >
                     <ArrowUpDown size={10} />
                     <span>{isReordering ? "Done Reordering" : "Reorder Workspaces"}</span>
@@ -1813,22 +1823,40 @@ export default function Home() {
                   })();
 
                   const stageObjects = (() => {
+                    const realStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) : null;
+                    if (realStr) {
+                      try {
+                        const parsed = JSON.parse(realStr);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                          return parsed.map((s: any) => ({
+                            stage: s.title || s.stage || "Stage",
+                            deadline: s.deadline || "Target Active"
+                          }));
+                        }
+                      } catch {}
+                    }
                     const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
                     if (metaStr) {
                       try {
                         const meta = JSON.parse(metaStr);
                         if (meta && meta.stages && meta.stages.length > 0) {
-                          return meta.stages as { stage: string; deadline: string }[];
+                          return meta.stages.map((s: any) => ({
+                            stage: s.title || s.stage || "Stage",
+                            deadline: s.deadline || "Target Active"
+                          }));
                         }
                       } catch {}
                     }
-                    return ev.stages.map((s, i) => ({
-                      stage: s,
-                      deadline: i === 0 ? "09 Aug 2026" : i === 1 ? "06 Sep 2026" : i === 2 ? "27 Sep 2026" : "Nov 02 2026"
-                    }));
+                    return [
+                      { stage: "Round 1 - Online Assessment", deadline: "09 Aug 2026" },
+                      { stage: "Round 2 - Development Round", deadline: "06 Sep 2026" },
+                      { stage: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026" },
+                      { stage: "Round 4 - Grand Finale", deadline: "02 Nov 2026" }
+                    ];
                   })();
 
-                  const activeIdx = ev.status === "submitted" ? 3 : ev.status === "testing" ? 2 : ev.status === "development" ? 1 : 0;
+                  const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
+                  const activeIdx = firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1;
                   const maxIdx = Math.max(stageObjects.length - 1, 1);
                   const progressPct = `${Math.min(100, Math.max(0, Math.round((activeIdx / maxIdx) * 100)))}%`;
 
@@ -1885,30 +1913,30 @@ export default function Home() {
                                     setEditingWorkspaceId(ev.id);
                                   }}
                                   className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
-                                  title="Rename Workspace"
                                 >
                                   <Edit2 size={10} />
                                   <span>Rename</span>
                                 </button>
                               </div>
                             )}
-                            <span className="text-[9px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-                              {ev.level}
-                            </span>
                           </div>
                           {ev.url && (() => {
-                            const cleanDisplayUrl = ev.url.startsWith("/workspace/") 
+                            let displayUrl = ev.url.startsWith("/workspace/") 
                               ? `Workspace Desk (${ev.id.substring(0, 8)})` 
                               : ev.url.replace(/^https?:\/\/(www\.)?/, "");
+
+                            if (!ev.url.startsWith("/workspace/") && displayUrl.length > 30) {
+                              displayUrl = displayUrl.substring(0, 30) + "...";
+                            }
+
                             return (
                               <a 
                                 href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
                                 target="_blank" 
                                 rel="noreferrer"
-                                className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono flex items-center gap-1.5 self-start max-w-[260px] sm:max-w-[400px] md:max-w-[500px] transition-colors group/link py-0.5"
-                                title={ev.url}
+                                className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-base/40"
                               >
-                                <span className="truncate leading-none">{cleanDisplayUrl}</span>
+                                <span className="truncate leading-none">{displayUrl}</span>
                                 <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
                               </a>
                             );
@@ -1917,7 +1945,7 @@ export default function Home() {
 
                         <div className="flex items-center gap-3 flex-shrink-0">
                           {isReordering && events.length > 1 && (
-                            <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40" title="Reorder Workspace">
+                            <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40">
                               <button
                                 type="button"
                                 onClick={() => handleMoveWorkspace(evIndex, "up")}
@@ -1925,7 +1953,6 @@ export default function Home() {
                                 className={`p-1 rounded transition-colors ${
                                   evIndex === 0 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
                                 }`}
-                                title="Move Workspace Up"
                               >
                                 <ChevronUp size={13} />
                               </button>
@@ -1936,7 +1963,6 @@ export default function Home() {
                                 className={`p-1 rounded transition-colors ${
                                   evIndex === events.length - 1 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
                                 }`}
-                                title="Move Workspace Down"
                               >
                                 <ChevronDown size={13} />
                               </button>
@@ -1950,49 +1976,42 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Timeline Stages & Milestone Diagram */}
-                      <div className="flex flex-col gap-3 shadow-xs bg-bg-base/30 p-4 rounded-md border border-border-main/40">
-                        <div className="flex justify-between items-center text-[9px] font-mono tracking-widest text-txt-muted uppercase">
-                          <span className="font-medium flex items-center gap-1.5 text-txt-muted/65 opacity-70">
-                            <Layers size={11} className="text-txt-muted/80" /> Timeline Stages & Milestone Diagram
-                          </span>
-                          <span className="text-txt-muted/65 font-medium bg-bg-card/40 px-2 py-0.5 rounded border border-border-main/40 opacity-70">
-                            {isDatePassed(ev.deadline) ? "Status: Completed" : `Active: ${ev.status}`}
-                          </span>
-                        </div>
-                        
-                        <div className="relative flex justify-between items-start pt-2 pb-1 px-2 gap-2 overflow-x-auto">
-                          <div className="absolute top-[18px] left-4 right-4 h-[2px] bg-border-main/50 z-0" />
+                      {/* Milestone Diagram */}
+                      <div className="p-4 rounded-md border border-border-main/40 bg-bg-base/30 overflow-x-auto">
+                        <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
+                          <div className="absolute top-[10px] left-6 right-6 h-[2px] bg-border-main/50 z-0" />
                           <motion.div 
-                            className="absolute top-[18px] left-4 h-[2px] bg-accent-main z-0"
+                            className="absolute top-[10px] left-6 h-[2px] bg-accent-main z-0"
                             initial={false}
-                            animate={{ width: progressPct }}
+                            animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
                             transition={{ type: "spring", stiffness: 120, damping: 20 }}
                           />
-                          
-                          {stageObjects.map((stgObj, idx) => {
-                            const isStagePassed = isDatePassed(stgObj.deadline);
-                            const isCurrent = idx === activeIdx;
+                            
+                          {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
+                            const isPassed = isDatePassed(stgObj.deadline);
+                            const isCompleted = isPassed || idx < activeIdx;
+                            const isCurrent = !isCompleted && idx === activeIdx;
+
                             return (
-                              <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[110px]">
+                              <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[120px]">
                                 <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                                  isStagePassed
-                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                                  isCompleted
+                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
                                     : isCurrent
                                     ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
-                                    : "border-border-main text-txt-muted"
+                                    : "border-border-main/60 text-txt-muted/60"
                                 }`}>
-                                  {isStagePassed ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                  {isCompleted ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
                                 </div>
 
-                                <span className={`text-[10px] font-display font-medium leading-tight max-w-[120px] ${
-                                  isCurrent ? "text-accent-main font-semibold" : isStagePassed ? "text-txt-main" : "text-txt-muted"
+                                <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
+                                  isCurrent ? "text-accent-main font-bold" : isCompleted ? "text-emerald-400/90 font-medium" : "text-txt-muted/70"
                                 }`}>
                                   {stgObj.stage}
                                 </span>
 
-                                <span className={`text-[9px] font-mono ${isStagePassed ? "text-emerald-400/80 font-medium" : "text-txt-muted"}`}>
-                                  {isStagePassed ? `Completed (${stgObj.deadline})` : stgObj.deadline}
+                                <span className={`text-[9px] font-mono ${isCompleted ? "text-emerald-400/80 font-medium" : isCurrent ? "text-accent-main/80 font-medium" : "text-txt-muted/60"}`}>
+                                  {isCompleted ? `Completed (${stgObj.deadline})` : `Target ${stgObj.deadline}`}
                                 </span>
                               </div>
                             );
@@ -2002,9 +2021,16 @@ export default function Home() {
 
                   {/* Actions row */}
                   <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                    <div className="flex items-center gap-1 text-[10px] text-txt-muted">
-                      <MapPin size={11} />
-                      <span className="uppercase font-mono">{ev.location}</span>
+                    <div className="flex items-center gap-2 text-[10px] text-txt-muted">
+                      <div className="flex items-center gap-1">
+                        <MapPin size={11} className="text-txt-muted/70" />
+                        <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
+                      </div>
+                      {ev.level && (
+                        <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
+                          {ev.level}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
@@ -2012,7 +2038,6 @@ export default function Home() {
                         type="button"
                         onClick={() => setConfirmLeaveId(ev.id)}
                         className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
-                        title="Leave or Remove Workspace"
                       >
                         <Trash2 size={11} />
                         <span>Leave</span>

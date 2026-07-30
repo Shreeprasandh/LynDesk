@@ -89,6 +89,8 @@ CREATE TABLE public.project_members (
     project_space_id UUID REFERENCES public.project_spaces ON DELETE CASCADE NOT NULL,
     profile_id UUID REFERENCES public.profiles ON DELETE CASCADE NOT NULL,
     role role_type DEFAULT 'member'::role_type NOT NULL,
+    custom_status TEXT DEFAULT 'Active',
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     UNIQUE(project_space_id, profile_id)
 );
 
@@ -412,3 +414,38 @@ CREATE POLICY "Allow users to delete their own notifications"
 -- High-performance index for user notification lookup
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id, created_at DESC);
 
+-- 12. AUTOMATED 10-DAY STORAGE ATTACHMENT CLEANUP FUNCTION
+CREATE OR REPLACE FUNCTION delete_old_chat_attachments()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Delete storage objects older than 10 days in project-vaults bucket
+  DELETE FROM storage.objects
+  WHERE bucket_id = 'project-vaults'
+    AND created_at < (NOW() - INTERVAL '10 days');
+END;
+$$;
+-- 13. WORKSPACE PRESENCE TABLE
+CREATE TABLE IF NOT EXISTS public.workspace_presence (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    workspace_id UUID REFERENCES public.project_spaces(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    status_text TEXT DEFAULT 'Active',
+    is_online BOOLEAN DEFAULT true NOT NULL,
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(workspace_id, user_id)
+);
+
+-- Enable RLS on Workspace Presence
+ALTER TABLE public.workspace_presence ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public select on workspace_presence" 
+    ON public.workspace_presence FOR SELECT 
+    USING (true);
+
+CREATE POLICY "Allow authenticated users to upsert workspace_presence" 
+    ON public.workspace_presence FOR ALL 
+    USING (true)
+    WITH CHECK (true);

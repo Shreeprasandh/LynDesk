@@ -89,6 +89,8 @@ interface TeamMember {
   isOnline: boolean;
   isSpeaking?: boolean;
   avatarUrl?: string;
+  customStatus?: string;
+  lastSeenAt?: string;
 }
 
 interface ChatMsg {
@@ -396,24 +398,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     url: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333"
   });
 
-  // Timeline / Stages (Fetched live from event URL or fallback)
-  const stages = ["Ideation", "Development", "Testing", "Submitted"];
-  const stageOrder = ["ideation", "development", "testing", "submitted"];
-  const [liveStageDates, setLiveStageDates] = useState<string[]>([
-    "09 Aug 2026",
-    "06 Sep 2026",
-    "27 Sep 2026",
-    "02 Nov 2026"
-  ]);
+  // Real Event Stage Item Type
+  type RealStageItem = {
+    title: string;
+    deadline: string;
+    brief?: string;
+  };
+
+  const defaultRealStages: RealStageItem[] = [
+    { title: "Round 1 - Online Assessment", deadline: "09 Aug 2026", brief: "15 MCQs & 1 Coding Challenge." },
+    { title: "Round 2 - Development Round", deadline: "06 Sep 2026", brief: "Build software solution per official problem brief." },
+    { title: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026", brief: "Build working interactive prototype." },
+    { title: "Round 4 - Grand Finale", deadline: "02 Nov 2026", brief: "Final project presentation to leadership." }
+  ];
+
+  const [realStageItems, setRealStageItems] = useState<RealStageItem[]>(defaultRealStages);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`ldk_workspace_live_dates_${id}`);
+      const saved = localStorage.getItem(`ldk_workspace_real_stages_${id}`);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length >= 4) {
-            setLiveStageDates(parsed);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRealStageItems(parsed);
           }
         } catch {}
       }
@@ -431,11 +439,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.stages) && data.stages.length >= 4) {
-            const extracted = data.stages.slice(0, 4).map((s: { deadline?: string }) => s.deadline || "Target Active");
-            setLiveStageDates(extracted);
+          if (data && Array.isArray(data.stages) && data.stages.length > 0) {
+            const extracted: RealStageItem[] = data.stages.map((s: any, idx: number) => ({
+              title: s.stage || s.title || `Round ${idx + 1}`,
+              deadline: s.deadline || "Target Active",
+              brief: s.brief || ""
+            }));
+            setRealStageItems(extracted);
             if (typeof window !== "undefined") {
-              localStorage.setItem(`ldk_workspace_live_dates_${id}`, JSON.stringify(extracted));
+              localStorage.setItem(`ldk_workspace_real_stages_${id}`, JSON.stringify(extracted));
             }
           }
         }
@@ -452,6 +464,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
+  const [myCustomStatus, setMyCustomStatus] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(`ldk_my_custom_status_${id}`) || "Active";
+    }
+    return "Active";
+  });
+  const myCustomStatusRef = useRef<string>(myCustomStatus);
+  const [statusInputDraft, setStatusInputDraft] = useState<string>(myCustomStatus);
+  useEffect(() => {
+    myCustomStatusRef.current = myCustomStatus;
+    setStatusInputDraft(myCustomStatus);
+  }, [myCustomStatus]);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
 
   const router = useRouter();
@@ -702,6 +726,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         setClaimStatus(payload as any);
       } else if (type === "name_update" && typeof payload === "string") {
         setProjectName(payload);
+        if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_name_${id}`, payload);
       } else if (type === "call_presence" && payload) {
         setIsCallActiveInRoom(!!payload.active);
         if (payload.callerName) setCallCallerName(payload.callerName);
@@ -783,28 +808,33 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const storedStr = localStorage.getItem(`ldk_workspace_members_${id}`);
       const storedList: TeamMember[] = storedStr ? JSON.parse(storedStr) : [];
 
-      // 2. Query real database members from Supabase project_members
+      // 2. Query real database members from project_members & profiles
       let dbMembersList: TeamMember[] = [];
       try {
-        const { data, error } = await supabase
+        const { data: memberRows } = await supabase
           .from("project_members")
-          .select(`
-            role,
-            profile:profile_id ( * )
-          `)
+          .select("profile_id, role")
           .eq("project_space_id", workspaceUuid);
-        
-        if (!error && data && data.length > 0) {
-          dbMembersList = data.map((item: any) => {
-            const prof = item.profile;
-            if (!prof) return null;
-            return {
-              id: prof.id,
-              name: prof.full_name || prof.username || "Collaborator",
-              avatarUrl: getBestAvatarUrl(prof),
-              isOnline: true
-            };
-          }).filter(Boolean) as TeamMember[];
+
+        if (memberRows && memberRows.length > 0) {
+          const profIds = memberRows.map((m: any) => m.profile_id).filter(Boolean);
+          if (profIds.length > 0) {
+            const { data: profRows } = await supabase
+              .from("profiles")
+              .select("*")
+              .in("id", profIds);
+
+            if (profRows && profRows.length > 0) {
+              dbMembersList = profRows.map((prof: any) => ({
+                id: prof.id,
+                name: prof.full_name || prof.username || "Collaborator",
+                avatarUrl: getBestAvatarUrl(prof),
+                isOnline: false,
+                customStatus: "Active",
+                lastSeenAt: "Recently"
+              }));
+            }
+          }
         }
       } catch (e) {
         console.error("Error loading project members: ", e);
@@ -842,6 +872,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         } catch (e) {
           console.warn("Avatar enrichment warning: ", e);
         }
+      }
+
+      // Ensure logged in user is always online with proper avatarUrl in roomMembers
+      if (user && uniqueMap.has(user.id)) {
+        const myMem = uniqueMap.get(user.id)!;
+        uniqueMap.set(user.id, {
+          ...myMem,
+          isOnline: true,
+          avatarUrl: getBestAvatarUrl(user) || myMem.avatarUrl || ""
+        });
+      } else if (user) {
+        uniqueMap.set(user.id, {
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "You",
+          isOnline: true,
+          avatarUrl: getBestAvatarUrl(user) || ""
+        });
       }
 
       setRoomMembers(Array.from(uniqueMap.values()));
@@ -1135,28 +1182,35 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           .from("project_spaces")
           .select(`
             *,
-            events ( title )
+            events ( title, registration_deadline, source_url )
           `)
           .eq("id", workspaceUuid)
           .maybeSingle();
 
         if (!error && data) {
-          if (data.project_name) setProjectName(data.project_name);
-          const savedLocalStatus = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_status_${id}`) : null;
-          if (savedLocalStatus && savedLocalStatus !== data.status && user && workspaceUuid) {
-            setStatus(savedLocalStatus as any);
-            (async () => {
-              try {
-                await supabase
-                  .from("project_spaces")
-                  .update({ status: savedLocalStatus })
-                  .eq("id", workspaceUuid);
-              } catch {}
-            })();
-          } else if (data.status) {
+          const savedLocalName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${id}`) : null;
+          const resolvedName = data.project_name || savedLocalName || "Shared Workspace";
+          setProjectName(resolvedName);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`ldk_workspace_name_${id}`, resolvedName);
+          }
+          if (data.status) {
             setStatus(data.status);
             if (typeof window !== "undefined") {
               localStorage.setItem(`ldk_workspace_status_${id}`, data.status);
+            }
+          } else {
+            const savedLocalStatus = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_status_${id}`) : null;
+            if (savedLocalStatus && workspaceUuid) {
+              setStatus(savedLocalStatus as any);
+              (async () => {
+                try {
+                  await supabase
+                    .from("project_spaces")
+                    .update({ status: savedLocalStatus })
+                    .eq("id", workspaceUuid);
+                } catch {}
+              })();
             }
           }
 
@@ -1193,7 +1247,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             })();
           }
           if (data.events) {
-            setEventTitle(data.events.title);
+            if (data.events.title) setEventTitle(data.events.title);
           }
 
           // Sync workspace to ldk_joined_workspaces and ldk_events so home dashboard renders it
@@ -1412,9 +1466,70 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   // Real-time Chat subscription
   useEffect(() => {
-    // Subscribe to chat message inserts & real-time member joins/chat in Supabase for this project space
+    // Subscribe to chat message inserts & real-time member presence/sync in Supabase for this project space
     const channel = supabase
-      .channel(`project_chat:${workspaceUuid}`)
+      .channel(`project_chat:${workspaceUuid}`, {
+        config: {
+          presence: { key: user?.id || "guest" }
+        }
+      });
+
+    const syncWorkspacePresences = () => {
+      const wsState = channel.presenceState();
+      const onlineKeys = new Set(Object.keys(wsState));
+
+      setRoomMembers((prev) => {
+        const updated = prev.map((member) => {
+          const isOnlineNow = (user?.id && member.id === user.id) || onlineKeys.has(member.id);
+          const userPresences = wsState[member.id] as any[];
+          let latestStatus = member.customStatus;
+          let newName = member.name;
+          let newAvatar = member.avatarUrl;
+
+          if (member.id === user?.id) {
+            latestStatus = myCustomStatusRef.current || member.customStatus;
+          } else if (userPresences && userPresences.length > 0) {
+            const pres = userPresences[0];
+            if (pres.customStatus) latestStatus = pres.customStatus;
+            if (pres.name) newName = pres.name;
+            if (pres.avatarUrl) newAvatar = pres.avatarUrl;
+          }
+
+          return {
+            ...member,
+            name: newName,
+            avatarUrl: newAvatar || member.avatarUrl,
+            isOnline: isOnlineNow,
+            customStatus: latestStatus || member.customStatus
+          };
+        });
+
+        // Dynamically add any online presence users NOT currently in roomMembers list
+        const existingIds = new Set(updated.map((m) => m.id));
+        onlineKeys.forEach((key) => {
+          if (!existingIds.has(key)) {
+            const presArray = wsState[key] as any[];
+            if (presArray && presArray.length > 0) {
+              const pres = presArray[0];
+              updated.push({
+                id: key,
+                name: pres.name || "Collaborator",
+                avatarUrl: pres.avatarUrl || "",
+                isOnline: true,
+                customStatus: pres.customStatus || "Active"
+              });
+            }
+          }
+        });
+
+        return updated;
+      });
+    };
+
+    channel
+      .on("presence", { event: "sync" }, syncWorkspacePresences)
+      .on("presence", { event: "join" }, syncWorkspacePresences)
+      .on("presence", { event: "leave" }, syncWorkspacePresences)
       .on(
         "postgres_changes",
         {
@@ -1545,8 +1660,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             }
           } else if (action === "credits" && typeof data === "string") {
             setClaimStatus(data as any);
-          } else if (action === "name" && data.projectName) {
-            setProjectName(data.projectName);
+          } else if (action === "name" && (data.projectName || data.name)) {
+            const newName = data.projectName || data.name;
+            setProjectName(newName);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_name_${id}`, newName);
+            }
           } else if (action === "call_presence" && data) {
             setIsCallActiveInRoom(!!data.active);
             if (data.callerName) setCallCallerName(data.callerName);
@@ -1594,18 +1713,79 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           }
         }
       )
-      .subscribe((status) => {
+      .on(
+        "broadcast",
+        { event: "presence_ping" },
+        (payload) => {
+          const ping = payload.payload;
+          if (ping && ping.id) {
+            setRoomMembers((prev) => {
+              const exists = prev.some((m) => m.id === ping.id);
+              if (exists) {
+                return prev.map((m) => (m.id === ping.id ? { ...m, isOnline: !!ping.isOnline, avatarUrl: ping.avatarUrl || m.avatarUrl } : m));
+              }
+              return [
+                ...prev,
+                {
+                  id: ping.id,
+                  name: ping.name || "Collaborator",
+                  avatarUrl: ping.avatarUrl || "",
+                  isOnline: true
+                }
+              ];
+            });
+          }
+        }
+      )
+      .subscribe(async (status) => {
         if (status === "SUBSCRIBED" && user) {
           const myName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Collaborator";
-          channel.send({
-            type: "broadcast",
-            event: "member_joined",
-            payload: {
+          const currentStatus = myCustomStatus || "Active";
+          const myAvatar = getBestAvatarUrl(user);
+
+          // 1. Update profiles table updated_at so Dashboard Active Co-Workers knows user is online right now
+          try {
+            await supabase.from("profiles").update({ updated_at: new Date().toISOString() }).eq("id", user.id);
+          } catch {}
+          
+          // 2. Track presence on Supabase Realtime Server
+          try {
+            await channel.track({
               id: user.id,
               name: myName,
-              avatarUrl: getBestAvatarUrl(user)
-            }
-          });
+              avatarUrl: myAvatar,
+              customStatus: currentStatus,
+              online_at: new Date().toISOString()
+            });
+          } catch {}
+
+          // 3. Persist presence row in database via server API route
+          if (workspaceUuid) {
+            fetch("/api/workspace/presence", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workspaceId: workspaceUuid,
+                userId: user.id,
+                statusText: currentStatus,
+                isOnline: true
+              })
+            }).catch(() => {});
+          }
+
+          // 4. Send member_joined and presence_ping broadcasts
+          try {
+            channel.send({
+              type: "broadcast",
+              event: "member_joined",
+              payload: { id: user.id, name: myName, avatarUrl: myAvatar }
+            });
+            channel.send({
+              type: "broadcast",
+              event: "presence_ping",
+              payload: { id: user.id, name: myName, avatarUrl: myAvatar, isOnline: true }
+            });
+          } catch {}
         }
       });
 
@@ -1652,17 +1832,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       if (user && id !== "e1" && id !== "e2") {
         try {
           const fileExt = chatAttachment.file.name.split(".").pop();
-          const fileName = `chat/${id}/${getUniqueId("chat")}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage
-            .from("project-vaults")
-            .upload(fileName, chatAttachment.file, { upsert: true });
+          const fileName = `chat_${id}_${getUniqueId("chat")}.${fileExt}`;
+          const uploadData = new FormData();
+          uploadData.append("file", chatAttachment.file);
+          uploadData.append("bucket", "project-vaults");
+          uploadData.append("path", fileName);
 
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage
-              .from("project-vaults")
-              .getPublicUrl(fileName);
-            if (urlData?.publicUrl) {
-              attachedFileUrl = urlData.publicUrl;
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: uploadData
+          });
+
+          if (uploadRes.ok) {
+            const resJson = await uploadRes.json();
+            if (resJson?.publicUrl) {
+              attachedFileUrl = resJson.publicUrl;
             }
           }
         } catch {}
@@ -1739,6 +1923,47 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch (err) {
         console.error("Failed to sync chat message to DB: ", err);
       }
+    }
+  };
+
+  const handleUpdateMyCustomStatus = async (newStatus: string) => {
+    const cleanStatus = newStatus.trim() || "Active";
+    myCustomStatusRef.current = cleanStatus;
+    setMyCustomStatus(cleanStatus);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_my_custom_status_${id}`, cleanStatus);
+    }
+
+    setRoomMembers((prev) =>
+      prev.map((m) => (m.id === user?.id ? { ...m, customStatus: cleanStatus } : m))
+    );
+
+    if (activeChannelRef.current && user) {
+      try {
+        const myName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Collaborator";
+        activeChannelRef.current.track({
+          id: user.id,
+          name: myName,
+          avatarUrl: getBestAvatarUrl(user),
+          customStatus: cleanStatus,
+          online_at: new Date().toISOString()
+        });
+      } catch {}
+    }
+
+    if (user && workspaceUuid) {
+      try {
+        await fetch("/api/workspace/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId: workspaceUuid,
+            userId: user.id,
+            statusText: cleanStatus,
+            isOnline: true
+          })
+        });
+      } catch {}
     }
   };
 
@@ -2630,6 +2855,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         }
         localStorage.setItem("ldk_events", JSON.stringify(eventsList));
         window.dispatchEvent(new Event("ldk_events_update"));
+        window.dispatchEvent(new Event("storage"));
       } catch {}
     }
 
@@ -2651,137 +2877,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    if (user && workspaceUuid) {
+    if (workspaceUuid) {
       try {
-        const { data: existing } = await supabase
-          .from("project_spaces")
-          .select("id")
-          .eq("id", workspaceUuid)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase
-            .from("project_spaces")
-            .update({ project_name: cleanName })
-            .eq("id", workspaceUuid);
-        } else {
-          await supabase
-            .from("project_spaces")
-            .insert({
-              id: workspaceUuid,
-              project_name: cleanName,
-              status: status || "development"
-            });
-        }
+        await fetch("/api/workspace/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId: workspaceUuid,
+            projectName: cleanName
+          })
+        });
       } catch (err) {
-        console.error("Failed updating workspace name in db", err);
+        console.error("Failed updating workspace name in db via API", err);
       }
     }
   };
 
   const fetchCommits = useCallback(async () => {
-    if (!githubRepo || !githubRepo.trim()) {
-      const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
-      if (savedCommitsStr) {
-        try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
-      }
-      return;
-    }
-
-    let fetched = false;
-    const cleanUrl = githubRepo.trim().replace(/\/$/, "");
-
-    // 1. Try matching owner/repo (e.g. https://github.com/Shreeprasandh/LynDesk)
-    const repoMatch = cleanUrl.match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)$/);
-    if (repoMatch) {
-      const owner = repoMatch[1];
-      const repo = repoMatch[2].replace(/\.git$/, "");
-      try {
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=5`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const parsed = data.map((item: any) => {
-              const dateObj = new Date(item.commit?.author?.date || item.commit?.committer?.date);
-              const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-              return {
-                hash: item.sha ? item.sha.substring(0, 7) : "commit",
-                author: item.commit?.author?.name || item.commit?.committer?.name || owner,
-                message: item.commit?.message ? item.commit.message.split("\n")[0] : "Update codebase",
-                time: relative
-              };
-            });
-            setCommits(parsed);
-            if (typeof window !== "undefined") {
-              localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(parsed));
-            }
-            fetched = true;
+    try {
+      const paramUrl = githubRepo ? encodeURIComponent(githubRepo) : "";
+      const res = await fetch(`/api/github/commits?repoUrl=${paramUrl}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.commits) && data.commits.length > 0) {
+          setCommits(data.commits);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(data.commits));
           }
+          return;
         }
-      } catch {}
-    }
-
-    // 2. If not repo or repo fetch failed, try Profile URL (e.g. https://github.com/Shreeprasandh)
-    if (!fetched) {
-      const profileMatch = cleanUrl.match(/(?:github\.com\/)?([^\/]+)$/);
-      if (profileMatch && profileMatch[1] && profileMatch[1] !== "github.com") {
-        const username = profileMatch[1];
-        try {
-          const res = await fetch(`https://api.github.com/users/${username}/events/public`);
-          if (res.ok) {
-            const events = await res.json();
-            if (Array.isArray(events)) {
-              const pushEvents = events.filter((e: any) => e.type === "PushEvent");
-              const parsedCommits: any[] = [];
-              
-              pushEvents.forEach((ev: any) => {
-                const repoName = ev.repo?.name ? ev.repo.name.split("/")[1] || ev.repo.name : "";
-                const dateObj = new Date(ev.created_at);
-                const relative = dateObj.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-
-                if (Array.isArray(ev.payload?.commits)) {
-                  ev.payload.commits.forEach((c: any) => {
-                    if (parsedCommits.length < 5) {
-                      parsedCommits.push({
-                        hash: c.sha ? c.sha.substring(0, 7) : "commit",
-                        author: ev.actor?.display_login || ev.actor?.login || username,
-                        message: `${repoName ? `[${repoName}] ` : ""}${c.message ? c.message.split("\n")[0] : "Pushed code"}`,
-                        time: relative
-                      });
-                    }
-                  });
-                }
-              });
-
-              if (parsedCommits.length > 0) {
-                setCommits(parsedCommits);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(parsedCommits));
-                }
-                fetched = true;
-              }
-            }
-          }
-        } catch {}
       }
-    }
+    } catch {}
 
-    // 3. Fallback to /api/git/commits if no live GitHub commits could be fetched and no cache exists
-    if (!fetched) {
-      const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
-      if (savedCommitsStr) {
-        try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
-      } else {
-        try {
-          const res = await fetch("/api/git/commits");
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.commits) {
-              setCommits(data.commits);
-            }
-          }
-        } catch {}
-      }
+    const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
+    if (savedCommitsStr) {
+      try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
     }
   }, [githubRepo, id]);
 
@@ -2793,29 +2923,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
       return;
     }
-    const githubMatch = githubRepo.trim().match(/(?:github\.com\/)?([^\/]+)\/([^\/]+)/);
-    if (githubMatch) {
-      const owner = githubMatch[1];
-      const repo = githubMatch[2].replace(/\.git$/, "");
-      try {
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`);
-        if (res.ok) {
-          const data = await res.json();
-          const total = Object.values(data).reduce((acc: number, val: any) => acc + Number(val), 0) as number;
-          if (total > 0) {
-            const parsed: GitLanguage[] = Object.entries(data).map(([name, bytes]) => ({
-              name,
-              bytes: Number(bytes),
-              percentage: Number(((Number(bytes) / total) * 100).toFixed(1))
-            })).sort((a, b) => b.bytes - a.bytes);
-            setGitLanguages(parsed);
-            localStorage.setItem(`ldk_workspace_langs_${id}`, JSON.stringify(parsed));
-            return;
+    try {
+      const res = await fetch(`/api/github/languages?repoUrl=${encodeURIComponent(githubRepo)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.languages) && data.languages.length > 0) {
+          setGitLanguages(data.languages);
+          if (typeof window !== "undefined") {
+            localStorage.setItem(`ldk_workspace_langs_${id}`, JSON.stringify(data.languages));
           }
+          return;
         }
-      } catch (err) {
-        console.warn("Failed fetching repo languages: ", err);
       }
+    } catch (err) {
+      console.warn("Failed fetching repo languages: ", err);
     }
     const savedLangsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_langs_${id}`) : null;
     if (savedLangsStr) {
@@ -2971,7 +3092,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 type="button"
                 onClick={toggleLayoutLock}
                 className="opacity-50 hover:opacity-100 transition-opacity text-[9px] font-mono tracking-wider uppercase text-txt-muted hover:text-txt-main flex items-center gap-1 cursor-pointer bg-bg-card/70 border border-border-main/60 px-1.5 py-0.5 rounded select-none"
-                title={isLayoutLocked ? "Layout is locked. Click to enable mouse dragging" : "Layout is drag-adjustable. Click to lock layout in place"}
               >
                 {isLayoutLocked ? (
                   <Lock size={10} className="shrink-0 text-txt-muted" />
@@ -2985,7 +3105,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 type="button"
                 onClick={() => setShowLeaveConfirmModal(true)}
                 className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/50 hover:text-red-400 opacity-40 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer font-bold px-1.5 py-0.5 rounded hover:bg-red-500/10"
-                title="Leave Workspace"
               >
                 <LogOut size={10} />
                 <span>Leave</span>
@@ -2993,26 +3112,34 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 border-b border-border-main/40 pb-4">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">{eventTitle}</span>
-            
+          {/* Single Clean Unified Workspace Title Header */}
+          <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-4">
             {!isEditingName ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2 group">
-                  <h2 className="font-display text-lg font-light text-txt-main truncate">{projectName}</h2>
+                  <h2 className="font-display text-xl font-medium text-txt-main truncate">
+                    {projectName && projectName !== "Loading Project..."
+                      ? projectName 
+                      : (eventTitle || "Project Workspace")}
+                  </h2>
                   <button
                     type="button"
                     onClick={() => {
-                      setTempName(projectName);
+                      setTempName(projectName && projectName !== "Loading Project..." ? projectName : (eventTitle || ""));
                       setIsEditingName(true);
                     }}
-                    className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 lg:opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-surface px-1.5 py-0.5 rounded border border-border-main/50"
-                    title="Rename Workspace"
+                    className="text-[9px] font-mono text-txt-muted/70 hover:text-accent-main opacity-80 lg:opacity-0 group-hover:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-surface px-2 py-0.5 rounded border border-border-main/50 font-semibold"
                   >
                     <Edit2 size={10} />
                     <span>Rename</span>
                   </button>
                 </div>
+
+                {eventTitle && projectName && projectName !== eventTitle && (
+                  <span className="text-[10px] font-mono text-txt-muted uppercase tracking-wider">
+                    Linked Event: <strong className="text-txt-main/80 font-normal">{eventTitle}</strong>
+                  </span>
+                )}
 
                 <div className="flex items-center gap-2 flex-wrap pt-0.5">
                   <a
@@ -3020,7 +3147,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     target="_blank"
                     rel="noreferrer"
                     className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/70 hover:text-accent-main opacity-60 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer bg-bg-surface/80 px-2 py-0.5 rounded border border-border-main/50 w-fit"
-                    title="Open official event registration page"
                   >
                     <span>Visit Event Page</span>
                     <ExternalLink size={10} />
@@ -3030,7 +3156,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     type="button"
                     onClick={() => setShowBriefModal(true)}
                     className="text-[9px] font-mono tracking-wider uppercase text-accent-main hover:underline flex items-center gap-1 cursor-pointer bg-accent-main/10 px-2 py-0.5 rounded border border-accent-main/30 w-fit font-semibold"
-                    title="View scraped rules, prize pool, and stage briefs"
                   >
                     <Sparkles size={10} className="text-accent-main animate-pulse" />
                     <span>Event Brief & Rules</span>
@@ -3038,7 +3163,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5 pt-0.5">
+              <div className="flex flex-col gap-2 pt-0.5">
                 <input
                   type="text"
                   value={tempName}
@@ -3047,174 +3172,99 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     if (e.key === "Enter") saveProjectName();
                     if (e.key === "Escape") setIsEditingName(false);
                   }}
-                  className="h-8 px-2 bg-bg-base border border-accent-main text-txt-main text-sm font-display rounded-sm focus:outline-none"
+                  className="h-8 px-2.5 bg-bg-base border border-accent-main text-txt-main text-xs font-mono rounded focus:outline-none w-full"
                   placeholder="Enter workspace name..."
                   autoFocus
                 />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingName(false)}
-                    className="text-[9px] font-mono text-txt-muted hover:underline uppercase cursor-pointer"
-                  >
-                    Cancel
-                  </button>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={saveProjectName}
-                    className="text-[9px] font-mono text-accent-main font-bold hover:underline uppercase cursor-pointer"
+                    className="bg-accent-main text-bg-base text-[10px] font-mono font-bold px-3 py-1 rounded hover:opacity-90 cursor-pointer"
                   >
                     Save Name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingName(false)}
+                    className="text-[10px] font-mono text-txt-muted hover:text-txt-main cursor-pointer"
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Vertical Node Line Masterpiece */}
+          {/* Automated Non-Selectable Milestone Stage Timeline */}
           <div className="relative flex flex-col gap-5 pl-2 py-2 flex-grow">
             {/* Subtle Low-Opacity Left Guide Line */}
             <div className="absolute top-4 bottom-4 left-[6px] w-[1px] bg-border-main/40 opacity-20 rounded-full z-0" />
             
-            {stages.map((stg, idx) => {
-              const currentIdx = stageOrder.indexOf(status.toLowerCase());
-              const liveDate = liveStageDates[idx] || "Target Active";
-              const isCompleted = isDatePassed(liveDate);
-              const isActiveFocus = idx === currentIdx;
+            {(() => {
+              const firstUnpassed = realStageItems.findIndex((s) => !isDatePassed(s.deadline));
+              const activeIdx = firstUnpassed >= 0 ? firstUnpassed : realStageItems.length - 1;
 
-              const displayDate = isCompleted
-                ? `Completed (${liveDate})`
-                : isActiveFocus
-                ? `Active (Target ${liveDate})`
-                : `Target ${liveDate}`;
+              return realStageItems.map((item, idx) => {
+                const liveDate = item.deadline || "Target Active";
+                const isPassed = isDatePassed(liveDate);
+                const isCompleted = isPassed || idx < activeIdx;
+                const isActive = !isCompleted && idx === activeIdx;
 
-              return (
-                <motion.div 
-                  key={idx} 
-                  whileHover={{ x: 3 }}
-                  onClick={async () => {
-                    const newStatus = stageOrder[idx] as "ideation" | "development" | "testing" | "submitted";
-                    setStatus(newStatus);
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem(`ldk_workspace_status_${id}`, newStatus);
-                      try {
-                        const eventsStr = localStorage.getItem("ldk_events");
-                        const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
-                        const existingIdx = eventsList.findIndex(e => e.id === id);
-                        if (existingIdx >= 0) {
-                          eventsList[existingIdx].status = newStatus;
-                          localStorage.setItem("ldk_events", JSON.stringify(eventsList));
-                        }
-                      } catch {}
-                    }
+                const displayDate = isCompleted
+                  ? `Completed (${liveDate})`
+                  : `Target ${liveDate}`;
 
-                    if (activeChannelRef.current) {
-                      try {
-                        activeChannelRef.current.send({
-                          type: "broadcast",
-                          event: "workspace_sync",
-                          payload: { action: "status", data: newStatus }
-                        });
-                      } catch {}
-                    }
-
-                    if (typeof BroadcastChannel !== "undefined") {
-                      try {
-                        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-                        bc.postMessage({ type: "status_update", payload: newStatus });
-                        bc.close();
-                      } catch {}
-                    }
-
-                    if (user && workspaceUuid) {
-                      try {
-                        await supabase
-                          .from("project_members")
-                          .upsert(
-                            {
-                              project_space_id: workspaceUuid,
-                              profile_id: user.id,
-                              role: "member"
-                            },
-                            { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
-                          );
-
-                        const { data: existing } = await supabase
-                          .from("project_spaces")
-                          .select("id")
-                          .eq("id", workspaceUuid)
-                          .maybeSingle();
-
-                        if (existing) {
-                          await supabase
-                            .from("project_spaces")
-                            .update({ status: newStatus })
-                            .eq("id", workspaceUuid);
-                        } else {
-                          await supabase
-                            .from("project_spaces")
-                            .insert({
-                              id: workspaceUuid,
-                              status: newStatus,
-                              project_name: projectName || "Shared Workspace"
-                            });
-                        }
-                      } catch (err) {
-                        console.error("Failed updating stage status", err);
-                      }
-                    }
-                  }}
-                  className="relative z-10 flex items-start gap-3.5 group cursor-pointer p-1.5 rounded hover:bg-bg-surface/60 transition-colors"
-                >
-                  {/* Node Circle */}
-                  <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                    isCompleted
-                      ? "border-emerald-500 bg-emerald-500/20"
-                      : isActiveFocus
-                      ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105"
-                      : "border-border-main group-hover:border-accent-main/60"
-                  }`}>
-                    {isCompleted ? (
-                      <CheckCircle2 size={12} className="text-emerald-400 fill-emerald-500/30" />
-                    ) : isActiveFocus ? (
-                      <div className="w-2 h-2 rounded-full bg-accent-main animate-pulse" />
-                    ) : (
-                      <div className="w-1.5 h-1.5 rounded-full bg-txt-muted/40 group-hover:bg-accent-main/60" />
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-0.5 pt-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-xs font-semibold ${
-                        isCompleted
-                          ? "text-emerald-400 font-bold"
-                          : isActiveFocus
-                          ? "text-accent-main font-bold"
-                          : "text-txt-main"
-                      }`}>
-                        {stg}
-                      </span>
-                      
-                      {/* Teammate Active Workspace Focus Badge */}
-                      {isActiveFocus && (
-                        <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded border bg-accent-main/20 border-accent-main/40 text-accent-main font-bold animate-pulse">
-                          ● Active Focus
-                        </span>
+                return (
+                  <div 
+                    key={idx} 
+                    className="relative z-10 flex items-start gap-3.5 select-none p-1.5 rounded cursor-default transition-colors"
+                  >
+                    {/* Node Circle */}
+                    <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                      isCompleted
+                        ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                        : isActive
+                        ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105"
+                        : "border-border-main/60 bg-bg-base/60"
+                    }`}>
+                      {isCompleted ? (
+                        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                          <CheckCircle2 size={12} className="text-emerald-400 fill-emerald-500/30" />
+                        </motion.div>
+                      ) : isActive ? (
+                        <div className="w-2.5 h-2.5 rounded-full bg-accent-main animate-pulse" />
+                      ) : (
+                        <div className="w-1.5 h-1.5 rounded-full bg-txt-muted/40" />
                       )}
                     </div>
-                    <span className={`text-[10px] font-mono tracking-tight ${
-                      isCompleted 
-                        ? "text-emerald-400/80 font-medium" 
-                        : isActiveFocus 
-                        ? "text-accent-main/80 font-medium" 
-                        : "text-txt-muted"
-                    }`}>
-                      {displayDate}
-                    </span>
+
+                    <div className="flex flex-col gap-0.5 pt-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-xs font-semibold ${
+                          isCompleted
+                            ? "text-emerald-400 font-bold"
+                            : isActive
+                            ? "text-accent-main font-bold"
+                            : "text-txt-main/80"
+                        }`}>
+                          {item.title}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-mono tracking-tight ${
+                        isCompleted 
+                          ? "text-emerald-400/80 font-medium" 
+                          : isActive 
+                          ? "text-accent-main/80 font-medium" 
+                          : "text-txt-muted/60"
+                      }`}>
+                        {displayDate}
+                      </span>
+                    </div>
                   </div>
-                </motion.div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
 
           {/* Project Specification & Repository Languages Panel */}
@@ -3243,7 +3293,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           key={lang.name}
                           className={`h-full ${colors[idx % colors.length]}`}
                           style={{ width: `${lang.percentage}%` }}
-                          title={`${lang.name}: ${lang.percentage}%`}
                         />
                       );
                     })}
@@ -3280,7 +3329,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             className={`hidden lg:flex w-1.5 hover:w-2 bg-border-main/30 hover:bg-accent-main/80 active:bg-accent-main transition-all cursor-col-resize z-30 shrink-0 items-center justify-center group relative select-none ${
               isResizing === "left-center" ? "bg-accent-main w-2" : ""
             }`}
-            title="Drag to resize Left & Chat panels (Double-click to reset default)"
           >
             <div className="w-0.5 h-6 bg-border-main/60 group-hover:bg-bg-base rounded-full" />
           </div>
@@ -3327,7 +3375,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 ${
                       member.isSpeaking ? "ring-2 ring-emerald-500 scale-105" : ""
                     }`}
-                    title={member.name}
                   >
                     {member.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -3608,7 +3655,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 type="button"
                 onClick={() => setChatAttachment(null)}
                 className="p-1 rounded text-txt-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                title="Remove attachment"
               >
                 <X size={12} />
               </button>
@@ -3623,7 +3669,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               className={`p-2.5 rounded border transition-colors focus:outline-none cursor-pointer ${
                 chatAttachment ? "border-accent-main bg-accent-main/10 text-accent-main" : "border-border-main/80 text-txt-muted hover:text-txt-main hover:bg-bg-card"
               }`}
-              title="Attach File or Image"
             >
               <Paperclip size={14} />
             </button>
@@ -3660,7 +3705,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             className={`hidden lg:flex w-1.5 hover:w-2 bg-border-main/30 hover:bg-accent-main/80 active:bg-accent-main transition-all cursor-col-resize z-30 shrink-0 items-center justify-center group relative select-none ${
               isResizing === "center-right" ? "bg-accent-main w-2" : ""
             }`}
-            title="Drag to resize Chat & Workbench panels (Double-click to reset default)"
           >
             <div className="w-0.5 h-6 bg-border-main/60 group-hover:bg-bg-base rounded-full" />
           </div>
@@ -3825,14 +3869,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           <div className="mt-2 border border-border-main/60 rounded overflow-hidden bg-bg-base flex flex-col shadow-inner">
                             <div className="flex justify-between items-center bg-bg-surface px-2.5 py-1 border-b border-border-main/40 text-[9px] font-mono text-txt-muted">
                               <span className="truncate max-w-[200px]">{formatUrl(liveDemo)}</span>
-                              <button onClick={() => setDemoIframeKey(k => k + 1)} className="hover:text-txt-main p-0.5 cursor-pointer" title="Refresh frame">
+                              <button onClick={() => setDemoIframeKey(k => k + 1)} className="hover:text-txt-main p-0.5 cursor-pointer">
                                 <RefreshCw size={10} />
                               </button>
                             </div>
                             <iframe
                               key={demoIframeKey}
                               src={formatUrl(liveDemo)}
-                              title="Inline Live Demo Preview"
                               className="w-full h-[280px] bg-white border-0"
                               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                             />
@@ -3940,7 +3983,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       type="button"
                       onClick={() => handleDeleteTask(t.id)}
                       className="p-1 text-txt-muted/50 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
-                      title="Delete Task"
                     >
                       <Trash2 size={11} />
                     </button>
@@ -4169,7 +4211,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                                 setTempSlotName(defaultSlotTitle);
                               }}
                               className="opacity-80 lg:opacity-0 group-hover:opacity-100 transition-opacity text-txt-muted hover:text-txt-main p-1 cursor-pointer shrink-0"
-                              title="Rename Slot"
                             >
                               <Edit3 size={12} />
                             </button>
@@ -4183,7 +4224,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           <div className="flex items-center justify-between gap-2 min-w-0 w-full">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <FileText size={14} className="text-accent-main shrink-0" />
-                              <span className="text-xs text-txt-main font-medium truncate min-w-0" title={slotArtifact.file_name}>
+                              <span className="text-xs text-txt-main font-medium truncate min-w-0">
                                 {slotArtifact.file_name}
                               </span>
                             </div>
@@ -4477,7 +4518,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <X size={16} />
               </button>
             </div>
-
             {/* Members List */}
             <div className="flex flex-col gap-3.5 max-h-[300px] overflow-y-auto pr-1">
               {roomMembers.map((member) => (
@@ -4519,7 +4559,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   <div>
                     {member.isOnline ? (
                       <span className="text-[8px] font-mono tracking-widest uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded">
-                        Active Online
+                        Online
                       </span>
                     ) : (
                       <span className="text-[8px] font-mono tracking-widest uppercase bg-bg-card text-txt-muted border border-border-main px-2 py-0.5 rounded">
@@ -4815,7 +4855,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     return (
                       <iframe
                         src={previewArtifact.file_url}
-                        title={previewArtifact.file_name}
                         className="w-full h-[70vh] rounded border border-border-main/50 shadow-inner bg-white"
                       />
                     );
@@ -4874,7 +4913,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
                     demoViewportMode === "desktop" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
                   }`}
-                  title="Desktop Mode (Full Width)"
                 >
                   <Monitor size={12} />
                   <span className="hidden sm:inline">Desktop</span>
@@ -4884,7 +4922,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
                     demoViewportMode === "tablet" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
                   }`}
-                  title="Tablet Mode (768px)"
                 >
                   <Tablet size={12} />
                   <span className="hidden sm:inline">Tablet</span>
@@ -4894,7 +4931,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   className={`px-2.5 py-1 text-[10px] font-mono rounded flex items-center gap-1.5 transition-colors cursor-pointer ${
                     demoViewportMode === "mobile" ? "bg-accent-main text-bg-base font-bold" : "text-txt-muted hover:text-txt-main"
                   }`}
-                  title="Mobile Mode (375px)"
                 >
                   <Smartphone size={12} />
                   <span className="hidden sm:inline">Mobile</span>
@@ -4906,7 +4942,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <button
                   onClick={() => setDemoIframeKey(k => k + 1)}
                   className="p-1.5 text-txt-muted hover:text-txt-main hover:bg-bg-surface rounded transition-colors cursor-pointer"
-                  title="Reload Frame"
                 >
                   <RefreshCw size={14} />
                 </button>
@@ -4915,7 +4950,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   target="_blank"
                   rel="noreferrer"
                   className="p-1.5 text-txt-muted hover:text-txt-main hover:bg-bg-surface rounded transition-colors"
-                  title="Open in New Tab"
                 >
                   <ExternalLink size={14} />
                 </a>
@@ -4940,7 +4974,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <iframe
                   key={demoIframeKey}
                   src={formatUrl(liveDemo)}
-                  title="Live Prototype Demo Preview"
                   className="w-full h-full rounded border border-border-main/60 bg-white shadow-2xl"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                 />
@@ -4971,7 +5004,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               type="button"
               onClick={() => setChatImagePreviewUrl(null)}
               className="p-2 rounded bg-bg-surface/90 border border-border-main/60 text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
-              title="Close Preview (Esc)"
             >
               <X size={16} />
             </button>
