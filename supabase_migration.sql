@@ -449,3 +449,12 @@ CREATE POLICY "Allow authenticated users to upsert workspace_presence"
     ON public.workspace_presence FOR ALL 
     USING (true)
     WITH CHECK (true);
+
+-- 14. WORKSPACE ENHANCEMENTS FOR MULTI-DEVICE & TEAMMATE SYNC
+ALTER TABLE public.project_spaces ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.project_spaces ADD COLUMN IF NOT EXISTS tasks JSONB;
+ALTER TABLE public.project_spaces ADD COLUMN IF NOT EXISTS slot_names JSONB;
+
+ALTER TABLE public.project_artifacts ADD COLUMN IF NOT EXISTS slot_index INTEGER;
+ALTER TABLE public.project_artifacts ADD COLUMN IF NOT EXISTS slot_name TEXT;
+

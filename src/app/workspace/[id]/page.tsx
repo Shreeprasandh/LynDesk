@@ -270,13 +270,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         try {
           const parsed = JSON.parse(saved);
           if (parsed && typeof parsed.left === "number" && typeof parsed.chat === "number" && typeof parsed.right === "number") {
-            setPanelWidths(parsed);
+            setTimeout(() => setPanelWidths(parsed), 0);
           }
         } catch {}
       }
       const savedLock = localStorage.getItem(`ldk_workspace_layout_locked_${id}`);
       if (savedLock !== null) {
-        setIsLayoutLocked(savedLock === "true");
+        setTimeout(() => setIsLayoutLocked(savedLock === "true"), 0);
       }
     }
   }, [id]);
@@ -421,7 +421,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setRealStageItems(parsed);
+            setTimeout(() => setRealStageItems(parsed), 0);
           }
         } catch {}
       }
@@ -474,7 +474,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [statusInputDraft, setStatusInputDraft] = useState<string>(myCustomStatus);
   useEffect(() => {
     myCustomStatusRef.current = myCustomStatus;
-    setStatusInputDraft(myCustomStatus);
+    setTimeout(() => setStatusInputDraft(myCustomStatus), 0);
   }, [myCustomStatus]);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
 
@@ -627,6 +627,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     setSlotNames(updated);
     localStorage.setItem(`ldk_workspace_slot_names_${id}`, JSON.stringify(updated));
     setEditingSlotIndex(null);
+    if (workspaceUuid) {
+      (async () => {
+        try {
+          await supabase.from("project_spaces").update({ slot_names: updated }).eq("id", workspaceUuid);
+        } catch {}
+      })();
+    }
   };
 
   const triggerSlotUpload = (slotIndex: number) => {
@@ -1250,6 +1257,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (data.events.title) setEventTitle(data.events.title);
           }
 
+          // Restore notes, tasks, and slot_names from DB if present
+          if (data.notes !== undefined && data.notes !== null) {
+            setWorkspaceNotes(data.notes);
+            if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_notes_${id}`, data.notes);
+          }
+          if (Array.isArray(data.tasks) && data.tasks.length > 0) {
+            setTasks(data.tasks);
+            if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
+          }
+          if (Array.isArray(data.slot_names) && data.slot_names.length === 4) {
+            setSlotNames(data.slot_names);
+            if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_slot_names_${id}`, JSON.stringify(data.slot_names));
+          }
+
           // Sync workspace to ldk_joined_workspaces and ldk_events so home dashboard renders it
           if (typeof window !== "undefined") {
             try {
@@ -1406,6 +1427,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           .from("project_artifacts")
           .select(`
             id,
+            slot_index,
+            slot_name,
             file_name,
             file_url,
             version,
@@ -1419,6 +1442,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         if (!artError && dbArtifacts && dbArtifacts.length > 0) {
           const loadedArtifacts: Artifact[] = dbArtifacts.map(a => ({
             id: a.id,
+            slot_index: (a as any).slot_index ?? 0,
+            slot_name: (a as any).slot_name || "Artifact",
             file_name: a.file_name,
             file_url: a.file_url,
             version: a.version,
@@ -2451,24 +2476,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (urlData?.publicUrl) {
             fileUrl = urlData.publicUrl;
           }
-
-          // Insert into project_artifacts table
-          const { error: dbError } = await supabase
-            .from("project_artifacts")
-            .insert({
-              project_space_id: workspaceUuid,
-              file_name: file.name,
-              file_url: fileUrl,
-              version: nextVersion,
-              is_active: true,
-              uploaded_by: user.id
-            });
-
-          if (dbError) {
-            console.error("DB Artifact insert error: ", dbError);
-          }
         } else {
           console.warn("Storage bucket upload failed, using persistent Data URL fallback: ", uploadError);
+        }
+
+        // Insert into project_artifacts table regardless of storage bucket result
+        const { error: dbError } = await supabase
+          .from("project_artifacts")
+          .insert({
+            project_space_id: workspaceUuid,
+            slot_index: slotIdx,
+            slot_name: slotName,
+            file_name: file.name,
+            file_url: fileUrl,
+            version: nextVersion,
+            is_active: true,
+            uploaded_by: user.id
+          });
+
+        if (dbError) {
+          console.error("DB Artifact insert error: ", dbError);
         }
       } catch (err) {
         console.error("Supabase Storage error: ", err);
@@ -2992,6 +3019,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           } catch {}
         }
       }
+      if (workspaceUuid) {
+        (async () => {
+          try {
+            await supabase.from("project_spaces").update({ tasks: updated }).eq("id", workspaceUuid);
+          } catch {}
+        })();
+      }
       return updated;
     });
     setNewTaskTitle("");
@@ -3035,6 +3069,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           bc.close();
         } catch {}
       }
+      if (workspaceUuid) {
+        (async () => {
+          try {
+            await supabase.from("project_spaces").update({ tasks: updatedTasks }).eq("id", workspaceUuid);
+          } catch {}
+        })();
+      }
       return updatedTasks;
     });
   };
@@ -3059,6 +3100,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
           bc.close();
         } catch {}
+      }
+      if (workspaceUuid) {
+        (async () => {
+          try {
+            await supabase.from("project_spaces").update({ tasks: updatedTasks }).eq("id", workspaceUuid);
+          } catch {}
+        })();
       }
       return updatedTasks;
     });
@@ -4363,6 +4411,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       bc.postMessage({ type: "notes_update", payload: val });
                       bc.close();
                     } catch {}
+                  }
+                  if (workspaceUuid) {
+                    (async () => {
+                      try {
+                        await supabase.from("project_spaces").update({ notes: val }).eq("id", workspaceUuid);
+                      } catch {}
+                    })();
                   }
                 }}
                 placeholder="Write team notes, API specs, architectural decisions..."
