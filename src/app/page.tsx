@@ -168,7 +168,17 @@ export default function Home() {
 
       const fullName = dbProfile?.full_name || publicProf.full_name || draft.fullName || meta.full_name || "Developer";
       const username = dbProfile?.username || publicProf.username || draft.username || meta.username || "student";
-      const avatarUrl = dbProfile?.avatar_url || publicProf.avatar_url || draft.avatarUrl || draft.avatar_url || meta.avatar_url || meta.picture || localAvatar || "";
+      const isValidImage = (s: any) => typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:image/"));
+      const rawAvatar = [
+        dbProfile?.avatar_url,
+        publicProf.avatar_url,
+        draft.avatarUrl,
+        draft.avatar_url,
+        localAvatar,
+        meta.avatar_url,
+        meta.picture
+      ].find(isValidImage) || "";
+      const avatarUrl = rawAvatar;
       const collegeName = dbProfile?.college_name || publicProf.college_name || draft.collegeName || meta.college_name || "University Student";
       const department = dbProfile?.department || publicProf.department || draft.department || meta.department || "Computer Science";
       const lcHandle = dbProfile?.leetcode_username || publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || handle || "";
@@ -193,6 +203,10 @@ export default function Home() {
     };
 
     fetchProfile();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_profile_update", fetchProfile);
+    }
 
     // 4. Fetch Online Friends (Prioritizing Workspace co-members)
     const fetchOnlineFriends = async () => {
@@ -271,6 +285,12 @@ export default function Home() {
     };
 
     fetchOnlineFriends();
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("ldk_profile_update", fetchProfile);
+      }
+    };
   }, [user]);
 
   if (loading) {

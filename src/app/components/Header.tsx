@@ -110,6 +110,54 @@ export default function Header() {
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
   const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
+  const [headerAvatar, setHeaderAvatar] = useState<string>("");
+
+  // Live avatar updates
+  useEffect(() => {
+    const resolveHeaderAvatar = () => {
+      if (!user) {
+        setHeaderAvatar("");
+        return;
+      }
+      let url = "";
+      if (typeof window !== "undefined") {
+        try {
+          const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+          if (rawPublic) {
+            const parsed = JSON.parse(rawPublic);
+            if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
+              url = parsed.avatar_url;
+            }
+          }
+        } catch {}
+        if (!url) {
+          const stored =
+            localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+            localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+            localStorage.getItem("ldk_avatar_url") ||
+            "";
+          if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
+            url = stored;
+          }
+        }
+      }
+      if (!url) {
+        const metaUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || "";
+        if (metaUrl && (metaUrl.startsWith("http") || metaUrl.startsWith("data:image/"))) {
+          url = metaUrl;
+        }
+      }
+      setHeaderAvatar(url);
+    };
+
+    resolveHeaderAvatar();
+    window.addEventListener("ldk_profile_update", resolveHeaderAvatar);
+    window.addEventListener("storage", resolveHeaderAvatar);
+    return () => {
+      window.removeEventListener("ldk_profile_update", resolveHeaderAvatar);
+      window.removeEventListener("storage", resolveHeaderAvatar);
+    };
+  }, [user]);
 
   // Check onboarding status on mount / user change
   useEffect(() => {
@@ -816,36 +864,20 @@ export default function Header() {
               {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
             </button>
             
-            {user && (() => {
-              const headerAvatarUrl = typeof window !== "undefined" && user?.id
-                ? (
-                    (() => {
-                      try {
-                        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
-                        if (rawPublic) {
-                          const parsed = JSON.parse(rawPublic);
-                          if (parsed?.avatar_url) return parsed.avatar_url;
-                        }
-                      } catch {}
-                      return localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
-                    })() || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || ""
-                  )
-                : user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
-
-              return (
-                <>
-                  <Link 
-                    href="/profile"
-                    className="p-1 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden w-8 h-8 shrink-0"
-                    title="View Profile"
-                  >
-                    {headerAvatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={headerAvatarUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
-                    ) : (
-                      <User size={14} />
-                    )}
-                  </Link>
+            {user && (
+              <>
+                <Link 
+                  href="/profile"
+                  className="p-1 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden w-8 h-8 shrink-0"
+                  title="View Profile"
+                >
+                  {headerAvatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={headerAvatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    <User size={14} />
+                  )}
+                </Link>
                 <button 
                   onClick={() => setShowLogoutConfirm(true)}
                   className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
@@ -863,8 +895,7 @@ export default function Header() {
                   <Menu size={14} />
                 </button>
               </>
-              );
-            })()}
+            )}
           </div>
         </div>
       </header>

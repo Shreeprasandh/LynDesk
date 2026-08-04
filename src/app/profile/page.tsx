@@ -1135,12 +1135,13 @@ export default function ProfilePage() {
     if (!files || files.length === 0) return;
     const file = files[0];
     
-    // Check file size (e.g., 2MB limit)
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ text: "Profile image size cannot exceed 2MB.", type: "error" });
+    // Check file size (e.g., 5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ text: "Please upload an image file under 5MB.", type: "error" });
       return;
     }
-    // Check mime type
+    
+    // Check image mime type
     if (!file.type.startsWith("image/")) {
       setMessage({ text: "Please upload a valid image file (PNG, JPG, WebP).", type: "error" });
       return;
@@ -1149,7 +1150,38 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     setMessage(null);
     
+    const applyNewAvatar = (url: string) => {
+      setAvatarUrl(url);
+      if (typeof window !== "undefined" && user?.id) {
+        localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
+        localStorage.setItem("ldk_avatar_url", url);
+        try {
+          const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
+          const parsed = raw ? JSON.parse(raw) : {};
+          parsed.avatar_url = url;
+          localStorage.setItem(`ldk_public_profile_${user.id}`, JSON.stringify(parsed));
+        } catch {}
+        window.dispatchEvent(new Event("ldk_profile_update"));
+      }
+    };
+
     try {
+      // 1. Instantly generate base64 data URL for 0ms delay preview
+      const getBase64 = (f: File): Promise<string> => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (evt) => resolve((evt.target?.result as string) || "");
+          reader.onerror = () => resolve("");
+          reader.readAsDataURL(f);
+        });
+      };
+
+      const base64Url = await getBase64(file);
+      if (base64Url) {
+        applyNewAvatar(base64Url);
+      }
+
+      // 2. Background attempt to upload to Supabase storage bucket
       const fileExt = file.name.split(".").pop();
       const fileName = `${user?.id || Date.now()}-avatar.${fileExt}`;
       
@@ -1157,23 +1189,14 @@ export default function ProfilePage() {
         .from("avatars")
         .upload(fileName, file, { upsert: true });
         
-      if (error) throw error;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
-        
-      setAvatarUrl(publicUrl);
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage
+          .from("avatars")
+          .getPublicUrl(fileName);
+        if (publicUrl) applyNewAvatar(publicUrl);
+      }
     } catch (err) {
-      console.warn("Storage bucket 'avatars' might not be configured, converting to Local URL reference.", err);
-      // Fallback: read file content as base64 data url
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setAvatarUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      console.warn("Storage upload notice (using local base64 preview fallback):", err);
     } finally {
       setUploadingAvatar(false);
     }
@@ -1417,12 +1440,14 @@ export default function ProfilePage() {
             
             {/* Required Identity Panel */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Primary Identification</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                Primary Identification (Required)
+              </span>
               
               <div className="flex flex-col sm:flex-row items-center gap-6 border-b border-border-main/40 pb-4">
-                <div className="relative group">
+                <div className="relative group shrink-0">
                   <div className="w-16 h-16 rounded-full border border-border-main overflow-hidden bg-bg-card flex items-center justify-center">
-                    {avatarUrl ? (
+                    {avatarUrl && (avatarUrl.startsWith("http") || avatarUrl.startsWith("data:image/")) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
@@ -1432,10 +1457,9 @@ export default function ProfilePage() {
                   <button
                     type="button"
                     onClick={() => avatarInputRef.current?.click()}
-                    disabled={!isEditing || uploadingAvatar}
-                    className={`absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold disabled:pointer-events-none ${
-                      isEditing ? "opacity-0 group-hover:opacity-100 cursor-pointer" : "hidden"
-                    }`}
+                    disabled={uploadingAvatar}
+                    className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
+                    title="Upload Custom Profile Picture"
                   >
                     {uploadingAvatar ? "..." : "Edit"}
                   </button>
@@ -1443,7 +1467,6 @@ export default function ProfilePage() {
                     type="file" 
                     ref={avatarInputRef}
                     onChange={handleAvatarUpload}
-                    disabled={!isEditing}
                     className="hidden" 
                     accept="image/*"
                   />
