@@ -66,8 +66,21 @@ export default function CodingDeckPage() {
 
   const handleSaveInlineHandle = async () => {
     if (!inputLcHandle.trim()) return;
-    const cleanHandle = inputLcHandle.trim();
+    let cleanHandle = inputLcHandle.trim().replace(/^@/, "");
+    if (cleanHandle.includes("/") || cleanHandle.includes(".")) {
+      try {
+        const urlString = /^https?:\/\//i.test(cleanHandle) ? cleanHandle : `https://${cleanHandle}`;
+        const url = new URL(urlString);
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments[0] === "u" && pathSegments[1]) {
+          cleanHandle = pathSegments[1];
+        } else if (pathSegments[0] && pathSegments[0] !== "u" && pathSegments[0] !== "problems" && pathSegments[0] !== "contest") {
+          cleanHandle = pathSegments[0];
+        }
+      } catch {}
+    }
     setLeetcodeUser(cleanHandle);
+    setInputLcHandle(cleanHandle);
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_leetcode_handle", cleanHandle);
     }
@@ -276,30 +289,52 @@ export default function CodingDeckPage() {
 
         setStats(updatedStats);
 
-        // Auto-emit streak warning notification to global header drawer if daily problem is pending
-        if (leetcodeStats?.dailyChallenge && !leetcodeStats.dailyChallenge.completed) {
+        // Auto-manage streak warning notification in global header drawer for daily challenge
+        if (leetcodeStats?.dailyChallenge) {
           const todayStr = new Date().toISOString().split("T")[0];
           const notifId = `notif_streak_warning_${todayStr}`;
           const title = leetcodeStats.dailyChallenge.title || "Daily Challenge";
-          const diff = leetcodeStats.dailyChallenge.difficulty || "Medium";
+          const diff = leetcodeStats.dailyChallenge.difficulty || "Easy";
           const streak = leetcodeStats.leetcodeStreak || 0;
 
           if (typeof window !== "undefined") {
             const userKey = user ? `ldk_user_notifications_${user.id}` : "ldk_global_notifications";
             const stored = localStorage.getItem(userKey);
-            const list = stored ? JSON.parse(stored) : [];
-            if (!list.some((n: any) => n.id === notifId)) {
+            let list = stored ? JSON.parse(stored) : [];
+
+            if (leetcodeStats.dailyChallenge.completed) {
+              // If today's challenge is completed, purge streak warnings!
+              list = list.filter((n: any) => 
+                !n.id?.startsWith("notif_streak_warning_") && 
+                !n.title?.includes("Streak at Risk") && 
+                !n.title?.includes("LeetCode Daily Challenge Pending")
+              );
+              localStorage.setItem(userKey, JSON.stringify(list));
+              window.dispatchEvent(new Event("ldk_notifications_update"));
+            } else {
+              const message = streak > 0 
+                ? `Today's daily challenge “${title}” (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`
+                : `Today's daily challenge “${title}” (${diff}) is pending. Solve now to start your daily challenge streak!`;
+              
+              // Filter out old warning variants
+              list = list.filter((n: any) => 
+                !n.id?.startsWith("notif_streak_warning_") && 
+                !n.title?.includes("Streak at Risk") && 
+                !n.title?.includes("LeetCode Daily Challenge Pending")
+              );
+
               list.unshift({
                 id: notifId,
-                title: "🔥 LeetCode Streak at Risk!",
-                message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
+                title: "LeetCode Daily Challenge Pending",
+                message,
                 type: "deadline",
                 category: "alerts",
-                time: "Just now",
+                time: "Today",
                 read: false,
                 actionLabel: "Solve Challenge",
                 actionUrl: "/coding-deck"
               });
+
               localStorage.setItem(userKey, JSON.stringify(list.slice(0, 100)));
               window.dispatchEvent(new Event("ldk_notifications_update"));
             }
@@ -724,7 +759,7 @@ export default function CodingDeckPage() {
 
         {/* Title Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 min-w-0">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
             <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Deck & Platforms</h1>
             <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
@@ -732,7 +767,7 @@ export default function CodingDeckPage() {
           <button
             onClick={handleManualSync}
             disabled={isManualSyncing}
-            className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit"
+            className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit shrink-0 whitespace-nowrap"
             title="Force immediate live sync with coding platforms"
           >
             <RotateCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
@@ -743,21 +778,21 @@ export default function CodingDeckPage() {
         {/* Banner Alert for outstanding daily problem */}
         {leetcodeUser && stats.leetcode?.dailyChallenge && !stats.leetcode.dailyChallenge.completed && (
           <div className="border border-yellow-500/40 bg-yellow-500/10 p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <AlertCircle className="text-yellow-500 flex-shrink-0" size={18} />
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0">
                 <span className="text-xs font-semibold text-txt-main">LeetCode Daily Challenge Pending</span>
                 <span className="text-[10px] text-txt-sub">
                   Today&apos;s daily challenge <strong className="text-yellow-500 font-mono font-bold">“{stats.leetcode.dailyChallenge.title}”</strong> ({stats.leetcode.dailyChallenge.difficulty}) is pending. {stats.leetcode?.leetcodeStreak && stats.leetcode.leetcodeStreak > 0 ? `Solve now to maintain your ${stats.leetcode.leetcodeStreak}-day streak!` : "Solve now to start your daily challenge streak!"}
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <a 
                 href={stats.leetcode.dailyChallenge.link} 
                 target="_blank" 
                 rel="noreferrer"
-                className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit"
+                className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit whitespace-nowrap"
               >
                 Solve on LeetCode <ExternalLink size={10} />
               </a>
@@ -767,16 +802,16 @@ export default function CodingDeckPage() {
 
         {leetcodeUser && showSuccessBanner && stats.leetcode?.dailyChallenge?.completed && (
           <div className="border border-emerald-500/40 bg-emerald-500/10 p-4 rounded-md flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <CheckCircle2 className="text-emerald-500 flex-shrink-0" size={18} />
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0">
                 <span className="text-xs font-semibold text-txt-main">Daily Challenge Completed!</span>
                 <span className="text-[10px] text-txt-sub">
                   Awesome! You solved <strong className="text-emerald-400 font-semibold font-mono">“{stats.leetcode.dailyChallenge.title}”</strong> today. Active Streak: {stats.leetcode?.leetcodeStreak || 0} days!
                 </span>
               </div>
             </div>
-            <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-wider font-semibold border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 rounded-sm">
+            <span className="text-[9px] font-mono text-emerald-400 uppercase tracking-wider font-semibold border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 rounded-sm shrink-0 whitespace-nowrap">
               Verified Live
             </span>
           </div>
@@ -800,51 +835,57 @@ export default function CodingDeckPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* ================= LEFT COLUMN: CODING CARD STACKS (8 Columns) ================= */}
-            <div className="lg:col-span-8 flex flex-col gap-6">
+            <div className="lg:col-span-8 flex flex-col gap-6 min-w-0">
               
               {/* LeetCode Card */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center text-txt-main">
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 overflow-hidden">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 border-b border-border-main/40 pb-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center text-txt-main shrink-0">
                       <svg viewBox="-5 -2 105 118" className="w-4 h-4" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M67.5068339,83.0664138 C70.0005384,80.5763786 74.0371402,80.5828822 76.5228362,83.0809398 C79.0085322,85.5789975 79.00204,89.6226456 76.5083355,92.1126808 L65.4351451,103.169577 C55.2192332,113.370744 38.5604663,113.518673 28.1722578,103.513204 C28.112217,103.455678 23.486583,98.9201326 8.22702585,83.9570195 C-1.92478479,74.0028895 -2.93614945,58.0748736 6.61697549,47.8463644 L24.4286944,28.7745461 C33.9100043,18.6218594 51.3874487,17.5122246 62.2279907,26.2789232 L78.4052912,39.3620235 C81.1448956,41.5776292 81.5728103,45.5984975 79.3610655,48.3428842 C77.1493207,51.0872709 73.1354592,51.5159327 70.3958548,49.300327 L54.2186634,36.2173149 C48.5492813,31.6325105 38.631911,32.2621597 33.7398535,37.5006265 L15.9279056,56.5726899 C11.2772073,61.552182 11.7865613,69.5740156 17.1461283,74.8292186 C28.3515339,85.8169393 36.9874071,94.2846214 36.9973988,94.294225 C42.3981571,99.4959838 51.130862,99.418438 56.43358,94.1233737 L67.5068339,83.0664138 Z" fill="#FFA116" fillRule="nonzero" />
                         <path d="M40.6069914,72.0014117 C37.086019,72.0014117 34.2317068,69.142117 34.2317068,65.6149982 C34.2317068,62.0878794 37.086019,59.2285847 40.6069914,59.2285847 L87.6247154,59.2285847 C91.1456879,59.2285847 94,62.0878794 94,65.6149982 C94,69.142117 91.1456879,72.0014117 87.6247154,72.0014117 L40.6069914,72.0014117 Z" fill="#B3B3B3" />
                         <path d="M49.4124315,2.02335002 C51.8178981,-0.552320454 55.852269,-0.686893945 58.4234511,1.72277172 C60.9946333,4.13243738 61.1289722,8.17385083 58.7235056,10.7495213 L15.9282277,56.5728697 C11.2773659,61.551984 11.7867168,69.5737689 17.1459309,74.8291832 L36.9094236,94.2091099 C39.4255514,96.6764051 39.4686234,100.719828 37.0056277,103.240348 C34.5426319,105.760868 30.5062548,105.804016 27.990127,103.33672 L8.22654289,83.9567041 C-1.92467414,74.0021005 -2.93603527,58.0741402 6.61751533,47.846311 L49.4124315,2.02335002 Z" fill="currentColor" />
                       </svg>
                     </span>
-                    <div className="flex flex-col">
-                      <h3 className="text-sm font-semibold text-txt-main">LeetCode Profile</h3>
-                      <span className="text-[10px] text-txt-muted">Sync solve tallies & activity heatmap</span>
+                    <div className="flex flex-col min-w-0">
+                      <h3 className="text-sm font-semibold text-txt-main truncate">LeetCode Profile</h3>
+                      <span className="text-[10px] text-txt-muted truncate">Sync solve tallies & activity heatmap</span>
                     </div>
                   </div>
 
                   {leetcodeUser && (
-                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
-                      @{leetcodeUser}
-                    </span>
+                    <a 
+                      href={`https://leetcode.com/${leetcodeUser}/`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                    >
+                      <span className="truncate max-w-[140px]">@{leetcodeUser}</span>
+                      <ExternalLink size={10} className="shrink-0" />
+                    </a>
                   )}
                 </div>
 
                 {!leetcodeUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 font-mono text-xs text-txt-muted flex flex-col sm:flex-row items-center justify-between gap-4 py-6">
-                    <div className="flex flex-col gap-1 text-left">
+                  <div className="p-4 sm:p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 font-mono text-xs text-txt-muted flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-5 overflow-hidden">
+                    <div className="flex flex-col gap-1 text-left min-w-0 flex-1">
                       <span className="font-semibold text-txt-main">LeetCode handle is not linked yet.</span>
                       <span className="text-[10px] text-txt-sub">Enter your LeetCode username below to sync daily challenge streak & stats.</span>
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 min-w-0">
                       <input
                         type="text"
                         value={inputLcHandle}
                         onChange={(e) => setInputLcHandle(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") handleSaveInlineHandle(); }}
                         placeholder="e.g. your_leetcode_id"
-                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main"
+                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main min-w-0 flex-1 sm:w-44"
                       />
                       <button
                         type="button"
                         onClick={handleSaveInlineHandle}
-                        className="h-8 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold rounded hover:opacity-90 transition-all shrink-0 cursor-pointer"
+                        className="h-8 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold rounded hover:opacity-90 transition-all shrink-0 cursor-pointer whitespace-nowrap"
                       >
                         Link & Sync
                       </button>

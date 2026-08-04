@@ -1004,26 +1004,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   }, [user, id]);
 
-  // Git Commits (live simulation list with local storage cache)
-  const [commits, setCommits] = useState<any[]>([
-    { hash: "8f3e2b1", author: "Alex Carter", message: "refactor: optimize dynamic layout caching", time: "10 mins ago" },
-    { hash: "2c7d9a0", author: "Alex Carter", message: "feat: establish state initializer hook in context", time: "1 hour ago" },
-    { hash: "b4a9f82", author: "Mira Sen", message: "design: finalize paper-thin border color palette", time: "4 hours ago" }
-  ]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`ldk_workspace_commits_${id}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setTimeout(() => setCommits(parsed), 0);
-          }
-        } catch {}
-      }
-    }
-  }, [id]);
+  // Git Commits
+  const [commits, setCommits] = useState<any[]>([]);
 
   // speaking simulation loop
   useEffect(() => {
@@ -2796,9 +2778,48 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const saveLiveDemo = async () => {
     const rawInput = tempDemo.trim();
     if (!rawInput) {
-      setDemoUrlError("⚠️ Please enter a Prototype Demo URL");
+      setLiveDemo("");
+      setDemoUrlError(null);
+      setIsEditingDemo(false);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_demo_${id}`);
+      }
+      if (activeChannelRef.current) {
+        try {
+          activeChannelRef.current.send({
+            type: "broadcast",
+            event: "workspace_sync",
+            payload: { action: "links", githubRepo, liveDemo: "" }
+          });
+        } catch {}
+      }
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const bc = new BroadcastChannel(`ldk_bus_${id}`);
+          bc.postMessage({ type: "links_update", payload: { githubRepo, liveDemo: "" } });
+          bc.close();
+        } catch {}
+      }
+      if (user && workspaceUuid) {
+        try {
+          await supabase
+            .from("project_spaces")
+            .update({ live_demo_url: null })
+            .eq("id", workspaceUuid);
+        } catch (err) {
+          console.error("Failed to clear live demo: ", err);
+        }
+      }
       return;
     }
+
+    const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(:\d+)?(\/.*)?$/i;
+    const localhostPattern = /^(https?:\/\/)?localhost(:\d+)?(\/.*)?$/i;
+    if (!urlPattern.test(rawInput) && !localhostPattern.test(rawInput)) {
+      setDemoUrlError("⚠️ Please enter a valid URL (e.g. https://my-app.vercel.app or localhost:3000)");
+      return;
+    }
+
     const cleanDemo = formatUrl(rawInput);
     setDemoUrlError(null);
     setLiveDemo(cleanDemo);
@@ -2921,32 +2942,40 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   };
 
   const fetchCommits = useCallback(async () => {
+    if (!githubRepo || !githubRepo.trim()) {
+      setCommits([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_commits_${id}`);
+      }
+      return;
+    }
     try {
-      const paramUrl = githubRepo ? encodeURIComponent(githubRepo) : "";
-      const res = await fetch(`/api/github/commits?repoUrl=${paramUrl}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data?.commits) && data.commits.length > 0) {
-          setCommits(data.commits);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(data.commits));
-          }
-          return;
+      const res = await fetch(`/api/github/commits?repoUrl=${encodeURIComponent(githubRepo)}`);
+      const data = await res.json();
+      if (res.ok && Array.isArray(data?.commits) && data.commits.length > 0) {
+        setCommits(data.commits);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`ldk_workspace_commits_${id}`, JSON.stringify(data.commits));
+        }
+      } else {
+        setCommits([]);
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`ldk_workspace_commits_${id}`);
         }
       }
-    } catch {}
-
-    const savedCommitsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_commits_${id}`) : null;
-    if (savedCommitsStr) {
-      try { setCommits(JSON.parse(savedCommitsStr)); } catch {}
+    } catch {
+      setCommits([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_commits_${id}`);
+      }
     }
   }, [githubRepo, id]);
 
   const fetchGitLanguages = useCallback(async () => {
     if (!githubRepo || !githubRepo.trim()) {
-      const savedLangsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_langs_${id}`) : null;
-      if (savedLangsStr) {
-        try { setGitLanguages(JSON.parse(savedLangsStr)); } catch {}
+      setGitLanguages([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_langs_${id}`);
       }
       return;
     }
@@ -2962,12 +2991,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           return;
         }
       }
+      setGitLanguages([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_langs_${id}`);
+      }
     } catch (err) {
       console.warn("Failed fetching repo languages: ", err);
-    }
-    const savedLangsStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_langs_${id}`) : null;
-    if (savedLangsStr) {
-      try { setGitLanguages(JSON.parse(savedLangsStr)); } catch {}
+      setGitLanguages([]);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(`ldk_workspace_langs_${id}`);
+      }
     }
   }, [githubRepo, id]);
 
@@ -3878,9 +3911,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         Edit
                       </button>
                     </div>
-                    <span className="text-xs font-mono text-txt-main truncate select-all">
-                      {liveDemo || "Not hosted"}
-                    </span>
+                    {liveDemo ? (
+                      <span className="text-xs font-mono text-txt-main truncate select-all font-semibold">
+                        {liveDemo}
+                      </span>
+                    ) : (
+                      <div className="flex flex-col gap-1 py-3 px-2 text-center items-center justify-center border border-dashed border-border-main/40 rounded bg-bg-surface/50">
+                        <AlertCircle size={14} className="text-txt-muted/60 mb-0.5" />
+                        <span className="text-[10px] font-mono text-txt-main font-medium">No prototype demo connected</span>
+                        <span className="text-[9px] font-mono text-txt-muted/80 leading-relaxed max-w-[210px]">
+                          Click &apos;Edit&apos; above to attach your live project demo or prototype URL.
+                        </span>
+                      </div>
+                    )}
                     {liveDemo && (
                       <div className="flex flex-col gap-2 pt-1 border-t border-border-main/20">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -3993,9 +4036,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       </div>
                     ))
                   ) : (
-                    <span className="text-[10px] font-mono text-txt-muted/70 italic py-1 leading-relaxed">
-                      {githubRepo ? "No public commit history found for this repository." : "No Git repository linked yet. Click 'Edit' above to attach your project's GitHub URL."}
-                    </span>
+                    <div className="flex flex-col gap-1 py-3 px-2 text-center items-center justify-center border border-dashed border-border-main/40 rounded bg-bg-surface/50">
+                      <AlertCircle size={14} className="text-txt-muted/60 mb-0.5" />
+                      <span className="text-[10px] font-mono text-txt-main font-medium">
+                        {!githubRepo || !githubRepo.trim() ? "No repository connected" : "No repository found"}
+                      </span>
+                      <span className="text-[9px] font-mono text-txt-muted/80 leading-relaxed max-w-[210px]">
+                        {!githubRepo || !githubRepo.trim()
+                          ? "Attach your GitHub repository link above to display live commit activity."
+                          : "The repository link does not exist or is private."}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

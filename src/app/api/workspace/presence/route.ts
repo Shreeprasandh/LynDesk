@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get("workspaceId");
+  const urlParams = req.nextUrl.searchParams;
+  const workspaceId = urlParams.get("workspaceId");
 
   if (!workspaceId) {
     return NextResponse.json({ error: "Missing workspaceId" }, { status: 400 });

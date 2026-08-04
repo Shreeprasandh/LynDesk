@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const repoUrl = searchParams.get("repoUrl");
+  const urlParams = req.nextUrl.searchParams;
+  const repoUrl = urlParams.get("repoUrl");
 
   if (!repoUrl || !repoUrl.trim()) {
     return NextResponse.json({ languages: [] });

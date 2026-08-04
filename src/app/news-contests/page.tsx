@@ -8,7 +8,8 @@ import {
   Sparkles, 
   Trophy, 
   Filter, 
-  Calendar
+  Calendar,
+  GraduationCap
 } from "lucide-react";
 
 interface OpportunityItem {
@@ -197,7 +198,8 @@ export default function NewsContestsPage() {
           <div className="border border-amber-500/30 bg-amber-500/[0.04] p-5 sm:p-6 rounded-lg flex flex-col gap-4">
             <div className="flex items-center gap-2 text-amber-500 font-mono text-[10px] uppercase tracking-widest font-bold">
               <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-              🏫 Faculty Recommended Opportunities
+              <GraduationCap size={14} className="text-amber-500 shrink-0" />
+              <span>Faculty Recommended Opportunities</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {opportunities.filter(o => o.facultyRecommended).map((opp) => (

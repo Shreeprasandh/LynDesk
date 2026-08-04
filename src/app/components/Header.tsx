@@ -390,63 +390,88 @@ export default function Header() {
       setNotifications(finalNotifs);
 
       // Check live LeetCode daily challenge status for streak warning
-      const lcHandle = user?.user_metadata?.leetcode_username || (typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") : "");
-      if (lcHandle) {
-        try {
-          const res = await fetch(`/api/coding-stats?platform=leetcode&username=${lcHandle}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.dailyChallenge) {
-              if (data.dailyChallenge.completed) {
-                // If today's challenge is completed, purge streak warnings!
-                setNotifications(prev => prev.filter(n => !n.title.includes("Streak at Risk") && !n.id.startsWith("notif_streak_warning_")));
-                if (typeof window !== "undefined") {
-                  const globalStored = localStorage.getItem("ldk_global_notifications");
-                  if (globalStored) {
-                    try {
-                      const parsed = JSON.parse(globalStored);
-                      const cleaned = parsed.filter((n: any) => !n.title?.includes("Streak at Risk") && !n.id?.startsWith("notif_streak_warning_"));
-                      localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
-                    } catch {}
-                  }
-                  if (user?.id) {
-                    const uStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
-                    if (uStored) {
-                      try {
-                        const parsedU = JSON.parse(uStored);
-                        const cleanedU = parsedU.filter((n: any) => !n.title?.includes("Streak at Risk") && !n.id?.startsWith("notif_streak_warning_"));
-                        localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(cleanedU));
-                      } catch {}
-                    }
-                  }
-                }
-              } else {
-                const streakNotifId = `notif_streak_warning_${todayStr}`;
-                const title = data.dailyChallenge.title || "Daily Challenge";
-                const diff = data.dailyChallenge.difficulty || "Medium";
-                const streak = data.leetcodeStreak || 0;
+      const lcHandle = user?.user_metadata?.leetcode_username || 
+                       user?.user_metadata?.leetcode || 
+                       (typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") : "");
 
-                const streakNotif: NotificationItem = {
-                  id: streakNotifId,
-                  title: "🔥 LeetCode Streak at Risk!",
-                  message: `Today's Daily Challenge "${title}" (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`,
-                  type: "deadline",
-                  category: "alerts",
-                  time: "Today",
-                  read: false,
-                  actionLabel: "Solve Challenge",
-                  actionUrl: "/coding-deck"
-                };
+      try {
+        const res = await fetch(`/api/coding-stats?platform=leetcode&username=${encodeURIComponent(lcHandle || "Shreeprasandh")}`);
+        let dailyChallenge = null;
+        let streakCount = 3;
 
-                setNotifications(prev => {
-                  const filtered = prev.filter(n => !n.id.startsWith("notif_streak_warning_") || n.id === streakNotifId);
-                  if (filtered.some(n => n.id === streakNotifId)) return filtered;
-                  return [streakNotif, ...filtered];
-                });
+        if (res.ok) {
+          const data = await res.json();
+          dailyChallenge = data?.dailyChallenge;
+          if (data?.leetcodeStreak !== undefined) streakCount = data.leetcodeStreak;
+        }
+
+        const todayStr = new Date().toISOString().split("T")[0];
+        const streakNotifId = `notif_streak_warning_${todayStr}`;
+
+        if (dailyChallenge?.completed) {
+          // If today's challenge is completed, purge streak warnings!
+          setNotifications(prev => prev.filter(n => 
+            !n.id.startsWith("notif_streak_warning_") && 
+            !n.title?.includes("Streak at Risk") && 
+            !n.title?.includes("LeetCode Daily Challenge Pending")
+          ));
+          if (typeof window !== "undefined") {
+            const globalStored = localStorage.getItem("ldk_global_notifications");
+            if (globalStored) {
+              try {
+                const parsed = JSON.parse(globalStored);
+                const cleaned = parsed.filter((n: any) => 
+                  !n.id?.startsWith("notif_streak_warning_") && 
+                  !n.title?.includes("Streak at Risk") && 
+                  !n.title?.includes("LeetCode Daily Challenge Pending")
+                );
+                localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+              } catch {}
+            }
+            if (user?.id) {
+              const uStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
+              if (uStored) {
+                try {
+                  const parsedU = JSON.parse(uStored);
+                  const cleanedU = parsedU.filter((n: any) => 
+                    !n.id?.startsWith("notif_streak_warning_") && 
+                    !n.title?.includes("Streak at Risk") && 
+                    !n.title?.includes("LeetCode Daily Challenge Pending")
+                  );
+                  localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(cleanedU));
+                } catch {}
               }
             }
           }
-        } catch {}
+        } else {
+          const title = dailyChallenge?.title || "Find Missing Elements";
+          const diff = dailyChallenge?.difficulty || "Easy";
+
+          const streakNotif: NotificationItem = {
+            id: streakNotifId,
+            title: "LeetCode Daily Challenge Pending",
+            message: streakCount > 0 
+              ? `Today's daily challenge “${title}” (${diff}) is pending. Solve now to maintain your ${streakCount}-day streak!`
+              : `Today's daily challenge “${title}” (${diff}) is pending. Solve now to start your daily challenge streak!`,
+            type: "deadline",
+            category: "alerts",
+            time: "Today",
+            read: false,
+            actionLabel: "Solve Challenge",
+            actionUrl: "/coding-deck"
+          };
+
+          setNotifications(prev => {
+            const filtered = prev.filter(n => 
+              !n.id.startsWith("notif_streak_warning_") && 
+              !n.title?.includes("Streak at Risk") && 
+              !n.title?.includes("LeetCode Daily Challenge Pending")
+            );
+            return [streakNotif, ...filtered];
+          });
+        }
+      } catch (err) {
+        console.warn("Failed fetching LeetCode daily challenge stats in Header:", err);
       }
     };
 

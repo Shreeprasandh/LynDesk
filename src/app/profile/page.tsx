@@ -62,6 +62,192 @@ interface BackupProfileData {
   grantSharePermission: boolean;
 }
 
+export function extractPlatformHandle(input: string, platform: string): { handle: string; error?: string } {
+  const raw = (input || "").trim();
+  if (!raw) return { handle: "" };
+
+  const clean = raw.startsWith("@") ? raw.slice(1).trim() : raw;
+
+  if (clean.includes("/") || clean.includes(".")) {
+    try {
+      const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+      const url = new URL(urlString);
+      const host = url.hostname.toLowerCase();
+      const pathSegments = url.pathname.split("/").filter(Boolean);
+
+      if (platform === "LeetCode") {
+        if (!host.includes("leetcode")) {
+          return { handle: "", error: "Invalid LeetCode URL. Must be a leetcode.com profile link." };
+        }
+        let username = "";
+        if (pathSegments[0] === "u" && pathSegments[1]) {
+          username = pathSegments[1];
+        } else if (pathSegments[0] && pathSegments[0] !== "u" && pathSegments[0] !== "problems" && pathSegments[0] !== "contest") {
+          username = pathSegments[0];
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract LeetCode username from URL." };
+        }
+        return { handle: username };
+      }
+
+      if (platform === "Codeforces") {
+        if (!host.includes("codeforces")) {
+          return { handle: "", error: "Invalid Codeforces URL. Must be a codeforces.com profile link." };
+        }
+        let username = "";
+        if (pathSegments[0] === "profile" && pathSegments[1]) {
+          username = pathSegments[1];
+        } else if (pathSegments[0] && pathSegments[0] !== "profile") {
+          username = pathSegments[0];
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract Codeforces username from URL." };
+        }
+        return { handle: username };
+      }
+
+      if (platform === "CodeChef") {
+        if (!host.includes("codechef")) {
+          return { handle: "", error: "Invalid CodeChef URL. Must be a codechef.com profile link." };
+        }
+        let username = "";
+        if (pathSegments[0] === "users" && pathSegments[1]) {
+          username = pathSegments[1];
+        } else if (pathSegments[0] && pathSegments[0] !== "users") {
+          username = pathSegments[0];
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract CodeChef username from URL." };
+        }
+        return { handle: username };
+      }
+
+      if (platform === "Unstop") {
+        if (!host.includes("unstop")) {
+          return { handle: "", error: "Invalid Unstop URL. Must be an unstop.com profile link." };
+        }
+        let username = pathSegments[pathSegments.length - 1] || "";
+        if (pathSegments[0] === "user" || pathSegments[0] === "u") {
+          username = pathSegments[1] || username;
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract Unstop username from URL." };
+        }
+        return { handle: username };
+      }
+
+      if (platform === "Hack2Skill") {
+        if (!host.includes("hack2skill")) {
+          return { handle: "", error: "Invalid Hack2Skill URL. Must be a hack2skill.com profile link." };
+        }
+        let username = pathSegments[pathSegments.length - 1] || "";
+        if (pathSegments[0] === "user" || pathSegments[0] === "u") {
+          username = pathSegments[1] || username;
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract Hack2Skill username from URL." };
+        }
+        return { handle: username };
+      }
+    } catch {
+      return { handle: "", error: `Invalid ${platform} profile URL format.` };
+    }
+  }
+
+  if (!/^[a-zA-Z0-9_.-]+$/.test(clean)) {
+    return { handle: "", error: `Invalid ${platform} handle format. Handle contains invalid characters.` };
+  }
+
+  return { handle: clean };
+}
+
+export function normalizeSocialUrl(input: string, platform: "github" | "linkedin" | "discord" | "portfolio"): { url: string; error?: string } {
+  const raw = (input || "").trim();
+  if (!raw) return { url: "" };
+
+  if (platform === "github") {
+    const clean = raw.startsWith("@") ? raw.slice(1).trim() : raw;
+    if (clean.includes("/") || clean.includes(".")) {
+      try {
+        const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+        const url = new URL(urlString);
+        if (!url.hostname.toLowerCase().includes("github")) {
+          return { url: "", error: "Invalid GitHub URL. Must be a github.com profile link." };
+        }
+        const user = url.pathname.split("/").filter(Boolean)[0];
+        if (!user) return { url: "", error: "Could not extract GitHub username from URL." };
+        return { url: `https://github.com/${user}` };
+      } catch {
+        return { url: "", error: "Invalid GitHub profile URL format." };
+      }
+    }
+    if (!/^[a-zA-Z0-9-._]+$/.test(clean)) {
+      return { url: "", error: "Invalid GitHub handle format." };
+    }
+    return { url: `https://github.com/${clean}` };
+  }
+
+  if (platform === "linkedin") {
+    const clean = raw.startsWith("@") ? raw.slice(1).trim() : raw;
+    if (clean.includes("/") || clean.includes(".")) {
+      try {
+        const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+        const url = new URL(urlString);
+        if (!url.hostname.toLowerCase().includes("linkedin")) {
+          return { url: "", error: "Invalid LinkedIn URL. Must be a linkedin.com profile link." };
+        }
+        const segments = url.pathname.split("/").filter(Boolean);
+        const user = segments[segments.length - 1] || "";
+        if (!user) return { url: "", error: "Could not extract LinkedIn username from URL." };
+        return { url: `https://linkedin.com/in/${user}` };
+      } catch {
+        return { url: "", error: "Invalid LinkedIn profile URL format." };
+      }
+    }
+    if (!/^[a-zA-Z0-9-._]+$/.test(clean)) {
+      return { url: "", error: "Invalid LinkedIn handle format." };
+    }
+    return { url: `https://linkedin.com/in/${clean}` };
+  }
+
+  if (platform === "discord") {
+    const clean = raw.startsWith("@") ? raw.slice(1).trim() : raw;
+    if (clean.includes("/") || clean.includes(".")) {
+      try {
+        const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+        const url = new URL(urlString);
+        const segments = url.pathname.split("/").filter(Boolean);
+        const user = segments[segments.length - 1] || "";
+        return { url: user || clean };
+      } catch {
+        return { url: clean };
+      }
+    }
+    return { url: clean };
+  }
+
+  if (platform === "portfolio") {
+    if (!/^https?:\/\//i.test(raw)) {
+      const formatted = `https://${raw}`;
+      try {
+        new URL(formatted);
+        return { url: formatted };
+      } catch {
+        return { url: "", error: "Invalid Portfolio URL format." };
+      }
+    }
+    try {
+      new URL(raw);
+      return { url: raw };
+    } catch {
+      return { url: "", error: "Invalid Portfolio URL format." };
+    }
+  }
+
+  return { url: raw };
+}
+
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
 
@@ -105,6 +291,10 @@ export default function ProfilePage() {
   const [codechefVerified, setCodechefVerified] = useState(false);
   const [unstopVerified, setUnstopVerified] = useState(false);
   const [hack2skillVerified, setHack2skillVerified] = useState(false);
+
+  // Coding Platform & Social Input Errors
+  const [platformInputErrors, setPlatformInputErrors] = useState<Record<string, string>>({});
+  const [socialInputErrors, setSocialInputErrors] = useState<Record<string, string>>({});
 
   // Verification request modal states
   const [verifyPlatform, setVerifyPlatform] = useState<string | null>(null);
@@ -154,6 +344,9 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [backupData, setBackupData] = useState<BackupProfileData | null>(null);
 
+  // Draft auto-preservation states
+  const isInitialLoadRef = useRef(true);
+
   const handleStartEdit = () => {
     setBackupData({
       fullName,
@@ -192,6 +385,9 @@ export default function ProfilePage() {
       setCollegeKey(backupData.collegeKey);
       setBatchCode(backupData.batchCode);
       setGrantSharePermission(backupData.grantSharePermission);
+    }
+    if (typeof window !== "undefined" && user?.id) {
+      localStorage.removeItem(`ldk_profile_draft_${user.id}`);
     }
     setIsEditing(false);
     setMessage(null);
@@ -299,16 +495,95 @@ export default function ProfilePage() {
         setBatchCode(meta.batch_code || "");
         setGrantSharePermission(!!meta.grant_share_permission);
         setCollegeLinkedStatus(meta.college_linked_status || "none");
+
+        // 3. Restore unsaved local draft if user typed changes without submitting
+        if (typeof window !== "undefined" && user?.id) {
+          const draftStr = localStorage.getItem(`ldk_profile_draft_${user.id}`);
+          if (draftStr) {
+            try {
+              const draft = JSON.parse(draftStr);
+              if (draft.fullName !== undefined) setFullName(draft.fullName);
+              if (draft.username !== undefined) setUsername(draft.username);
+              if (draft.bio !== undefined) setBio(draft.bio);
+              if (draft.skills !== undefined) setSkills(draft.skills);
+              if (draft.githubUrl !== undefined) setGithubUrl(draft.githubUrl);
+              if (draft.linkedinUrl !== undefined) setLinkedinUrl(draft.linkedinUrl);
+              if (draft.discordUsername !== undefined) setDiscordUsername(draft.discordUsername);
+              if (draft.portfolioUrl !== undefined) setPortfolioUrl(draft.portfolioUrl);
+              if (draft.collegeName !== undefined) setCollegeName(draft.collegeName);
+              if (draft.department !== undefined) setDepartment(draft.department);
+              if (draft.gradYear !== undefined) setGradYear(draft.gradYear);
+              if (draft.collegeKey !== undefined) setCollegeKey(draft.collegeKey);
+              if (draft.batchCode !== undefined) setBatchCode(draft.batchCode);
+              if (draft.leetcodeUsername !== undefined) setLeetcodeUsername(draft.leetcodeUsername);
+              if (draft.codeforcesUsername !== undefined) setCodeforcesUsername(draft.codeforcesUsername);
+              if (draft.codechefUsername !== undefined) setCodechefUsername(draft.codechefUsername);
+              if (draft.unstopUsername !== undefined) setUnstopUsername(draft.unstopUsername);
+              if (draft.hack2skillUsername !== undefined) setHack2skillUsername(draft.hack2skillUsername);
+              if (draft.isPublic !== undefined) setIsPublic(draft.isPublic);
+              if (draft.grantSharePermission !== undefined) setGrantSharePermission(draft.grantSharePermission);
+            } catch (draftErr) {
+              console.warn("Failed parsing profile draft:", draftErr);
+            }
+          }
+        }
         
       } catch (err) {
         console.error("Error loading user profile: ", err);
       } finally {
         setLoading(false);
+        setTimeout(() => {
+          isInitialLoadRef.current = false;
+        }, 400);
       }
     };
     
     loadProfileData();
   }, [user]);
+
+  // Auto-save local draft whenever profile fields change during editing mode
+  useEffect(() => {
+    if (!user || isInitialLoadRef.current || !isEditing) return;
+
+    const draftData = {
+      fullName,
+      username,
+      bio,
+      skills,
+      githubUrl,
+      linkedinUrl,
+      discordUsername,
+      portfolioUrl,
+      collegeName,
+      department,
+      gradYear,
+      isPublic,
+      collegeKey,
+      batchCode,
+      grantSharePermission,
+      leetcodeUsername,
+      codeforcesUsername,
+      codechefUsername,
+      unstopUsername,
+      hack2skillUsername,
+      updatedAt: Date.now()
+    };
+
+    const timeoutId = setTimeout(() => {
+      try {
+        localStorage.setItem(`ldk_profile_draft_${user.id}`, JSON.stringify(draftData));
+      } catch (err) {
+        console.warn("Failed saving profile draft:", err);
+      }
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    user, fullName, username, bio, skills, githubUrl, linkedinUrl, discordUsername,
+    portfolioUrl, collegeName, department, gradYear, isPublic, collegeKey, batchCode,
+    grantSharePermission, leetcodeUsername, codeforcesUsername, codechefUsername,
+    unstopUsername, hack2skillUsername, isEditing
+  ]);
 
   // Sync institutional link status in real-time
   useEffect(() => {
@@ -595,25 +870,59 @@ export default function ProfilePage() {
       return;
     }
 
-    const isValidUrl = (url: string) => {
-      try {
-        new URL(url);
-        return true;
-      } catch {
-        return false;
-      }
-    };
+    // Auto-normalize and validate Social Platform URLs & Handles
+    const socialList: { name: string; key: "github" | "linkedin" | "discord" | "portfolio"; raw: string; setFn: (v: string) => void }[] = [
+      { name: "GitHub", key: "github", raw: githubUrl, setFn: setGithubUrl },
+      { name: "LinkedIn", key: "linkedin", raw: linkedinUrl, setFn: setLinkedinUrl },
+      { name: "Discord", key: "discord", raw: discordUsername, setFn: setDiscordUsername },
+      { name: "Portfolio", key: "portfolio", raw: portfolioUrl, setFn: setPortfolioUrl },
+    ];
 
-    if (githubUrl.trim() && !isValidUrl(githubUrl.trim())) {
-      setMessage({ text: "Please enter a valid GitHub URL (including https://).", type: "error" });
+    const newSocialErrors: Record<string, string> = {};
+    for (const item of socialList) {
+      if (!item.raw.trim()) continue;
+      const res = normalizeSocialUrl(item.raw, item.key);
+      if (res.error) {
+        newSocialErrors[item.name] = res.error;
+      } else {
+        item.setFn(res.url);
+      }
+    }
+    setSocialInputErrors(newSocialErrors);
+
+    if (Object.keys(newSocialErrors).length > 0) {
+      const firstErr = Object.values(newSocialErrors)[0];
+      setMessage({ text: `Validation Error: ${firstErr}. Please fix the indicated social link issue to save your profile.`, type: "error" });
       return;
     }
-    if (linkedinUrl.trim() && !isValidUrl(linkedinUrl.trim())) {
-      setMessage({ text: "Please enter a valid LinkedIn URL (including https://).", type: "error" });
-      return;
+    // Auto-extract and validate coding platform handles or links
+    const platformList = [
+      { name: "LeetCode", raw: leetcodeUsername, setFn: setLeetcodeUsername },
+      { name: "Codeforces", raw: codeforcesUsername, setFn: setCodeforcesUsername },
+      { name: "CodeChef", raw: codechefUsername, setFn: setCodechefUsername },
+      { name: "Unstop", raw: unstopUsername, setFn: setUnstopUsername },
+      { name: "Hack2Skill", raw: hack2skillUsername, setFn: setHack2skillUsername },
+    ];
+
+    const newPlatformErrors: Record<string, string> = {};
+    const extractedHandles: Record<string, string> = {};
+
+    for (const item of platformList) {
+      if (!item.raw.trim()) continue;
+      const res = extractPlatformHandle(item.raw, item.name);
+      if (res.error) {
+        newPlatformErrors[item.name] = res.error;
+      } else {
+        extractedHandles[item.name] = res.handle;
+        item.setFn(res.handle);
+      }
     }
-    if (portfolioUrl.trim() && !isValidUrl(portfolioUrl.trim())) {
-      setMessage({ text: "Please enter a valid Personal Portfolio URL (including https://).", type: "error" });
+
+    setPlatformInputErrors(newPlatformErrors);
+
+    if (Object.keys(newPlatformErrors).length > 0) {
+      const firstErr = Object.values(newPlatformErrors)[0];
+      setMessage({ text: `Validation Error: ${firstErr}. Please fix the indicated handle issue to save your profile.`, type: "error" });
       return;
     }
 
@@ -622,11 +931,11 @@ export default function ProfilePage() {
 
     try {
       // Unique Handle Validation (must be checked outside inner try to block saving on duplicates)
-      const lcTrim = leetcodeUsername.trim();
-      const cfTrim = codeforcesUsername.trim();
-      const ccTrim = codechefUsername.trim();
-      const usTrim = unstopUsername.trim();
-      const h2sTrim = hack2skillUsername.trim();
+      const lcTrim = extractedHandles["LeetCode"] || leetcodeUsername.trim();
+      const cfTrim = extractedHandles["Codeforces"] || codeforcesUsername.trim();
+      const ccTrim = extractedHandles["CodeChef"] || codechefUsername.trim();
+      const usTrim = extractedHandles["Unstop"] || unstopUsername.trim();
+      const h2sTrim = extractedHandles["Hack2Skill"] || hack2skillUsername.trim();
 
       if (lcTrim || cfTrim || ccTrim || usTrim || h2sTrim) {
         const { data: existingProfiles } = await supabase
@@ -765,6 +1074,10 @@ export default function ProfilePage() {
         const sharingMap = sharingPermissions ? JSON.parse(sharingPermissions) : {};
         sharingMap[user.id] = grantSharePermission;
         localStorage.setItem("ldk_student_sharing_permissions", JSON.stringify(sharingMap));
+      }
+
+      if (typeof window !== "undefined" && user?.id) {
+        localStorage.removeItem(`ldk_profile_draft_${user.id}`);
       }
 
       setMessage({ text: "Profile details updated successfully.", type: "success" });
@@ -1064,7 +1377,7 @@ export default function ProfilePage() {
             
             {/* Required Identity Panel */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Primary Identification (Required)</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Primary Identification</span>
               
               <div className="flex flex-col sm:flex-row items-center gap-6 border-b border-border-main/40 pb-4">
                 <div className="relative group">
@@ -1150,7 +1463,7 @@ export default function ProfilePage() {
               <>
                 {/* Resume and Tech Profile Panel */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Technical Portfolio Details (Optional)</span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Technical Portfolio Details</span>
                   
                   <div className="flex flex-col gap-1">
                     <label className="text-xs text-txt-sub font-semibold">Professional Bio</label>
@@ -1213,7 +1526,7 @@ export default function ProfilePage() {
 
                 {/* Social Platform Profiles */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Social Platform Profiles (Optional)</span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Social Platform Profiles</span>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
@@ -1223,11 +1536,27 @@ export default function ProfilePage() {
                       <input 
                         type="url" 
                         value={githubUrl}
-                        onChange={(e) => setGithubUrl(e.target.value)}
+                        onChange={(e) => {
+                          setGithubUrl(e.target.value);
+                          setSocialInputErrors(prev => ({ ...prev, GitHub: "" }));
+                        }}
+                        onBlur={() => {
+                          if (githubUrl.trim()) {
+                            const res = normalizeSocialUrl(githubUrl, "github");
+                            if (res.url) setGithubUrl(res.url);
+                            if (res.error) setSocialInputErrors(prev => ({ ...prev, GitHub: res.error || "" }));
+                            else setSocialInputErrors(prev => ({ ...prev, GitHub: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="https://github.com/myusername"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="https://github.com/myusername or handle"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          socialInputErrors.GitHub ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {socialInputErrors.GitHub && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.GitHub}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1237,11 +1566,27 @@ export default function ProfilePage() {
                       <input 
                         type="url" 
                         value={linkedinUrl}
-                        onChange={(e) => setLinkedinUrl(e.target.value)}
+                        onChange={(e) => {
+                          setLinkedinUrl(e.target.value);
+                          setSocialInputErrors(prev => ({ ...prev, LinkedIn: "" }));
+                        }}
+                        onBlur={() => {
+                          if (linkedinUrl.trim()) {
+                            const res = normalizeSocialUrl(linkedinUrl, "linkedin");
+                            if (res.url) setLinkedinUrl(res.url);
+                            if (res.error) setSocialInputErrors(prev => ({ ...prev, LinkedIn: res.error || "" }));
+                            else setSocialInputErrors(prev => ({ ...prev, LinkedIn: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="https://linkedin.com/in/myusername"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="https://linkedin.com/in/myusername or handle"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          socialInputErrors.LinkedIn ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {socialInputErrors.LinkedIn && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.LinkedIn}</span>
+                      )}
                     </div>
                   </div>
 
@@ -1253,11 +1598,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={discordUsername}
-                        onChange={(e) => setDiscordUsername(e.target.value)}
+                        onChange={(e) => {
+                          setDiscordUsername(e.target.value);
+                          setSocialInputErrors(prev => ({ ...prev, Discord: "" }));
+                        }}
+                        onBlur={() => {
+                          if (discordUsername.trim()) {
+                            const res = normalizeSocialUrl(discordUsername, "discord");
+                            if (res.url) setDiscordUsername(res.url);
+                            if (res.error) setSocialInputErrors(prev => ({ ...prev, Discord: res.error || "" }));
+                            else setSocialInputErrors(prev => ({ ...prev, Discord: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="username#0000"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="username or profile link"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          socialInputErrors.Discord ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {socialInputErrors.Discord && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.Discord}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1267,18 +1628,34 @@ export default function ProfilePage() {
                       <input 
                         type="url" 
                         value={portfolioUrl}
-                        onChange={(e) => setPortfolioUrl(e.target.value)}
+                        onChange={(e) => {
+                          setPortfolioUrl(e.target.value);
+                          setSocialInputErrors(prev => ({ ...prev, Portfolio: "" }));
+                        }}
+                        onBlur={() => {
+                          if (portfolioUrl.trim()) {
+                            const res = normalizeSocialUrl(portfolioUrl, "portfolio");
+                            if (res.url) setPortfolioUrl(res.url);
+                            if (res.error) setSocialInputErrors(prev => ({ ...prev, Portfolio: res.error || "" }));
+                            else setSocialInputErrors(prev => ({ ...prev, Portfolio: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
                         placeholder="https://myportfolio.dev"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          socialInputErrors.Portfolio ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {socialInputErrors.Portfolio && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.Portfolio}</span>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Coding Platform Integrations */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Coding Platform Integrations (Optional)</span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Coding Platform Integrations</span>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1">
@@ -1304,11 +1681,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={leetcodeUsername}
-                        onChange={(e) => setLeetcodeUsername(e.target.value)}
+                        onChange={(e) => {
+                          setLeetcodeUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, LeetCode: "" }));
+                        }}
+                        onBlur={() => {
+                          if (leetcodeUsername.trim()) {
+                            const res = extractPlatformHandle(leetcodeUsername, "LeetCode");
+                            if (res.handle) setLeetcodeUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, LeetCode: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, LeetCode: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="Enter LeetCode handle"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="Enter handle or profile link (e.g. https://leetcode.com/u/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.LeetCode ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {platformInputErrors.LeetCode && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.LeetCode}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1334,11 +1727,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={codeforcesUsername}
-                        onChange={(e) => setCodeforcesUsername(e.target.value)}
+                        onChange={(e) => {
+                          setCodeforcesUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
+                        }}
+                        onBlur={() => {
+                          if (codeforcesUsername.trim()) {
+                            const res = extractPlatformHandle(codeforcesUsername, "Codeforces");
+                            if (res.handle) setCodeforcesUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Codeforces: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="Enter Codeforces handle"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="Enter handle or profile link (e.g. https://codeforces.com/profile/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.Codeforces ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {platformInputErrors.Codeforces && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Codeforces}</span>
+                      )}
                     </div>
                   </div>
 
@@ -1366,11 +1775,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={codechefUsername}
-                        onChange={(e) => setCodechefUsername(e.target.value)}
+                        onChange={(e) => {
+                          setCodechefUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, CodeChef: "" }));
+                        }}
+                        onBlur={() => {
+                          if (codechefUsername.trim()) {
+                            const res = extractPlatformHandle(codechefUsername, "CodeChef");
+                            if (res.handle) setCodechefUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, CodeChef: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, CodeChef: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="Enter CodeChef handle"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="Enter handle or profile link (e.g. https://codechef.com/users/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.CodeChef ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {platformInputErrors.CodeChef && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.CodeChef}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1396,11 +1821,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={unstopUsername}
-                        onChange={(e) => setUnstopUsername(e.target.value)}
+                        onChange={(e) => {
+                          setUnstopUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, Unstop: "" }));
+                        }}
+                        onBlur={() => {
+                          if (unstopUsername.trim()) {
+                            const res = extractPlatformHandle(unstopUsername, "Unstop");
+                            if (res.handle) setUnstopUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Unstop: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, Unstop: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="Enter Unstop handle"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="Enter handle or profile link (e.g. https://unstop.com/user/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.Unstop ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {platformInputErrors.Unstop && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Unstop}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -1426,11 +1867,27 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={hack2skillUsername}
-                        onChange={(e) => setHack2skillUsername(e.target.value)}
+                        onChange={(e) => {
+                          setHack2skillUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: "" }));
+                        }}
+                        onBlur={() => {
+                          if (hack2skillUsername.trim()) {
+                            const res = extractPlatformHandle(hack2skillUsername, "Hack2Skill");
+                            if (res.handle) setHack2skillUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: "" }));
+                          }
+                        }}
                         disabled={!isEditing}
-                        placeholder="Enter Hack2Skill handle"
-                        className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                        placeholder="Enter handle or profile link (e.g. https://hack2skill.com/user/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.Hack2Skill ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
                       />
+                      {platformInputErrors.Hack2Skill && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Hack2Skill}</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1439,7 +1896,7 @@ export default function ProfilePage() {
 
             {/* College & Department Panel */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials (Optional)</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials</span>
               
               <div className="flex flex-col gap-1 relative">
                 <label className="text-xs text-txt-sub font-semibold">Institute / College Name</label>
@@ -1881,7 +2338,7 @@ export default function ProfilePage() {
               
               <div className="flex flex-col gap-1.5">
                 <label className="text-[9px] font-mono uppercase text-txt-muted">
-                  {isSwitch ? "Reason for Username Change" : "Verification Notes (Optional)"}
+                  {isSwitch ? "Reason for Username Change" : "Verification Notes"}
                 </label>
                 <textarea
                   rows={3}
