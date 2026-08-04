@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { 
   Sparkles, 
   Users, 
@@ -171,7 +172,7 @@ export default function StudyDeskPage() {
     <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       <Header />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-8 flex flex-col gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-2 flex flex-col gap-6">
 
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
@@ -491,6 +492,8 @@ export default function StudyDeskPage() {
         )}
 
       </main>
+
+      <Footer />
     </div>
   );
 }

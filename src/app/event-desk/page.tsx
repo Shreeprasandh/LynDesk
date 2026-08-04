@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -22,12 +23,9 @@ import {
   X,
   Eye,
   EyeOff,
-  RotateCw,
   Edit2,
-  Layers,
   ChevronUp,
   ChevronDown,
-  GripVertical,
   ArrowUpDown,
   Trash2,
   LogOut
@@ -96,8 +94,8 @@ function DashboardSkeleton() {
         </div>
       </div>
 
-      {/* Center Column Skeleton (6 columns) */}
-      <div className="lg:col-span-6 flex flex-col gap-6">
+      {/* Main Column Skeleton (9 columns) */}
+      <div className="lg:col-span-9 flex flex-col gap-6">
         <div className="flex gap-4 border-b border-border-main/40 pb-2">
           <div className="h-4 w-20 bg-border-main/60 rounded" />
           <div className="h-4 w-20 bg-border-main/40 rounded" />
@@ -110,15 +108,6 @@ function DashboardSkeleton() {
         </div>
         <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
           <div className="h-4 w-32 bg-border-main/60 rounded" />
-          <div className="h-3 w-full bg-border-main/40 rounded" />
-        </div>
-      </div>
-
-      {/* Right Column Skeleton (3 columns) */}
-      <div className="lg:col-span-3 flex flex-col gap-6">
-        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
-          <div className="h-2 w-24 bg-border-main/60 rounded" />
-          <div className="h-3 w-full bg-border-main/40 rounded" />
           <div className="h-3 w-full bg-border-main/40 rounded" />
         </div>
       </div>
@@ -240,11 +229,11 @@ export default function Home() {
   const [isInviteHomeModalOpen, setIsInviteHomeModalOpen] = useState(false);
 
   // News and Opportunities States
-  const [dashTab] = useState<"workspaces" | "opportunities">("workspaces");
+  const [dashTab, setDashTab] = useState<"workspaces" | "opportunities">("workspaces");
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
   // Real-time Coding Platform Overview Stats
-  const [codingStats, setCodingStats] = useState<{
+  const [, setCodingStats] = useState<{
     leetcode: any;
     codeforces: any;
     codechef: any;
@@ -255,7 +244,6 @@ export default function Home() {
     codechef: null,
     unstop: null
   });
-  const [loadingCodingStats, setLoadingCodingStats] = useState(false);
 
   // Load opportunities from localStorage on mount and register active listener
   useEffect(() => {
@@ -386,7 +374,6 @@ export default function Home() {
     }
 
     const loadLiveStats = async () => {
-      setLoadingCodingStats(true);
       try {
         const fetchPlatformStats = async (platform: string, username: string) => {
           if (!username) return null;
@@ -421,8 +408,6 @@ export default function Home() {
         localStorage.setItem(cacheKey, JSON.stringify(updatedStats));
       } catch (err) {
         console.error("Error fetching live coding stats on dashboard:", err);
-      } finally {
-        setLoadingCodingStats(false);
       }
     };
 
@@ -1299,7 +1284,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* 1. Header (Unified Navigation & Notifications Drawer) */}
       <Header />
@@ -1674,7 +1659,7 @@ export default function Home() {
         </main>
       ) : (
         /* ==================== DASHBOARD PANEL ==================== */
-        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-6 pb-2 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* A. Left Sidebar: Profile & Campus Credits (3 Columns) */}
           <section className="lg:col-span-3 flex flex-col gap-6">
@@ -1735,9 +1720,9 @@ export default function Home() {
                 )}
               </div>
               <div className="flex flex-col gap-2.5">
-                {coworkers.length > 0 ? (
-                  coworkers.map((cw, i) => (
-                    <div key={cw.id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
+                {activeCoworkers.length > 0 ? (
+                  activeCoworkers.map((cw, i) => (
+                    <div key={(cw as any).id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                         <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
@@ -1755,15 +1740,31 @@ export default function Home() {
 
           </section>
 
-          {/* B. Center Panel: The Event Registry & Timelines (6 Columns) */}
-          <section className="lg:col-span-6 flex flex-col gap-6">
+          {/* B. Main Panel: The Event Registry & Timelines (9 Columns) */}
+          <section className="lg:col-span-9 flex flex-col gap-6">
             
             {/* Header + Add button */}
             <div className="flex items-center justify-between border-b border-border-main/50 pb-4">
-              <div className="flex flex-col gap-0.5">
-                <h2 className="font-display text-xl font-light text-txt-main">
-                  {dashTab === "workspaces" ? "Event Registry" : `Opportunities Board (${opportunities.length})`}
-                </h2>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setDashTab("workspaces")}
+                    className={`font-display text-xl font-light cursor-pointer transition-colors ${
+                      dashTab === "workspaces" ? "text-txt-main border-b-2 border-accent-main font-medium pb-0.5" : "text-txt-muted hover:text-txt-main pb-0.5"
+                    }`}
+                  >
+                    Event Registry
+                  </button>
+                  <span className="text-border-main/60">•</span>
+                  <button
+                    onClick={() => setDashTab("opportunities")}
+                    className={`font-display text-xl font-light cursor-pointer transition-colors ${
+                      dashTab === "opportunities" ? "text-txt-main border-b-2 border-accent-main font-medium pb-0.5" : "text-txt-muted hover:text-txt-main pb-0.5"
+                    }`}
+                  >
+                    Opportunities Board ({opportunities.length})
+                  </button>
+                </div>
                 <p className="text-[10px] text-txt-muted font-light">
                   {dashTab === "workspaces" ? "Tracked project desks and submission stages." : "Faculty-recommended contests, hackathons, and news."}
                 </p>
@@ -1771,432 +1772,394 @@ export default function Home() {
               {dashTab === "workspaces" && (
                 <button 
                   onClick={() => setIsModalOpen(true)}
-                  className="h-9 px-3.5 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-opacity duration-150 cursor-pointer"
+                  className="h-9 px-3.5 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-opacity duration-150 cursor-pointer font-semibold"
                 >
                   <Plus size={13} />
                   Track Link
                 </button>
               )}
             </div>
+              {dashTab === "workspaces" ? (
+              <>
+                {/* My Active Workspaces Section Header */}
+                <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
+                      My Active Workspaces
+                    </span>
+                    {events.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsReordering(!isReordering)}
+                        className={`text-[9px] font-mono uppercase tracking-wider transition-all flex items-center gap-1 px-2 py-0.5 rounded border cursor-pointer ${
+                          isReordering 
+                            ? "bg-accent-main/15 text-accent-main border-accent-main/40 font-bold opacity-100" 
+                            : "bg-bg-card text-txt-muted/70 hover:text-txt-main opacity-60 hover:opacity-100 border-border-main/60"
+                        }`}
+                      >
+                        <ArrowUpDown size={10} />
+                        <span>{isReordering ? "Done Reordering" : "Reorder Workspaces"}</span>
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[9px] font-mono text-txt-muted uppercase">
+                    {events.length} Active {events.length === 1 ? "Project" : "Projects"}
+                  </span>
+                </div>
 
-            {/* My Active Workspaces Section Header */}
-            <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
-              <div className="flex items-center gap-2.5">
-                <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
-                  My Active Workspaces
-                </span>
-                {events.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsReordering(!isReordering)}
-                    className={`text-[9px] font-mono uppercase tracking-wider transition-all flex items-center gap-1 px-2 py-0.5 rounded border cursor-pointer ${
-                      isReordering 
-                        ? "bg-accent-main/15 text-accent-main border-accent-main/40 font-bold opacity-100" 
-                        : "bg-bg-card text-txt-muted/70 hover:text-txt-main opacity-60 hover:opacity-100 border-border-main/60"
-                    }`}
-                  >
-                    <ArrowUpDown size={10} />
-                    <span>{isReordering ? "Done Reordering" : "Reorder Workspaces"}</span>
-                  </button>
-                )}
-              </div>
-              <span className="text-[9px] font-mono text-txt-muted uppercase">
-                {events.length} Active {events.length === 1 ? "Project" : "Projects"}
-              </span>
-            </div>
-
-            {/* List of active events / workspaces */}
-            <div className="flex flex-col gap-5">
-              <AnimatePresence mode="popLayout">
-                {events.map((ev, evIndex) => {
-                  const resolvedTitle = (() => {
-                    const localName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${ev.id}`) : null;
-                    if (localName && !localName.startsWith("Loading Project")) return localName;
-                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
-                    if (metaStr) {
-                      try {
-                        const meta = JSON.parse(metaStr);
-                        if (meta && meta.title) return meta.title;
-                      } catch {}
-                    }
-                    return (ev.title && !ev.title.startsWith("Loading Project")) ? ev.title : "Hackathon Event";
-                  })();
-
-                  const stageObjects = (() => {
-                    const realStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) : null;
-                    if (realStr) {
-                      try {
-                        const parsed = JSON.parse(realStr);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                          return parsed.map((s: any) => ({
-                            stage: s.title || s.stage || "Stage",
-                            deadline: s.deadline || "Target Active"
-                          }));
-                        }
-                      } catch {}
-                    }
-                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
-                    if (metaStr) {
-                      try {
-                        const meta = JSON.parse(metaStr);
-                        if (meta && meta.stages && meta.stages.length > 0) {
-                          return meta.stages.map((s: any) => ({
-                            stage: s.title || s.stage || "Stage",
-                            deadline: s.deadline || "Target Active"
-                          }));
-                        }
-                      } catch {}
-                    }
-                    return [
-                      { stage: "Round 1 - Online Assessment", deadline: "09 Aug 2026" },
-                      { stage: "Round 2 - Development Round", deadline: "06 Sep 2026" },
-                      { stage: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026" },
-                      { stage: "Round 4 - Grand Finale", deadline: "02 Nov 2026" }
-                    ];
-                  })();
-
-                  const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
-                  const activeIdx = firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1;
-                  const maxIdx = Math.max(stageObjects.length - 1, 1);
-                  const progressPct = `${Math.min(100, Math.max(0, Math.round((activeIdx / maxIdx) * 100)))}%`;
-
-                  return (
-                    <motion.div 
-                      key={ev.id}
-                      layout
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0, padding: 0, overflow: "hidden" }}
-                      transition={{ duration: 0.35, ease: "easeInOut" }}
-                      className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            {editingWorkspaceId === ev.id ? (
-                              <div className="flex items-center gap-1.5 py-0.5">
-                                <input
-                                  type="text"
-                                  value={tempWorkspaceTitle}
-                                  onChange={(e) => setTempWorkspaceTitle(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
-                                    if (e.key === "Escape") setEditingWorkspaceId(null);
-                                  }}
-                                  className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
-                                  autoFocus
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveWorkspaceTitle(ev.id)}
-                                  className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setEditingWorkspaceId(null)}
-                                  className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group/title">
-                                <h3 className="font-display text-base font-semibold text-txt-main truncate">
-                                  {resolvedTitle}
-                                </h3>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setTempWorkspaceTitle(resolvedTitle);
-                                    setEditingWorkspaceId(ev.id);
-                                  }}
-                                  className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
-                                >
-                                  <Edit2 size={10} />
-                                  <span>Rename</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          {ev.url && (() => {
-                            let displayUrl = ev.url.startsWith("/workspace/") 
-                              ? `Workspace Desk (${ev.id.substring(0, 8)})` 
-                              : ev.url.replace(/^https?:\/\/(www\.)?/, "");
-
-                            if (!ev.url.startsWith("/workspace/") && displayUrl.length > 30) {
-                              displayUrl = displayUrl.substring(0, 30) + "...";
-                            }
-
-                            return (
-                              <a 
-                                href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-base/40"
-                              >
-                                <span className="truncate leading-none">{displayUrl}</span>
-                                <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
-                              </a>
-                            );
-                          })()}
-                        </div>
-
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {isReordering && events.length > 1 && (
-                            <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40">
-                              <button
-                                type="button"
-                                onClick={() => handleMoveWorkspace(evIndex, "up")}
-                                disabled={evIndex === 0}
-                                className={`p-1 rounded transition-colors ${
-                                  evIndex === 0 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
-                                }`}
-                              >
-                                <ChevronUp size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMoveWorkspace(evIndex, "down")}
-                                disabled={evIndex === events.length - 1}
-                                className={`p-1 rounded transition-colors ${
-                                  evIndex === events.length - 1 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
-                                }`}
-                              >
-                                <ChevronDown size={13} />
-                              </button>
-                            </div>
-                          )}
-
-                          <div className="flex flex-col items-end gap-1">
-                            <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                            <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
-                          </div>
-                        </div>
+                {/* List of active events / workspaces */}
+                <div className="flex flex-col gap-5">
+                  {events.length === 0 ? (
+                    <div className="border border-dashed border-border-main/60 bg-bg-surface/50 p-8 rounded-md flex flex-col items-center justify-center text-center gap-3 py-12">
+                      <div className="h-10 w-10 rounded-full bg-bg-card border border-border-main/80 flex items-center justify-center text-txt-muted">
+                        <Plus size={18} />
                       </div>
+                      <div className="flex flex-col gap-1 max-w-sm">
+                        <h3 className="font-display text-sm font-semibold text-txt-main">No active workspaces</h3>
+                        <p className="text-xs text-txt-muted font-light leading-relaxed">
+                          Track a hackathon or event link to auto-extract stages and launch your team project workspace desk.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="mt-2 h-9 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 font-bold cursor-pointer"
+                      >
+                        <Plus size={13} />
+                        Track Link
+                      </button>
+                    </div>
+                  ) : (
+                    <AnimatePresence mode="popLayout">
+                      {events.map((ev, evIndex) => {
+                        const resolvedTitle = (() => {
+                          const localName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${ev.id}`) : null;
+                          if (localName && !localName.startsWith("Loading Project")) return localName;
+                          const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                          if (metaStr) {
+                            try {
+                              const meta = JSON.parse(metaStr);
+                              if (meta && meta.title) return meta.title;
+                            } catch {}
+                          }
+                          return (ev.title && !ev.title.startsWith("Loading Project")) ? ev.title : "Hackathon Event";
+                        })();
 
-                      {/* Milestone Diagram */}
-                      <div className="p-4 rounded-md border border-border-main/40 bg-bg-base/30 overflow-x-auto">
-                        <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
-                          <div className="absolute top-[10px] left-6 right-6 h-[2px] bg-border-main/50 z-0" />
+                        const stageObjects = (() => {
+                          const realStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) : null;
+                          if (realStr) {
+                            try {
+                              const parsed = JSON.parse(realStr);
+                              if (Array.isArray(parsed) && parsed.length > 0) {
+                                return parsed.map((s: any) => ({
+                                  stage: s.title || s.stage || "Stage",
+                                  deadline: s.deadline || "Target Active"
+                                }));
+                              }
+                            } catch {}
+                          }
+                          const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                          if (metaStr) {
+                            try {
+                              const meta = JSON.parse(metaStr);
+                              if (meta && meta.stages && meta.stages.length > 0) {
+                                return meta.stages.map((s: any) => ({
+                                  stage: s.title || s.stage || "Stage",
+                                  deadline: s.deadline || "Target Active"
+                                }));
+                              }
+                            } catch {}
+                          }
+                          return [
+                            { stage: "Round 1 - Online Assessment", deadline: "09 Aug 2026" },
+                            { stage: "Round 2 - Development Round", deadline: "06 Sep 2026" },
+                            { stage: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026" },
+                            { stage: "Round 4 - Grand Finale", deadline: "02 Nov 2026" }
+                          ];
+                        })();
+
+                        const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
+                        const activeIdx = firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1;
+                        const maxIdx = Math.max(stageObjects.length - 1, 1);
+
+                        return (
                           <motion.div 
-                            className="absolute top-[10px] left-6 h-[2px] bg-accent-main z-0"
-                            initial={false}
-                            animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
-                            transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                          />
-                            
-                          {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
-                            const isPassed = isDatePassed(stgObj.deadline);
-                            const isCompleted = isPassed || idx < activeIdx;
-                            const isCurrent = !isCompleted && idx === activeIdx;
+                            key={ev.id}
+                            layout
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0, padding: 0, overflow: "hidden" }}
+                            transition={{ duration: 0.35, ease: "easeInOut" }}
+                            className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col gap-1 min-w-0">
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                  {editingWorkspaceId === ev.id ? (
+                                    <div className="flex items-center gap-1.5 py-0.5">
+                                      <input
+                                        type="text"
+                                        value={tempWorkspaceTitle}
+                                        onChange={(e) => setTempWorkspaceTitle(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
+                                          if (e.key === "Escape") setEditingWorkspaceId(null);
+                                        }}
+                                        className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
+                                        autoFocus
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveWorkspaceTitle(ev.id)}
+                                        className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingWorkspaceId(null)}
+                                        className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 group/title">
+                                      <h3 className="font-display text-base font-semibold text-txt-main truncate">
+                                        {resolvedTitle}
+                                      </h3>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setTempWorkspaceTitle(resolvedTitle);
+                                          setEditingWorkspaceId(ev.id);
+                                        }}
+                                        className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
+                                      >
+                                        <Edit2 size={10} />
+                                        <span>Rename</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {ev.url && (() => {
+                                  let displayUrl = ev.url.startsWith("/workspace/") 
+                                    ? `Workspace Desk (${ev.id.substring(0, 8)})` 
+                                    : ev.url.replace(/^https?:\/\/(www\.)?/, "");
 
-                            return (
-                              <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[120px]">
-                                <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                                  isCompleted
-                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
-                                    : isCurrent
-                                    ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
-                                    : "border-border-main/60 text-txt-muted/60"
-                                }`}>
-                                  {isCompleted ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                  if (!ev.url.startsWith("/workspace/") && displayUrl.length > 30) {
+                                    displayUrl = displayUrl.substring(0, 30) + "...";
+                                  }
+
+                                  return (
+                                    <a 
+                                      href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
+                                      target="_blank" 
+                                      rel="noreferrer"
+                                      className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-base/40"
+                                    >
+                                      <span className="truncate leading-none">{displayUrl}</span>
+                                      <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
+                                    </a>
+                                  );
+                                })()}
+                              </div>
+
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                {isReordering && events.length > 1 && (
+                                  <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveWorkspace(evIndex, "up")}
+                                      disabled={evIndex === 0}
+                                      className={`p-1 rounded transition-colors ${
+                                        evIndex === 0 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                      }`}
+                                    >
+                                      <ChevronUp size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveWorkspace(evIndex, "down")}
+                                      disabled={evIndex === events.length - 1}
+                                      className={`p-1 rounded transition-colors ${
+                                        evIndex === events.length - 1 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                      }`}
+                                    >
+                                      <ChevronDown size={13} />
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
+                                  <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Milestone Diagram */}
+                            <div className="p-4 rounded-md border border-border-main/40 bg-bg-base/30 overflow-x-auto">
+                              <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
+                                <div className="absolute top-[10px] left-6 right-6 h-[2px] bg-border-main/50 z-0" />
+                                <motion.div 
+                                  className="absolute top-[10px] left-6 h-[2px] bg-accent-main z-0"
+                                  initial={false}
+                                  animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
+                                  transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                                />
+                                  
+                                {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
+                                  const isPassed = isDatePassed(stgObj.deadline);
+                                  const isCompleted = isPassed || idx < activeIdx;
+                                  const isCurrent = !isCompleted && idx === activeIdx;
+
+                                  return (
+                                    <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[120px]">
+                                      <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                                        isCompleted
+                                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                                          : isCurrent
+                                          ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
+                                          : "border-border-main/60 text-txt-muted/60"
+                                      }`}>
+                                        {isCompleted ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                      </div>
+
+                                      <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
+                                        isCurrent ? "text-accent-main font-bold" : isCompleted ? "text-emerald-400/90 font-medium" : "text-txt-muted/70"
+                                      }`}>
+                                        {stgObj.stage}
+                                      </span>
+
+                                      <span className={`text-[9px] font-mono ${isCompleted ? "text-emerald-400/80 font-medium" : isCurrent ? "text-accent-main/80 font-medium" : "text-txt-muted/60"}`}>
+                                        {isCompleted ? `Completed (${stgObj.deadline})` : `Target ${stgObj.deadline}`}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Actions row */}
+                            <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                                <div className="flex items-center gap-2 text-[10px] text-txt-muted flex-wrap">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin size={11} className="text-txt-muted/70" />
+                                    <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
+                                  </div>
+                                  {ev.level && (
+                                    <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
+                                      {ev.level}
+                                    </span>
+                                  )}
+                                  <select
+                                    value={ev.status || "development"}
+                                    onChange={(e) => handleUpdateWorkspaceStatus(ev.id, e.target.value as any)}
+                                    className="text-[8px] font-mono tracking-widest uppercase border border-border-main/50 px-1 py-0.5 rounded bg-bg-card text-accent-main font-semibold focus:outline-none cursor-pointer"
+                                  >
+                                    <option value="ideation">Ideation</option>
+                                    <option value="development">Development</option>
+                                    <option value="testing">Testing</option>
+                                    <option value="submitted">Submitted</option>
+                                  </select>
                                 </div>
 
-                                <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
-                                  isCurrent ? "text-accent-main font-bold" : isCompleted ? "text-emerald-400/90 font-medium" : "text-txt-muted/70"
-                                }`}>
-                                  {stgObj.stage}
-                                </span>
-
-                                <span className={`text-[9px] font-mono ${isCompleted ? "text-emerald-400/80 font-medium" : isCurrent ? "text-accent-main/80 font-medium" : "text-txt-muted/60"}`}>
-                                  {isCompleted ? `Completed (${stgObj.deadline})` : `Target ${stgObj.deadline}`}
-                                </span>
+                              <div className="flex gap-2">
+                                <button 
+                                  type="button"
+                                  onClick={() => setConfirmLeaveId(ev.id)}
+                                  className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
+                                >
+                                  <Trash2 size={11} />
+                                  <span>Leave</span>
+                                </button>
+                                <button 
+                                  onClick={() => handleOpenInviteModal(ev.id)}
+                                  className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                                >
+                                  Invite
+                                </button>
+                                <Link 
+                                  href={`/workspace/${ev.id}`}
+                                  className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                                >
+                                  Enter Workspace →
+                                </Link>
                               </div>
-                            );
-                          })}
+                            </div>
+
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* Opportunities Board Tab View */
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
+                  <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
+                    Recommended Contests &amp; Hackathons
+                  </span>
+                  <span className="text-[9px] font-mono text-txt-muted uppercase">
+                    {opportunities.length} Items Listed
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {opportunities.map((opp) => (
+                    <div key={opp.id} className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3 justify-between hover:border-txt-main/40 transition-colors">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <h3 className="font-display text-sm font-semibold text-txt-main leading-snug">{opp.title}</h3>
+                          {opp.facultyRecommended && (
+                            <span className="text-[8px] font-mono text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5 rounded uppercase font-bold shrink-0">
+                              Faculty Pick
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-txt-muted font-light leading-relaxed line-clamp-2">{opp.description}</p>
+                      </div>
+
+                      <div className="flex flex-col gap-3 border-t border-border-main/30 pt-3">
+                        <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted">
+                          <span>Deadline: {opp.deadline}</span>
+                          <span className="uppercase">{opp.location} · {opp.level}</span>
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                          <a
+                            href={opp.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-7 px-3 border border-border-main/60 hover:bg-bg-card text-txt-main text-[9px] font-mono uppercase tracking-wider rounded-sm flex items-center gap-1 font-semibold"
+                          >
+                            View Link <ExternalLink size={9} />
+                          </a>
+                          <button
+                            onClick={() => {
+                              setScraperUrl(opp.url);
+                              setNewEventTitle(opp.title);
+                              setNewEventDeadline(opp.deadline);
+                              setIsModalOpen(true);
+                            }}
+                            className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono uppercase tracking-wider rounded-sm flex items-center gap-1 font-bold cursor-pointer"
+                          >
+                            <Plus size={9} /> Track Desk
+                          </button>
                         </div>
                       </div>
-
-                  {/* Actions row */}
-                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                    <div className="flex items-center gap-2 text-[10px] text-txt-muted">
-                      <div className="flex items-center gap-1">
-                        <MapPin size={11} className="text-txt-muted/70" />
-                        <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
-                      </div>
-                      {ev.level && (
-                        <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
-                          {ev.level}
-                        </span>
-                      )}
                     </div>
-
-                    <div className="flex gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => setConfirmLeaveId(ev.id)}
-                        className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
-                      >
-                        <Trash2 size={11} />
-                        <span>Leave</span>
-                      </button>
-                      <button 
-                        onClick={() => handleOpenInviteModal(ev.id)}
-                        className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
-                      >
-                        Invite
-                      </button>
-                      <Link 
-                        href={`/workspace/${ev.id}`}
-                        className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
-                      >
-                        Enter Workspace →
-                      </Link>
-                    </div>
-                  </div>
-
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-          </div>
-
-          </section>
-
-          {/* C. Right Panel: Coding Platform Overview (3 Columns) */}
-          <section className="lg:col-span-3 flex flex-col gap-6">
-            
-            {/* Coding Platform Overview */}
-            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Coding Platform Overview</span>
-                {loadingCodingStats && (
-                  <RotateCw size={11} className="animate-spin text-accent-main" />
-                )}
+                  ))}
+                </div>
               </div>
-              
-              {(() => {
-                const meta = user?.user_metadata || {};
-                const lcUser = meta.leetcode_username || "";
-                const cfUser = meta.codeforces_username || "";
-                const ccUser = meta.codechef_username || "";
-                const unstopUser = meta.unstop_username || "";
-                const hasAnyLinked = lcUser || cfUser || ccUser || unstopUser;
-
-                if (hasAnyLinked) {
-                  return (
-                    <div className="flex flex-col gap-3">
-                      {lcUser && (
-                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-txt-main font-semibold">LeetCode</span>
-                            <span className="text-[10px] text-accent-main font-mono">@{lcUser}</span>
-                          </div>
-                          <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">
-                              {codingStats.leetcode?.solved !== undefined ? codingStats.leetcode.solved : (loadingCodingStats ? "..." : 0)}{" "}
-                              <span className="text-[9px] text-txt-muted uppercase font-normal">Solved</span>
-                            </span>
-                            <span className="text-[9px] font-mono text-txt-sub">
-                              {codingStats.leetcode?.rank || (codingStats.leetcode?.globalRank ? `Rank #${codingStats.leetcode.globalRank}` : (loadingCodingStats ? "Syncing..." : "Active"))}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {cfUser && (
-                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-txt-main font-semibold">Codeforces</span>
-                            <span className="text-[10px] text-accent-main font-mono">@{cfUser}</span>
-                          </div>
-                          <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">
-                              {codingStats.codeforces?.rating !== undefined ? codingStats.codeforces.rating : (loadingCodingStats ? "..." : 0)}{" "}
-                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
-                            </span>
-                            <span className="text-[9px] font-mono text-txt-sub">
-                              {codingStats.codeforces?.rank || (loadingCodingStats ? "Syncing..." : "Coder")}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {ccUser && (
-                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-txt-main font-semibold">CodeChef</span>
-                            <span className="text-[10px] text-accent-main font-mono">@{ccUser}</span>
-                          </div>
-                          <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">
-                              {codingStats.codechef?.rating !== undefined ? codingStats.codechef.rating : (loadingCodingStats ? "..." : 0)}{" "}
-                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
-                            </span>
-                            <span className="text-[9px] font-mono text-txt-sub">
-                              {codingStats.codechef?.stars || (loadingCodingStats ? "Syncing..." : "1★ Star")}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {unstopUser && (
-                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs text-txt-main font-semibold">Unstop</span>
-                            <span className="text-[10px] text-accent-main font-mono">@{unstopUser}</span>
-                          </div>
-                          <div className="flex justify-between items-baseline mt-1">
-                            <span className="text-base font-mono text-txt-main font-bold">6 <span className="text-[9px] text-txt-muted uppercase font-normal">Hacks</span></span>
-                            <span className="text-[9px] font-mono text-txt-sub">Rank #145</span>
-                          </div>
-                        </div>
-                      )}
-
-                      <Link 
-                        href="/coding-deck"
-                        className="h-8 bg-accent-main/10 hover:bg-accent-main/20 text-accent-main text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-colors border border-accent-main/30 font-bold"
-                      >
-                        Manage Coding Deck &rarr;
-                      </Link>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex flex-col gap-3 text-center py-2">
-                    <p className="text-[10px] text-txt-sub font-light leading-relaxed">
-                      Link LeetCode, Codeforces, CodeChef, and Unstop handles to display stats, ratings, and streaks here.
-                    </p>
-                    <Link 
-                      href="/coding-deck"
-                      className="h-8 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity font-bold"
-                    >
-                      Connect Platforms &rarr;
-                    </Link>
-                  </div>
-                );
-              })()}
-            </div>
-
+            )}
           </section>
-
         </main>
       )}
 
-      {/* 3. Footer */}
-      <footer className="h-12 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
-        <div>
-          © 2026 LYNDESK NETWORK INC.
-        </div>
-        <div className="flex gap-6 uppercase font-mono">
-          <Link href="/privacy" className="hover:text-txt-main transition-colors">Privacy</Link>
-          <Link href="/terms" className="hover:text-txt-main transition-colors">Terms</Link>
-          <span className="text-txt-muted select-none">LDK:SYS</span>
-        </div>
-      </footer>
+
 
       {/* ==================== SCRAPER ADD MODAL ==================== */}
       <AnimatePresence>
@@ -2414,6 +2377,7 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      <Footer />
     </div>
   );
 }

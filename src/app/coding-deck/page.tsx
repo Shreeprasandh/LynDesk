@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -742,13 +743,13 @@ export default function CodingDeckPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header component */}
       <Header />
 
       {/* Main scrolling section */}
-      <main className="flex-1 overflow-y-auto bg-bg-base/30 py-8 px-4 md:px-12 max-w-6xl w-full mx-auto flex flex-col gap-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-12 pt-6 pb-2 flex flex-col gap-6">
         
         <Link 
           href="/profile"
@@ -1327,8 +1328,7 @@ export default function CodingDeckPage() {
 
       </main>
 
-
-
+      <Footer />
     </div>
   );
 }

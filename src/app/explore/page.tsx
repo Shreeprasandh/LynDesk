@@ -1,245 +1,550 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
-import { 
-  ArrowLeft, 
-  Search, 
-  UserPlus, 
-  Check, 
-  Plus, 
-  Filter, 
-  MapPin, 
+import {
+  Search,
+  UserPlus,
+  Check,
+  Plus,
+  Filter,
+  MapPin,
   ExternalLink,
-  GraduationCap,
-  Trophy,
   Users,
+  Trophy,
   Award,
-  Sparkles
+  Sparkles,
+  UserCheck,
+  UserX,
+  Code,
+  Clock,
+  Shield,
+  ChevronRight,
+  GraduationCap,
+  Copy,
+  AlertTriangle,
 } from "lucide-react";
 
-interface ProfileItem {
-  id: string;
-  full_name: string;
-  username: string;
-  avatar_url: string;
-  skills: string;
-  bio: string;
-  college_name: string;
-  department: string;
-  isOpenToTeam: boolean;
-}
-
-interface HackathonItem {
+// Types for Events & Contests
+interface OpportunityItem {
   id: string;
   title: string;
+  category: "hackathon" | "contest" | "news";
   deadline: string;
   location: "online" | "in_person" | "hybrid";
   level: "local" | "national" | "global";
   url: string;
   description: string;
+  facultyRecommended?: boolean;
+}
+
+// Types for Friends & Network (exact match from legacy friends page)
+interface FriendProfile {
+  id: string;
+  username: string;
+  full_name: string;
+  avatar_url?: string;
+  academic_credits: number;
+  department?: string;
+  graduation_year?: string;
+  college_name?: string;
+  leetcode_username?: string;
+  codeforces_username?: string;
+  codechef_username?: string;
+  unstop_username?: string;
+  hack2skill_username?: string;
+  github_url?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+}
+
+interface Friendship {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: "pending" | "accepted" | "rejected";
+  sender_restricted?: boolean;
+  receiver_restricted?: boolean;
+  friend: FriendProfile;
 }
 
 export default function ExplorePage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"teammate_board" | "friends" | "news" | "directory">("teammate_board");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
+
+  // Two Main Sub-Tabs: "events" | "friends"
+  const [activeTab, setActiveTab] = useState<"events" | "friends">("events");
 
   // Sync tab state from URL query parameter
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const urlQuery = window.location.search;
+      const urlParams = new URLSearchParams(window.location.search);
+      const tab = urlParams.get("tab");
       queueMicrotask(() => {
-        if (urlQuery.includes("tab=friends")) setActiveTab("friends");
-        else if (urlQuery.includes("tab=news") || urlQuery.includes("tab=events") || urlQuery.includes("tab=contests")) setActiveTab("news");
-        else if (urlQuery.includes("tab=directory")) setActiveTab("directory");
-        else if (urlQuery.includes("tab=teammate_board") || urlQuery.includes("tab=matchmaking")) setActiveTab("teammate_board");
+        if (tab === "friends" || tab === "network" || tab === "classmates" || tab === "teammates") {
+          setActiveTab("friends");
+        } else if (tab === "events" || tab === "contests" || tab === "news" || tab === "hackathons") {
+          setActiveTab("events");
+        }
       });
     }
   }, []);
 
-  const [classmates, setClassmates] = useState<ProfileItem[]>([]);
-  const [events, setEvents] = useState<HackathonItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [connectionStates, setConnectionStates] = useState<{ [key: string]: "none" | "pending" | "connected" }>({});
-  const [invitingStates, setInvitingStates] = useState<{ [key: string]: boolean }>({});
-  const [modalMessage, setModalMessage] = useState<{ isOpen: boolean; title: string; text: string } | null>(null);
+  // ── EVENTS & CONTESTS STATE ─────────────────────────────────────────────
+  const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
+  const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [eventCategoryFilter, setEventCategoryFilter] = useState("");
 
+  const defaultEvents: OpportunityItem[] = [
+    {
+      id: "opp_1",
+      title: "MIT HackHarvard 2026",
+      category: "hackathon",
+      deadline: "Oct 12, 2026",
+      location: "hybrid",
+      level: "global",
+      url: "https://hackharvard.org",
+      description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+      facultyRecommended: true,
+    },
+    {
+      id: "opp_2",
+      title: "Google Code Jam / Summer of Code 2026",
+      category: "contest",
+      deadline: "Nov 01, 2026",
+      location: "online",
+      level: "global",
+      url: "https://summerofcode.withgoogle.com",
+      description: "Global algorithmic contest and open-source mentorship program sponsored by Google Open Source.",
+      facultyRecommended: true,
+    },
+    {
+      id: "opp_3",
+      title: "SIH (Smart India Hackathon) 2026 - Senior Edition",
+      category: "hackathon",
+      deadline: "Nov 20, 2026",
+      location: "in_person",
+      level: "national",
+      url: "https://sih.gov.in",
+      description: "Nationwide initiative to provide students a platform to solve pressing real-world problems.",
+      facultyRecommended: true,
+    },
+    {
+      id: "opp_4",
+      title: "LeetCode Biweekly Contest 142",
+      category: "contest",
+      deadline: "This Saturday",
+      location: "online",
+      level: "global",
+      url: "https://leetcode.com/contest",
+      description: "90-minute competitive programming contest with 4 algorithmic problems.",
+      facultyRecommended: false,
+    },
+  ];
 
-
-  // Fetch classmates and events
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // 1. Fetch profiles from database with Joined Institute Name (excluding logged in user)
-        let query = supabase
-          .from("profiles")
-          .select("*, institutes(name)");
-
-        if (user?.id) {
-          query = query.neq("id", user.id);
-        }
-
-        const { data: profiles, error } = await query.limit(20);
-
-        if (!error && profiles) {
-          const formatted: ProfileItem[] = profiles
-            .filter((p: any) => p.id !== user?.id)
-            .map((p: any) => ({
-              id: p.id,
-              full_name: p.full_name || "Student Engineer",
-              username: p.username || "student",
-              avatar_url: p.avatar_url || "",
-              skills: p.skills || (p.department?.toLowerCase().includes("design") ? "Figma, React, Tailwind, UI/UX" : "React, Next.js, TypeScript, Node.js"),
-              bio: p.bio || "Building clean codebases and minimal interfaces. Open to hackathons.",
-              college_name: p.institutes?.name || p.college_name || "Independent University",
-              department: p.department || "Computer Science",
-              isOpenToTeam: p.is_profile_public ?? true
-            }));
-          setClassmates(formatted);
-          setClassmates([]);
-        }
-
-        // 2. Fetch hackathons
-        const { data: dbEvents } = await supabase
-          .from("events")
-          .select("*")
-          .limit(10);
-
-        if (dbEvents && dbEvents.length > 0) {
-          const formattedEvents: HackathonItem[] = dbEvents.map(e => ({
-            id: e.id,
-            title: e.title,
-            deadline: new Date(e.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-            location: e.location as "online" | "in_person" | "hybrid",
-            level: e.level as "local" | "national" | "global",
-            url: e.source_url || "https://lyndesk.com",
-            description: e.description || "Official campus hackathon with university credit approval."
-          }));
-          setEvents(formattedEvents);
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("ldk_opportunities");
+      queueMicrotask(() => {
+        if (stored) {
+          try {
+            setOpportunities(JSON.parse(stored));
+          } catch {
+            setOpportunities(defaultEvents);
+          }
         } else {
-          setEvents([]);
+          setOpportunities(defaultEvents);
         }
+      });
+    }
+  }, []);
 
-      } catch (err) {
-        console.error("Explore fetch error: ", err);
-      } finally {
-        setLoading(false);
+  const filteredEvents = opportunities.filter((item) => {
+    const matchesSearch =
+      !eventSearchQuery.trim() ||
+      item.title.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(eventSearchQuery.toLowerCase());
+    const matchesCat = !eventCategoryFilter || item.category === eventCategoryFilter;
+    return matchesSearch && matchesCat;
+  });
+
+  // ── FRIENDS & NETWORK STATE (EXACT LEGACY FRIENDS SYSTEM) ────────────────
+  const [friendsSubTab, setFriendsSubTab] = useState<"friends" | "requests">("friends");
+
+  // Search States
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<FriendProfile[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+
+  // Lists
+  const [friendsList, setFriendsList] = useState<Friendship[]>([]);
+  const [requestsList, setRequestsList] = useState<Friendship[]>([]);
+  const [outgoingRequestsList, setOutgoingRequestsList] = useState<Friendship[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+
+  // Selected friend details
+  const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
+
+  // Custom Alert
+  const [customAlert, setCustomAlert] = useState<{
+    isOpen: boolean;
+    message: string;
+    onConfirm?: () => void;
+    showCancel?: boolean;
+  }>({
+    isOpen: false,
+    message: "",
+  });
+
+  const showCustomAlert = (message: string, onConfirm?: () => void, showCancel: boolean = false) => {
+    setCustomAlert({
+      isOpen: true,
+      message,
+      onConfirm,
+      showCancel,
+    });
+  };
+
+  // Fetch Friends and Requests from Supabase with Realtime
+  const triggerFetchList = useCallback(async () => {
+    if (!user) return;
+    setLoadingList(true);
+    try {
+      const { data, error } = await supabase
+        .from("friendships")
+        .select(`
+          id,
+          sender_id,
+          receiver_id,
+          status,
+          sender_restricted,
+          receiver_restricted,
+          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
+          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
+        `);
+
+      if (!error && data && data.length > 0) {
+        const friends: Friendship[] = [];
+        const requests: Friendship[] = [];
+        const outgoing: Friendship[] = [];
+
+        data.forEach((item: any) => {
+          const isSender = item.sender_id === user.id;
+          const partner = isSender ? item.receiver : item.sender;
+
+          const formattedFriend: FriendProfile = partner
+            ? {
+                id: partner.id,
+                username: partner.username || "user",
+                full_name: partner.full_name || "Teammate",
+                avatar_url: partner.avatar_url,
+                academic_credits: partner.academic_credits || 0,
+                department: partner.department,
+                graduation_year: partner.graduation_year,
+                leetcode_username: partner.leetcode_username,
+                codeforces_username: partner.codeforces_username,
+                codechef_username: partner.codechef_username,
+                unstop_username: partner.unstop_username,
+                hack2skill_username: partner.hack2skill_username,
+                github_url: partner.github_url,
+                linkedin_url: partner.linkedin_url,
+                portfolio_url: partner.portfolio_url,
+                college_name: partner.college_name,
+              }
+            : {
+                id: isSender ? item.receiver_id : item.sender_id,
+                username: "anonymous_peer",
+                full_name: "Anonymous Classmate",
+                academic_credits: 0,
+                department: "Engineering",
+              };
+
+          const friendshipObj: Friendship = {
+            id: item.id,
+            sender_id: item.sender_id,
+            receiver_id: item.receiver_id,
+            status: item.status,
+            sender_restricted: !!item.sender_restricted,
+            receiver_restricted: !!item.receiver_restricted,
+            friend: formattedFriend,
+          };
+
+          if (item.status === "accepted") {
+            friends.push(friendshipObj);
+          } else if (item.status === "pending") {
+            if (item.receiver_id === user.id) {
+              requests.push(friendshipObj);
+            } else {
+              outgoing.push(friendshipObj);
+            }
+          }
+        });
+
+        setFriendsList(friends);
+        setRequestsList(requests);
+        setOutgoingRequestsList(outgoing);
+      } else {
+        setFriendsList([]);
+        setRequestsList([]);
+        setOutgoingRequestsList([]);
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch friendship list: ", err);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [user]);
 
-    fetchData();
-  }, [user?.id]);
-
-  const handleConnect = (id: string) => {
-    setConnectionStates(prev => ({
-      ...prev,
-      [id]: prev[id] === "pending" ? "none" : "pending"
-    }));
+  // Realtime Supabase Subscription & Auto-Sync Metadata to Profiles Table
+  useEffect(() => {
+    if (!user) return;
     
-    // Simulate accepted connection request after 4 seconds
-    if (connectionStates[id] !== "pending") {
-      setTimeout(() => {
-        setConnectionStates(prev => ({
-          ...prev,
-          [id]: "connected"
-        }));
-      }, 4000);
+    // Sync current user auth metadata to local public profile cache
+    const meta = user.user_metadata || {};
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        `ldk_public_profile_${user.id}`,
+        JSON.stringify({
+          github_url: meta.github_url || "",
+          linkedin_url: meta.linkedin_url || "",
+          portfolio_url: meta.portfolio_url || "",
+          leetcode_username: meta.leetcode_username || "",
+          codeforces_username: meta.codeforces_username || "",
+          codechef_username: meta.codechef_username || "",
+          unstop_username: meta.unstop_username || "",
+          hack2skill_username: meta.hack2skill_username || "",
+          avatar_url: meta.avatar_url || meta.picture || "",
+          full_name: meta.full_name || "",
+          username: meta.username || "",
+          college_name: meta.college_name || "",
+          department: meta.department || "",
+          graduation_year: meta.graduation_year || "",
+        })
+      );
+    }
+    queueMicrotask(() => {
+      triggerFetchList();
+    });
+
+    const channel = supabase
+      .channel(`public:friendships:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        () => {
+          triggerFetchList();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, triggerFetchList]);
+
+  // Search users based on exact UID or username
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearchLoading(true);
+    setSearchMessage(null);
+    setSearchResults([]);
+
+    try {
+      let query = supabase.from("profiles").select("*");
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        searchQuery.trim()
+      );
+      if (isUUID) {
+        query = query.eq("id", searchQuery.trim());
+      } else {
+        query = query.ilike("username", `%${searchQuery.trim()}%`);
+      }
+
+      const { data, error } = await query.limit(5);
+
+      if (!error && data && data.length > 0) {
+        const filtered = data
+          .filter((p: any) => p.id !== user?.id)
+          .map((p: any) => ({
+            id: p.id,
+            username: p.username || "user",
+            full_name: p.full_name || "Teammate",
+            avatar_url: p.avatar_url,
+            academic_credits: p.academic_credits || 0,
+            department: p.department,
+            graduation_year: p.graduation_year,
+            leetcode_username: p.leetcode_username,
+            codeforces_username: p.codeforces_username,
+            codechef_username: p.codechef_username,
+            unstop_username: p.unstop_username,
+            hack2skill_username: p.hack2skill_username,
+            github_url: p.github_url,
+            linkedin_url: p.linkedin_url,
+            portfolio_url: p.portfolio_url,
+            college_name: p.college_name,
+          }));
+        setSearchResults(filtered);
+        if (filtered.length === 0) {
+          setSearchMessage("No users found matching query.");
+        }
+      } else {
+        setSearchMessage("No users found matching query.");
+      }
+    } catch (err) {
+      console.error("Search failed: ", err);
+      setSearchMessage("Error executing user directory query.");
+    } fontFinally: {
+      setSearchLoading(false);
     }
   };
 
-  const handleInviteToTeam = async (id: string) => {
-    setInvitingStates(prev => ({ ...prev, [id]: true }));
-    setTimeout(async () => {
-      setInvitingStates(prev => ({ ...prev, [id]: false }));
-      
-      const targetClassmate = classmates.find(c => c.id === id);
-      const name = targetClassmate ? targetClassmate.full_name : "Teammate";
-      const senderName = user?.user_metadata?.full_name || "A classmate";
-      
-      try {
-        let userSpaceId = "e1";
-        if (user?.id) {
-          const { data: memberSpaces } = await supabase
-            .from("project_members")
-            .select("project_space_id")
-            .eq("profile_id", user.id)
-            .limit(1);
+  // Send a Friend Request
+  const sendFriendRequest = async (receiverId: string) => {
+    if (!user) return;
 
-          if (memberSpaces && memberSpaces.length > 0) {
-            userSpaceId = memberSpaces[0].project_space_id;
-          }
-        }
+    const alreadyFriends = friendsList.some((f) => f.friend.id === receiverId);
+    const alreadyRequested =
+      requestsList.some((r) => r.friend.id === receiverId) ||
+      outgoingRequestsList.some((r) => r.friend.id === receiverId);
+    if (alreadyFriends || alreadyRequested) {
+      showCustomAlert("You are already connected or request is pending.");
+      return;
+    }
 
-        const targetUrl = `/workspace/${userSpaceId}?acceptInvite=${id}&friendName=${encodeURIComponent(name)}`;
-
-        try {
-          await fetch("/api/notifications/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              recipientId: id,
-              senderId: user?.id,
-              title: "Teammate Match Invite",
-              message: `${senderName} invited you to join their project team!`,
-              actionUrl: targetUrl,
-              type: "invite"
-            })
-          });
-        } catch (e) {
-          console.error("Error dispatching notification fetch: ", e);
-        }
-
-        const recipientKey = `ldk_user_notifications_${id}`;
-        const notifStored = localStorage.getItem(recipientKey);
-        const notifList = notifStored ? JSON.parse(notifStored) : [];
-        notifList.unshift({
-          id: `n_explore_invite_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          recipientId: id,
-          senderId: user?.id,
-          title: "Teammate Match Invite",
-          message: `${senderName} invited you to join their project team!`,
-          type: "invite",
-          category: "alerts",
-          time: "Just now",
-          read: false,
-          actionLabel: "Accept Invite",
-          actionUrl: targetUrl
-        });
-        localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
-        window.dispatchEvent(new Event("ldk_notifications_update"));
-      } catch (e) {
-        console.error("Failed to send notification: ", e);
-      }
-
-      setModalMessage({
-        isOpen: true,
-        title: "Invitation Sent",
-        text: `Invitation sent successfully to ${name}! They will receive a notification in their chat deck.`
+    try {
+      const { error } = await supabase.from("friendships").insert({
+        sender_id: user.id,
+        receiver_id: receiverId,
+        status: "pending",
       });
-    }, 1200);
+
+      if (!error) {
+        showCustomAlert("Friend request sent successfully!");
+        setSearchQuery("");
+        setSearchResults([]);
+        triggerFetchList();
+      } else {
+        showCustomAlert("Could not send request: " + error.message);
+      }
+    } catch (e: any) {
+      showCustomAlert("Friend request failed: " + e.message);
+    }
   };
 
-  // Filters logic
-  const filteredClassmates = classmates.filter(c => {
-    const skillsStr = Array.isArray(c.skills) ? c.skills.join(" ") : String(c.skills || "");
-    const matchesSearch = c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          skillsStr.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.username.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSkill = skillFilter === "" || skillsStr.toLowerCase().includes(skillFilter.toLowerCase());
-    return matchesSearch && matchesSkill;
-  });
+  // Respond to Friend Request (Accept or Reject)
+  const handleRequestResponse = async (friendshipId: string, accept: boolean) => {
+    if (!user) return;
+    try {
+      if (accept) {
+        const { error } = await supabase
+          .from("friendships")
+          .update({ status: "accepted" })
+          .eq("id", friendshipId);
 
-  const filteredEvents = events.filter(e => 
-    e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    e.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+        if (!error) {
+          showCustomAlert("Friend request accepted!");
+          triggerFetchList();
+        }
+      } else {
+        const { error } = await supabase
+          .from("friendships")
+          .delete()
+          .eq("id", friendshipId);
+
+        if (!error) {
+          showCustomAlert("Friend request rejected.");
+          triggerFetchList();
+        }
+      }
+    } catch (e: any) {
+      console.error("Action failed:", e);
+    }
+  };
+
+  // Toggle Restrict Friend Profile View
+  const toggleRestrictFriend = async (friendshipId: string, isCurrentlyRestricted: boolean) => {
+    if (!user) return;
+
+    const friendship = friendsList.find((f) => f.id === friendshipId);
+    if (!friendship) return;
+
+    const isSender = friendship.sender_id === user.id;
+    const updatePayload = isSender
+      ? { sender_restricted: !isCurrentlyRestricted }
+      : { receiver_restricted: !isCurrentlyRestricted };
+
+    try {
+      const { error } = await supabase
+        .from("friendships")
+        .update(updatePayload)
+        .eq("id", friendshipId);
+
+      if (!error) {
+        showCustomAlert(
+          !isCurrentlyRestricted
+            ? "Profile view restricted for this friend."
+            : "Profile view restriction lifted."
+        );
+        triggerFetchList();
+      }
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  // Confirm Removal of Friend
+  const handleRemoveFriendClick = () => {
+    if (!selectedFriend) return;
+    const friendship = friendsList.find((f) => f.friend.id === selectedFriend.id);
+    if (!friendship) return;
+
+    showCustomAlert(
+      `Are you sure you want to remove ${selectedFriend.full_name} from your friends list?`,
+      async () => {
+        try {
+          const { error } = await supabase
+            .from("friendships")
+            .delete()
+            .eq("id", friendship.id);
+
+          if (!error) {
+            setSelectedFriend(null);
+            triggerFetchList();
+          }
+        } catch (e: any) {
+          console.error(e);
+        }
+      },
+      true
+    );
+  };
+
+  // Derived properties for selected friend
+  const activeFriendship = selectedFriend
+    ? friendsList.find((f) => f.friend.id === selectedFriend.id)
+    : null;
+  const isSender = activeFriendship ? activeFriendship.sender_id === user?.id : false;
+  const isRestrictedByMe = activeFriendship
+    ? isSender
+      ? activeFriendship.sender_restricted
+      : activeFriendship.receiver_restricted
+    : false;
+  const isRestrictedByThem = activeFriendship
+    ? isSender
+      ? activeFriendship.receiver_restricted
+      : activeFriendship.sender_restricted
+    : false;
+
+  const handleRestrictClick = () => {
+    if (!activeFriendship) return;
+    toggleRestrictFriend(activeFriendship.id, !!isRestrictedByMe);
+  };
 
   if (authLoading) {
     return (
@@ -253,385 +558,710 @@ export default function ExplorePage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
-      
-      {/* Header (Unified Navigation & Notifications Drawer) */}
+    <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       <Header />
 
-      {/* Main content grid */}
-      <main className="flex-1 overflow-y-auto lg:overflow-hidden max-w-7xl w-full mx-auto px-6 md:px-12 py-6 flex flex-col gap-6">
-        
-        <Link 
-          href="/"
-          className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase self-start"
-        >
-          <ArrowLeft size={12} />
-          Back to Portal
-        </Link>
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-2 flex flex-col gap-6">
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-5 gap-4">
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Matchmaking Arena</span>
-            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Explore Campus Registry</h1>
-            <p className="text-xs text-txt-sub">Discover classmates, available team builders, and open hackathon stages.</p>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">
+              Discovery &amp; Networking Hub
+            </span>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">
+              Explore Arena
+            </h1>
+            <p className="text-xs text-txt-sub font-light">
+              Discover active hackathons, global contests, and connect with student developers across universities.
+            </p>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase flex-wrap gap-0.5">
-            <button 
-              onClick={() => { setActiveTab("teammate_board"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "teammate_board" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+          {/* TWO MAIN SUB-TABS */}
+          <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase">
+            <button
+              onClick={() => setActiveTab("events")}
+              className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "events"
+                  ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                  : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Teammate Board
+              <Trophy size={13} />
+              Events &amp; Contests
             </button>
-            <button 
-              onClick={() => { setActiveTab("friends"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "friends" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+            <button
+              onClick={() => setActiveTab("friends")}
+              className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 relative ${
+                activeTab === "friends"
+                  ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                  : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Friends & Network
-            </button>
-            <button 
-              onClick={() => { setActiveTab("news"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "news" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              News & Contests
-            </button>
-            <button 
-              onClick={() => { setActiveTab("directory"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "directory" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              Classmates
+              <Users size={13} />
+              Friends &amp; Network
+              {requestsList.length > 0 && (
+                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse ml-0.5" />
+              )}
             </button>
           </div>
         </div>
 
-        {/* Search and filter bar */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <div className="relative flex-1 w-full">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txt-muted" />
-            <input 
-              type="text"
-              placeholder={
-                activeTab === "news" 
-                  ? "Search hackathon stages or locations..." 
-                  : "Search classmates by name, skills, or username..."
-              }
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 border border-border-main/80 bg-bg-surface text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light"
-            />
-          </div>
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* SUB-TAB 1: EVENTS & CONTESTS                                       */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === "events" && (
+          <div className="flex flex-col gap-6 pb-12">
+            
+            {/* Filter & Search Bar */}
+            <div className="border border-border-main/70 bg-bg-surface p-4 rounded-md flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full sm:w-80">
+                <Search size={14} className="absolute left-3 top-3 text-txt-muted" />
+                <input
+                  type="text"
+                  value={eventSearchQuery}
+                  onChange={(e) => setEventSearchQuery(e.target.value)}
+                  placeholder="Search hackathons, contests, topics..."
+                  className="w-full h-10 pl-9 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                />
+              </div>
 
-          {activeTab !== "news" && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Filter size={12} className="text-txt-muted flex-shrink-0" />
-              <select
-                value={skillFilter}
-                onChange={(e) => setSkillFilter(e.target.value)}
-                className="h-11 px-3 border border-border-main/80 bg-bg-surface text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors w-full sm:w-44"
-              >
-                <option value="">All Skills</option>
-                <option value="react">React / Frontend</option>
-                <option value="rust">Rust / Systems</option>
-                <option value="figma">Figma / UI/UX</option>
-                <option value="python">Python / AI</option>
-              </select>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={eventCategoryFilter}
+                  onChange={(e) => setEventCategoryFilter(e.target.value)}
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono flex-1 sm:flex-none"
+                >
+                  <option value="">All Categories</option>
+                  <option value="hackathon">Hackathons</option>
+                  <option value="contest">Contests</option>
+                  <option value="news">Announcements</option>
+                </select>
+
+                <span className="text-[10px] font-mono text-txt-muted uppercase px-2 py-1 bg-bg-card rounded border border-border-main/60 shrink-0">
+                  {filteredEvents.length} Events Listed
+                </span>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Dynamic content rendering */}
-        {loading ? (
-          <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
-              {[1, 2, 3, 4].map(n => (
-                <div key={n} className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4 animate-pulse">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-border-main/20" />
-                      <div className="flex flex-col gap-2">
-                        <div className="h-3 w-28 bg-border-main/20 rounded-sm" />
-                        <div className="h-2.5 w-36 bg-border-main/10 rounded-sm" />
+            {/* Events Feed */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {filteredEvents.map((e) => (
+                <div
+                  key={e.id}
+                  className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col justify-between gap-4 hover:border-border-main transition-all duration-200"
+                >
+                  <div className="flex flex-col gap-3">
+                    {/* Badge Strip */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-[8px] font-mono tracking-widest uppercase px-2 py-0.5 rounded border ${
+                            e.category === "hackathon"
+                              ? "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                              : e.category === "contest"
+                              ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                              : "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                          }`}
+                        >
+                          {e.category}
+                        </span>
+                        <span className="text-[8px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
+                          {e.level}
+                        </span>
+                      </div>
+
+                      {e.facultyRecommended && (
+                        <span className="text-[8px] font-mono uppercase text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1 font-semibold">
+                          <GraduationCap size={10} /> Faculty Pick
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title & Description */}
+                    <div>
+                      <h3 className="font-display text-base font-semibold text-txt-main leading-snug">
+                        {e.title}
+                      </h3>
+                      <p className="text-xs text-txt-sub font-light leading-relaxed mt-1">
+                        {e.description}
+                      </p>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 text-[10px] font-mono">
+                      <div className="bg-bg-base/40 p-2.5 border border-border-main/50 rounded flex flex-col gap-0.5">
+                        <span className="text-txt-muted uppercase text-[8px]">Deadline</span>
+                        <span className="text-txt-main font-semibold">{e.deadline}</span>
+                      </div>
+                      <div className="bg-bg-base/40 p-2.5 border border-border-main/50 rounded flex flex-col gap-0.5">
+                        <span className="text-txt-muted uppercase text-[8px]">Location</span>
+                        <span className="text-txt-main font-semibold flex items-center gap-1">
+                          <MapPin size={9} /> {e.location}
+                        </span>
                       </div>
                     </div>
-                    <div className="h-4 w-14 bg-border-main/10 rounded-sm" />
                   </div>
-                  <div className="h-3 w-full bg-border-main/10 rounded-sm" />
-                  <div className="h-3 w-2/3 bg-border-main/10 rounded-sm" />
-                  <div className="flex gap-2 pt-2 border-t border-border-main/20">
-                    <div className="h-8 w-20 bg-border-main/20 rounded-sm" />
-                    <div className="h-8 w-20 bg-border-main/10 rounded-sm" />
+
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                    <Link
+                      href="/event-desk"
+                      className="text-[10px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1"
+                    >
+                      <Plus size={10} /> Create Team Workspace
+                    </Link>
+
+                    <a
+                      href={e.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="h-8 px-4 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] tracking-wider uppercase font-semibold rounded transition-opacity flex items-center gap-1.5"
+                    >
+                      Register / View Event <ExternalLink size={10} />
+                    </a>
                   </div>
                 </div>
               ))}
+
+              {filteredEvents.length === 0 && (
+                <div className="col-span-full border border-dashed border-border-main/60 bg-bg-surface p-12 text-center rounded-md font-mono text-xs text-txt-muted flex flex-col items-center gap-2">
+                  <Trophy size={20} className="text-txt-muted" />
+                  <span>No events match your current filter.</span>
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto pr-1">
-            
-            {/* 1. Teammate Board */}
-            {activeTab === "teammate_board" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-8">
-                {filteredClassmates.filter(c => c.isOpenToTeam).map(c => (
-                  <div key={c.id} className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-5 rounded flex flex-col gap-3.5 hover:border-border-main/80 transition-colors">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full border border-border-main/60 bg-bg-base flex items-center justify-center font-mono text-xs font-bold text-txt-main select-none">
-                          {c.full_name.charAt(0)}
+        )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* SUB-TAB 2: FRIENDS & NETWORK (FULL RESTORED FRIEND SYSTEM)         */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === "friends" && (
+          <div className="flex flex-col gap-6 pb-12">
+
+            {/* Top Bar: Copy UID + Search form */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* My UID Copy Badge */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.id);
+                    showCustomAlert("UID copied to clipboard!");
+                  }}
+                  className="font-mono text-[10px] uppercase text-txt-muted bg-bg-base border border-border-main/80 px-3 py-1.5 rounded hover:text-txt-main hover:border-border-main transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Click to copy your UID"
+                >
+                  <Copy size={11} className="text-accent-main" />
+                  <span>My UID: {user.id}</span>
+                </button>
+              </div>
+
+              {/* Search Form (by Username or exact UID) */}
+              <form onSubmit={handleSearch} className="flex gap-2 items-center flex-1 max-w-md">
+                <div className="relative flex-1">
+                  <Search size={14} className="absolute left-3 top-3 text-txt-muted" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search classmates by username or full UID..."
+                    className="w-full h-10 pl-9 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={searchLoading || !searchQuery.trim()}
+                  className="h-10 px-4 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded cursor-pointer disabled:opacity-40 transition-opacity shrink-0"
+                >
+                  {searchLoading ? "Searching..." : "Search"}
+                </button>
+              </form>
+            </div>
+
+            {/* Search Results Display Area */}
+            {searchResults.length > 0 && (
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">
+                  Search Results ({searchResults.length})
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {searchResults.map((p) => {
+                    const isAlreadyFriend = friendsList.some((f) => f.friend.id === p.id);
+                    const isPending =
+                      requestsList.some((r) => r.friend.id === p.id) ||
+                      outgoingRequestsList.some((r) => r.friend.id === p.id);
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main flex items-center justify-center font-mono text-sm font-bold text-txt-main">
+                            {p.full_name.charAt(0)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-semibold text-txt-main">
+                              {p.full_name}
+                            </span>
+                            <span className="text-[9px] text-txt-muted font-mono">
+                              @{p.username} • UID: {p.id.substring(0, 8)}...
+                            </span>
+                            {p.department && (
+                              <span className="text-[9px] text-txt-sub font-mono">{p.department}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-txt-main font-semibold truncate">{c.full_name}</span>
-                          <span className="text-[9px] text-txt-muted font-mono tracking-tight">@{c.username} • {c.college_name}</span>
-                        </div>
+
+                        <button
+                          onClick={() => sendFriendRequest(p.id)}
+                          disabled={isAlreadyFriend || isPending}
+                          className="h-8 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] uppercase font-bold rounded cursor-pointer disabled:opacity-40 shrink-0 transition-opacity flex items-center gap-1"
+                        >
+                          {isAlreadyFriend ? (
+                            <>
+                              <Check size={10} /> Friends
+                            </>
+                          ) : isPending ? (
+                            "Pending"
+                          ) : (
+                            <>
+                              <UserPlus size={10} /> Send Request
+                            </>
+                          )}
+                        </button>
                       </div>
-
-                      <span className="text-[8px] font-mono tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded uppercase font-semibold">
-                        Available
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-txt-sub font-light leading-relaxed">
-                      {c.bio}
-                    </p>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.skills.split(",").map((s, idx) => (
-                        <span key={idx} className="text-[8px] font-mono text-txt-muted border border-border-main/40 px-2 py-0.5 rounded bg-bg-base/40">
-                          {s.trim()}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="flex gap-2 border-t border-border-main/30 pt-3 mt-1 justify-end">
-                      <button 
-                        onClick={() => handleConnect(c.id)}
-                        className={`h-7 px-3 rounded font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer ${
-                          connectionStates[c.id] === "connected"
-                            ? "bg-bg-base text-emerald-400 border border-emerald-500/30 font-semibold"
-                            : connectionStates[c.id] === "pending"
-                            ? "bg-bg-base text-txt-muted border border-border-main/50"
-                            : "border border-border-main/60 text-txt-main hover:bg-bg-base"
-                        }`}
-                      >
-                        {connectionStates[c.id] === "connected" ? (
-                          <><Check size={10} /> Linked</>
-                        ) : connectionStates[c.id] === "pending" ? (
-                          "Pending"
-                        ) : (
-                          <><UserPlus size={10} /> Connect</>
-                        )}
-                      </button>
-                      
-                      <button 
-                        onClick={() => handleInviteToTeam(c.id)}
-                        disabled={invitingStates[c.id]}
-                        className="h-7 px-3.5 bg-accent-main/90 hover:bg-accent-main text-bg-base font-mono text-[9px] tracking-wider uppercase font-semibold rounded hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50"
-                      >
-                        {invitingStates[c.id] ? "Inviting..." : "Invite to Team"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {filteredClassmates.filter(c => c.isOpenToTeam).length === 0 && (
-                  <div className="col-span-2 text-center py-12 text-xs text-txt-muted font-light italic">
-                    No classmate candidates found matching this criteria.
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            {/* 2. Classmate Directory */}
-            {activeTab === "directory" && (
-              <div className="flex flex-col border border-border-main/60 bg-bg-surface rounded-md divide-y divide-border-main/60 pb-4">
-                {filteredClassmates.map(c => (
-                  <div key={c.id} className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-bg-card/20 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full border border-border-main bg-bg-card flex items-center justify-center font-mono text-sm font-bold text-txt-main select-none">
-                        {c.full_name.charAt(0)}
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xs text-txt-main font-semibold">{c.full_name}</span>
-                          <span className="text-[9px] text-txt-muted font-mono">@{c.username}</span>
-                        </div>
-                        <span className="text-[10px] text-txt-sub font-light">{c.department} • {c.college_name}</span>
-                        <span className="text-[9px] text-txt-muted font-mono mt-0.5 truncate max-w-sm sm:max-w-md">{c.skills}</span>
-                      </div>
-                    </div>
+            {searchMessage && (
+              <span className="text-[10px] font-mono text-amber-400/90 italic px-1">
+                {searchMessage}
+              </span>
+            )}
 
-                    <button 
-                      onClick={() => handleConnect(c.id)}
-                      className={`h-8 px-4 rounded-sm font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer w-full sm:w-auto justify-center ${
-                        connectionStates[c.id] === "connected"
-                          ? "bg-bg-card text-emerald-500 border border-border-main"
-                          : connectionStates[c.id] === "pending"
-                          ? "bg-bg-card text-txt-muted border border-border-main"
-                          : "border border-border-main/80 text-txt-main hover:bg-bg-card"
+            {/* Inner Friends Sub-Nav (My Friends vs Requests) */}
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3 gap-2">
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase">
+                <button
+                  onClick={() => setFriendsSubTab("friends")}
+                  className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
+                    friendsSubTab === "friends"
+                      ? "bg-bg-card text-txt-main font-bold border border-border-main"
+                      : "text-txt-sub hover:text-txt-main"
+                  }`}
+                >
+                  My Friends ({friendsList.length})
+                </button>
+                <button
+                  onClick={() => setFriendsSubTab("requests")}
+                  className={`px-4 py-1.5 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    friendsSubTab === "requests"
+                      ? "bg-bg-card text-txt-main font-bold border border-border-main"
+                      : "text-txt-sub hover:text-txt-main"
+                  }`}
+                >
+                  Requests
+                  {requestsList.length > 0 && (
+                    <span className="px-1.5 py-0.2 bg-amber-500/20 text-amber-400 rounded text-[9px] font-bold">
+                      {requestsList.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* MAIN FRIENDS & REQUESTS CONTENT */}
+            {friendsSubTab === "friends" ? (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Friends List (7 cols) */}
+                <div className="lg:col-span-7 flex flex-col gap-3">
+                  {friendsList.map((f) => (
+                    <div
+                      key={f.id}
+                      onClick={() => setSelectedFriend(f.friend)}
+                      className={`border p-4 rounded-md bg-bg-surface flex items-center justify-between cursor-pointer transition-all ${
+                        selectedFriend?.id === f.friend.id
+                          ? "border-accent-main ring-1 ring-accent-main/30"
+                          : "border-border-main/60 hover:border-border-main"
                       }`}
                     >
-                      {connectionStates[c.id] === "connected" ? (
-                        <><Check size={10} /> Linked</>
-                      ) : connectionStates[c.id] === "pending" ? (
-                        "Pending"
-                      ) : (
-                        <><UserPlus size={10} /> Connect</>
-                      )}
-                    </button>
-                  </div>
-                ))}
-
-                {filteredClassmates.length === 0 && (
-                  <div className="text-center py-12 text-xs text-txt-muted font-light italic">
-                    No classmates discovered in this department.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 3. News & Contests registry feed */}
-            {activeTab === "news" && (
-              <div className="flex flex-col gap-6 pb-8">
-                {/* Faculty Recommended Section */}
-                <div className="border border-amber-500/30 bg-amber-500/[0.04] p-5 sm:p-6 rounded-lg flex flex-col gap-4">
-                  <div className="flex items-center gap-2 text-amber-500 font-mono text-[10px] uppercase tracking-widest font-bold">
-                    <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                    <GraduationCap size={14} className="text-amber-500 shrink-0" />
-                    <span>Faculty Recommended Opportunities</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredEvents.slice(0, 2).map((opp) => (
-                      <div key={opp.id} className="border border-amber-500/20 bg-bg-surface/80 p-4 rounded flex flex-col gap-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-display text-xs font-bold text-txt-main">{opp.title}</span>
-                          <span className="text-[8px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0">
-                            Faculty Pick
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-bg-card border border-border-main/60 flex items-center justify-center font-mono text-sm font-bold text-txt-main">
+                          {f.friend.full_name.charAt(0)}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-txt-main">
+                            {f.friend.full_name}
+                          </span>
+                          <span className="text-[10px] font-mono text-txt-muted">
+                            @{f.friend.username} {f.friend.department ? `· ${f.friend.department}` : ""}
                           </span>
                         </div>
-                        <p className="text-[11px] text-txt-sub font-light line-clamp-2">{opp.description}</p>
-                        <div className="flex items-center justify-between mt-1 pt-2 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
-                          <span>Deadline: {opp.deadline}</span>
-                          <a href={opp.url} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
-                            Details <ExternalLink size={10} />
-                          </a>
-                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="flex items-center gap-3">
+                        {f.friend.academic_credits > 0 && (
+                          <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                            {f.friend.academic_credits} Credits
+                          </span>
+                        )}
+                        <ChevronRight size={14} className="text-txt-muted" />
+                      </div>
+                    </div>
+                  ))}
+
+                  {friendsList.length === 0 && !loadingList && (
+                    <div className="border border-dashed border-border-main/60 p-8 rounded-md text-center font-mono text-xs text-txt-muted flex flex-col items-center gap-2">
+                      <Users size={18} />
+                      <span>No friends connected yet. Use search above with classmate username or UID to connect.</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Main Opportunities Feed */}
-                <div className="flex flex-col gap-4">
-                  {filteredEvents.map(e => (
-                    <div key={e.id} className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300">
-                      <div className="flex justify-between items-start gap-4">
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="font-display text-base font-semibold text-txt-main">{e.title}</h3>
-                            <span className="text-[8px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-                              {e.level}
-                            </span>
-                          </div>
-                          <a 
-                            href={e.url} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-[9px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
-                          >
-                            {e.url}
-                            <ExternalLink size={10} />
-                          </a>
-                        </div>
+                {/* Selected Friend Detailed Overview Panel (5 cols) */}
+                <div className="lg:col-span-5 border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                  {selectedFriend ? (
+                    (() => {
+                      // Multi-layer fail-safe resolution: selectedFriend -> Profile Draft -> Public Cache -> Auth Metadata
+                      const isSelf = selectedFriend.id === user.id;
+                      const meta = isSelf ? (user.user_metadata || {}) : {};
+                      
+                      let draft: any = {};
+                      let publicCached: any = {};
+                      
+                      if (typeof window !== "undefined") {
+                        try {
+                          const draftRaw = localStorage.getItem(`ldk_profile_draft_${selectedFriend.id}`);
+                          if (draftRaw) draft = JSON.parse(draftRaw);
+                          const pubRaw = localStorage.getItem(`ldk_public_profile_${selectedFriend.id}`);
+                          if (pubRaw) publicCached = JSON.parse(pubRaw);
+                        } catch {}
+                      }
 
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                          <span className="text-xs text-txt-main font-semibold">{e.deadline}</span>
+                      const avatar =
+                        selectedFriend.avatar_url ||
+                        draft.avatarUrl ||
+                        draft.avatar_url ||
+                        publicCached.avatar_url ||
+                        meta.avatar_url ||
+                        meta.picture ||
+                        "";
+
+                      const leetcode =
+                        selectedFriend.leetcode_username ||
+                        draft.leetcodeUsername ||
+                        draft.leetcode_username ||
+                        publicCached.leetcode_username ||
+                        meta.leetcode_username ||
+                        "";
+
+                      const codeforces =
+                        selectedFriend.codeforces_username ||
+                        draft.codeforcesUsername ||
+                        draft.codeforces_username ||
+                        publicCached.codeforces_username ||
+                        meta.codeforces_username ||
+                        "";
+
+                      const codechef =
+                        selectedFriend.codechef_username ||
+                        draft.codechefUsername ||
+                        draft.codechef_username ||
+                        publicCached.codechef_username ||
+                        meta.codechef_username ||
+                        "";
+
+                      const unstop =
+                        selectedFriend.unstop_username ||
+                        draft.unstopUsername ||
+                        draft.unstop_username ||
+                        publicCached.unstop_username ||
+                        meta.unstop_username ||
+                        "";
+
+                      const hack2skill =
+                        selectedFriend.hack2skill_username ||
+                        draft.hack2skillUsername ||
+                        draft.hack2skill_username ||
+                        publicCached.hack2skill_username ||
+                        meta.hack2skill_username ||
+                        "";
+
+                      const github =
+                        selectedFriend.github_url ||
+                        draft.githubUrl ||
+                        draft.github_url ||
+                        publicCached.github_url ||
+                        meta.github_url ||
+                        "";
+
+                      const linkedin =
+                        selectedFriend.linkedin_url ||
+                        draft.linkedinUrl ||
+                        draft.linkedin_url ||
+                        publicCached.linkedin_url ||
+                        meta.linkedin_url ||
+                        "";
+
+                      const portfolio =
+                        selectedFriend.portfolio_url ||
+                        draft.portfolioUrl ||
+                        draft.portfolio_url ||
+                        publicCached.portfolio_url ||
+                        meta.portfolio_url ||
+                        "";
+
+                      return (
+                        <>
+                          <div className="flex items-center gap-3 border-b border-border-main/40 pb-4">
+                            <div className="w-12 h-12 rounded-full bg-bg-card border border-border-main overflow-hidden flex items-center justify-center font-mono text-base font-bold text-txt-main shrink-0">
+                              {avatar ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={avatar} alt={selectedFriend.full_name} className="w-full h-full object-cover" />
+                              ) : (
+                                selectedFriend.full_name.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <h4 className="text-sm font-semibold text-txt-main truncate">
+                                {selectedFriend.full_name}
+                              </h4>
+                              <span className="text-[10px] font-mono text-txt-muted truncate">
+                                @{selectedFriend.username}
+                              </span>
+                              {selectedFriend.college_name && (
+                                <span className="text-[9px] font-mono text-txt-sub truncate">
+                                  {selectedFriend.college_name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Restricted Profile Notice */}
+                          {isRestrictedByThem ? (
+                            <div className="p-4 border border-amber-500/30 bg-amber-500/[0.04] rounded text-center flex flex-col items-center gap-1 text-amber-400 font-mono text-[10px]">
+                              <AlertTriangle size={16} />
+                              <span>This friend has restricted full profile stats view.</span>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Academic Credits */}
+                              <div className="bg-bg-base/40 p-3 border border-border-main/50 rounded flex items-center justify-between text-xs font-mono">
+                                <span className="text-txt-sub">Academic Credits</span>
+                                <span className="text-amber-400 font-bold">
+                                  {selectedFriend.academic_credits} pts
+                                </span>
+                              </div>
+
+                              {/* Competitive Handles */}
+                              <div className="flex flex-col gap-2 pt-2 border-t border-border-main/30">
+                                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                                  Competitive Handles
+                                </span>
+                                {leetcode || codeforces || codechef || unstop || hack2skill ? (
+                                  <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                                    {leetcode && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">LeetCode</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{leetcode}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {codeforces && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">Codeforces</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{codeforces}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {codechef && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">CodeChef</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{codechef}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {unstop && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">Unstop</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{unstop}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {hack2skill && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">Hack2Skill</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{hack2skill}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] font-mono text-txt-muted italic">No handles connected</span>
+                                )}
+                              </div>
+
+                              {/* Codebases & Links */}
+                              <div className="flex flex-col gap-2 pt-2 border-t border-border-main/30 text-xs font-mono">
+                                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                                  Verified Repos &amp; Links
+                                </span>
+                                <div className="flex flex-col gap-1.5">
+                                  {github ? (
+                                    <a
+                                      href={github}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-txt-main hover:underline truncate flex items-center justify-between text-[10px]"
+                                    >
+                                      <span>GitHub Profile</span> <ExternalLink size={9} />
+                                    </a>
+                                  ) : (
+                                    <span className="text-[10px] text-txt-muted italic">GitHub: Not linked</span>
+                                  )}
+
+                                  {linkedin ? (
+                                    <a
+                                      href={linkedin}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-txt-main hover:underline truncate flex items-center justify-between text-[10px]"
+                                    >
+                                      <span>LinkedIn Profile</span> <ExternalLink size={9} />
+                                    </a>
+                                  ) : (
+                                    <span className="text-[10px] text-txt-muted italic">LinkedIn: Not linked</span>
+                                  )}
+
+                                  {portfolio ? (
+                                    <a
+                                      href={portfolio}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-txt-main hover:underline truncate flex items-center justify-between text-[10px]"
+                                    >
+                                      <span>Portfolio Website</span> <ExternalLink size={9} />
+                                    </a>
+                                  ) : (
+                                    <span className="text-[10px] text-txt-muted italic">Portfolio: Not linked</span>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Action Toggles for Restriction / Removal */}
+                          {activeFriendship && (
+                            <div className="flex justify-between items-center mt-2 pt-4 border-t border-border-main/20 text-[9px] font-mono uppercase">
+                              <button
+                                onClick={handleRestrictClick}
+                                className="text-txt-muted hover:text-red-400 opacity-65 hover:opacity-100 transition-all cursor-pointer select-none"
+                              >
+                                {isRestrictedByMe ? "Lift profile restriction" : "Restrict profile view"}
+                              </button>
+                              <button
+                                onClick={handleRemoveFriendClick}
+                                className="text-txt-muted hover:text-red-500 opacity-65 hover:opacity-100 transition-all cursor-pointer select-none font-semibold"
+                              >
+                                Remove Friend
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
+                  ) : (
+                    <div className="py-12 text-center text-xs font-mono text-txt-muted flex flex-col items-center gap-2">
+                      <Code size={16} />
+                      <span>Select a friend from the left list to view their handles, credits, and codebases.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* REQUESTS TAB */
+              <div className="flex flex-col gap-5 max-w-2xl">
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-txt-muted font-bold">
+                    Incoming Friend Requests ({requestsList.length})
+                  </span>
+
+                  {requestsList.map((r) => (
+                    <div
+                      key={r.id}
+                      className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-bg-card border border-border-main flex items-center justify-center font-mono text-xs font-bold text-txt-main">
+                          {r.friend.full_name.charAt(0)}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-txt-main">
+                            {r.friend.full_name}
+                          </span>
+                          <span className="text-[10px] font-mono text-txt-muted">
+                            @{r.friend.username} {r.friend.department ? `· ${r.friend.department}` : ""}
+                          </span>
                         </div>
                       </div>
 
-                      <p className="text-xs text-txt-sub font-light leading-relaxed">
-                        {e.description}
-                      </p>
-
-                      <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                        <div className="flex items-center gap-1.5 text-[9px] text-txt-muted font-mono uppercase">
-                          <MapPin size={10} />
-                          {e.location}
-                        </div>
-
-                        <button className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] tracking-wider uppercase transition-opacity cursor-pointer flex items-center gap-1">
-                          <Plus size={10} /> Track Event Vault
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleRequestResponse(r.id, true)}
+                          className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] uppercase font-bold rounded cursor-pointer transition-opacity flex items-center gap-1"
+                        >
+                          <UserCheck size={11} /> Accept
+                        </button>
+                        <button
+                          onClick={() => handleRequestResponse(r.id, false)}
+                          className="h-7 px-3 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[9px] uppercase rounded cursor-pointer transition-colors"
+                        >
+                          Decline
                         </button>
                       </div>
                     </div>
                   ))}
 
-                  {filteredEvents.length === 0 && (
-                    <div className="text-center py-12 text-xs text-txt-muted font-light italic">
-                      No opportunities matched your query.
-                    </div>
+                  {requestsList.length === 0 && (
+                    <span className="text-xs font-mono text-txt-muted italic py-2">
+                      No incoming requests pending.
+                    </span>
                   )}
                 </div>
-              </div>
-            )}
 
-            {/* 4. Friends & Network tab */}
-            {activeTab === "friends" && (
-              <div className="flex flex-col gap-6 pb-8">
-                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Users size={16} className="text-accent-main" />
-                      <span className="font-display text-sm font-semibold text-txt-main">Your Student Network</span>
-                    </div>
-                    <span className="text-[10px] font-mono text-txt-muted">
-                      {filteredClassmates.filter(c => connectionStates[c.id] === "connected").length} Connected Peers
+                {outgoingRequestsList.length > 0 && (
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-txt-muted font-bold">
+                      Sent Requests Pending ({outgoingRequestsList.length})
                     </span>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredClassmates.map(c => (
-                      <div key={c.id} className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-full border border-border-main bg-bg-card flex items-center justify-center font-mono text-xs font-bold text-txt-main">
-                            {c.full_name.charAt(0)}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-semibold text-txt-main truncate">{c.full_name}</span>
-                            <span className="text-[9px] font-mono text-txt-muted">@{c.username} • {c.department}</span>
-                          </div>
-                        </div>
-
-                        <button 
-                          onClick={() => handleConnect(c.id)}
-                          className={`h-7 px-3 rounded font-mono text-[9px] tracking-wider uppercase transition-colors shrink-0 ${
-                            connectionStates[c.id] === "connected"
-                              ? "bg-bg-base text-emerald-400 border border-emerald-500/30 font-semibold"
-                              : connectionStates[c.id] === "pending"
-                              ? "bg-bg-base text-txt-muted border border-border-main/50"
-                              : "border border-border-main/60 text-txt-main hover:bg-bg-base"
-                          }`}
+                    {outgoingRequestsList.map((o) => (
+                      <div
+                        key={o.id}
+                        className="border border-border-main/50 bg-bg-base/40 p-3.5 rounded flex items-center justify-between text-xs font-mono"
+                      >
+                        <span className="text-txt-main">@{o.friend.username}</span>
+                        <button
+                          onClick={() => handleRequestResponse(o.id, false)}
+                          className="text-[9px] uppercase text-txt-muted hover:text-red-400 transition-colors"
                         >
-                          {connectionStates[c.id] === "connected" ? "Linked" : connectionStates[c.id] === "pending" ? "Pending" : "Connect"}
+                          Cancel Request
                         </button>
                       </div>
                     ))}
                   </div>
-
-                  {filteredClassmates.length === 0 && (
-                    <div className="text-center py-8 text-xs text-txt-muted italic">
-                      No connections found in your network.
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             )}
 
@@ -640,37 +1270,44 @@ export default function ExplorePage() {
 
       </main>
 
-      {/* Custom Themed Alert Modal */}
-      {modalMessage?.isOpen && (
-        <div className="fixed inset-0 z-[15000] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-            onClick={() => setModalMessage(null)}
-          />
-          
-          {/* Modal Container */}
-          <div className="relative w-full max-w-sm border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl animate-fade-in flex flex-col gap-5 z-10">
-            <div className="flex flex-col gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">System Notification</span>
-              <h3 className="text-sm font-semibold text-txt-main">{modalMessage.title}</h3>
-              <p className="text-xs text-txt-muted font-light leading-relaxed">
-                {modalMessage.text}
+      {/* Custom Alert Modal */}
+      {customAlert.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="bg-bg-surface border border-border-main max-w-sm w-full mx-4 p-6 rounded-md shadow-2xl flex flex-col gap-4 font-mono">
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                System Notification
+              </span>
+              <p className="text-xs text-txt-main font-light leading-relaxed mt-2 whitespace-pre-line">
+                {customAlert.message}
               </p>
             </div>
-            
-            <div className="flex justify-end font-mono text-[10px] uppercase tracking-wider">
+            <div className="flex justify-end gap-2 mt-2 text-[9px] uppercase">
+              {customAlert.showCancel && (
+                <button
+                  onClick={() => setCustomAlert((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-4 h-8 border border-border-main hover:bg-bg-card text-txt-main rounded cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
               <button
-                onClick={() => setModalMessage(null)}
-                className="px-4 py-2 bg-accent-main text-bg-base font-bold rounded-sm transition-colors cursor-pointer"
+                onClick={() => {
+                  setCustomAlert((prev) => ({ ...prev, isOpen: false }));
+                  if (customAlert.onConfirm) {
+                    customAlert.onConfirm();
+                  }
+                }}
+                className="px-4 h-8 bg-accent-main hover:opacity-90 text-bg-base rounded font-bold cursor-pointer"
               >
-                Acknowledge
+                OK
               </button>
             </div>
           </div>
         </div>
       )}
 
+      <Footer />
     </div>
   );
 }

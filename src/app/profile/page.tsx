@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { 
   ArrowLeft, 
   Save, 
@@ -1027,13 +1028,49 @@ export default function ProfilePage() {
             username: cleanUsername,
             full_name: cleanFullName,
             department: cleanDept,
+            college_name: cleanCollege || null,
             college_key: collegeKey.trim() || null,
+            avatar_url: avatarUrl || null,
+            github_url: githubUrl.trim() || null,
+            linkedin_url: linkedinUrl.trim() || null,
+            portfolio_url: portfolioUrl.trim() || null,
+            leetcode_username: leetcodeUsername.trim() || null,
+            codeforces_username: codeforcesUsername.trim() || null,
+            codechef_username: codechefUsername.trim() || null,
+            unstop_username: unstopUsername.trim() || null,
+            hack2skill_username: hack2skillUsername.trim() || null,
+            graduation_year: gradYear.trim() || null,
             updated_at: new Date().toISOString()
           })
           .eq("id", user.id);
 
         if (profileError) {
-          console.warn("Profiles table upsert failed (database RLS/Schema). Proceeding with Auth Metadata fallback.", profileError);
+          console.warn("Profiles table update note:", profileError);
+        }
+
+        // Save public profile cache for instant cross-component discovery
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            `ldk_public_profile_${user.id}`,
+            JSON.stringify({
+              username: cleanUsername,
+              full_name: cleanFullName,
+              department: cleanDept,
+              college_name: cleanCollege,
+              avatar_url: avatarUrl,
+              bio: bio.trim(),
+              skills: cleanSkills,
+              github_url: githubUrl.trim(),
+              linkedin_url: linkedinUrl.trim(),
+              portfolio_url: portfolioUrl.trim(),
+              leetcode_username: leetcodeUsername.trim(),
+              codeforces_username: codeforcesUsername.trim(),
+              codechef_username: codechefUsername.trim(),
+              unstop_username: unstopUsername.trim(),
+              hack2skill_username: hack2skillUsername.trim(),
+              graduation_year: gradYear.trim(),
+            })
+          );
         }
       } catch (dbErr) {
         console.warn("Database profiles table write exception. Proceeding with Auth Metadata fallback.", dbErr);
@@ -2490,6 +2527,7 @@ export default function ProfilePage() {
         </div>
       )}
 
+      <Footer />
     </div>
   );
 }
