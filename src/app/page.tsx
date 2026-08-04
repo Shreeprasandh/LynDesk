@@ -152,24 +152,29 @@ export default function Home() {
         dbProfile = data;
       } catch {}
 
-      // Read draft from localStorage
+      // Read draft & public profile from localStorage
       let draft: any = {};
+      let publicProf: any = {};
+      let localAvatar = "";
       if (typeof window !== "undefined") {
         try {
           const rawDraft = localStorage.getItem(`ldk_profile_draft_${user.id}`);
           if (rawDraft) draft = JSON.parse(rawDraft);
+          const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+          if (rawPublic) publicProf = JSON.parse(rawPublic);
+          localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
         } catch {}
       }
 
-      const fullName = dbProfile?.full_name || draft.fullName || meta.full_name || "Developer";
-      const username = dbProfile?.username || draft.username || meta.username || "student";
-      const avatarUrl = dbProfile?.avatar_url || draft.avatarUrl || meta.avatar_url || meta.picture || "";
-      const collegeName = dbProfile?.college_name || draft.collegeName || meta.college_name || "University Student";
-      const department = dbProfile?.department || draft.department || meta.department || "Computer Science";
-      const lcHandle = dbProfile?.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || handle || "";
-      const ghUrl = dbProfile?.github_url || draft.githubUrl || meta.github_url || "";
-      const liUrl = draft.linkedinUrl || meta.linkedin_url || "";
-      const pfUrl = draft.portfolioUrl || meta.portfolio_url || "";
+      const fullName = dbProfile?.full_name || publicProf.full_name || draft.fullName || meta.full_name || "Developer";
+      const username = dbProfile?.username || publicProf.username || draft.username || meta.username || "student";
+      const avatarUrl = dbProfile?.avatar_url || publicProf.avatar_url || draft.avatarUrl || draft.avatar_url || meta.avatar_url || meta.picture || localAvatar || "";
+      const collegeName = dbProfile?.college_name || publicProf.college_name || draft.collegeName || meta.college_name || "University Student";
+      const department = dbProfile?.department || publicProf.department || draft.department || meta.department || "Computer Science";
+      const lcHandle = dbProfile?.leetcode_username || publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || handle || "";
+      const ghUrl = dbProfile?.github_url || publicProf.github_url || draft.githubUrl || meta.github_url || "";
+      const liUrl = publicProf.linkedin_url || draft.linkedinUrl || meta.linkedin_url || "";
+      const pfUrl = publicProf.portfolio_url || draft.portfolioUrl || meta.portfolio_url || "";
 
       setProfile({
         full_name: fullName,

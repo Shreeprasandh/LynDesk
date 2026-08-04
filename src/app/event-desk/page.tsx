@@ -852,7 +852,20 @@ export default function Home() {
   ];
 
   // Derivations for profile picture and username
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+  const avatarUrl = (() => {
+    if (typeof window !== "undefined" && user?.id) {
+      try {
+        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (rawPublic) {
+          const parsed = JSON.parse(rawPublic);
+          if (parsed?.avatar_url) return parsed.avatar_url;
+        }
+      } catch {}
+      const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
+      if (localAvatar) return localAvatar;
+    }
+    return user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+  })();
   const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
   const activeCoworkers = (coworkers.length > 0 ? coworkers : fallbackCoworkers).filter(

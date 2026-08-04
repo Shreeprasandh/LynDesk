@@ -1071,6 +1071,9 @@ export default function ProfilePage() {
               graduation_year: gradYear.trim(),
             })
           );
+          if (avatarUrl) {
+            localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
+          }
         }
       } catch (dbErr) {
         console.warn("Database profiles table write exception. Proceeding with Auth Metadata fallback.", dbErr);

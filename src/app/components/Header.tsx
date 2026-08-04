@@ -816,15 +816,36 @@ export default function Header() {
               {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
             </button>
             
-            {user && (
-              <>
-                <Link 
-                  href="/profile"
-                  className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center"
-                  title="View Profile"
-                >
-                  <User size={14} />
-                </Link>
+            {user && (() => {
+              const headerAvatarUrl = typeof window !== "undefined" && user?.id
+                ? (
+                    (() => {
+                      try {
+                        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+                        if (rawPublic) {
+                          const parsed = JSON.parse(rawPublic);
+                          if (parsed?.avatar_url) return parsed.avatar_url;
+                        }
+                      } catch {}
+                      return localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
+                    })() || user?.user_metadata?.avatar_url || user?.user_metadata?.picture || ""
+                  )
+                : user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+
+              return (
+                <>
+                  <Link 
+                    href="/profile"
+                    className="p-1 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden w-8 h-8 shrink-0"
+                    title="View Profile"
+                  >
+                    {headerAvatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={headerAvatarUrl} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                    ) : (
+                      <User size={14} />
+                    )}
+                  </Link>
                 <button 
                   onClick={() => setShowLogoutConfirm(true)}
                   className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
@@ -842,7 +863,8 @@ export default function Header() {
                   <Menu size={14} />
                 </button>
               </>
-            )}
+              );
+            })()}
           </div>
         </div>
       </header>
