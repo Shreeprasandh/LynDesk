@@ -83,6 +83,7 @@ export default function CodingDeckPage() {
     setInputLcHandle(cleanHandle);
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_leetcode_handle", cleanHandle);
+      if (user?.id) localStorage.setItem(`ldk_leetcode_handle_${user.id}`, cleanHandle);
     }
 
     if (user) {

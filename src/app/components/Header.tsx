@@ -389,15 +389,54 @@ export default function Header() {
 
       setNotifications(finalNotifs);
 
-      // Check live LeetCode daily challenge status for streak warning
-      const lcHandle = user?.user_metadata?.leetcode_username || 
-                       user?.user_metadata?.leetcode || 
-                       (typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") : "");
+      // Check live LeetCode daily challenge status for streak warning ONLY if user has connected a LeetCode handle
+      const lcHandle = (user?.user_metadata?.leetcode_username || 
+                        user?.user_metadata?.leetcode || 
+                        (typeof window !== "undefined" && user?.id ? localStorage.getItem(`ldk_leetcode_handle_${user.id}`) : "") || 
+                        "").trim();
+
+      if (!lcHandle) {
+        // User has NOT connected LeetCode: purge any streak warning notifications!
+        setNotifications(prev => prev.filter(n => 
+          !n.id.startsWith("notif_streak_warning_") && 
+          !n.title?.includes("Streak at Risk") && 
+          !n.title?.includes("LeetCode Daily Challenge Pending")
+        ));
+        if (typeof window !== "undefined") {
+          const globalStored = localStorage.getItem("ldk_global_notifications");
+          if (globalStored) {
+            try {
+              const parsed = JSON.parse(globalStored);
+              const cleaned = parsed.filter((n: any) => 
+                !n.id?.startsWith("notif_streak_warning_") && 
+                !n.title?.includes("Streak at Risk") && 
+                !n.title?.includes("LeetCode Daily Challenge Pending")
+              );
+              localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+            } catch {}
+          }
+          if (user?.id) {
+            const uStored = localStorage.getItem(`ldk_user_notifications_${user.id}`);
+            if (uStored) {
+              try {
+                const parsedU = JSON.parse(uStored);
+                const cleanedU = parsedU.filter((n: any) => 
+                  !n.id?.startsWith("notif_streak_warning_") && 
+                  !n.title?.includes("Streak at Risk") && 
+                  !n.title?.includes("LeetCode Daily Challenge Pending")
+                );
+                localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(cleanedU));
+              } catch {}
+            }
+          }
+        }
+        return;
+      }
 
       try {
-        const res = await fetch(`/api/coding-stats?platform=leetcode&username=${encodeURIComponent(lcHandle || "Shreeprasandh")}`);
+        const res = await fetch(`/api/coding-stats?platform=leetcode&username=${encodeURIComponent(lcHandle)}`);
         let dailyChallenge = null;
-        let streakCount = 3;
+        let streakCount = 0;
 
         if (res.ok) {
           const data = await res.json();
@@ -444,8 +483,8 @@ export default function Header() {
             }
           }
         } else {
-          const title = dailyChallenge?.title || "Find Missing Elements";
-          const diff = dailyChallenge?.difficulty || "Easy";
+          const title = dailyChallenge?.title || "Daily Coding Challenge";
+          const diff = dailyChallenge?.difficulty || "Medium";
 
           const streakNotif: NotificationItem = {
             id: streakNotifId,
