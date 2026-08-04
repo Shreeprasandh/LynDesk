@@ -13,7 +13,12 @@ import {
   Plus, 
   Filter, 
   MapPin, 
-  ExternalLink
+  ExternalLink,
+  GraduationCap,
+  Trophy,
+  Users,
+  Award,
+  Sparkles
 } from "lucide-react";
 
 interface ProfileItem {
@@ -40,9 +45,22 @@ interface HackathonItem {
 
 export default function ExplorePage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"teammate_board" | "directory" | "events">("teammate_board");
+  const [activeTab, setActiveTab] = useState<"teammate_board" | "friends" | "news" | "directory">("teammate_board");
   const [searchQuery, setSearchQuery] = useState("");
   const [skillFilter, setSkillFilter] = useState("");
+
+  // Sync tab state from URL query parameter
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlQuery = window.location.search;
+      queueMicrotask(() => {
+        if (urlQuery.includes("tab=friends")) setActiveTab("friends");
+        else if (urlQuery.includes("tab=news") || urlQuery.includes("tab=events") || urlQuery.includes("tab=contests")) setActiveTab("news");
+        else if (urlQuery.includes("tab=directory")) setActiveTab("directory");
+        else if (urlQuery.includes("tab=teammate_board") || urlQuery.includes("tab=matchmaking")) setActiveTab("teammate_board");
+      });
+    }
+  }, []);
 
   const [classmates, setClassmates] = useState<ProfileItem[]>([]);
   const [events, setEvents] = useState<HackathonItem[]>([]);
@@ -259,30 +277,38 @@ export default function ExplorePage() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase">
+          <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase flex-wrap gap-0.5">
             <button 
               onClick={() => { setActiveTab("teammate_board"); setSearchQuery(""); }}
               className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "teammate_board" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
+                activeTab === "teammate_board" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
               Teammate Board
             </button>
             <button 
+              onClick={() => { setActiveTab("friends"); setSearchQuery(""); }}
+              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "friends" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+              }`}
+            >
+              Friends & Network
+            </button>
+            <button 
+              onClick={() => { setActiveTab("news"); setSearchQuery(""); }}
+              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "news" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+              }`}
+            >
+              News & Contests
+            </button>
+            <button 
               onClick={() => { setActiveTab("directory"); setSearchQuery(""); }}
               className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "directory" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
+                activeTab === "directory" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
               Classmates
-            </button>
-            <button 
-              onClick={() => { setActiveTab("events"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "events" ? "bg-accent-main text-bg-base" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              Hackathons
             </button>
           </div>
         </div>
@@ -294,7 +320,7 @@ export default function ExplorePage() {
             <input 
               type="text"
               placeholder={
-                activeTab === "events" 
+                activeTab === "news" 
                   ? "Search hackathon stages or locations..." 
                   : "Search classmates by name, skills, or username..."
               }
@@ -304,7 +330,7 @@ export default function ExplorePage() {
             />
           </div>
 
-          {activeTab !== "events" && (
+          {activeTab !== "news" && (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter size={12} className="text-txt-muted flex-shrink-0" />
               <select
@@ -471,58 +497,141 @@ export default function ExplorePage() {
               </div>
             )}
 
-            {/* 3. Hackathon registry feed */}
-            {activeTab === "events" && (
+            {/* 3. News & Contests registry feed */}
+            {activeTab === "news" && (
               <div className="flex flex-col gap-6 pb-8">
-                {filteredEvents.map(e => (
-                  <div key={e.id} className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          <h3 className="font-display text-base font-semibold text-txt-main">{e.title}</h3>
-                          <span className="text-[8px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
-                            {e.level}
+                {/* Faculty Recommended Section */}
+                <div className="border border-amber-500/30 bg-amber-500/[0.04] p-5 sm:p-6 rounded-lg flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-amber-500 font-mono text-[10px] uppercase tracking-widest font-bold">
+                    <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                    <GraduationCap size={14} className="text-amber-500 shrink-0" />
+                    <span>Faculty Recommended Opportunities</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredEvents.slice(0, 2).map((opp) => (
+                      <div key={opp.id} className="border border-amber-500/20 bg-bg-surface/80 p-4 rounded flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-display text-xs font-bold text-txt-main">{opp.title}</span>
+                          <span className="text-[8px] font-mono uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded shrink-0">
+                            Faculty Pick
                           </span>
                         </div>
-                        <a 
-                          href={e.url} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="text-[9px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
+                        <p className="text-[11px] text-txt-sub font-light line-clamp-2">{opp.description}</p>
+                        <div className="flex items-center justify-between mt-1 pt-2 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
+                          <span>Deadline: {opp.deadline}</span>
+                          <a href={opp.url} target="_blank" rel="noreferrer" className="text-amber-400 hover:underline flex items-center gap-1">
+                            Details <ExternalLink size={10} />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Main Opportunities Feed */}
+                <div className="flex flex-col gap-4">
+                  {filteredEvents.map(e => (
+                    <div key={e.id} className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <h3 className="font-display text-base font-semibold text-txt-main">{e.title}</h3>
+                            <span className="text-[8px] font-mono tracking-widest text-txt-muted uppercase border border-border-main/80 px-2 py-0.5 rounded bg-bg-card">
+                              {e.level}
+                            </span>
+                          </div>
+                          <a 
+                            href={e.url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[9px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 self-start transition-colors"
+                          >
+                            {e.url}
+                            <ExternalLink size={10} />
+                          </a>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
+                          <span className="text-xs text-txt-main font-semibold">{e.deadline}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-txt-sub font-light leading-relaxed">
+                        {e.description}
+                      </p>
+
+                      <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                        <div className="flex items-center gap-1.5 text-[9px] text-txt-muted font-mono uppercase">
+                          <MapPin size={10} />
+                          {e.location}
+                        </div>
+
+                        <button className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] tracking-wider uppercase transition-opacity cursor-pointer flex items-center gap-1">
+                          <Plus size={10} /> Track Event Vault
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {filteredEvents.length === 0 && (
+                    <div className="text-center py-12 text-xs text-txt-muted font-light italic">
+                      No opportunities matched your query.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Friends & Network tab */}
+            {activeTab === "friends" && (
+              <div className="flex flex-col gap-6 pb-8">
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Users size={16} className="text-accent-main" />
+                      <span className="font-display text-sm font-semibold text-txt-main">Your Student Network</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-txt-muted">
+                      {filteredClassmates.filter(c => connectionStates[c.id] === "connected").length} Connected Peers
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredClassmates.map(c => (
+                      <div key={c.id} className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full border border-border-main bg-bg-card flex items-center justify-center font-mono text-xs font-bold text-txt-main">
+                            {c.full_name.charAt(0)}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-semibold text-txt-main truncate">{c.full_name}</span>
+                            <span className="text-[9px] font-mono text-txt-muted">@{c.username} • {c.department}</span>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleConnect(c.id)}
+                          className={`h-7 px-3 rounded font-mono text-[9px] tracking-wider uppercase transition-colors shrink-0 ${
+                            connectionStates[c.id] === "connected"
+                              ? "bg-bg-base text-emerald-400 border border-emerald-500/30 font-semibold"
+                              : connectionStates[c.id] === "pending"
+                              ? "bg-bg-base text-txt-muted border border-border-main/50"
+                              : "border border-border-main/60 text-txt-main hover:bg-bg-base"
+                          }`}
                         >
-                          {e.url}
-                          <ExternalLink size={10} />
-                        </a>
+                          {connectionStates[c.id] === "connected" ? "Linked" : connectionStates[c.id] === "pending" ? "Pending" : "Connect"}
+                        </button>
                       </div>
-
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                        <span className="text-xs text-txt-main font-semibold">{e.deadline}</span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-txt-sub font-light leading-relaxed">
-                      {e.description}
-                    </p>
-
-                    <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                      <div className="flex items-center gap-1.5 text-[9px] text-txt-muted font-mono uppercase">
-                        <MapPin size={10} />
-                        {e.location}
-                      </div>
-
-                      <button className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] tracking-wider uppercase transition-opacity cursor-pointer flex items-center gap-1">
-                        <Plus size={10} /> Track Event Vault
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                ))}
 
-                {filteredEvents.length === 0 && (
-                  <div className="text-center py-12 text-xs text-txt-muted font-light italic">
-                    No hackathon events matched your query. Try adding one manually.
-                  </div>
-                )}
+                  {filteredClassmates.length === 0 && (
+                    <div className="text-center py-8 text-xs text-txt-muted italic">
+                      No connections found in your network.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

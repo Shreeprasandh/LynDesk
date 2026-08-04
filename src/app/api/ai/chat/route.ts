@@ -58,10 +58,24 @@ function generateConversationalFallback(
     };
   }
 
+  if (p.includes("study") || p.includes("material") || p.includes("assignment") || p.includes("class") || p.includes("quiz") || p.includes("exam")) {
+    return {
+      response: `### Study Desk & AI Tutor\nAccess course materials, submit assignments, join study rooms, or learn any topic interactively with AI:`,
+      actionLink: { label: "Go to Study Desk", href: "/study-desk" }
+    };
+  }
+
+  if (p.includes("event") || p.includes("workspace") || p.includes("project")) {
+    return {
+      response: `### Event Desk & Workspaces\nManage active project workspaces, track hackathons, and monitor team presence:`,
+      actionLink: { label: "Go to Event Desk", href: "/event-desk" }
+    };
+  }
+
   if (p.includes("contest") || p.includes("hackathon") || p.includes("news")) {
     return {
-      response: `### Contests & Opportunities\nExplore faculty-recommended hackathons and global coding contests:`,
-      actionLink: { label: "Go to News & Contests", href: "/news-contests" }
+      response: `### Contests & Opportunities\nExplore faculty-recommended hackathons and global coding contests in Explore:`,
+      actionLink: { label: "Go to Explore -> News & Contests", href: "/explore?tab=news" }
     };
   }
 

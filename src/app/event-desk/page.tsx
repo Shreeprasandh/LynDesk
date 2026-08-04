@@ -1,0 +1,2419 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
+import Link from "next/link";
+import Header from "../components/Header";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Link2, 
+  Users, 
+  Award, 
+  ArrowRight, 
+  Globe, 
+  Mail,
+  Plus,
+  MapPin,
+  ExternalLink,
+  User,
+  CheckCircle2,
+  X,
+  Eye,
+  EyeOff,
+  RotateCw,
+  Edit2,
+  Layers,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  ArrowUpDown,
+  Trash2,
+  LogOut
+} from "lucide-react";
+
+// Brand Icon Helpers
+const DiscordIcon = ({ size = 14 }: { size?: number }) => (
+  <svg viewBox="0 0 127.14 96.36" width={size} height={size} fill="currentColor">
+    <path d="M107.7,8.07A105.15,105.15,0,0,0,77.26,0a77.19,77.19,0,0,0-3.3,6.83A96.67,96.67,0,0,0,53.22,6.83,77.19,77.19,0,0,0,49.88,0,105.15,105.15,0,0,0,19.44,8.07C3.66,31.58-1.86,54.65,1,77.53A105.73,105.73,0,0,0,32,96.36a77.7,77.7,0,0,0,6.63-10.85,68.43,68.43,0,0,1-10.5-5c.9-.65,1.76-1.34,2.58-2a75.58,75.58,0,0,0,73.08,0c.83.71,1.69,1.4,2.59,2a68.61,68.61,0,0,1-10.5,5,77.45,77.45,0,0,0,6.63,10.85,105.73,105.73,0,0,0,31.58-18.83C129.24,49.07,122.86,26.32,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53S36.18,40.36,42.45,40.36,53.83,46,53.83,53,48.72,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.24,60,73.24,53S78.41,40.36,84.69,40.36,96.07,46,96.07,53,91,65.69,84.69,65.69Z" />
+  </svg>
+);
+
+const GithubIcon = ({ size = 14 }: { size?: number }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+  </svg>
+);
+
+const getWorkspaceUuid = (rawId: string): string => {
+  if (!rawId) return "00000000-0000-4000-8000-000000000000";
+  const trimmed = rawId.trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    return trimmed;
+  }
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < trimmed.length; i++) {
+    const code = trimmed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 16777619);
+    h2 = Math.imul(h2 ^ code, 2246822519);
+  }
+  const hex1 = Math.abs(h1).toString(16).padStart(8, "0");
+  const hex2 = Math.abs(h2).toString(16).padStart(8, "0");
+  const combined = (hex1 + hex2 + hex1 + hex2).substring(0, 32);
+
+  const p1 = combined.substring(0, 8);
+  const p2 = combined.substring(8, 12);
+  const p3 = "4" + combined.substring(13, 16);
+  const p4 = "8" + combined.substring(17, 20);
+  const p5 = combined.substring(20, 32);
+  return `${p1}-${p2}-${p3}-${p4}-${p5}`;
+};
+
+
+
+function DashboardSkeleton() {
+  return (
+    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-pulse">
+      {/* Left Sidebar Skeleton (3 columns) */}
+      <div className="lg:col-span-3 flex flex-col gap-6">
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-16 bg-border-main/60 rounded" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-border-main/60" />
+            <div className="flex flex-col gap-2 flex-grow">
+              <div className="h-3 w-24 bg-border-main/60 rounded" />
+              <div className="h-2 w-32 bg-border-main/60 rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-20 bg-border-main/60 rounded" />
+          <div className="h-8 w-24 bg-border-main/60 rounded mt-1" />
+          <div className="h-1 w-full bg-border-main/60 rounded" />
+          <div className="h-2 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+
+      {/* Center Column Skeleton (6 columns) */}
+      <div className="lg:col-span-6 flex flex-col gap-6">
+        <div className="flex gap-4 border-b border-border-main/40 pb-2">
+          <div className="h-4 w-20 bg-border-main/60 rounded" />
+          <div className="h-4 w-20 bg-border-main/40 rounded" />
+          <div className="h-4 w-20 bg-border-main/40 rounded" />
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
+          <div className="h-4 w-40 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+          <div className="h-3 w-5/6 bg-border-main/40 rounded" />
+        </div>
+        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
+          <div className="h-4 w-32 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+
+      {/* Right Column Skeleton (3 columns) */}
+      <div className="lg:col-span-3 flex flex-col gap-6">
+        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
+          <div className="h-2 w-24 bg-border-main/60 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+          <div className="h-3 w-full bg-border-main/40 rounded" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LandingSkeleton() {
+  return (
+    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-pulse">
+      <div className="lg:col-span-7 flex flex-col gap-6">
+        <div className="h-3 w-32 bg-border-main/60 rounded" />
+        <div className="h-12 w-4/5 bg-border-main/60 rounded" />
+        <div className="h-4 w-full bg-border-main/40 rounded" />
+        <div className="h-4 w-2/3 bg-border-main/40 rounded" />
+      </div>
+      <div className="lg:col-span-5 border border-border-main/40 bg-bg-surface/50 p-8 rounded-md flex flex-col gap-4">
+        <div className="h-6 w-32 bg-border-main/60 rounded" />
+        <div className="h-10 w-full bg-border-main/40 rounded" />
+        <div className="h-10 w-full bg-border-main/40 rounded" />
+      </div>
+    </div>
+  );
+}
+
+function isDatePassed(dateStr?: string | null): boolean {
+  if (!dateStr) return false;
+  const clean = dateStr.trim().toLowerCase();
+  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none")) {
+    return false;
+  }
+
+  try {
+    let raw = dateStr.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
+    if (!raw) return false;
+
+    raw = raw.replace(/Sept/i, "Sep");
+
+    let parsedTime = Date.parse(raw);
+
+    if (isNaN(parsedTime)) {
+      const currentYear = new Date().getFullYear();
+      raw = `${raw}, ${currentYear}`;
+      parsedTime = Date.parse(raw);
+    }
+
+    if (!isNaN(parsedTime)) {
+      const targetDate = new Date(parsedTime);
+      targetDate.setHours(23, 59, 59, 999);
+      return new Date().getTime() > targetDate.getTime();
+    }
+  } catch {}
+
+  return false;
+}
+
+interface EventItem {
+  id: string;
+  title: string;
+  deadline: string;
+  location: "online" | "in_person" | "hybrid";
+  level: "local" | "national" | "global";
+  url: string;
+  status: "ideation" | "development" | "testing" | "submitted";
+  stages: string[];
+}
+
+// Production empty initial state
+const INITIAL_EVENTS: EventItem[] = [];
+
+export default function Home() {
+  const { user, loading: authLoading } = useAuth();
+  const [likelyHasSession, setLikelyHasSession] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const keys = Object.keys(localStorage);
+      const hasToken = keys.some(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
+      queueMicrotask(() => {
+        setLikelyHasSession(hasToken);
+      });
+    }
+  }, []);
+
+  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success" | "faculty_login">("idle");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [staffKey, setStaffKey] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showFacultyPassword, setShowFacultyPassword] = useState(false);
+
+  // Dashboard & Scraper States
+  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scraperUrl, setScraperUrl] = useState("");
+  const [scraping, setScraping] = useState(false);
+  const [scrapedData, setScrapedData] = useState<any>(null);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDeadline, setNewEventDeadline] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState<"online" | "in_person" | "hybrid">("online");
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Home Workspace Title Rename States
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [tempWorkspaceTitle, setTempWorkspaceTitle] = useState("");
+
+  // Active Co-workers live list state
+  const [coworkers, setCoworkers] = useState<{ id?: string; name: string; role: string; active: boolean }[]>([]);
+  const [collegeName, setCollegeName] = useState("");
+  const [isReordering, setIsReordering] = useState(false);
+  const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
+
+  // Home Invite Friends States
+  const [inviteEventId, setInviteEventId] = useState<string | null>(null);
+  const [friendsToInviteHome, setFriendsToInviteHome] = useState<any[]>([]);
+  const [isInviteHomeModalOpen, setIsInviteHomeModalOpen] = useState(false);
+
+  // News and Opportunities States
+  const [dashTab] = useState<"workspaces" | "opportunities">("workspaces");
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+
+  // Real-time Coding Platform Overview Stats
+  const [codingStats, setCodingStats] = useState<{
+    leetcode: any;
+    codeforces: any;
+    codechef: any;
+    unstop: any;
+  }>({
+    leetcode: null,
+    codeforces: null,
+    codechef: null,
+    unstop: null
+  });
+  const [loadingCodingStats, setLoadingCodingStats] = useState(false);
+
+  // Load opportunities from localStorage on mount and register active listener
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const loadOpps = () => {
+        const stored = localStorage.getItem("ldk_opportunities");
+        if (stored) {
+          setOpportunities(JSON.parse(stored));
+        } else {
+          const defaultOpps = [
+            {
+              id: "opp_1",
+              title: "MIT HackHarvard 2026",
+              category: "hackathon",
+              deadline: "Oct 12, 2026",
+              location: "hybrid",
+              level: "global",
+              url: "https://hackharvard.org",
+              description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_2",
+              title: "Google Developer Hackathon India",
+              category: "hackathon",
+              deadline: "Nov 02, 2026",
+              location: "online",
+              level: "national",
+              url: "https://build.google.com",
+              description: "National developer jam leveraging Google Cloud and AI agents.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_3",
+              title: "Stanford TreeHacks 2026",
+              category: "hackathon",
+              deadline: "Feb 18, 2026",
+              location: "in_person",
+              level: "global",
+              url: "https://treehacks.com",
+              description: "Stanford's landmark hackathon focusing on engineering solutions for social good.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_4",
+              title: "Codeforces Round 990 (Div. 2)",
+              category: "contest",
+              deadline: "July 28, 2026",
+              location: "online",
+              level: "global",
+              url: "https://codeforces.com",
+              description: "Official Div. 2 programming contest with rating updates.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_5",
+              title: "LeetCode Weekly Contest 410",
+              category: "contest",
+              deadline: "July 26, 2026",
+              location: "online",
+              level: "global",
+              url: "https://leetcode.com",
+              description: "Weekly algorithmic challenge with globally ranked leaderboard.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_6",
+              title: "Smart India Hackathon (SIH) 2026",
+              category: "hackathon",
+              deadline: "Sept 15, 2026",
+              location: "hybrid",
+              level: "national",
+              url: "https://sih.gov.in",
+              description: "Nationwide initiative to provide students with a platform to solve pressing problems.",
+              facultyRecommended: true,
+              createdDate: "Oct 14"
+            },
+            {
+              id: "opp_7",
+              title: "Next.js 16 Conference Keynote Details",
+              category: "news",
+              deadline: "Oct 25, 2026",
+              location: "online",
+              level: "global",
+              url: "https://nextjs.org/conf",
+              description: "Vercel announces Next.js 16 featuring compiler optimizations and Server Component refinements.",
+              facultyRecommended: false,
+              createdDate: "Oct 14"
+            }
+          ];
+          setOpportunities(defaultOpps);
+          localStorage.setItem("ldk_opportunities", JSON.stringify(defaultOpps));
+        }
+      };
+      loadOpps();
+      window.addEventListener("ldk_opportunities_update", loadOpps);
+      return () => window.removeEventListener("ldk_opportunities_update", loadOpps);
+    }
+  }, []);
+
+  // Fetch and sync real-time coding stats for linked accounts
+  useEffect(() => {
+    if (!user) return;
+    const meta = user.user_metadata || {};
+    const lc = meta.leetcode_username || "";
+    const cf = meta.codeforces_username || "";
+    const cc = meta.codechef_username || "";
+    const un = meta.unstop_username || "";
+
+    if (!lc && !cf && !cc && !un) return;
+
+    const cacheKey = `ldk_coding_stats_${user.id}`;
+    
+    // Load cached stats first for instant rendering
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        queueMicrotask(() => setCodingStats(parsed));
+      } catch (e) {
+        console.warn("Failed parsing cached stats", e);
+      }
+    }
+
+    const loadLiveStats = async () => {
+      setLoadingCodingStats(true);
+      try {
+        const fetchPlatformStats = async (platform: string, username: string) => {
+          if (!username) return null;
+          try {
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}&t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache" }
+            });
+            if (res.ok) {
+              return await res.json();
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch ${platform} stats`, e);
+          }
+          return null;
+        };
+
+        const [lcStats, cfStats, ccStats] = await Promise.all([
+          fetchPlatformStats("leetcode", lc),
+          fetchPlatformStats("codeforces", cf),
+          fetchPlatformStats("codechef", cc)
+        ]);
+
+        const updatedStats = {
+          leetcode: lcStats,
+          codeforces: cfStats,
+          codechef: ccStats,
+          unstop: un ? { registered: 6, completed: 4, rank: 42 } : null
+        };
+
+        setCodingStats(updatedStats);
+        localStorage.setItem(cacheKey, JSON.stringify(updatedStats));
+      } catch (err) {
+        console.error("Error fetching live coding stats on dashboard:", err);
+      } finally {
+        setLoadingCodingStats(false);
+      }
+    };
+
+    loadLiveStats();
+
+    const handleStatsUpdate = () => {
+      const updatedCache = localStorage.getItem(cacheKey);
+      if (updatedCache) {
+        try {
+          setCodingStats(JSON.parse(updatedCache));
+        } catch (e) {
+          console.warn("Error updating stats from event", e);
+        }
+      }
+    };
+
+    window.addEventListener("ldk_coding_stats_update", handleStatsUpdate);
+    return () => window.removeEventListener("ldk_coding_stats_update", handleStatsUpdate);
+  }, [user]);
+
+  // Load events and joined workspaces from localStorage on mount with live status & name enrichment
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const loadLocalWorkspaces = () => {
+        const stored = localStorage.getItem("ldk_events");
+        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+        const parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
+        const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+
+        // Enrich parsed events with local workspace overrides
+        const enrichedEvents = parsedEvents.map(e => {
+          const customName = localStorage.getItem(`ldk_workspace_name_${e.id}`);
+          const customStatus = localStorage.getItem(`ldk_workspace_status_${e.id}`);
+          const metaStr = localStorage.getItem(`ldk_workspace_meta_${e.id}`);
+          
+          let finalTitle = e.title;
+          if (customName && !customName.startsWith("Loading Project")) {
+            finalTitle = customName;
+          } else if (metaStr) {
+            try {
+              const meta = JSON.parse(metaStr);
+              if (meta && meta.title) finalTitle = `${meta.title} Workspace`;
+            } catch {}
+          }
+
+          let finalStages = e.stages;
+          if (metaStr) {
+            try {
+              const meta = JSON.parse(metaStr);
+              if (meta && meta.stages && meta.stages.length > 0) {
+                finalStages = meta.stages.map((s: { stage: string }) => s.stage);
+              }
+            } catch {}
+          }
+
+          return {
+            ...e,
+            title: finalTitle,
+            status: (customStatus as any) || e.status,
+            stages: finalStages || ["Ideation", "Development", "Testing", "Submitted"]
+          };
+        });
+
+        joinedIds.forEach(id => {
+          if (!enrichedEvents.some(e => e.id === id)) {
+            const customName = localStorage.getItem(`ldk_workspace_name_${id}`);
+            const customStatus = localStorage.getItem(`ldk_workspace_status_${id}`);
+            const metaStr = localStorage.getItem(`ldk_workspace_meta_${id}`);
+            
+            let title = `Shared Workspace (${id.substring(0, 8)})`;
+            if (customName && !customName.startsWith("Loading Project")) {
+              title = customName;
+            } else if (metaStr) {
+              try {
+                const meta = JSON.parse(metaStr);
+                if (meta && meta.title) title = `${meta.title} Workspace`;
+              } catch {}
+            }
+
+            enrichedEvents.unshift({
+              id,
+              title,
+              deadline: "Ongoing",
+              location: "online",
+              level: "global",
+              url: `/workspace/${id}`,
+              status: (customStatus as any) || "development",
+              stages: ["Ideation", "Development", "Testing", "Submitted"]
+            });
+          }
+        });
+
+        if (enrichedEvents.length > 0) {
+          setEvents(enrichedEvents);
+        }
+      };
+
+      loadLocalWorkspaces();
+      window.addEventListener("ldk_events_update", loadLocalWorkspaces);
+      window.addEventListener("storage", loadLocalWorkspaces);
+      return () => {
+        window.removeEventListener("ldk_events_update", loadLocalWorkspaces);
+        window.removeEventListener("storage", loadLocalWorkspaces);
+      };
+    }
+  }, []);
+
+  // Sync events to localStorage on modification
+  useEffect(() => {
+    if (events && events.length > 0) {
+      localStorage.setItem("ldk_events", JSON.stringify(events));
+    }
+  }, [events]);
+
+  useEffect(() => {
+    if (user) {
+      const fetchCoworkersAndCollege = async () => {
+        try {
+          // Fetch institute/college name
+          const { data: profData, error: profErr } = await supabase
+            .from("profiles")
+            .select(`
+              institute_id,
+              institutes ( name )
+            `)
+            .eq("id", user.id)
+            .single();
+
+          if (!profErr && profData) {
+            const inst = profData.institutes as any;
+            if (inst?.name) {
+              setCollegeName(inst.name);
+            }
+          }
+
+          // Fetch database workspaces/events user is a member of
+          const { data: memberData } = await supabase
+            .from("project_members")
+            .select(`
+              project_space_id,
+              project_spaces (
+                id,
+                project_name,
+                status,
+                github_repo,
+                events (
+                  id,
+                  title,
+                  source_url,
+                  registration_deadline,
+                  location,
+                  level
+                )
+              )
+            `)
+            .eq("profile_id", user.id);
+
+          // 0. Update current user's profile timestamp so teammates see user as active
+          supabase.from("profiles").update({ updated_at: new Date().toISOString() }).eq("id", user.id).then(() => {});
+
+          const mySpaceIds: string[] = (memberData || []).map((m: any) => m.project_space_id).filter(Boolean);
+
+          // Fetch fellow members ONLY from shared workspaces who are currently ONLINE
+          let onlineTeammates: { id?: string; name: string; role: string; active: boolean }[] = [];
+
+          if (mySpaceIds.length > 0) {
+            // 1. Fetch teammate profiles
+            const { data: teammateMembers } = await supabase
+              .from("project_members")
+              .select("profile_id, profiles(id, full_name, username, department, updated_at)")
+              .in("project_space_id", mySpaceIds)
+              .neq("profile_id", user.id);
+
+            const profileMap = new Map<string, any>();
+            (teammateMembers || []).forEach((tm: any) => {
+              const p = tm.profiles;
+              if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
+            });
+
+            const now = Date.now();
+            onlineTeammates = Array.from(profileMap.values())
+              .filter(p => {
+                if (!p.updated_at) return true;
+                const lastActive = new Date(p.updated_at).getTime();
+                return (now - lastActive) < 15 * 60 * 1000; // Online in last 15 min
+              })
+              .map(p => ({
+                id: p.id,
+                name: p.full_name || p.username || "Collaborator",
+                role: p.department || "Teammate",
+                active: true
+              }));
+          }
+
+          setCoworkers(onlineTeammates);
+
+          const dbEvents: EventItem[] = [];
+          if (memberData && memberData.length > 0) {
+            memberData.forEach((m: any) => {
+              const space = m.project_spaces;
+              const ev = space?.events;
+              if (space || m.project_space_id) {
+                const spaceId = space?.id || m.project_space_id;
+                const localWorkspaceName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${spaceId}`) : null;
+                const resolvedTitle = localWorkspaceName || space?.project_name || ev?.title || "Shared Workspace";
+
+                dbEvents.push({
+                  id: spaceId,
+                  title: resolvedTitle,
+                  deadline: ev?.registration_deadline 
+                    ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) 
+                    : "Ongoing",
+                  location: ev?.location || "online",
+                  level: ev?.level || "global",
+                  url: ev?.source_url || space?.github_repo || `/workspace/${spaceId}`,
+                  status: space?.status || "development",
+                  stages: ["Ideation", "Development", "Final Submission"]
+                });
+              }
+            });
+          }
+
+          setEvents(prev => {
+            const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
+            const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+            
+            const map = new Map<string, EventItem>();
+            
+            // 1. Add prev state items
+            prev.forEach(item => { if (item && item.id) map.set(item.id, item); });
+
+            // 2. Add DB events
+            dbEvents.forEach(item => { if (item && item.id) map.set(item.id, item); });
+
+            // 3. Add joined workspace IDs from localStorage
+            joinedIds.forEach(id => {
+              if (!map.has(id)) {
+                map.set(id, {
+                  id,
+                  title: `Shared Workspace (${id.substring(0, 8)})`,
+                  deadline: "Ongoing",
+                  location: "online",
+                  level: "global",
+                  url: `/workspace/${id}`,
+                  status: "development",
+                  stages: ["Ideation", "Development", "Final Submission"]
+                });
+              }
+            });
+
+            const mergedList = Array.from(map.values());
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ldk_events", JSON.stringify(mergedList));
+            }
+            return mergedList;
+          });
+        } catch (err) {
+          console.error("Failed to load live active coworkers/college: ", err);
+        }
+      };
+      fetchCoworkersAndCollege();
+
+      const profileChannel = supabase
+        .channel("public:profiles_home")
+        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+          fetchCoworkersAndCollege();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(profileChannel);
+      };
+    }
+  }, [user]);
+
+  const handleSaveWorkspaceTitle = async (workspaceId: string) => {
+    if (!tempWorkspaceTitle || !tempWorkspaceTitle.trim()) return;
+    const cleanTitle = tempWorkspaceTitle.trim();
+    
+    setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, title: cleanTitle } : e));
+    localStorage.setItem(`ldk_workspace_name_${workspaceId}`, cleanTitle);
+    
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const idx = parsed.findIndex(e => e.id === workspaceId);
+        if (idx >= 0) {
+          parsed[idx].title = cleanTitle;
+          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+        }
+      } catch {}
+    }
+
+    const targetUuid = getWorkspaceUuid(workspaceId);
+    if (user && workspaceId !== "mock" && targetUuid) {
+      try {
+        const { data: existing } = await supabase
+          .from("project_spaces")
+          .select("id")
+          .eq("id", targetUuid)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ project_name: cleanTitle })
+            .eq("id", targetUuid);
+        } else {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: targetUuid,
+              project_name: cleanTitle,
+              status: "development"
+            });
+        }
+      } catch (e) {
+        console.error("Failed updating workspace title in db", e);
+      }
+    }
+    
+    setEditingWorkspaceId(null);
+  };
+
+  const handleUpdateWorkspaceStatus = async (workspaceId: string, newStatus: "ideation" | "development" | "testing" | "submitted") => {
+    setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, status: newStatus } : e));
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`ldk_workspace_status_${workspaceId}`, newStatus);
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const idx = parsed.findIndex(e => e.id === workspaceId);
+        if (idx >= 0) {
+          parsed[idx].status = newStatus;
+          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+        }
+      } catch {}
+      window.dispatchEvent(new CustomEvent("ldk_events_update"));
+    }
+
+    const targetUuid = getWorkspaceUuid(workspaceId);
+    if (user && workspaceId !== "mock" && targetUuid) {
+      try {
+        const { data: existing } = await supabase
+          .from("project_spaces")
+          .select("id")
+          .eq("id", targetUuid)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("project_spaces")
+            .update({ status: newStatus })
+            .eq("id", targetUuid);
+        } else {
+          await supabase
+            .from("project_spaces")
+            .insert({
+              id: targetUuid,
+              status: newStatus,
+              project_name: "Shared Workspace"
+            });
+        }
+      } catch (e) {
+        console.error("Failed updating workspace status in db", e);
+      }
+    }
+  };
+
+  const handleMoveWorkspace = (index: number, direction: "up" | "down") => {
+    const newEvents = [...events];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newEvents.length) return;
+    
+    const temp = newEvents[index];
+    newEvents[index] = newEvents[targetIndex];
+    newEvents[targetIndex] = temp;
+
+    setEvents(newEvents);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_events", JSON.stringify(newEvents));
+      window.dispatchEvent(new CustomEvent("ldk_events_update"));
+    }
+  };
+
+  const handleConfirmLeaveWorkspace = async () => {
+    if (!confirmLeaveId) return;
+    const idToRemove = confirmLeaveId;
+    setConfirmLeaveId(null);
+
+    // Smoothly remove item from state for AnimatePresence transition
+    setEvents(prev => prev.filter(e => e.id !== idToRemove));
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ldk_events");
+        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
+        const filteredEvents = parsed.filter(e => e.id !== idToRemove);
+        localStorage.setItem("ldk_events", JSON.stringify(filteredEvents));
+
+        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+        const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+        const filteredJoined = joinedIds.filter(id => id !== idToRemove);
+        localStorage.setItem("ldk_joined_workspaces", JSON.stringify(filteredJoined));
+
+        localStorage.removeItem(`ldk_workspace_name_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_status_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_meta_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_git_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_demo_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_tasks_${idToRemove}`);
+        localStorage.removeItem(`ldk_chat_messages_${idToRemove}`);
+        localStorage.removeItem(`ldk_workspace_members_${idToRemove}`);
+
+        window.dispatchEvent(new CustomEvent("ldk_events_update"));
+      } catch (err) {
+        console.error("Failed leaving workspace:", err);
+      }
+    }
+
+    if (idToRemove !== "mock") {
+      try {
+        const targetUuid = getWorkspaceUuid(idToRemove);
+        if (user) {
+          await supabase
+            .from("project_members")
+            .delete()
+            .eq("project_space_id", targetUuid)
+            .eq("profile_id", user.id);
+        }
+      } catch (e) {
+        console.error("Failed removing membership in DB:", e);
+      }
+    }
+  };
+
+  const fallbackCoworkers = [
+    { name: "Alex Carter", role: "Dev", active: true },
+    { name: "Mira Sen", role: "Designer", active: true },
+    { name: "Prof. Davis", role: "Mentor", active: false }
+  ];
+
+  // Derivations for profile picture and username
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+  const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+
+  const activeCoworkers = (coworkers.length > 0 ? coworkers : fallbackCoworkers).filter(
+    cw => cw.name.toLowerCase() !== username.toLowerCase() && cw.name.toLowerCase() !== "kaizzcer"
+  );
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (!authLoading) {
+        setLoading(false);
+      }
+      if (user) {
+        setAuthStep("success");
+        if (typeof window !== "undefined" && (window.location.hash.includes("access_token") || window.location.search.includes("code"))) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } else {
+        setAuthStep("idle");
+      }
+    }, 0);
+    return () => clearTimeout(handle);
+  }, [user, authLoading]);
+
+  useEffect(() => {
+    const handlePageShow = () => {
+      setLoading(false);
+      setError(null);
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setStaffKey("");
+    }, 0);
+  }, [authStep]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Login connection error.");
+      setLoading(false);
+    }
+  };
+
+  const handleFacultyLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Check recruiter key first
+      if (staffKey.trim().toLowerCase() === "recruit2026") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          setError(error.message);
+          setLoading(false);
+          return;
+        }
+
+        if (data.user) {
+          localStorage.setItem("company_recruiter_member", JSON.stringify({ name: "Corporate Recruiter", key: "recruit2026" }));
+          try {
+            await supabase.auth.updateUser({
+              data: { company_key: "recruit2026", role: "employee" }
+            });
+          } catch (updateErr) {
+            console.error("Failed updating user metadata:", updateErr);
+          }
+          window.location.href = "/recruiter";
+          return;
+        }
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!data.user) {
+        setError("Authentication failed.");
+        setLoading(false);
+        return;
+      }
+
+      const staffList = data.user.user_metadata?.registered_staff || [];
+      if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
+        staffList.push({ name: "Main Administrator", key: "ADMIN" });
+      }
+
+      const matched = staffList.find((s: any) => s.key === staffKey.trim());
+      if (matched) {
+        localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
+        window.location.href = "/coordinator";
+      } else {
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutErr) {
+          console.error("Sign out error:", signOutErr);
+        }
+        setError("Invalid Staff Key. Access denied.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Faculty authentication connection error.");
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        setSuccessMessage("Registration successful! Check your email for verification. (If email confirmation is disabled in your Supabase Auth settings, you can sign in immediately).");
+        setPassword("");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Sign up connection error.");
+      setLoading(false);
+    }
+  };
+
+  const handleOAuthLogin = async (provider: "google" | "github" | "discord" | "linkedin") => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === "linkedin" ? "linkedin_oidc" : provider,
+        options: {
+          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err?.message || "OAuth connection error.");
+      setLoading(false);
+    }
+  };
+
+  // Real URL Scraper Logic fetching /api/scrape
+  const handleScrape = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scraperUrl) return;
+    setScraping(true);
+    setModalError(null);
+    
+    try {
+      const response = await fetch("/api/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: scraperUrl }),
+      });
+      
+      const data = await response.json();
+      if (response.ok) {
+        setScrapedData(data);
+        setNewEventTitle(data.title || "");
+        setNewEventDeadline(data.deadline || "");
+      } else {
+        setModalError(data.error || "Failed to parse URL metadata.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reach scraper service.";
+      setModalError(message);
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const handleAddEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEventTitle.trim()) {
+      setModalError("Event Title is required.");
+      return;
+    }
+
+    const finalUrl = scraperUrl.trim() || `https://eventtracker.local/custom-${Date.now()}`;
+    let eventId = `e_${Date.now()}`;
+    let spaceId = eventId;
+
+    if (user) {
+      try {
+        let formattedDeadline = null;
+        if (newEventDeadline.trim()) {
+          const parsedDate = new Date(newEventDeadline.trim());
+          if (!isNaN(parsedDate.getTime())) {
+            formattedDeadline = parsedDate.toISOString();
+          }
+        }
+
+        // 1. Insert into events table
+        const { data: eventData, error: eventErr } = await supabase
+          .from("events")
+          .insert({
+            title: newEventTitle,
+            source_url: finalUrl,
+            registration_deadline: formattedDeadline,
+            location: newEventLocation,
+            level: "global"
+          })
+          .select()
+          .single();
+
+        if (!eventErr && eventData) {
+          eventId = eventData.id;
+          
+          // 2. Insert into project_spaces table
+          const { data: spaceData, error: spaceErr } = await supabase
+            .from("project_spaces")
+            .insert({
+              event_id: eventId,
+              project_name: `${newEventTitle} Workspace`,
+              status: "ideation"
+            })
+            .select()
+            .single();
+
+          if (!spaceErr && spaceData) {
+            spaceId = spaceData.id;
+
+            // 3. Register user as Leader in project_members
+            await supabase
+              .from("project_members")
+              .insert({
+                project_space_id: spaceId,
+                profile_id: user.id,
+                role: "leader"
+              });
+          }
+        }
+      } catch (err) {
+        console.error("DB Event sync error: ", err);
+      }
+    }
+
+    const initialMeta = scrapedData || {
+      title: newEventTitle,
+      description: `Official workspace for ${newEventTitle}. Collaborate with your team, assign tasks, and track stage milestones.`,
+      organization: "Campus / Custom Host",
+      prizes: "Certificate of Excellence & Awards",
+      rules: "1. Develop your project prototype during the hackathon timeline.\n2. Submit project demo and source repository before the deadline.",
+      deadline: newEventDeadline.trim() || "TBD",
+      team_size: "2 - 4 Members",
+      eligibility: "Open to student participants",
+      stages: [
+        { stage: "Ideation & Proposal", deadline: "Target Active", brief: "Problem selection, team assignment, and architecture draft." },
+        { stage: "Prototype Development", deadline: "Target Active", brief: "Implement core MVP components and features." },
+        { stage: "QA & User Testing", deadline: "Target Active", brief: "User testing, bug fixes, and polish." },
+        { stage: "Final Submission", deadline: newEventDeadline.trim() || "TBD", brief: "Publish live demo and GitHub repository." }
+      ],
+      url: finalUrl
+    };
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`ldk_workspace_meta_${spaceId}`, JSON.stringify(initialMeta));
+      } catch {}
+    }
+
+    const newObj = {
+      id: spaceId,
+      title: newEventTitle,
+      deadline: newEventDeadline.trim() || "TBD",
+      location: newEventLocation,
+      level: "global" as const,
+      url: finalUrl,
+      status: "ideation" as const,
+      stages: initialMeta.stages?.map((s: { stage: string }) => s.stage) || ["Ideation", "Development", "Final Submission"]
+    };
+
+    setEvents([newObj, ...events]);
+    setIsModalOpen(false);
+    setScraperUrl("");
+    setScrapedData(null);
+    setNewEventTitle("");
+    setNewEventDeadline("");
+    setModalError(null);
+  };
+
+  const handleOpenInviteModal = async (eventId: string) => {
+    setInviteEventId(eventId);
+    setIsInviteHomeModalOpen(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("friendships")
+        .select(`
+          id,
+          status,
+          sender_id,
+          receiver_id,
+          sender:sender_id ( id, username, full_name ),
+          receiver:receiver_id ( id, username, full_name )
+        `);
+      
+      if (!error && data) {
+        const friendsList: any[] = [];
+        data.forEach((item: any) => {
+          if (item.status === "accepted") {
+            const isSender = item.sender_id === user?.id;
+            const partner = isSender ? item.receiver : item.sender;
+            if (partner) {
+              friendsList.push({
+                id: partner.id,
+                username: partner.username || "user",
+                full_name: partner.full_name || "Classmate"
+              });
+            }
+          }
+        });
+        setFriendsToInviteHome(friendsList);
+      } else {
+        setFriendsToInviteHome([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setFriendsToInviteHome([]);
+    }
+  };
+
+  const handleSendInviteFromHome = async (friendId: string, friendName: string) => {
+    if (!inviteEventId) return;
+    try {
+      const targetUrl = `/workspace/${inviteEventId}?acceptInvite=${friendId}&friendName=${encodeURIComponent(friendName)}`;
+
+      if (user?.id) {
+        try {
+          await supabase
+            .from("project_members")
+            .upsert(
+              {
+                project_space_id: inviteEventId,
+                profile_id: friendId,
+                role: "member"
+              },
+              { onConflict: "project_space_id,profile_id", ignoreDuplicates: true }
+            );
+
+          await supabase.from("chat_messages").insert({
+            project_space_id: inviteEventId,
+            profile_id: user?.id,
+            content: `Invited ${friendName} to collaborate via Dashboard!`
+          });
+
+          await fetch("/api/notifications/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipientId: friendId,
+              senderId: user.id,
+              title: "Teammate Match Invite",
+              message: `${user.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
+              actionUrl: targetUrl,
+              type: "invite"
+            })
+          });
+        } catch (e) {
+          console.error("Error in home workspace invite dispatch: ", e);
+        }
+      }
+
+      // Add to local notification bus for recipient
+      const recipientKey = `ldk_user_notifications_${friendId}`;
+      const notifStored = localStorage.getItem(recipientKey);
+      const notifList = notifStored ? JSON.parse(notifStored) : [];
+      const uniqueNotifId = typeof crypto !== "undefined" && crypto.randomUUID ? `n_invite_${crypto.randomUUID()}` : `n_invite_${friendId}_${notifList.length + 1}`;
+      notifList.unshift({
+        id: uniqueNotifId,
+        recipientId: friendId,
+        senderId: user?.id,
+        title: "Teammate Match Invite",
+        message: `${user?.user_metadata?.full_name || "A classmate"} invited you to collaborate on project workspace!`,
+        type: "invite",
+        category: "alerts",
+        time: "Just now",
+        read: false,
+        actionLabel: "Accept Invite",
+        actionUrl: targetUrl
+      });
+      localStorage.setItem(recipientKey, JSON.stringify(notifList.slice(0, 100)));
+      window.dispatchEvent(new Event("ldk_notifications_update"));
+
+      alert(`Successfully sent invitation to ${friendName}!`);
+      setIsInviteHomeModalOpen(false);
+    } catch (e) {
+      console.error(e);
+      alert(`Invite sent: ${friendName} invited.`);
+      setIsInviteHomeModalOpen(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+      
+      {/* 1. Header (Unified Navigation & Notifications Drawer) */}
+      <Header />
+
+      {/* Conditional Layout: Landing VS. Dashboard */}
+      {authLoading ? (
+        likelyHasSession ? (
+          <DashboardSkeleton />
+        ) : (
+          <LandingSkeleton />
+        )
+      ) : !user ? (
+        /* ==================== LANDING PANEL ==================== */
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 lg:py-12 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center">
+          
+          {/* Left Column: Typographic layout */}
+          <section className="lg:col-span-7 flex flex-col items-start gap-12 lg:pr-8">
+            <div className="flex flex-col gap-4">
+              <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-txt-muted font-semibold">
+                Link Your Next Desk
+              </span>
+              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-light tracking-[-0.03em] text-txt-main leading-[1.08]">
+                The space where technical projects <span className="font-normal border-b border-txt-main/30">take shape.</span>
+              </h1>
+            </div>
+            
+            <p className="text-txt-sub text-base md:text-lg leading-relaxed max-w-xl font-light">
+              An index for student hackathons, team workspaces, and academic credit coordination. 
+              No noise, no vanity metrics. Just a vault to organize your code, files, and milestones.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full pt-8 border-t border-border-main/60">
+              <div className="flex flex-col gap-3">
+                <div className="h-9 w-9 rounded-sm border border-border-main/80 bg-bg-surface flex items-center justify-center text-txt-main">
+                  <Link2 size={15} className="stroke-[1.5]" />
+                </div>
+                <h3 className="font-display text-sm font-semibold tracking-tight text-txt-main">The Registry</h3>
+                <p className="text-xs text-txt-muted leading-relaxed font-light">
+                  Paste any event link. The parser organizes deadlines, stage timelines, and guidelines into your personal vault.
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <div className="h-9 w-9 rounded-sm border border-border-main/80 bg-bg-surface flex items-center justify-center text-txt-main">
+                  <Users size={15} className="stroke-[1.5]" />
+                </div>
+                <h3 className="font-display text-sm font-semibold tracking-tight text-txt-main">Workspace Decks</h3>
+                <p className="text-xs text-txt-muted leading-relaxed font-light">
+                  A shared portal mapping your active slide deck, code repositories, team discussions, and voice channels.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="h-9 w-9 rounded-sm border border-border-main/80 bg-bg-surface flex items-center justify-center text-txt-main">
+                  <Award size={15} className="stroke-[1.5]" />
+                </div>
+                <h3 className="font-display text-sm font-semibold tracking-tight text-txt-main">Campus Credits</h3>
+                <p className="text-xs text-txt-muted leading-relaxed font-light">
+                  Export certified summaries of project completions directly to department coordinators for academic validation.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Right Column: Portal Terminal Auth Card */}
+          <section className="lg:col-span-5 w-full flex justify-center lg:sticky lg:top-28">
+            <div className="w-full max-w-md border border-border-main/70 bg-bg-surface p-8 rounded-lg shadow-[0_4px_24px_rgba(0,0,0,0.02)] transition-shadow duration-300">
+              <AnimatePresence mode="wait">
+                {authStep === "idle" && (
+                  <motion.div 
+                    key="idle"
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col gap-6"
+                  >
+                    <div className="flex flex-col gap-1.5">
+                      <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main">
+                        Authenticate Credentials
+                      </h2>
+                      <p className="text-xs text-txt-muted font-light">
+                        Establish a secure session to access your workspaces.
+                      </p>
+                    </div>
+
+                    {error && (
+                      <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                        {error}
+                      </div>
+                    )}
+
+                    <button 
+                      onClick={() => {
+                        setError(null);
+                        setAuthStep("login");
+                      }}
+                      className="w-full h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2.5 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    >
+                      <Mail size={14} className="stroke-[1.5]" />
+                      Email Credentials
+                    </button>
+
+                    <div className="relative flex py-1 items-center">
+                      <div className="flex-grow border-t border-border-main/60"></div>
+                      <span className="flex-shrink mx-3 text-[9px] font-mono tracking-widest text-txt-muted uppercase">or</span>
+                      <div className="flex-grow border-t border-border-main/60"></div>
+                    </div>
+
+                    <button 
+                      onClick={() => handleOAuthLogin("google")}
+                      disabled={loading}
+                      className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2.5 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    >
+                      {loading ? (
+                        <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                      ) : (
+                        <>
+                          <Globe size={14} className="stroke-[1.5]" />
+                          Institutional Google Sign-In
+                        </>
+                      )}
+                    </button>
+
+                    <div className="flex gap-3 items-center w-full">
+                      <button 
+                        onClick={() => handleOAuthLogin("github")}
+                        disabled={loading}
+                        className="flex-1 h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                      >
+                        <GithubIcon size={14} />
+                        <span className="text-[10px] font-mono tracking-widest uppercase">GitHub</span>
+                      </button>
+
+                      <button 
+                        onClick={() => handleOAuthLogin("discord")}
+                        disabled={loading}
+                        className="flex-1 h-11 rounded-sm border border-border-main/80 hover:bg-bg-card text-txt-main flex items-center justify-center gap-2 transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                      >
+                        <DiscordIcon size={14} />
+                        <span className="text-[10px] font-mono tracking-widest uppercase">Discord</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-center text-txt-muted leading-relaxed font-light mt-1">
+                      Using Google Auth automatically routes you into your local campus network.
+                    </p>
+
+                    <div className="border-t border-border-main/40 pt-4 text-center mt-1">
+                      <button
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep("faculty_login");
+                        }}
+                        className="text-[9px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase underline cursor-pointer"
+                      >
+                        Faculty / Company Portal Login
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {(authStep === "login" || authStep === "signup") && (
+                  <motion.form 
+                    key={authStep}
+                    onSubmit={authStep === "login" ? handleLogin : handleSignUp}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col gap-5"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep("idle");
+                        }}
+                        className="text-[10px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main mt-2">
+                        {authStep === "login" ? "Secure Sign In" : "Create Account"}
+                      </h2>
+                    </div>
+
+                    {error && (
+                      <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 p-2.5 rounded-sm font-mono tracking-tight">
+                        {error}
+                      </div>
+                    )}
+
+                    {successMessage && (
+                      <div className="text-xs text-green-500 bg-green-500/10 border border-green-500/30 p-2.5 rounded-sm font-mono tracking-tight leading-relaxed">
+                        {successMessage}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-3.5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Domain Email Address</label>
+                        <input 
+                          type="email" 
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="username@university.edu"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-light"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs text-txt-sub font-medium">Password</label>
+                          {authStep === "login" && (
+                            <a href="#" className="text-[10px] text-txt-muted hover:text-txt-main transition-colors font-light">Forgot?</a>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <input 
+                            type={showPassword ? "text" : "password"} 
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="h-10 pl-3 pr-10 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 w-full"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main cursor-pointer flex items-center justify-center bg-transparent border-0 outline-none"
+                          >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    >
+                      {loading ? (
+                        <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                      ) : (
+                        <>
+                          {authStep === "login" ? "Authenticate Session" : "Initialize Registration"}
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep(authStep === "login" ? "signup" : "login");
+                        }}
+                        className="text-xs text-txt-muted hover:text-txt-main transition-colors font-light underline"
+                      >
+                        {authStep === "login" ? "Need a new desk? Create an account" : "Already registered? Sign in"}
+                      </button>
+                    </div>
+                  </motion.form>
+                )}
+
+                {authStep === "faculty_login" && (
+                  <motion.form 
+                    key="faculty_login"
+                    onSubmit={handleFacultyLogin}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex flex-col gap-5"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setAuthStep("idle");
+                        }}
+                        className="text-[10px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase"
+                      >
+                        ← Back
+                      </button>
+                      <h2 className="font-display text-lg font-semibold tracking-tight text-txt-main mt-2">
+                        Faculty & Company Portal
+                      </h2>
+                      <p className="text-xs text-txt-muted font-light">
+                        Log in using your shared institutional email and unique staff key.
+                      </p>
+                    </div>
+
+                    {error && (
+                      <div className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 p-2.5 rounded-sm font-mono tracking-tight">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-3.5">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Shared Portal Email</label>
+                        <input 
+                          type="email" 
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="e.g. coordinator@college.edu"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-light"
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Portal Password</label>
+                        <div className="relative">
+                          <input 
+                            type={showFacultyPassword ? "text" : "password"} 
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="h-10 pl-3 pr-10 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 w-full"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowFacultyPassword(!showFacultyPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main cursor-pointer flex items-center justify-center bg-transparent border-0 outline-none"
+                          >
+                            {showFacultyPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs text-txt-sub font-medium">Unique Staff Key / ID</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={staffKey}
+                          onChange={(e) => setStaffKey(e.target.value)}
+                          placeholder="e.g. DAVIS987"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity duration-150 focus:outline-none focus:ring-1 focus:ring-ring-main cursor-pointer"
+                    >
+                      {loading ? (
+                        <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
+                      ) : (
+                        <>
+                          Authenticate Staff Session
+                          <ArrowRight size={14} />
+                        </>
+                      )}
+                    </button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
+            </div>
+          </section>
+        </main>
+      ) : (
+        /* ==================== DASHBOARD PANEL ==================== */
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* A. Left Sidebar: Profile & Campus Credits (3 Columns) */}
+          <section className="lg:col-span-3 flex flex-col gap-6">
+            
+            {/* User profile Summary */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Verified Session</span>
+              <div className="flex items-center gap-3">
+                {avatarUrl ? (
+                  <Image 
+                    src={avatarUrl} 
+                    alt="Profile" 
+                    width={40}
+                    height={40}
+                    className="rounded-full border border-border-main/60 object-cover"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded-full border border-border-main/80 bg-bg-card flex items-center justify-center text-txt-muted flex-shrink-0">
+                    <User size={18} className="stroke-[1.5]" />
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
+                  <span className="text-[10px] text-txt-muted font-light">{collegeName || "Independent Student"}</span>
+                  <span className="text-[8px] text-txt-muted font-mono select-all mt-0.5">Desk ID: {user?.id}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Academic Credits Tracker */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credits</span>
+                <Award size={14} className="text-txt-main" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-display font-light tracking-tight text-txt-main">32</span>
+                  <span className="text-[10px] text-txt-muted uppercase tracking-wider font-mono">/ 100 Pts</span>
+                </div>
+                <div className="w-full h-1 bg-border-main/50 rounded-full overflow-hidden">
+                  <div className="bg-accent-main h-full rounded-full" style={{ width: "32%" }} />
+                </div>
+                <p className="text-[10px] text-txt-muted font-light leading-relaxed">
+                  3 completed projects verified by academic coordinators. 8 points pending.
+                </p>
+              </div>
+            </div>
+
+            {/* Teammates List */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Active Co-Workers</span>
+                {coworkers.length > 0 && (
+                  <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50 font-bold">
+                    {coworkers.length} Online
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {coworkers.length > 0 ? (
+                  coworkers.map((cw, i) => (
+                    <div key={cw.id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
+                      </div>
+                      <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50">{cw.role}</span>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-[10px] font-mono text-txt-muted/60 py-1 text-center block uppercase tracking-wider">
+                    None online
+                  </span>
+                )}
+              </div>
+            </div>
+
+          </section>
+
+          {/* B. Center Panel: The Event Registry & Timelines (6 Columns) */}
+          <section className="lg:col-span-6 flex flex-col gap-6">
+            
+            {/* Header + Add button */}
+            <div className="flex items-center justify-between border-b border-border-main/50 pb-4">
+              <div className="flex flex-col gap-0.5">
+                <h2 className="font-display text-xl font-light text-txt-main">
+                  {dashTab === "workspaces" ? "Event Registry" : `Opportunities Board (${opportunities.length})`}
+                </h2>
+                <p className="text-[10px] text-txt-muted font-light">
+                  {dashTab === "workspaces" ? "Tracked project desks and submission stages." : "Faculty-recommended contests, hackathons, and news."}
+                </p>
+              </div>
+              {dashTab === "workspaces" && (
+                <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="h-9 px-3.5 rounded-sm bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 transition-opacity duration-150 cursor-pointer"
+                >
+                  <Plus size={13} />
+                  Track Link
+                </button>
+              )}
+            </div>
+
+            {/* My Active Workspaces Section Header */}
+            <div className="flex items-center justify-between border-b border-border-main/45 pb-2">
+              <div className="flex items-center gap-2.5">
+                <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
+                  My Active Workspaces
+                </span>
+                {events.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsReordering(!isReordering)}
+                    className={`text-[9px] font-mono uppercase tracking-wider transition-all flex items-center gap-1 px-2 py-0.5 rounded border cursor-pointer ${
+                      isReordering 
+                        ? "bg-accent-main/15 text-accent-main border-accent-main/40 font-bold opacity-100" 
+                        : "bg-bg-card text-txt-muted/70 hover:text-txt-main opacity-60 hover:opacity-100 border-border-main/60"
+                    }`}
+                  >
+                    <ArrowUpDown size={10} />
+                    <span>{isReordering ? "Done Reordering" : "Reorder Workspaces"}</span>
+                  </button>
+                )}
+              </div>
+              <span className="text-[9px] font-mono text-txt-muted uppercase">
+                {events.length} Active {events.length === 1 ? "Project" : "Projects"}
+              </span>
+            </div>
+
+            {/* List of active events / workspaces */}
+            <div className="flex flex-col gap-5">
+              <AnimatePresence mode="popLayout">
+                {events.map((ev, evIndex) => {
+                  const resolvedTitle = (() => {
+                    const localName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${ev.id}`) : null;
+                    if (localName && !localName.startsWith("Loading Project")) return localName;
+                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                    if (metaStr) {
+                      try {
+                        const meta = JSON.parse(metaStr);
+                        if (meta && meta.title) return meta.title;
+                      } catch {}
+                    }
+                    return (ev.title && !ev.title.startsWith("Loading Project")) ? ev.title : "Hackathon Event";
+                  })();
+
+                  const stageObjects = (() => {
+                    const realStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) : null;
+                    if (realStr) {
+                      try {
+                        const parsed = JSON.parse(realStr);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                          return parsed.map((s: any) => ({
+                            stage: s.title || s.stage || "Stage",
+                            deadline: s.deadline || "Target Active"
+                          }));
+                        }
+                      } catch {}
+                    }
+                    const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                    if (metaStr) {
+                      try {
+                        const meta = JSON.parse(metaStr);
+                        if (meta && meta.stages && meta.stages.length > 0) {
+                          return meta.stages.map((s: any) => ({
+                            stage: s.title || s.stage || "Stage",
+                            deadline: s.deadline || "Target Active"
+                          }));
+                        }
+                      } catch {}
+                    }
+                    return [
+                      { stage: "Round 1 - Online Assessment", deadline: "09 Aug 2026" },
+                      { stage: "Round 2 - Development Round", deadline: "06 Sep 2026" },
+                      { stage: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026" },
+                      { stage: "Round 4 - Grand Finale", deadline: "02 Nov 2026" }
+                    ];
+                  })();
+
+                  const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
+                  const activeIdx = firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1;
+                  const maxIdx = Math.max(stageObjects.length - 1, 1);
+                  const progressPct = `${Math.min(100, Math.max(0, Math.round((activeIdx / maxIdx) * 100)))}%`;
+
+                  return (
+                    <motion.div 
+                      key={ev.id}
+                      layout
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0, padding: 0, overflow: "hidden" }}
+                      transition={{ duration: 0.35, ease: "easeInOut" }}
+                      className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            {editingWorkspaceId === ev.id ? (
+                              <div className="flex items-center gap-1.5 py-0.5">
+                                <input
+                                  type="text"
+                                  value={tempWorkspaceTitle}
+                                  onChange={(e) => setTempWorkspaceTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleSaveWorkspaceTitle(ev.id);
+                                    if (e.key === "Escape") setEditingWorkspaceId(null);
+                                  }}
+                                  className="h-7 px-2 border border-accent-main bg-bg-base text-txt-main text-xs font-display rounded-sm focus:outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveWorkspaceTitle(ev.id)}
+                                  className="text-[9px] font-mono text-accent-main font-bold uppercase hover:underline cursor-pointer"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingWorkspaceId(null)}
+                                  className="text-[9px] font-mono text-txt-muted uppercase hover:underline cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group/title">
+                                <h3 className="font-display text-base font-semibold text-txt-main truncate">
+                                  {resolvedTitle}
+                                </h3>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTempWorkspaceTitle(resolvedTitle);
+                                    setEditingWorkspaceId(ev.id);
+                                  }}
+                                  className="text-[9px] font-mono text-txt-muted/60 hover:text-accent-main opacity-80 sm:opacity-0 group-hover/title:opacity-100 transition-all cursor-pointer flex items-center gap-1 shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60"
+                                >
+                                  <Edit2 size={10} />
+                                  <span>Rename</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {ev.url && (() => {
+                            let displayUrl = ev.url.startsWith("/workspace/") 
+                              ? `Workspace Desk (${ev.id.substring(0, 8)})` 
+                              : ev.url.replace(/^https?:\/\/(www\.)?/, "");
+
+                            if (!ev.url.startsWith("/workspace/") && displayUrl.length > 30) {
+                              displayUrl = displayUrl.substring(0, 30) + "...";
+                            }
+
+                            return (
+                              <a 
+                                href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-base/40"
+                              >
+                                <span className="truncate leading-none">{displayUrl}</span>
+                                <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
+                              </a>
+                            );
+                          })()}
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          {isReordering && events.length > 1 && (
+                            <div className="flex items-center gap-0.5 bg-bg-card p-1 rounded border border-accent-main/40">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveWorkspace(evIndex, "up")}
+                                disabled={evIndex === 0}
+                                className={`p-1 rounded transition-colors ${
+                                  evIndex === 0 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                }`}
+                              >
+                                <ChevronUp size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveWorkspace(evIndex, "down")}
+                                disabled={evIndex === events.length - 1}
+                                className={`p-1 rounded transition-colors ${
+                                  evIndex === events.length - 1 ? "text-txt-muted/30 cursor-not-allowed" : "text-txt-muted hover:text-accent-main hover:bg-bg-surface cursor-pointer"
+                                }`}
+                              >
+                                <ChevronDown size={13} />
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
+                            <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Milestone Diagram */}
+                      <div className="p-4 rounded-md border border-border-main/40 bg-bg-base/30 overflow-x-auto">
+                        <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
+                          <div className="absolute top-[10px] left-6 right-6 h-[2px] bg-border-main/50 z-0" />
+                          <motion.div 
+                            className="absolute top-[10px] left-6 h-[2px] bg-accent-main z-0"
+                            initial={false}
+                            animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
+                            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+                          />
+                            
+                          {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
+                            const isPassed = isDatePassed(stgObj.deadline);
+                            const isCompleted = isPassed || idx < activeIdx;
+                            const isCurrent = !isCompleted && idx === activeIdx;
+
+                            return (
+                              <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[120px]">
+                                <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                                  isCompleted
+                                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                                    : isCurrent
+                                    ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
+                                    : "border-border-main/60 text-txt-muted/60"
+                                }`}>
+                                  {isCompleted ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                </div>
+
+                                <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
+                                  isCurrent ? "text-accent-main font-bold" : isCompleted ? "text-emerald-400/90 font-medium" : "text-txt-muted/70"
+                                }`}>
+                                  {stgObj.stage}
+                                </span>
+
+                                <span className={`text-[9px] font-mono ${isCompleted ? "text-emerald-400/80 font-medium" : isCurrent ? "text-accent-main/80 font-medium" : "text-txt-muted/60"}`}>
+                                  {isCompleted ? `Completed (${stgObj.deadline})` : `Target ${stgObj.deadline}`}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                  {/* Actions row */}
+                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
+                    <div className="flex items-center gap-2 text-[10px] text-txt-muted">
+                      <div className="flex items-center gap-1">
+                        <MapPin size={11} className="text-txt-muted/70" />
+                        <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
+                      </div>
+                      {ev.level && (
+                        <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
+                          {ev.level}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setConfirmLeaveId(ev.id)}
+                        className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
+                      >
+                        <Trash2 size={11} />
+                        <span>Leave</span>
+                      </button>
+                      <button 
+                        onClick={() => handleOpenInviteModal(ev.id)}
+                        className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                      >
+                        Invite
+                      </button>
+                      <Link 
+                        href={`/workspace/${ev.id}`}
+                        className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                      >
+                        Enter Workspace →
+                      </Link>
+                    </div>
+                  </div>
+
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+          </div>
+
+          </section>
+
+          {/* C. Right Panel: Coding Platform Overview (3 Columns) */}
+          <section className="lg:col-span-3 flex flex-col gap-6">
+            
+            {/* Coding Platform Overview */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Coding Platform Overview</span>
+                {loadingCodingStats && (
+                  <RotateCw size={11} className="animate-spin text-accent-main" />
+                )}
+              </div>
+              
+              {(() => {
+                const meta = user?.user_metadata || {};
+                const lcUser = meta.leetcode_username || "";
+                const cfUser = meta.codeforces_username || "";
+                const ccUser = meta.codechef_username || "";
+                const unstopUser = meta.unstop_username || "";
+                const hasAnyLinked = lcUser || cfUser || ccUser || unstopUser;
+
+                if (hasAnyLinked) {
+                  return (
+                    <div className="flex flex-col gap-3">
+                      {lcUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">LeetCode</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{lcUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.leetcode?.solved !== undefined ? codingStats.leetcode.solved : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Solved</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.leetcode?.rank || (codingStats.leetcode?.globalRank ? `Rank #${codingStats.leetcode.globalRank}` : (loadingCodingStats ? "Syncing..." : "Active"))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {cfUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">Codeforces</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{cfUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.codeforces?.rating !== undefined ? codingStats.codeforces.rating : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.codeforces?.rank || (loadingCodingStats ? "Syncing..." : "Coder")}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {ccUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">CodeChef</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{ccUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">
+                              {codingStats.codechef?.rating !== undefined ? codingStats.codechef.rating : (loadingCodingStats ? "..." : 0)}{" "}
+                              <span className="text-[9px] text-txt-muted uppercase font-normal">Rating</span>
+                            </span>
+                            <span className="text-[9px] font-mono text-txt-sub">
+                              {codingStats.codechef?.stars || (loadingCodingStats ? "Syncing..." : "1★ Star")}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {unstopUser && (
+                        <div className="bg-bg-base/40 border border-border-main/60 p-3 rounded flex flex-col gap-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-txt-main font-semibold">Unstop</span>
+                            <span className="text-[10px] text-accent-main font-mono">@{unstopUser}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline mt-1">
+                            <span className="text-base font-mono text-txt-main font-bold">6 <span className="text-[9px] text-txt-muted uppercase font-normal">Hacks</span></span>
+                            <span className="text-[9px] font-mono text-txt-sub">Rank #145</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <Link 
+                        href="/coding-deck"
+                        className="h-8 bg-accent-main/10 hover:bg-accent-main/20 text-accent-main text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-colors border border-accent-main/30 font-bold"
+                      >
+                        Manage Coding Deck &rarr;
+                      </Link>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex flex-col gap-3 text-center py-2">
+                    <p className="text-[10px] text-txt-sub font-light leading-relaxed">
+                      Link LeetCode, Codeforces, CodeChef, and Unstop handles to display stats, ratings, and streaks here.
+                    </p>
+                    <Link 
+                      href="/coding-deck"
+                      className="h-8 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center justify-center gap-1.5 transition-opacity font-bold"
+                    >
+                      Connect Platforms &rarr;
+                    </Link>
+                  </div>
+                );
+              })()}
+            </div>
+
+          </section>
+
+        </main>
+      )}
+
+      {/* 3. Footer */}
+      <footer className="h-12 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
+        <div>
+          © 2026 LYNDESK NETWORK INC.
+        </div>
+        <div className="flex gap-6 uppercase font-mono">
+          <Link href="/privacy" className="hover:text-txt-main transition-colors">Privacy</Link>
+          <Link href="/terms" className="hover:text-txt-main transition-colors">Terms</Link>
+          <span className="text-txt-muted select-none">LDK:SYS</span>
+        </div>
+      </footer>
+
+      {/* ==================== SCRAPER ADD MODAL ==================== */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            {/* Frosted Backing overlay */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsModalOpen(false); setModalError(null); setScraperUrl(""); setNewEventTitle(""); setNewEventDeadline(""); }}
+              className="absolute inset-0 bg-bg-primary/60 backdrop-blur-sm"
+            />
+
+            {/* Modal Box */}
+            <motion.div 
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-lg border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-lg z-10 flex flex-col gap-5"
+            >
+              
+              {/* Close Button */}
+              <button 
+                onClick={() => { setIsModalOpen(false); setModalError(null); setScraperUrl(""); setNewEventTitle(""); setNewEventDeadline(""); }}
+                className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main transition-colors"
+              >
+                <X size={15} />
+              </button>
+
+              <div className="flex flex-col gap-1 border-b border-border-main/40 pb-3">
+                <h3 className="font-display text-lg font-semibold text-txt-main">Track New Event Link</h3>
+                <p className="text-xs text-txt-muted font-light">Paste hackathon URL to auto-extract timelines and stages.</p>
+              </div>
+
+              {modalError && (
+                <div className="text-xs text-txt-muted bg-bg-card border border-border-main/60 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                  {modalError}
+                </div>
+              )}
+
+              {/* Scraper Input */}
+              <form onSubmit={handleScrape} className="flex gap-2 items-center">
+                <input 
+                  type="text"
+                  placeholder="Event Link (e.g. Unstop/Devpost URL or custom link)"
+                  value={scraperUrl}
+                  onChange={(e) => setScraperUrl(e.target.value)}
+                  className="flex-1 h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                />
+                <button 
+                  type="submit"
+                  disabled={scraping || !scraperUrl.trim()}
+                  className="h-10 px-4 rounded-sm bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-xs font-mono uppercase tracking-wider transition-opacity cursor-pointer flex items-center justify-center shrink-0"
+                >
+                  {scraping ? "Extracting..." : "Auto-Extract"}
+                </button>
+              </form>
+
+              {/* Manual Fields form */}
+              <form onSubmit={handleAddEvent} className="flex flex-col gap-4 pt-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-txt-sub font-medium">Event Title</label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="MIT HackHarvard 2026"
+                    value={newEventTitle}
+                    onChange={(e) => setNewEventTitle(e.target.value)}
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-txt-sub font-medium">Deadline Date (Optional)</label>
+                    <input 
+                      type="text"
+                      placeholder="Oct 12, 2026 (Optional)"
+                      value={newEventDeadline}
+                      onChange={(e) => setNewEventDeadline(e.target.value)}
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-txt-sub font-medium">Location</label>
+                    <select
+                      value={newEventLocation}
+                      onChange={(e) => setNewEventLocation(e.target.value as "online" | "in_person" | "hybrid")}
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors font-light"
+                    >
+                      <option value="online">Online</option>
+                      <option value="in_person">In-Person</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full h-11 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-medium text-xs tracking-wider uppercase flex items-center justify-center gap-2 mt-2 transition-opacity cursor-pointer"
+                >
+                  Create Project Vault
+                  <ArrowRight size={14} />
+                </button>
+              </form>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Invite Friends Modal from Homepage */}
+      {isInviteHomeModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden font-sans">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+            onClick={() => setIsInviteHomeModalOpen(false)}
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="max-w-md w-full border border-border-main/70 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-6 animate-fade-in relative z-55">
+              
+              <div className="flex justify-between items-start border-b border-border-main/40 pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Event invitation</span>
+                  <h3 className="font-display text-lg font-semibold text-txt-main">Invite Classmates to Collaborate</h3>
+                </div>
+                <button 
+                  onClick={() => setIsInviteHomeModalOpen(false)}
+                  className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Direct Invite Friends Block */}
+              <div className="flex flex-col gap-2.5">
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Active Friends</span>
+                
+                <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-base/30 divide-y divide-border-main/60">
+                  {friendsToInviteHome.length > 0 ? (
+                    friendsToInviteHome.map(f => (
+                      <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main font-semibold">{f.full_name}</span>
+                          <span className="text-[9px] text-txt-muted font-mono">@{f.username}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleSendInviteFromHome(f.id, f.full_name)}
+                          className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono tracking-wider uppercase rounded-sm flex items-center gap-1 cursor-pointer font-bold"
+                        >
+                          Send Invite
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-txt-muted font-mono text-[9px] uppercase">
+                      No active friends found. Connect on the Friends tab first.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave Workspace Confirmation Modal */}
+      <AnimatePresence>
+        {confirmLeaveId && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] overflow-hidden font-sans text-left bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="max-w-xs w-full border border-border-main/80 bg-bg-surface p-6 rounded-md shadow-2xl flex flex-col gap-4 relative z-[160]"
+            >
+              <div className="flex flex-col gap-1.5 text-center">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-red-400 font-bold flex items-center justify-center gap-1">
+                  <LogOut size={11} /> Leave Workspace
+                </span>
+                <h3 className="font-display text-base font-semibold text-txt-main">Leave this workspace?</h3>
+                <p className="text-[11px] text-txt-muted font-light leading-relaxed">
+                  Are you sure you want to leave and delete this workspace for your account? You will be removed from the active member roster and your local workspace desk access will be deleted.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmLeaveId(null)}
+                  className="flex-1 h-8 rounded bg-bg-card border border-border-main/80 text-txt-muted hover:text-txt-main text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmLeaveWorkspace}
+                  className="flex-1 h-8 rounded bg-red-500/90 hover:bg-red-500 text-white text-xs font-mono uppercase tracking-wider font-bold transition-opacity cursor-pointer shadow-sm flex items-center justify-center gap-1"
+                >
+                  Confirm & Leave
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

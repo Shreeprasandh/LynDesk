@@ -780,11 +780,10 @@ export default function Header() {
               ) : (
                 <>
                   <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
-                  <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
+                  <Link href="/event-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Event Desk</Link>
                   <Link href="/coding-deck" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Deck</Link>
-                  <Link href="/news-contests" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">News & Contests</Link>
-                  <Link href="/leaderboard" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Leaderboard</Link>
-                  <Link href="/friends" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Friends</Link>
+                  <Link href="/study-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Study Desk</Link>
+                  <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
                 </>
               )}
             </nav>
@@ -891,11 +890,10 @@ export default function Header() {
                 ) : (
                   <>
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Dashboard</Link>
-                    <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
+                    <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Event Desk</Link>
                     <Link href="/coding-deck" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Coding Deck</Link>
-                    <Link href="/news-contests" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">News & Contests</Link>
-                    <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Leaderboard</Link>
-                    <Link href="/friends" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Friends</Link>
+                    <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Study Desk</Link>
+                    <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
                   </>
                 )}
               </nav>
