@@ -634,6 +634,18 @@ export default function Header() {
     };
   }, [user]);
 
+  // Automatically mark all notifications as read when the notification drawer opens
+  useEffect(() => {
+    if (isOpen && unreadCount > 0) {
+      const updated = notifications.map(n => ({ ...n, read: true }));
+      setNotifications(updated);
+      localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+      if (user?.id) {
+        localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
+      }
+    }
+  }, [isOpen, unreadCount, notifications, user?.id]);
+
   const handleClearTab = () => {
     const updated = notifications.filter(n => n.category !== drawerTab);
     setNotifications(updated);
@@ -870,13 +882,15 @@ export default function Header() {
             {user && (
               <button 
                 onClick={() => setIsOpen(true)}
-                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none relative cursor-pointer"
+                className={`p-2 rounded-full transition-all duration-300 focus:outline-none relative cursor-pointer ${
+                  unreadCount > 0
+                    ? "border border-red-500/40 text-txt-main shadow-[0_0_6px_rgba(239,68,68,0.12)] animate-pulse hover:bg-bg-card"
+                    : "border border-border-main/80 hover:bg-bg-card text-txt-main"
+                }`}
                 aria-label="View notifications"
+                title={unreadCount > 0 ? `${unreadCount} new notification(s)` : "Notifications"}
               >
                 <Bell size={14} />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-red-500 opacity-85 bg-red-500/10" />
-                )}
               </button>
             )}
 
@@ -1034,7 +1048,7 @@ export default function Header() {
               </div>
 
               {/* Category Tabs inside Drawer */}
-              <div className="flex border-b border-border-main/40 bg-bg-base/30 px-6 py-2.5 font-mono text-[10px] uppercase tracking-wider gap-6">
+              <div className="flex border-b border-border-main/40 bg-bg-card px-6 py-2.5 font-mono text-[10px] uppercase tracking-wider gap-6">
                 <button
                   onClick={() => setDrawerTab("alerts")}
                   className={`pb-1 cursor-pointer transition-all border-b-2 font-medium ${
@@ -1059,7 +1073,7 @@ export default function Header() {
 
               {/* Nudge Engine Simulation Panel */}
               {(isFaculty || isRecruiter) && (
-                <div className="px-6 py-4 bg-bg-base/40 border-b border-border-main/40 flex items-center justify-between">
+                <div className="px-6 py-4 bg-bg-card border-b border-border-main/40 flex items-center justify-between">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[10px] font-semibold text-txt-main flex items-center gap-1">
                       <Sparkles size={11} className="text-yellow-500" /> Cron Simulator
@@ -1085,7 +1099,7 @@ export default function Header() {
                       key={`${item.id}_${idx}`} 
                       className={`p-4 border rounded-sm flex flex-col gap-3 transition-colors ${
                         item.read 
-                          ? "bg-bg-base/30 border-border-main/40 opacity-75" 
+                          ? "bg-bg-card/60 border-border-main/40 opacity-75" 
                           : "bg-bg-card border-border-main text-txt-main"
                       }`}
                     >

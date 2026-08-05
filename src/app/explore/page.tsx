@@ -28,7 +28,9 @@ import {
   GraduationCap,
   Copy,
   AlertTriangle,
+  SlidersHorizontal,
 } from "lucide-react";
+import PreferencePresetModal from "../components/PreferencePresetModal";
 
 // Types for Events & Contests
 interface OpportunityItem {
@@ -79,6 +81,31 @@ export default function ExplorePage() {
 
   // Two Main Sub-Tabs: "events" | "friends"
   const [activeTab, setActiveTab] = useState<"events" | "friends">("events");
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [hasActivePreset, setHasActivePreset] = useState(false);
+
+  useEffect(() => {
+    const checkPreset = () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("ldk_preference_preset");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.location || parsed.locationMode !== "all" || parsed.categoryFocus !== "all") {
+              setHasActivePreset(true);
+              return;
+            }
+          } catch {}
+        }
+      }
+      setHasActivePreset(false);
+    };
+    checkPreset();
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_preferences_update", checkPreset);
+      return () => window.removeEventListener("ldk_preferences_update", checkPreset);
+    }
+  }, []);
 
   // Sync tab state from URL query parameter
   useEffect(() => {
@@ -566,8 +593,9 @@ export default function ExplorePage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-2 flex flex-col gap-6">
 
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-5 gap-4">
-          <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-5 gap-6">
+          {/* Left Column: Title & Description */}
+          <div className="flex flex-col gap-1 flex-1">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">
               Discovery &amp; Networking Hub
             </span>
@@ -579,32 +607,45 @@ export default function ExplorePage() {
             </p>
           </div>
 
-          {/* TWO MAIN SUB-TABS */}
-          <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase">
+          {/* Right Column: Subtabs & Preference Preset Button */}
+          <div className="flex flex-col items-start md:items-end justify-between gap-2.5 shrink-0">
+            <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 font-mono text-[10px] tracking-wider uppercase">
+              <button
+                onClick={() => setActiveTab("events")}
+                className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === "events"
+                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                    : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                <Trophy size={13} />
+                Events &amp; Contests
+              </button>
+              <button
+                onClick={() => setActiveTab("friends")}
+                className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 relative ${
+                  activeTab === "friends"
+                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                    : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                <Users size={13} />
+                Friends &amp; Network
+                {requestsList.length > 0 && (
+                  <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse ml-0.5" />
+                )}
+              </button>
+            </div>
+
             <button
-              onClick={() => setActiveTab("events")}
-              className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === "events"
-                  ? "bg-accent-main text-bg-base font-semibold shadow-xs"
-                  : "text-txt-sub hover:text-txt-main"
-              }`}
+              type="button"
+              onClick={() => setIsPresetModalOpen(true)}
+              className="h-5 px-2 bg-bg-card/70 hover:bg-bg-card border border-border-main/70 text-txt-muted hover:text-txt-main text-[8.5px] font-mono tracking-wider uppercase rounded inline-flex items-center gap-1 transition-all cursor-pointer opacity-70 hover:opacity-100 shrink-0 font-medium"
+              title="Customize location, category, and travel preference presets"
             >
-              <Trophy size={13} />
-              Events &amp; Contests
-            </button>
-            <button
-              onClick={() => setActiveTab("friends")}
-              className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 relative ${
-                activeTab === "friends"
-                  ? "bg-accent-main text-bg-base font-semibold shadow-xs"
-                  : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              <Users size={13} />
-              Friends &amp; Network
-              {requestsList.length > 0 && (
-                <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse ml-0.5" />
-              )}
+              <SlidersHorizontal size={9} className="text-accent-main" />
+              <span>Preference Preset</span>
+              {hasActivePreset && <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse ml-0.5" />}
             </button>
           </div>
         </div>
@@ -1310,6 +1351,10 @@ export default function ExplorePage() {
       )}
 
       <Footer />
+      <PreferencePresetModal 
+        isOpen={isPresetModalOpen} 
+        onClose={() => setIsPresetModalOpen(false)} 
+      />
     </div>
   );
 }

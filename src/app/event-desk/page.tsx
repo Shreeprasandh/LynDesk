@@ -31,8 +31,10 @@ import {
   ArrowUpDown,
   Trash2,
   LogOut,
-  Copy
+  Copy,
+  SlidersHorizontal
 } from "lucide-react";
+import PreferencePresetModal from "../components/PreferencePresetModal";
 
 // Brand Icon Helpers
 const DiscordIcon = ({ size = 14 }: { size?: number }) => (
@@ -167,6 +169,20 @@ function isDatePassed(dateStr?: string | null): boolean {
   return false;
 }
 
+function calculateSubDeadline(targetDeadline: string, daysBefore: number): string {
+  if (!targetDeadline || targetDeadline === "TBD") return "TBD";
+  try {
+    const raw = targetDeadline.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
+    const time = Date.parse(raw);
+    if (!isNaN(time)) {
+      const d = new Date(time - daysBefore * 86400000);
+      const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+  } catch {}
+  return targetDeadline;
+}
+
 interface EventItem {
   id: string;
   title: string;
@@ -235,6 +251,31 @@ export default function Home() {
   // News and Opportunities States
   const [dashTab, setDashTab] = useState<"workspaces" | "opportunities">("workspaces");
   const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [hasActivePreset, setHasActivePreset] = useState(false);
+
+  useEffect(() => {
+    const checkPreset = () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("ldk_preference_preset");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.location || parsed.locationMode !== "all" || parsed.categoryFocus !== "all") {
+              setHasActivePreset(true);
+              return;
+            }
+          } catch {}
+        }
+      }
+      setHasActivePreset(false);
+    };
+    checkPreset();
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_preferences_update", checkPreset);
+      return () => window.removeEventListener("ldk_preferences_update", checkPreset);
+    }
+  }, []);
 
   // Real-time Coding Platform Overview Stats
   const [, setCodingStats] = useState<{
@@ -253,96 +294,103 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const loadOpps = () => {
+        const defaultOpps = [
+          {
+            id: "opp_1",
+            title: "MIT HackHarvard 2026",
+            category: "hackathon",
+            deadline: "Oct 12, 2026",
+            location: "hybrid",
+            level: "global",
+            url: "https://hackharvard.org",
+            description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+            facultyRecommended: true,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_2",
+            title: "Google Developer Hackathon India",
+            category: "hackathon",
+            deadline: "Nov 02, 2026",
+            location: "online",
+            level: "national",
+            url: "https://build.google.com",
+            description: "National developer jam leveraging Google Cloud and AI agents.",
+            facultyRecommended: true,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_3",
+            title: "Stanford TreeHacks 2026",
+            category: "hackathon",
+            deadline: "Nov 18, 2026",
+            location: "in_person",
+            level: "global",
+            url: "https://treehacks.com",
+            description: "Stanford's landmark hackathon focusing on engineering solutions for social good.",
+            facultyRecommended: false,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_4",
+            title: "Codeforces Round 995 (Div. 2)",
+            category: "contest",
+            deadline: "Sep 28, 2026",
+            location: "online",
+            level: "global",
+            url: "https://codeforces.com",
+            description: "Official Div. 2 programming contest with rating updates.",
+            facultyRecommended: true,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_5",
+            title: "LeetCode Weekly Contest 420",
+            category: "contest",
+            deadline: "Sep 20, 2026",
+            location: "online",
+            level: "global",
+            url: "https://leetcode.com",
+            description: "Weekly algorithmic challenge with globally ranked leaderboard.",
+            facultyRecommended: false,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_6",
+            title: "Smart India Hackathon (SIH) 2026",
+            category: "hackathon",
+            deadline: "Sept 15, 2026",
+            location: "hybrid",
+            level: "national",
+            url: "https://sih.gov.in",
+            description: "Nationwide initiative to provide students with a platform to solve pressing problems.",
+            facultyRecommended: true,
+            createdDate: "Oct 14"
+          },
+          {
+            id: "opp_7",
+            title: "Next.js 16 Conference Keynote Details",
+            category: "news",
+            deadline: "Oct 25, 2026",
+            location: "online",
+            level: "global",
+            url: "https://nextjs.org/conf",
+            description: "Vercel announces Next.js 16 featuring compiler optimizations and Server Component refinements.",
+            facultyRecommended: false,
+            createdDate: "Oct 14"
+          }
+        ];
+
         const stored = localStorage.getItem("ldk_opportunities");
         if (stored) {
-          setOpportunities(JSON.parse(stored));
+          try {
+            const parsed = JSON.parse(stored);
+            const activeOnly = parsed.filter((o: any) => !isDatePassed(o.deadline));
+            setOpportunities(activeOnly.length > 0 ? activeOnly : defaultOpps);
+          } catch {
+            setOpportunities(defaultOpps);
+          }
         } else {
-          const defaultOpps = [
-            {
-              id: "opp_1",
-              title: "MIT HackHarvard 2026",
-              category: "hackathon",
-              deadline: "Oct 12, 2026",
-              location: "hybrid",
-              level: "global",
-              url: "https://hackharvard.org",
-              description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
-              facultyRecommended: true,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_2",
-              title: "Google Developer Hackathon India",
-              category: "hackathon",
-              deadline: "Nov 02, 2026",
-              location: "online",
-              level: "national",
-              url: "https://build.google.com",
-              description: "National developer jam leveraging Google Cloud and AI agents.",
-              facultyRecommended: true,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_3",
-              title: "Stanford TreeHacks 2026",
-              category: "hackathon",
-              deadline: "Feb 18, 2026",
-              location: "in_person",
-              level: "global",
-              url: "https://treehacks.com",
-              description: "Stanford's landmark hackathon focusing on engineering solutions for social good.",
-              facultyRecommended: false,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_4",
-              title: "Codeforces Round 990 (Div. 2)",
-              category: "contest",
-              deadline: "July 28, 2026",
-              location: "online",
-              level: "global",
-              url: "https://codeforces.com",
-              description: "Official Div. 2 programming contest with rating updates.",
-              facultyRecommended: true,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_5",
-              title: "LeetCode Weekly Contest 410",
-              category: "contest",
-              deadline: "July 26, 2026",
-              location: "online",
-              level: "global",
-              url: "https://leetcode.com",
-              description: "Weekly algorithmic challenge with globally ranked leaderboard.",
-              facultyRecommended: false,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_6",
-              title: "Smart India Hackathon (SIH) 2026",
-              category: "hackathon",
-              deadline: "Sept 15, 2026",
-              location: "hybrid",
-              level: "national",
-              url: "https://sih.gov.in",
-              description: "Nationwide initiative to provide students with a platform to solve pressing problems.",
-              facultyRecommended: true,
-              createdDate: "Oct 14"
-            },
-            {
-              id: "opp_7",
-              title: "Next.js 16 Conference Keynote Details",
-              category: "news",
-              deadline: "Oct 25, 2026",
-              location: "online",
-              level: "global",
-              url: "https://nextjs.org/conf",
-              description: "Vercel announces Next.js 16 featuring compiler optimizations and Server Component refinements.",
-              facultyRecommended: false,
-              createdDate: "Oct 14"
-            }
-          ];
           setOpportunities(defaultOpps);
           localStorage.setItem("ldk_opportunities", JSON.stringify(defaultOpps));
         }
@@ -662,7 +710,10 @@ export default function Home() {
               }
             });
 
-            const mergedList = Array.from(map.values());
+            const deletedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_deleted_workspaces") : null;
+            const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+
+            const mergedList = Array.from(map.values()).filter(e => !deletedIds.includes(e.id));
             if (typeof window !== "undefined") {
               localStorage.setItem("ldk_events", JSON.stringify(mergedList));
             }
@@ -818,6 +869,13 @@ export default function Home() {
         const filteredJoined = joinedIds.filter(id => id !== idToRemove);
         localStorage.setItem("ldk_joined_workspaces", JSON.stringify(filteredJoined));
 
+        const deletedStr = localStorage.getItem("ldk_deleted_workspaces");
+        const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+        if (!deletedIds.includes(idToRemove)) {
+          deletedIds.push(idToRemove);
+          localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(deletedIds));
+        }
+
         localStorage.removeItem(`ldk_workspace_name_${idToRemove}`);
         localStorage.removeItem(`ldk_workspace_status_${idToRemove}`);
         localStorage.removeItem(`ldk_workspace_meta_${idToRemove}`);
@@ -842,6 +900,11 @@ export default function Home() {
             .delete()
             .eq("project_space_id", targetUuid)
             .eq("profile_id", user.id);
+          
+          await supabase
+            .from("project_spaces")
+            .delete()
+            .eq("id", targetUuid);
         }
       } catch (e) {
         console.error("Failed removing membership in DB:", e);
@@ -1138,19 +1201,29 @@ export default function Home() {
       }
     }
 
+    const titleLower = newEventTitle.toLowerCase();
+    const isContest = titleLower.includes("contest") ||
+                      titleLower.includes("leetcode") ||
+                      titleLower.includes("codeforces") ||
+                      titleLower.includes("codechef") ||
+                      titleLower.includes("assessment") ||
+                      titleLower.includes("quiz");
+
     const initialMeta = scrapedData || {
       title: newEventTitle,
       description: `Official workspace for ${newEventTitle}. Collaborate with your team, assign tasks, and track stage milestones.`,
       organization: "Campus / Custom Host",
       prizes: "Certificate of Excellence & Awards",
-      rules: "1. Develop your project prototype during the hackathon timeline.\n2. Submit project demo and source repository before the deadline.",
+      rules: isContest ? "Solve competitive programming problems during the contest timeline." : "1. Develop your project prototype during the hackathon timeline.\n2. Submit project demo and source repository before the deadline.",
       deadline: newEventDeadline.trim() || "TBD",
-      team_size: "2 - 4 Members",
+      team_size: isContest ? "1 Member (Solo)" : "2 - 4 Members",
       eligibility: "Open to student participants",
-      stages: [
-        { stage: "Ideation & Proposal", deadline: "Target Active", brief: "Problem selection, team assignment, and architecture draft." },
-        { stage: "Prototype Development", deadline: "Target Active", brief: "Implement core MVP components and features." },
-        { stage: "QA & User Testing", deadline: "Target Active", brief: "User testing, bug fixes, and polish." },
+      stages: isContest ? [
+        { stage: "Contest Live Session", deadline: newEventDeadline.trim() || "TBD", brief: "Compete live and solve problem set." }
+      ] : [
+        { stage: "Ideation & Proposal", deadline: calculateSubDeadline(newEventDeadline, 14), brief: "Problem selection, team assignment, and architecture draft." },
+        { stage: "Prototype Development", deadline: calculateSubDeadline(newEventDeadline, 7), brief: "Implement core MVP components and features." },
+        { stage: "QA & User Testing", deadline: calculateSubDeadline(newEventDeadline, 2), brief: "User testing, bug fixes, and polish." },
         { stage: "Final Submission", deadline: newEventDeadline.trim() || "TBD", brief: "Publish live demo and GitHub repository." }
       ],
       url: finalUrl
@@ -1213,7 +1286,38 @@ export default function Home() {
             }
           }
         });
-        setFriendsToInviteHome(friendsList);
+        let existingMemberIds: string[] = [user?.id || ""];
+        if (typeof window !== "undefined") {
+          const localMembersStr = localStorage.getItem(`ldk_workspace_members_${eventId}`);
+          if (localMembersStr) {
+            try {
+              const parsedMembers = JSON.parse(localMembersStr);
+              parsedMembers.forEach((m: any) => {
+                if (m.id && !existingMemberIds.includes(m.id)) existingMemberIds.push(m.id);
+              });
+            } catch {}
+          }
+        }
+
+        if (eventId && eventId !== "mock") {
+          try {
+            const targetUuid = getWorkspaceUuid(eventId);
+            const { data: dbMembers } = await supabase
+              .from("project_members")
+              .select("profile_id")
+              .eq("project_space_id", targetUuid);
+            if (dbMembers) {
+              dbMembers.forEach((m: any) => {
+                if (m.profile_id && !existingMemberIds.includes(m.profile_id)) {
+                  existingMemberIds.push(m.profile_id);
+                }
+              });
+            }
+          } catch {}
+        }
+
+        const availableFriends = friendsList.filter(f => !existingMemberIds.includes(f.id));
+        setFriendsToInviteHome(availableFriends);
       } else {
         setFriendsToInviteHome([]);
       }
@@ -1906,8 +2010,10 @@ export default function Home() {
                           ];
                         })();
 
+                        const isEventEnded = isDatePassed(ev.deadline);
                         const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
-                        const activeIdx = firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1;
+                        const allPassed = firstUnpassed === -1;
+                        const activeIdx = (isEventEnded || allPassed) ? stageObjects.length - 1 : (firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1);
                         const maxIdx = Math.max(stageObjects.length - 1, 1);
 
                         return (
@@ -2029,56 +2135,62 @@ export default function Home() {
                             {/* Milestone Diagram */}
                             <div className="p-4 rounded-md border border-border-main/40 bg-bg-card overflow-x-auto">
                               <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
-                                {/* Horizontal Background Track Line (Extended with Smooth Faded Gradient Ends) */}
+                                {/* Static Horizontal Track Line (Fading at both ends, never changes or glows) */}
                                 <div className="absolute top-[8px] left-3 right-3 h-[1.5px] bg-gradient-to-r from-transparent via-border-main/70 to-transparent z-0" />
-                                {/* Active Progress Line */}
-                                <motion.div 
-                                  className="absolute top-[8px] left-[60px] h-[1.5px] bg-accent-main z-0"
-                                  initial={false}
-                                  animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
-                                  transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                                />
                                   
                                 {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
                                   const isPassed = isDatePassed(stgObj.deadline);
-                                  const isCompleted = isPassed || idx < activeIdx;
+                                  const isCompleted = isEventEnded || allPassed || isPassed || idx < activeIdx;
                                   const isCurrent = !isCompleted && idx === activeIdx;
+                                  const isLastStage = idx === stageObjects.length - 1;
+                                  const isLastStageCompleted = isLastStage && isCompleted;
 
                                   return (
                                     <div key={idx} className="relative flex flex-col items-center gap-1.5 text-center min-w-[120px]">
                                       {/* Node Circle with Workspace Left Section Glow */}
                                       <div className="relative h-[17px] w-[17px] shrink-0 flex items-center justify-center">
-                                        {isCurrent && (
-                                          <div className="absolute -inset-1 rounded-full bg-accent-main/20 blur-[2.5px] pointer-events-none animate-pulse" />
-                                        )}
-                                        {isCompleted && (
+                                        {/* Glow Halos */}
+                                        {isLastStageCompleted ? (
                                           <div className="absolute -inset-0.5 rounded-full bg-emerald-500/15 blur-[2px] pointer-events-none" />
-                                        )}
+                                        ) : isCompleted ? (
+                                          <div className="absolute -inset-1 rounded-full bg-accent-main/20 blur-[2.5px] pointer-events-none" />
+                                        ) : isCurrent ? (
+                                          <div className="absolute -inset-1 rounded-full bg-accent-main/20 blur-[2.5px] pointer-events-none animate-pulse" />
+                                        ) : null}
 
-                                        <div className={`relative z-10 h-[17px] w-[17px] rounded-full border-[1.5px] flex items-center justify-center transition-all duration-300 ${
-                                          isCompleted
-                                            ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_5px_rgba(16,185,129,0.18)]"
+                                        {/* Node Circle with Numbers 1, 2, 3, 4 */}
+                                        <div className={`relative z-10 h-[17px] w-[17px] rounded-full border-[1.5px] flex items-center justify-center leading-none p-0 transition-all duration-300 ${
+                                          isLastStageCompleted
+                                            ? "border-emerald-500 bg-bg-surface shadow-[0_0_5px_rgba(16,185,129,0.18)] text-emerald-400 font-bold"
+                                            : isCompleted
+                                            ? "border-accent-main bg-bg-surface shadow-[0_0_6px_rgba(var(--color-accent-main),0.15)] text-accent-main font-bold"
                                             : isCurrent
-                                            ? "border-accent-main bg-bg-surface shadow-[0_0_6px_rgba(var(--color-accent-main),0.15)]"
-                                            : "border-border-main/60 bg-bg-card"
+                                            ? "border-accent-main bg-bg-surface shadow-[0_0_6px_rgba(var(--color-accent-main),0.15)] text-accent-main font-bold"
+                                            : "border-border-main/60 bg-bg-card text-txt-muted/60"
                                         }`}>
-                                          {isCompleted ? (
-                                            <CheckCircle2 size={10} className="text-emerald-400 fill-emerald-500/30" />
-                                          ) : (
-                                            <span className={`text-[7.5px] font-mono leading-none ${isCurrent ? "text-accent-main font-bold" : "text-txt-muted/60"}`}>
-                                              {idx + 1}
-                                            </span>
-                                          )}
+                                          <span className="text-[7.5px] font-mono leading-none block">
+                                            {idx + 1}
+                                          </span>
                                         </div>
                                       </div>
 
                                       <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
-                                        isCurrent ? "text-accent-main font-bold" : isCompleted ? "text-emerald-400/90 font-medium" : "text-txt-muted/70"
+                                        isLastStageCompleted
+                                          ? "text-emerald-400 font-bold"
+                                          : isCurrent || isCompleted
+                                          ? "text-accent-main font-semibold"
+                                          : "text-txt-muted/70"
                                       }`}>
                                         {stgObj.stage}
                                       </span>
 
-                                      <span className={`text-[9px] font-mono ${isCompleted ? "text-emerald-400/80 font-medium" : isCurrent ? "text-accent-main/80 font-medium" : "text-txt-muted/60"}`}>
+                                      <span className={`text-[9px] font-mono ${
+                                        isLastStageCompleted
+                                          ? "text-emerald-400 font-semibold"
+                                          : isCurrent || isCompleted
+                                          ? "text-accent-main/90 font-medium"
+                                          : "text-txt-muted/60"
+                                      }`}>
                                         {isCompleted ? `Completed (${stgObj.deadline})` : `Target ${stgObj.deadline}`}
                                       </span>
                                     </div>
@@ -2140,13 +2252,25 @@ export default function Home() {
                   <span className="text-[10px] uppercase font-mono tracking-wider font-bold text-accent-main">
                     Recommended Contests &amp; Hackathons
                   </span>
-                  <span className="text-[9px] font-mono text-txt-muted uppercase">
-                    {opportunities.length} Items Listed
-                  </span>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetModalOpen(true)}
+                      className="h-5 px-2 bg-bg-card/70 hover:bg-bg-card border border-border-main/70 text-txt-muted hover:text-txt-main text-[8.5px] font-mono tracking-wider uppercase rounded inline-flex items-center gap-1 transition-all cursor-pointer opacity-80 hover:opacity-100 shrink-0 font-medium"
+                      title="Customize location, category, and travel preference presets"
+                    >
+                      <SlidersHorizontal size={9} className="text-accent-main" />
+                      <span>Preference Preset</span>
+                      {hasActivePreset && <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse ml-0.5" />}
+                    </button>
+                    <span className="text-[9px] font-mono text-txt-muted uppercase">
+                      {opportunities.filter(opp => !isDatePassed(opp.deadline)).length} Items Listed
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {opportunities.map((opp) => (
+                  {opportunities.filter(opp => !isDatePassed(opp.deadline)).map((opp) => (
                     <div key={opp.id} className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3 justify-between hover:border-txt-main/40 transition-colors">
                       <div className="flex flex-col gap-2">
                         <div className="flex justify-between items-start gap-2">
@@ -2337,9 +2461,35 @@ export default function Home() {
                 </button>
               </div>
 
+              {/* Workspace Invite Link Box */}
+              <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-4">
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider font-mono">Workspace Invite Link</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text"
+                    readOnly
+                    value={typeof window !== "undefined" ? `${window.location.origin}/workspace/${inviteEventId}?join=true` : ""}
+                    className="h-9 px-3 border border-border-main/70 bg-bg-base text-txt-main rounded text-xs font-mono flex-1 font-light selection:bg-accent-main selection:text-bg-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        const link = `${window.location.origin}/workspace/${inviteEventId}?join=true`;
+                        navigator.clipboard.writeText(link);
+                        showToast("Workspace invite link copied!");
+                      }
+                    }}
+                    className="h-9 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[9px] uppercase tracking-wider font-bold rounded flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Copy size={11} /> Copy Link
+                  </button>
+                </div>
+              </div>
+
               {/* Direct Invite Friends Block */}
               <div className="flex flex-col gap-2.5">
-                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Active Friends</span>
+                <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider font-mono">Your Active Friends</span>
                 
                 <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-card divide-y divide-border-main/60">
                   {friendsToInviteHome.length > 0 ? (
@@ -2416,6 +2566,12 @@ export default function Home() {
       </AnimatePresence>
 
       <Footer />
+
+      {/* Shared Global Preference Preset Modal */}
+      <PreferencePresetModal 
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+      />
     </div>
   );
 }

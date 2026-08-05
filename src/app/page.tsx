@@ -21,7 +21,9 @@ import {
   Award,
   Globe,
   Mail,
+  SlidersHorizontal
 } from "lucide-react";
+import PreferencePresetModal from "./components/PreferencePresetModal";
 
 // Brand Icon Helpers
 const DiscordIcon = ({ size = 14 }: { size?: number }) => (
@@ -257,7 +259,11 @@ export default function Home() {
       localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
       window.location.href = "/coordinator";
     } else {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error("SignOut error:", err);
+      }
       setAuthError("Invalid Staff Key. Access denied.");
       setAuthActionLoading(false);
     }
@@ -267,15 +273,19 @@ export default function Home() {
     e.preventDefault();
     setAuthActionLoading(true);
     setAuthError(null);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) {
-      setAuthError(error.message);
-      setAuthActionLoading(false);
-    } else {
-      setAuthError("Registration successful. Check your email for verification.");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) {
+        setAuthError(error.message);
+      } else {
+        setAuthError("Registration successful. Check your email for verification.");
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Registration failed. Please try again.");
+    } finally {
       setAuthActionLoading(false);
     }
   };
@@ -283,17 +293,49 @@ export default function Home() {
   const handleOAuthLogin = async (provider: "google" | "github" | "discord" | "linkedin") => {
     setAuthActionLoading(true);
     setAuthError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: provider === "linkedin" ? "linkedin_oidc" : provider,
-      options: {
-        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-      },
-    });
-    if (error) {
-      setAuthError(error.message);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === "linkedin" ? "linkedin_oidc" : provider,
+        options: {
+          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
+      });
+      if (error) {
+        setAuthError(error.message);
+        setAuthActionLoading(false);
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "OAuth login failed.");
       setAuthActionLoading(false);
     }
   };
+
+  // Preference Preset Modal State
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [hasActivePreset, setHasActivePreset] = useState(false);
+
+  useEffect(() => {
+    const checkPreset = () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("ldk_preference_preset");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.location || parsed.locationMode !== "all" || parsed.categoryFocus !== "all") {
+              setHasActivePreset(true);
+              return;
+            }
+          } catch {}
+        }
+      }
+      setHasActivePreset(false);
+    };
+    checkPreset();
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_preferences_update", checkPreset);
+      return () => window.removeEventListener("ldk_preferences_update", checkPreset);
+    }
+  }, []);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -1269,6 +1311,11 @@ export default function Home() {
       </main>
 
       <Footer />
+
+      <PreferencePresetModal 
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+      />
     </div>
   );
 }

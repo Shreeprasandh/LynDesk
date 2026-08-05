@@ -185,23 +185,29 @@ Depth Mode: ${depthMode}
 Source text preview:
 ${sourceSummary || "General CS Topic"}`;
 
-        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${groqApiKey.trim()}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.4,
-            max_tokens: 3500,
-          }),
-        });
+        let groqRes: Response;
+        try {
+          groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${groqApiKey.trim()}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.4,
+              max_tokens: 3500,
+            }),
+          });
+        } catch (fetchErr) {
+          console.error("Groq study fetch error:", fetchErr);
+          return NextResponse.json(generateLocalFallbackLessons(pathTitle, depthMode));
+        }
 
         if (groqRes.ok) {
           const groqData = await groqRes.json();

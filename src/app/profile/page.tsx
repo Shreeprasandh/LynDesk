@@ -22,7 +22,8 @@ import {
   Trash2,
   X,
   Code2,
-  Sparkles
+  Sparkles,
+  MapPin
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -50,6 +51,7 @@ interface BackupProfileData {
   fullName: string;
   username: string;
   bio: string;
+  location?: string;
   skills: string;
   githubUrl: string;
   linkedinUrl: string;
@@ -264,6 +266,7 @@ export default function ProfilePage() {
   
   // Detailed metadata fields
   const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
   const [skills, setSkills] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
@@ -382,6 +385,7 @@ export default function ProfilePage() {
       fullName,
       username,
       bio,
+      location,
       skills,
       githubUrl,
       linkedinUrl,
@@ -404,6 +408,7 @@ export default function ProfilePage() {
       setFullName(backupData.fullName);
       setUsername(backupData.username);
       setBio(backupData.bio);
+      setLocation(backupData.location || "");
       setSkills(backupData.skills);
       setGithubUrl(backupData.githubUrl);
       setLinkedinUrl(backupData.linkedinUrl);
@@ -512,6 +517,7 @@ export default function ProfilePage() {
         setUnstopUsername(meta.unstop_username || profile?.unstop_username || "");
         setHack2skillUsername(meta.hack2skill_username || profile?.hack2skill_username || "");
         setBio(meta.bio || "");
+        setLocation(meta.location || profile?.location || "");
         setSkills(meta.skills || "");
         setGithubUrl(meta.github_url || "");
         setLinkedinUrl(meta.linkedin_url || "");
@@ -1089,6 +1095,7 @@ export default function ProfilePage() {
               college_name: cleanCollege,
               avatar_url: avatarUrl,
               bio: bio.trim(),
+              location: location.trim(),
               skills: cleanSkills,
               github_url: githubUrl.trim(),
               linkedin_url: linkedinUrl.trim(),
@@ -1101,6 +1108,10 @@ export default function ProfilePage() {
               graduation_year: gradYear.trim(),
             })
           );
+          if (location.trim()) {
+            localStorage.setItem("ldk_user_location", location.trim());
+            window.dispatchEvent(new Event("ldk_preferences_update"));
+          }
           if (avatarUrl) {
             localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
           }
@@ -1116,6 +1127,7 @@ export default function ProfilePage() {
           username: cleanUsername,
           avatar_url: avatarUrl,
           bio: bio.trim(),
+          location: location.trim(),
           skills: cleanSkills,
           github_url: githubUrl.trim(),
           linkedin_url: linkedinUrl.trim(),
@@ -1570,6 +1582,20 @@ export default function ProfilePage() {
                       disabled={!isEditing}
                       placeholder="Tell us about your developer specialties, hackathon goals, or stack specialties..."
                       className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light resize-none disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-txt-sub font-semibold flex items-center gap-1">
+                      <MapPin size={11} className="text-accent-main" /> City / State Location
+                    </label>
+                    <input 
+                      type="text" 
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="e.g. Chennai, Tamil Nadu, India"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main transition-colors font-light disabled:opacity-60"
                     />
                   </div>
 

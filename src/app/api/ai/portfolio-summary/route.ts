@@ -52,22 +52,28 @@ export async function POST(req: NextRequest) {
 - Codeforces: Rating ${codeforces?.rating || 0}, Rank: ${codeforces?.rank || "Unrated"}, Solved: ${codeforces?.solved || 0}
 - CodeChef: Rating ${codechef?.rating || 0}, Stars: ${codechef?.stars || "N/A"}, Solved: ${codechef?.solved || 0}`;
 
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${groqApiKey.trim()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.4,
-      }),
-    });
+    let groqRes: Response;
+    try {
+      groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${groqApiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.4,
+        }),
+      });
+    } catch (fetchErr) {
+      console.error("Groq portfolio fetch error:", fetchErr);
+      return NextResponse.json(generateLocalFallback(leetcode, codeforces, codechef));
+    }
 
     if (groqRes.ok) {
       const groqData = await groqRes.json();
