@@ -55,9 +55,9 @@
 
 /* Dark Theme */
 [data-theme="dark"] {
-  --bg-primary: 0 0% 6%;           /* #0F0F0F - Obsidian Black */
-  --bg-secondary: 0 0% 11%;        /* #1B1B1B - Charcoal Gray */
-  --surface: 0 0% 11%;             /* #1B1B1B - Charcoal Card */
+  --bg-primary: 0 0% 5.882%;       /* #0F0F0F - Obsidian Black */
+  --bg-secondary: 0 0% 9.804%;     /* #191919 - Dark Inner Card/Box */
+  --surface: 0 0% 10.98%;          /* #1C1C1C - Outer Card/Surface Container */
   --text-primary: 35 15% 82%;      /* #D8D3CC - Warm Sand/Alabaster */
   --text-secondary: 34 8% 68%;     /* #B4AEA6 - Lighter Sand Gray */
   --text-muted: 34 8% 60%;         /* #9E978E - Lighter Muted Sand (Contrast Compliant) */

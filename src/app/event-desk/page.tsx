@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Header from "../components/Header";
@@ -18,6 +19,7 @@ import {
   Plus,
   MapPin,
   ExternalLink,
+  UserPlus,
   User,
   CheckCircle2,
   X,
@@ -28,7 +30,8 @@ import {
   ChevronDown,
   ArrowUpDown,
   Trash2,
-  LogOut
+  LogOut,
+  Copy
 } from "lucide-react";
 
 // Brand Icon Helpers
@@ -180,6 +183,7 @@ const INITIAL_EVENTS: EventItem[] = [];
 
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const [likelyHasSession, setLikelyHasSession] = useState(false);
 
   useEffect(() => {
@@ -845,12 +849,6 @@ export default function Home() {
     }
   };
 
-  const fallbackCoworkers = [
-    { name: "Alex Carter", role: "Dev", active: true },
-    { name: "Mira Sen", role: "Designer", active: true },
-    { name: "Prof. Davis", role: "Mentor", active: false }
-  ];
-
   // Derivations for profile picture and username
   const avatarUrl = (() => {
     if (typeof window !== "undefined" && user?.id) {
@@ -868,7 +866,7 @@ export default function Home() {
   })();
   const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
-  const activeCoworkers = (coworkers.length > 0 ? coworkers : fallbackCoworkers).filter(
+  const activeCoworkers = coworkers.filter(
     cw => cw.name.toLowerCase() !== username.toLowerCase() && cw.name.toLowerCase() !== "kaizzcer"
   );
 
@@ -1697,7 +1695,25 @@ export default function Home() {
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs text-txt-main font-mono truncate font-semibold">{username}</span>
                   <span className="text-[10px] text-txt-muted font-light">{collegeName || "Independent Student"}</span>
-                  <span className="text-[8px] text-txt-muted font-mono select-all mt-0.5">Desk ID: {user?.id}</span>
+                  <div className="flex items-center gap-1.5 text-[9px] font-mono text-txt-muted mt-0.5 max-w-full">
+                    <span className="shrink-0 text-txt-muted/80 font-medium">UID:</span>
+                    <span className="truncate font-light select-all" title={user?.id}>
+                      {user?.id ? `${user.id.slice(0, 8)}...${user.id.slice(-4)}` : "..."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (user?.id) {
+                          navigator.clipboard.writeText(user.id);
+                          showToast("UID copied to clipboard");
+                        }
+                      }}
+                      className="p-0.5 hover:text-txt-main text-txt-muted/70 transition-colors cursor-pointer shrink-0"
+                      title="Copy UID"
+                    >
+                      <Copy size={10} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1737,7 +1753,7 @@ export default function Home() {
                   activeCoworkers.map((cw, i) => (
                     <div key={(cw as any).id || i} className="flex items-center justify-between gap-2 py-0.5 border-b border-border-main/20 last:border-0 pb-1.5 last:pb-0">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <span className="w-2 h-2 rounded-full border border-emerald-500/85 bg-emerald-500/20 shrink-0" />
                         <span className="text-xs text-txt-main font-medium truncate">{cw.name}</span>
                       </div>
                       <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider shrink-0 bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50">{cw.role}</span>
@@ -1968,7 +1984,7 @@ export default function Home() {
                                       href={ev.url.startsWith("/") || ev.url.startsWith("http") ? ev.url : `https://${ev.url}`} 
                                       target="_blank" 
                                       rel="noreferrer"
-                                      className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-base/40"
+                                      className="text-[10px] text-txt-muted/80 hover:text-accent-main font-mono inline-flex items-center gap-1.5 self-start max-w-[180px] sm:max-w-[260px] md:max-w-[320px] overflow-hidden transition-colors group/link py-0.5 border border-border-main/40 px-1.5 py-0.5 rounded bg-bg-card"
                                     >
                                       <span className="truncate leading-none">{displayUrl}</span>
                                       <ExternalLink size={10} className="shrink-0 text-txt-muted/70 group-hover/link:text-accent-main transition-colors" />
@@ -2011,11 +2027,13 @@ export default function Home() {
                             </div>
 
                             {/* Milestone Diagram */}
-                            <div className="p-4 rounded-md border border-border-main/40 bg-bg-base/30 overflow-x-auto">
+                            <div className="p-4 rounded-md border border-border-main/40 bg-bg-card overflow-x-auto">
                               <div className="relative flex justify-between items-start min-w-max w-full gap-4 px-2">
-                                <div className="absolute top-[10px] left-6 right-6 h-[2px] bg-border-main/50 z-0" />
+                                {/* Horizontal Background Track Line (Extended with Smooth Faded Gradient Ends) */}
+                                <div className="absolute top-[8px] left-3 right-3 h-[1.5px] bg-gradient-to-r from-transparent via-border-main/70 to-transparent z-0" />
+                                {/* Active Progress Line */}
                                 <motion.div 
-                                  className="absolute top-[10px] left-6 h-[2px] bg-accent-main z-0"
+                                  className="absolute top-[8px] left-[60px] h-[1.5px] bg-accent-main z-0"
                                   initial={false}
                                   animate={{ width: maxIdx > 0 ? `calc(${(activeIdx / maxIdx) * 100}% - 48px)` : "0%" }}
                                   transition={{ type: "spring", stiffness: 120, damping: 20 }}
@@ -2027,15 +2045,31 @@ export default function Home() {
                                   const isCurrent = !isCompleted && idx === activeIdx;
 
                                   return (
-                                    <div key={idx} className="relative z-10 flex flex-col items-center gap-1.5 text-center min-w-[120px]">
-                                      <div className={`h-5 w-5 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                                        isCompleted
-                                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
-                                          : isCurrent
-                                          ? "border-accent-main ring-4 ring-accent-main/20 text-accent-main scale-110"
-                                          : "border-border-main/60 text-txt-muted/60"
-                                      }`}>
-                                        {isCompleted ? <CheckCircle2 size={11} className="text-emerald-400" /> : <span className="text-[9px] font-mono">{idx + 1}</span>}
+                                    <div key={idx} className="relative flex flex-col items-center gap-1.5 text-center min-w-[120px]">
+                                      {/* Node Circle with Workspace Left Section Glow */}
+                                      <div className="relative h-[17px] w-[17px] shrink-0 flex items-center justify-center">
+                                        {isCurrent && (
+                                          <div className="absolute -inset-1 rounded-full bg-accent-main/20 blur-[2.5px] pointer-events-none animate-pulse" />
+                                        )}
+                                        {isCompleted && (
+                                          <div className="absolute -inset-0.5 rounded-full bg-emerald-500/15 blur-[2px] pointer-events-none" />
+                                        )}
+
+                                        <div className={`relative z-10 h-[17px] w-[17px] rounded-full border-[1.5px] flex items-center justify-center transition-all duration-300 ${
+                                          isCompleted
+                                            ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_5px_rgba(16,185,129,0.18)]"
+                                            : isCurrent
+                                            ? "border-accent-main bg-bg-surface shadow-[0_0_6px_rgba(var(--color-accent-main),0.15)]"
+                                            : "border-border-main/60 bg-bg-card"
+                                        }`}>
+                                          {isCompleted ? (
+                                            <CheckCircle2 size={10} className="text-emerald-400 fill-emerald-500/30" />
+                                          ) : (
+                                            <span className={`text-[7.5px] font-mono leading-none ${isCurrent ? "text-accent-main font-bold" : "text-txt-muted/60"}`}>
+                                              {idx + 1}
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
 
                                       <span className={`text-[10px] font-display font-medium leading-tight max-w-[130px] ${
@@ -2054,49 +2088,40 @@ export default function Home() {
                             </div>
 
                             {/* Actions row */}
-                            <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                                <div className="flex items-center gap-2 text-[10px] text-txt-muted flex-wrap">
-                                  <div className="flex items-center gap-1">
-                                    <MapPin size={11} className="text-txt-muted/70" />
-                                    <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
-                                  </div>
-                                  {ev.level && (
-                                    <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
-                                      {ev.level}
-                                    </span>
-                                  )}
-                                  <select
-                                    value={ev.status || "development"}
-                                    onChange={(e) => handleUpdateWorkspaceStatus(ev.id, e.target.value as any)}
-                                    className="text-[8px] font-mono tracking-widest uppercase border border-border-main/50 px-1 py-0.5 rounded bg-bg-card text-accent-main font-semibold focus:outline-none cursor-pointer"
-                                  >
-                                    <option value="ideation">Ideation</option>
-                                    <option value="development">Development</option>
-                                    <option value="testing">Testing</option>
-                                    <option value="submitted">Submitted</option>
-                                  </select>
+                            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border-main/30 pt-4 text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5 text-txt-sub font-light text-xs">
+                                  <MapPin size={11} className="text-txt-muted/70" />
+                                  <span className="uppercase font-mono text-[9px] tracking-wider">{ev.location}</span>
                                 </div>
-
+                                {ev.level && (
+                                  <span className="text-[8px] font-mono tracking-widest text-txt-muted/70 uppercase border border-border-main/50 px-1.5 py-0.5 rounded bg-bg-card/50">
+                                    {ev.level}
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex gap-2">
                                 <button 
                                   type="button"
                                   onClick={() => setConfirmLeaveId(ev.id)}
-                                  className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] tracking-wider uppercase transition-all flex items-center justify-center cursor-pointer font-semibold gap-1"
+                                  className="h-8 px-2.5 rounded-sm border border-border-main/50 hover:border-red-500/40 hover:bg-red-500/10 text-txt-muted hover:text-red-400 font-mono text-[10px] leading-none tracking-wider uppercase transition-all inline-flex items-center justify-center cursor-pointer font-medium gap-1.5 select-none"
                                 >
-                                  <Trash2 size={11} />
-                                  <span>Leave</span>
+                                  <Trash2 size={11} className="shrink-0" />
+                                  <span className="leading-none">Leave</span>
                                 </button>
                                 <button 
                                   onClick={() => handleOpenInviteModal(ev.id)}
-                                  className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] tracking-wider uppercase transition-colors flex items-center justify-center cursor-pointer font-bold"
+                                  className="h-8 px-3 rounded-sm border border-border-main/60 hover:bg-bg-card text-txt-main font-mono text-[10px] leading-none tracking-wider uppercase transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer font-medium select-none"
                                 >
-                                  Invite
+                                  <UserPlus size={11} className="shrink-0" />
+                                  <span className="leading-none">Invite</span>
                                 </button>
                                 <Link 
                                   href={`/workspace/${ev.id}`}
-                                  className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase transition-colors duration-150 flex items-center justify-center cursor-pointer select-none font-bold"
+                                  className="h-8 px-4 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] leading-none tracking-wider uppercase transition-colors duration-150 inline-flex items-center justify-center gap-1.5 cursor-pointer select-none font-semibold"
                                 >
-                                  Enter Workspace →
+                                  <span className="leading-none">Enter Workspace</span>
+                                  <ArrowRight size={11} className="shrink-0" />
                                 </Link>
                               </div>
                             </div>
@@ -2316,7 +2341,7 @@ export default function Home() {
               <div className="flex flex-col gap-2.5">
                 <span className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Active Friends</span>
                 
-                <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-base/30 divide-y divide-border-main/60">
+                <div className="max-h-56 overflow-y-auto border border-border-main/60 rounded bg-bg-card divide-y divide-border-main/60">
                   {friendsToInviteHome.length > 0 ? (
                     friendsToInviteHome.map(f => (
                       <div key={f.id} className="p-3 flex justify-between items-center gap-4 bg-bg-surface">

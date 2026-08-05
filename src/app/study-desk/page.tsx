@@ -4,157 +4,391 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { 
-  Sparkles, 
-  Users, 
-  Award, 
-  GraduationCap, 
-  FileText, 
-  Plus, 
-  ArrowRight, 
-  Send
-} from "lucide-react";
+import { supabase } from "../lib/supabase";
+import { StudyPath, StudyMistake, StudyStats, Lesson } from "./types";
 
-interface StudyMaterial {
-  id: string;
-  title: string;
-  subject: string;
-  description: string;
-  materialType: "pdf" | "video" | "link" | "note";
-  datePosted: string;
-}
+import LearningPathsView from "../components/study-desk/LearningPathsView";
+import ActivePathView from "../components/study-desk/ActivePathView";
+import SessionPlayer from "../components/study-desk/SessionPlayer";
+import AIPathStudioModal from "../components/study-desk/AIPathStudioModal";
+import ProgressDashboardView from "../components/study-desk/ProgressDashboardView";
+import ErrorBankModal from "../components/study-desk/ErrorBankModal";
 
-interface Assignment {
-  id: string;
-  title: string;
-  subject: string;
-  dueDate: string;
-  maxMarks: number;
-  status: "pending" | "submitted" | "graded";
-}
+
+
+const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
+const STORAGE_MISTAKES_KEY = "lyndesk_study_mistakes_cache";
+const STORAGE_STATS_KEY = "lyndesk_study_stats_cache";
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"classroom" | "study-room" | "ai-teach" | "assess">("classroom");
+  const [activeTab, setActiveTab] = useState<"paths" | "active" | "progress">("paths");
 
-  // AI Teach States
-  const [topicInput, setTopicInput] = useState("");
-  const [difficulty, setDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [curriculum, setCurriculum] = useState<any | null>(null);
-  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
+  // Synchronous 0ms local state initializers
+  const [paths, setPaths] = useState<StudyPath[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_PATHS_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
 
-  // AI Tutor Chat state inside Study Mode
-  const [aiChatQuery, setAiChatQuery] = useState("");
-  const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [mistakes, setMistakes] = useState<StudyMistake[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_MISTAKES_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
 
-  // Sync sub-tab from URL query parameter
+  const [stats, setStats] = useState<StudyStats>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_STATS_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return {
+      totalXp: 0,
+      streakCount: 0,
+      longestStreak: 0,
+      lastStudiedDate: "",
+      activeDays: [],
+    };
+  });
+
+  const [activePathId, setActivePathId] = useState<string | undefined>(() => {
+    return paths.find((p) => p.isActive)?.id || paths[0]?.id;
+  });
+
+  // Modal Overlays
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [showAIStudio, setShowAIStudio] = useState(false);
+  const [showErrorBank, setShowErrorBank] = useState(false);
+
+  // Sync state to local cache for 0ms loads
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const urlQuery = window.location.search;
-      queueMicrotask(() => {
-        if (urlQuery.includes("tab=study-room") || urlQuery.includes("tab=room")) setActiveTab("study-room");
-        else if (urlQuery.includes("tab=ai-teach") || urlQuery.includes("tab=teach")) setActiveTab("ai-teach");
-        else if (urlQuery.includes("tab=assess") || urlQuery.includes("tab=exam")) setActiveTab("assess");
-        else if (urlQuery.includes("tab=classroom")) setActiveTab("classroom");
-      });
+      try {
+        localStorage.setItem(STORAGE_PATHS_KEY, JSON.stringify(paths));
+      } catch {}
     }
-  }, []);
+  }, [paths]);
 
-  // Mock materials and assignments
-  const materials: StudyMaterial[] = [
-    {
-      id: "mat_1",
-      title: "Data Structures & Algorithms - Binary Trees & Heaps",
-      subject: "Computer Science",
-      description: "Comprehensive lecture notes and code implementations for binary search trees, AVL balancing, and min-heaps.",
-      materialType: "pdf",
-      datePosted: "Yesterday"
-    },
-    {
-      id: "mat_2",
-      title: "Operating Systems - Process Synchronization & Semaphores",
-      subject: "Systems Engineering",
-      description: "Module 3 slides covering mutex locks, classical concurrency problems, and deadlock handling.",
-      materialType: "pdf",
-      datePosted: "3 days ago"
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_MISTAKES_KEY, JSON.stringify(mistakes));
+      } catch {}
     }
-  ];
+  }, [mistakes]);
 
-  const assignments: Assignment[] = [
-    {
-      id: "ass_1",
-      title: "Assignment 4: Custom Red-Black Tree Implementation",
-      subject: "Data Structures",
-      dueDate: "Oct 18, 2026",
-      maxMarks: 100,
-      status: "pending"
-    },
-    {
-      id: "ass_2",
-      title: "Lab Milestone 2: Thread Pool & Task Scheduler",
-      subject: "Systems Programming",
-      dueDate: "Nov 05, 2026",
-      maxMarks: 50,
-      status: "submitted"
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_STATS_KEY, JSON.stringify(stats));
+      } catch {}
     }
-  ];
+  }, [stats]);
 
-  const handleGenerateCurriculum = () => {
-    if (!topicInput.trim()) return;
-    setIsGenerating(true);
+  // Fetch Supabase data when logged in
+  useEffect(() => {
+    if (!user) return;
 
-    setTimeout(() => {
-      const generated = {
-        topic: topicInput.trim(),
-        difficulty,
-        sections: [
-          {
-            title: `1. Fundamentals of ${topicInput.trim()}`,
-            content: `Core concepts and foundational principles of ${topicInput.trim()}. Understand key definitions, architecture, and practical applications in modern software engineering.`,
-            keyPoints: [
-              `Core structure and terminology of ${topicInput.trim()}`,
-              "Time and space complexity tradeoffs",
-              "Real-world production usage scenarios"
-            ],
-            codeExample: `// Sample implementation preview for ${topicInput.trim()}\nfunction initializeConcept() {\n  console.log("Initializing ${topicInput.trim()} module...");\n  return true;\n}`
-          },
-          {
-            title: `2. Deep Dive & Algorithms`,
-            content: `Algorithmic details, edge case considerations, and optimized patterns when implementing ${topicInput.trim()} at scale.`,
-            keyPoints: [
-              "Optimizing memory allocations",
-              "Handling concurrent access safely",
-              "Benchmarking execution latency"
-            ],
-            codeExample: `// Advanced operations\nfunction executeAdvanced() {\n  // Optimized execution step\n}`
+    async function loadData() {
+      if (!user) return;
+      try {
+        // 1. Fetch Study Paths
+        const { data: cloudPaths } = await supabase
+          .from("study_paths")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (cloudPaths && cloudPaths.length > 0) {
+          const mapped: StudyPath[] = cloudPaths.map((cp: any) => ({
+            id: cp.id,
+            userId: cp.user_id,
+            title: cp.title,
+            description: cp.description || "",
+            depthMode: cp.depth_mode || "standard",
+            uploadMode: cp.upload_mode || "unified",
+            sourceFiles: cp.source_files || [],
+            sections: cp.sections || [],
+            totalLessons: cp.total_lessons || 0,
+            completedLessons: cp.completed_lessons || 0,
+            xpEarned: cp.xp_earned || 0,
+            isActive: cp.is_active || false,
+            createdAt: cp.created_at,
+            lastStudiedAt: cp.last_studied_at,
+          }));
+          setPaths(mapped);
+          if (!activePathId) {
+            const active = mapped.find((p) => p.isActive) || mapped[0];
+            if (active) setActivePathId(active.id);
           }
-        ]
-      };
-      setCurriculum(generated);
-      setCurrentSectionIdx(0);
-      setIsGenerating(false);
-      setAiChatMessages([
-        { role: "ai", text: `Hello! I am your AI Tutor for ${topicInput.trim()}. Feel free to ask me any questions about Section 1!` }
-      ]);
-    }, 1500);
+        }
+
+        // 2. Fetch Mistakes
+        const { data: cloudMistakes } = await supabase
+          .from("study_mistakes")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (cloudMistakes && cloudMistakes.length > 0) {
+          const mappedM: StudyMistake[] = cloudMistakes.map((cm: any) => ({
+            id: cm.id,
+            pathId: cm.path_id,
+            lessonId: cm.lesson_id,
+            questionType: cm.question_type,
+            questionPrompt: cm.question_prompt,
+            options: cm.options,
+            correctAnswer: cm.correct_answer,
+            userAnswer: cm.user_answer,
+            explanation: cm.explanation || "",
+            createdAt: cm.created_at,
+          }));
+          setMistakes(mappedM);
+        }
+
+        // 3. Fetch Profile Stats
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("study_xp, study_streak, study_longest_streak, study_last_date, study_active_days")
+          .eq("id", user.id)
+          .single();
+
+        if (profile) {
+          setStats({
+            totalXp: profile.study_xp || 0,
+            streakCount: profile.study_streak || 0,
+            longestStreak: profile.study_longest_streak || 0,
+            lastStudiedDate: profile.study_last_date || "",
+            activeDays: profile.study_active_days || [],
+          });
+        }
+      } catch {}
+    }
+
+    loadData();
+  }, [user, activePathId]);
+
+  const activePath = paths.find((p) => p.id === activePathId) || paths[0];
+
+  // Path Handlers
+  const handleSelectActivePath = (pathId: string) => {
+    setActivePathId(pathId);
+    setPaths((prev) =>
+      prev.map((p) => ({
+        ...p,
+        isActive: p.id === pathId,
+      }))
+    );
+    setActiveTab("active");
+
+    // Sync active state to Supabase if logged in
+    if (user) {
+      supabase.from("study_paths").update({ is_active: false }).eq("user_id", user.id);
+      supabase.from("study_paths").update({ is_active: true }).eq("id", pathId);
+    }
   };
 
-  const handleSendAiQuestion = () => {
-    if (!aiChatQuery.trim()) return;
-    const q = aiChatQuery.trim();
-    setAiChatMessages(prev => [...prev, { role: "user", text: q }]);
-    setAiChatQuery("");
+  const handlePathCreated = async (newPath: StudyPath) => {
+    const fullPath: StudyPath = {
+      ...newPath,
+      userId: user?.id || "guest",
+    };
 
-    setTimeout(() => {
-      setAiChatMessages(prev => [
-        ...prev,
-        { 
-          role: "ai", 
-          text: `Great question regarding "${q}". In the context of ${curriculum?.topic || "this topic"}, key considerations involve keeping complexity low and handling memory bounds efficiently.`
+    setPaths((prev) => [fullPath, ...prev]);
+    setActivePathId(fullPath.id);
+    setShowAIStudio(false);
+    setActiveTab("active");
+
+    // Persist to Supabase if logged in
+    if (user) {
+      try {
+        await supabase.from("study_paths").insert({
+          id: fullPath.id,
+          user_id: user.id,
+          title: fullPath.title,
+          description: fullPath.description,
+          depth_mode: fullPath.depthMode,
+          upload_mode: fullPath.uploadMode,
+          source_files: fullPath.sourceFiles,
+          sections: fullPath.sections,
+          total_lessons: fullPath.totalLessons,
+          completed_lessons: 0,
+          xp_earned: 0,
+          is_active: true,
+        });
+      } catch {}
+    }
+  };
+
+  const handleDeletePath = async (pathId: string) => {
+    setPaths((prev) => prev.filter((p) => p.id !== pathId));
+    if (activePathId === pathId) {
+      const remaining = paths.filter((p) => p.id !== pathId);
+      setActivePathId(remaining[0]?.id);
+    }
+
+    if (user) {
+      try {
+        await supabase.from("study_paths").delete().eq("id", pathId);
+      } catch {}
+    }
+  };
+
+  const handleDuplicatePath = async (pathId: string) => {
+    const target = paths.find((p) => p.id === pathId);
+    if (!target) return;
+
+    const dupId = "path_" + Math.random().toString(36).substring(2, 9);
+    const duplicated: StudyPath = {
+      ...target,
+      id: dupId,
+      title: `${target.title} (Copy)`,
+      completedLessons: 0,
+      xpEarned: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPaths((prev) => [duplicated, ...prev]);
+
+    if (user) {
+      try {
+        await supabase.from("study_paths").insert({
+          id: duplicated.id,
+          user_id: user.id,
+          title: duplicated.title,
+          description: duplicated.description,
+          depth_mode: duplicated.depthMode,
+          upload_mode: duplicated.uploadMode,
+          source_files: duplicated.sourceFiles,
+          sections: duplicated.sections,
+          total_lessons: duplicated.totalLessons,
+          completed_lessons: 0,
+          xp_earned: 0,
+          is_active: false,
+        });
+      } catch {}
+    }
+  };
+
+  // Lesson Completion Handler
+  const handleLessonComplete = async (score: number, xpEarned: number, newMistakes: StudyMistake[]) => {
+    if (!activeLesson) return;
+
+    const targetPath = paths.find((p) => p.id === activeLesson.pathId) || activePath;
+    if (!targetPath) return;
+
+    // Update section/lesson completed status
+    const updatedSections = targetPath.sections.map((sec) => ({
+      ...sec,
+      lessons: sec.lessons.map((les) =>
+        les.id === activeLesson.id ? { ...les, completed: true, score } : les
+      ),
+    }));
+
+    const newCompletedCount = updatedSections.reduce(
+      (acc, sec) => acc + sec.lessons.filter((l) => l.completed).length,
+      0
+    );
+    const newXpEarned = (targetPath.xpEarned || 0) + xpEarned;
+
+    const updatedPath: StudyPath = {
+      ...targetPath,
+      sections: updatedSections,
+      completedLessons: newCompletedCount,
+      xpEarned: newXpEarned,
+      lastStudiedAt: new Date().toISOString(),
+    };
+
+    setPaths((prev) => prev.map((p) => (p.id === updatedPath.id ? updatedPath : p)));
+
+    // Streak & XP updates
+    const todayStr = new Date().toISOString().split("T")[0];
+    const activeDays = new Set(stats.activeDays || []);
+    activeDays.add(todayStr);
+
+    let newStreak = stats.streakCount;
+    if (stats.lastStudiedDate !== todayStr) {
+      newStreak = (stats.streakCount || 0) + 1;
+    }
+    const newLongest = Math.max(stats.longestStreak || 0, newStreak);
+    const newTotalXp = (stats.totalXp || 0) + xpEarned;
+
+    const newStats: StudyStats = {
+      totalXp: newTotalXp,
+      streakCount: newStreak,
+      longestStreak: newLongest,
+      lastStudiedDate: todayStr,
+      activeDays: Array.from(activeDays),
+    };
+    setStats(newStats);
+
+    // Save mistakes
+    if (newMistakes.length > 0) {
+      setMistakes((prev) => [...newMistakes, ...prev]);
+    }
+
+    setActiveLesson(null);
+
+    // Persist to Supabase if logged in
+    if (user) {
+      try {
+        await supabase
+          .from("study_paths")
+          .update({
+            sections: updatedSections,
+            completed_lessons: newCompletedCount,
+            xp_earned: newXpEarned,
+            last_studied_at: new Date().toISOString(),
+          })
+          .eq("id", updatedPath.id);
+
+        await supabase
+          .from("profiles")
+          .update({
+            study_xp: newTotalXp,
+            study_streak: newStreak,
+            study_longest_streak: newLongest,
+            study_last_date: todayStr,
+            study_active_days: Array.from(activeDays),
+          })
+          .eq("id", user.id);
+
+        if (newMistakes.length > 0) {
+          const insertM = newMistakes.map((m) => ({
+            id: m.id,
+            user_id: user.id,
+            path_id: m.pathId,
+            lesson_id: m.lessonId,
+            question_type: m.questionType,
+            question_prompt: m.questionPrompt,
+            options: m.options,
+            correct_answer: m.correctAnswer,
+            user_answer: m.userAnswer,
+            explanation: m.explanation,
+          }));
+          await supabase.from("study_mistakes").insert(insertM);
         }
-      ]);
-    }, 1000);
+      } catch {}
+    }
+  };
+
+  const handleRemoveMistake = async (id: string) => {
+    setMistakes((prev) => prev.filter((m) => m.id !== id));
+    if (user) {
+      try {
+        await supabase.from("study_mistakes").delete().eq("id", id);
+      } catch {}
+    }
   };
 
   if (authLoading) {
@@ -172,326 +406,124 @@ export default function StudyDeskPage() {
     <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       <Header />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-2 flex flex-col gap-6">
-
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-4 flex flex-col gap-6">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
           <div className="flex flex-col gap-1">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Center</span>
-            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Study Desk & AI Tutor</h1>
-            <p className="text-xs text-txt-sub">Access course materials, launch study rooms with classmates, or learn any topic interactively with AI.</p>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Engine</span>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Study Desk</h1>
+            <p className="text-xs text-txt-sub">
+              Upload notes or slides to generate adaptive AI study paths, practice bite-sized lessons, and review mistakes.
+            </p>
           </div>
 
-          {/* Sub-Tab Bar */}
+          {/* Sub-Tab Navigation Bar */}
           <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase flex-wrap gap-0.5">
-            <button 
-              onClick={() => setActiveTab("classroom")}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "classroom" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+            <button
+              onClick={() => setActiveTab("paths")}
+              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "paths" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Classroom & Materials
+              Learning Paths ({paths.length})
             </button>
-            <button 
-              onClick={() => setActiveTab("study-room")}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "study-room" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+
+            <button
+              onClick={() => setActiveTab("active")}
+              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "active" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Study Rooms
+              Active Path View
             </button>
-            <button 
-              onClick={() => setActiveTab("ai-teach")}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "ai-teach" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+
+            <button
+              onClick={() => setActiveTab("progress")}
+              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "progress" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              AI Teaching Mode
-            </button>
-            <button 
-              onClick={() => setActiveTab("assess")}
-              className={`px-3 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "assess" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              Test & Assess
+              Progress & Stats
             </button>
           </div>
         </div>
 
-        {/* 1. Classroom & Materials Tab */}
-        {activeTab === "classroom" && (
-          <div className="flex flex-col gap-6 pb-8">
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <GraduationCap size={16} className="text-amber-500" />
-                  <span className="font-display text-sm font-semibold text-txt-main">Faculty Uploaded Materials</span>
-                </div>
-                <span className="text-[10px] font-mono text-txt-muted">{materials.length} Materials Available</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {materials.map(m => (
-                  <div key={m.id} className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex flex-col justify-between gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] font-mono uppercase text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded self-start">
-                        {m.subject}
-                      </span>
-                      <h4 className="text-xs font-semibold text-txt-main">{m.title}</h4>
-                      <p className="text-[11px] text-txt-sub font-light leading-relaxed">{m.description}</p>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
-                      <span>Posted: {m.datePosted}</span>
-                      <button className="text-accent-main hover:underline flex items-center gap-1">
-                        View Material <ArrowRight size={10} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+        {/* Active Path Header Status Bar */}
+        {activePath && activeTab !== "active" && (
+          <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded flex items-center justify-between gap-4 font-mono text-xs">
+            <div className="flex items-center gap-3 truncate">
+              <span className="px-2 py-0.5 bg-accent-main/10 border border-accent-main/30 text-accent-main text-[9px] uppercase rounded">
+                ACTIVE
+              </span>
+              <span className="font-semibold text-txt-main truncate">{activePath.title}</span>
+              <span className="text-[10px] text-txt-muted hidden sm:inline">
+                {activePath.completedLessons}/{activePath.totalLessons} Lessons
+              </span>
             </div>
 
-            {/* Assignments Section */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <FileText size={16} className="text-purple-400" />
-                  <span className="font-display text-sm font-semibold text-txt-main">Pending Assignments</span>
-                </div>
-                <span className="text-[10px] font-mono text-txt-muted">{assignments.length} Active Tasks</span>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {assignments.map(a => (
-                  <div key={a.id} className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex items-center justify-between gap-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-txt-main">{a.title}</span>
-                        <span className={`text-[8px] font-mono uppercase px-2 py-0.5 rounded border ${
-                          a.status === "submitted" 
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                        }`}>
-                          {a.status}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-txt-muted font-mono">{a.subject} • Due: {a.dueDate} • Max Marks: {a.maxMarks}</span>
-                    </div>
-
-                    <button className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider font-semibold rounded hover:opacity-90 transition-opacity">
-                      {a.status === "submitted" ? "View Submission" : "Submit Assignment"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <button
+              onClick={() => setActiveTab("active")}
+              className="text-accent-main hover:underline text-[10px] uppercase font-semibold shrink-0"
+            >
+              Resume Path →
+            </button>
           </div>
         )}
 
-        {/* 2. Study Rooms Tab */}
-        {activeTab === "study-room" && (
-          <div className="flex flex-col gap-6 pb-8">
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-blue-400" />
-                  <span className="font-display text-sm font-semibold text-txt-main">Live Collaborative Study Rooms</span>
-                </div>
-                <button className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider font-semibold rounded flex items-center gap-1">
-                  <Plus size={10} /> Create Study Room
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-border-main/50 bg-bg-base/40 p-4 rounded flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-txt-main">Data Structures Deep Dive Room</span>
-                    <span className="text-[8px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">
-                      3 Members Online
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-txt-sub font-light">Collaborative study room focused on tree balancing and graph traversal problems.</p>
-                  <div className="flex items-center justify-between pt-2 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
-                    <span>Host: @Shreeprasandh</span>
-                    <button className="text-blue-400 hover:underline flex items-center gap-1 font-semibold">
-                      Enter Room <ArrowRight size={10} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Tab Views */}
+        {activeTab === "paths" && (
+          <LearningPathsView
+            paths={paths}
+            activePathId={activePathId}
+            onSelectActivePath={handleSelectActivePath}
+            onCreateNewPathClick={() => setShowAIStudio(true)}
+            onDeletePath={handleDeletePath}
+            onDuplicatePath={handleDuplicatePath}
+          />
         )}
 
-        {/* 3. AI Teaching Mode Tab */}
-        {activeTab === "ai-teach" && (
-          <div className="flex flex-col gap-6 pb-8">
-            {!curriculum ? (
-              <div className="border border-border-main/70 bg-bg-surface p-6 sm:p-8 rounded-md flex flex-col gap-5">
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-purple-400 font-mono text-[10px] uppercase tracking-widest font-bold">
-                    <Sparkles size={14} /> AI Interactive Learning Engine
-                  </div>
-                  <h3 className="font-display text-xl font-semibold text-txt-main">What topic would you like to learn today?</h3>
-                  <p className="text-xs text-txt-sub font-light">Enter any technical topic, and Gemini AI will structure a point-by-point curriculum with quizzes after each section.</p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input 
-                    type="text" 
-                    value={topicInput}
-                    onChange={(e) => setTopicInput(e.target.value)}
-                    placeholder="e.g. Binary Search Trees, React Hooks, TCP/IP Handshake..."
-                    className="flex-1 h-11 px-4 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
-                  />
-                  <select 
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value as any)}
-                    className="h-11 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                  <button 
-                    onClick={handleGenerateCurriculum}
-                    disabled={isGenerating || !topicInput.trim()}
-                    className="h-11 px-5 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs uppercase tracking-wider font-semibold rounded transition-colors flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
-                  >
-                    {isGenerating ? "Generating..." : "Generate AI Lesson"} <Sparkles size={12} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Main Section Content (8 cols) */}
-                <div className="lg:col-span-8 border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5">
-                  <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                    <span className="font-display text-base font-semibold text-txt-main">
-                      {curriculum.sections[currentSectionIdx]?.title}
-                    </span>
-                    <span className="text-[10px] font-mono text-txt-muted uppercase">
-                      Section {currentSectionIdx + 1} of {curriculum.sections.length}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-txt-main leading-relaxed font-light">
-                    {curriculum.sections[currentSectionIdx]?.content}
-                  </p>
-
-                  <div className="border border-purple-500/30 bg-purple-500/[0.04] p-4 rounded flex flex-col gap-2">
-                    <span className="text-[10px] font-mono uppercase text-purple-400 font-bold">Key Concept Points</span>
-                    <ul className="list-disc list-inside text-xs text-txt-sub flex flex-col gap-1 font-light">
-                      {curriculum.sections[currentSectionIdx]?.keyPoints?.map((pt: string, idx: number) => (
-                        <li key={idx}>{pt}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {curriculum.sections[currentSectionIdx]?.codeExample && (
-                    <div className="border border-border-main/80 bg-bg-base p-4 rounded font-mono text-xs text-emerald-400 overflow-x-auto">
-                      <pre>{curriculum.sections[currentSectionIdx]?.codeExample}</pre>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-2">
-                    <button 
-                      onClick={() => setCurrentSectionIdx(prev => Math.max(0, prev - 1))}
-                      disabled={currentSectionIdx === 0}
-                      className="h-8 px-4 border border-border-main text-txt-main font-mono text-[10px] uppercase rounded disabled:opacity-40"
-                    >
-                      ← Previous Section
-                    </button>
-                    <button 
-                      onClick={() => setCurrentSectionIdx(prev => Math.min(curriculum.sections.length - 1, prev + 1))}
-                      disabled={currentSectionIdx === curriculum.sections.length - 1}
-                      className="h-8 px-4 bg-purple-600 text-white font-mono text-[10px] uppercase font-semibold rounded disabled:opacity-40"
-                    >
-                      Next Section →
-                    </button>
-                  </div>
-                </div>
-
-                {/* AI Tutor Sidebar Chat (4 cols) */}
-                <div className="lg:col-span-4 border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col justify-between h-[450px]">
-                  <div className="flex items-center gap-2 border-b border-border-main/40 pb-3 text-purple-400 font-mono text-xs font-semibold">
-                    <Sparkles size={14} /> AI Tutor Chat
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto my-3 flex flex-col gap-3 pr-1 text-xs">
-                    {aiChatMessages.map((msg, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`p-3 rounded max-w-[90%] font-light ${
-                          msg.role === "user" 
-                            ? "bg-purple-600/20 text-txt-main border border-purple-500/30 self-end" 
-                            : "bg-bg-base text-txt-sub border border-border-main/60 self-start"
-                        }`}
-                      >
-                        {msg.text}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2 border-t border-border-main/40 pt-3">
-                    <input 
-                      type="text" 
-                      value={aiChatQuery}
-                      onChange={(e) => setAiChatQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSendAiQuestion()}
-                      placeholder="Ask AI Tutor a question..."
-                      className="flex-1 h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none font-mono"
-                    />
-                    <button 
-                      onClick={handleSendAiQuestion}
-                      className="h-9 px-3 bg-purple-600 text-white rounded cursor-pointer"
-                    >
-                      <Send size={12} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        {activeTab === "active" && (
+          <ActivePathView
+            path={activePath}
+            onStartLesson={(lesson) => setActiveLesson(lesson)}
+            onCreateNewPathClick={() => setShowAIStudio(true)}
+          />
         )}
 
-        {/* 4. Test & Assess Tab */}
-        {activeTab === "assess" && (
-          <div className="flex flex-col gap-6 pb-8">
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <Award size={16} className="text-emerald-400" />
-                  <span className="font-display text-sm font-semibold text-txt-main">Knowledge Evaluation & Self Exam</span>
-                </div>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
-                  Exam Engine Live
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <p className="text-xs text-txt-sub font-light">Generate a timed evaluation exam on any computer science topic or custom difficulty setting.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="Exam Topic (e.g. Operating Systems)"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
-                  />
-                  <select className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono">
-                    <option>10 Questions (15 mins)</option>
-                    <option>20 Questions (30 mins)</option>
-                  </select>
-                  <button className="h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs uppercase font-bold tracking-wider rounded cursor-pointer transition-colors">
-                    Start Self Exam
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+        {activeTab === "progress" && (
+          <ProgressDashboardView
+            stats={stats}
+            paths={paths}
+            mistakes={mistakes}
+            onOpenErrorBank={() => setShowErrorBank(true)}
+            onResumePath={handleSelectActivePath}
+          />
         )}
-
       </main>
+
+      {/* Modal Overlays */}
+      {showAIStudio && (
+        <AIPathStudioModal
+          onClose={() => setShowAIStudio(false)}
+          onPathCreated={handlePathCreated}
+        />
+      )}
+
+      {activeLesson && (
+        <SessionPlayer
+          lesson={activeLesson}
+          onComplete={handleLessonComplete}
+          onExit={() => setActiveLesson(null)}
+        />
+      )}
+
+      {showErrorBank && (
+        <ErrorBankModal
+          mistakes={mistakes}
+          onRemoveMistake={handleRemoveMistake}
+          onClose={() => setShowErrorBank(false)}
+        />
+      )}
 
       <Footer />
     </div>

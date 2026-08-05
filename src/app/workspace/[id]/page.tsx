@@ -3,6 +3,7 @@
 import React, { use, useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import { supabase } from "../../lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,9 @@ import {
   MicOff, 
   Video, 
   VideoOff, 
+  Phone,
+  PhoneOff,
+  UserPlus,
   FolderDown, 
   ExternalLink, 
   CheckCircle2, 
@@ -219,6 +223,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
   const workspaceUuid = useMemo(() => getWorkspaceUuid(id), [id]);
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [userUsername, setUserUsername] = useState<string>("");
 
   useEffect(() => {
@@ -2709,6 +2714,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     const inviteUrl = `${window.location.origin}/workspace/${id}?join=true`;
     navigator.clipboard.writeText(inviteUrl);
     setCopiedLink(true);
+    showToast("Workspace invite link copied to clipboard");
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
@@ -3222,24 +3228,24 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   </span>
                 )}
 
-                <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                <div className="flex items-center gap-1.5 flex-nowrap shrink-0 pt-0.5">
                   <a
                     href={eventMetadata.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[9px] font-mono tracking-wider uppercase text-txt-muted/70 hover:text-accent-main opacity-60 hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer bg-bg-surface/80 px-2 py-0.5 rounded border border-border-main/50 w-fit"
+                    className="h-5 inline-flex items-center justify-center gap-1 px-2 text-[8px] font-mono uppercase text-txt-muted/70 hover:text-accent-main opacity-80 hover:opacity-100 transition-all cursor-pointer bg-bg-surface/80 rounded border border-border-main/50 shrink-0"
                   >
-                    <span>Visit Event Page</span>
-                    <ExternalLink size={10} />
+                    <span className="leading-none pt-[0.5px]">Visit Event Page</span>
+                    <ExternalLink size={9} className="shrink-0" />
                   </a>
 
                   <button
                     type="button"
                     onClick={() => setShowBriefModal(true)}
-                    className="text-[9px] font-mono tracking-wider uppercase text-accent-main hover:underline flex items-center gap-1 cursor-pointer bg-accent-main/10 px-2 py-0.5 rounded border border-accent-main/30 w-fit font-semibold"
+                    className="h-5 inline-flex items-center justify-center gap-1 px-2 text-[8px] font-mono uppercase text-accent-main hover:underline cursor-pointer bg-accent-main/10 rounded border border-accent-main/30 shrink-0 font-semibold"
                   >
-                    <Sparkles size={10} className="text-accent-main animate-pulse" />
-                    <span>Event Brief & Rules</span>
+                    <Sparkles size={9} className="text-accent-main animate-pulse shrink-0" />
+                    <span className="leading-none pt-[0.5px]">Event Brief & Rules</span>
                   </button>
                 </div>
               </div>
@@ -3278,9 +3284,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           </div>
 
           {/* Automated Non-Selectable Milestone Stage Timeline */}
-          <div className="relative flex flex-col gap-5 pl-2 py-2 flex-grow">
-            {/* Subtle Low-Opacity Left Guide Line */}
-            <div className="absolute top-4 bottom-4 left-[6px] w-[1px] bg-border-main/40 opacity-20 rounded-full z-0" />
+          <div className="relative flex flex-col gap-3.5 pl-1.5 py-1.5 flex-grow">
+            {/* Fading Vertical Left Guide Line - Centered with Node Circles (18px) */}
+            <div className="absolute top-4 bottom-2 left-[18px] -translate-x-1/2 w-[1px] bg-gradient-to-b from-border-main/70 via-border-main/35 to-transparent z-0" />
             
             {(() => {
               const firstUnpassed = realStageItems.findIndex((s) => !isDatePassed(s.deadline));
@@ -3299,30 +3305,39 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 return (
                   <div 
                     key={idx} 
-                    className="relative z-10 flex items-start gap-3.5 select-none p-1.5 rounded cursor-default transition-colors"
+                    className="relative z-10 flex items-start gap-2.5 select-none p-1 rounded cursor-default transition-colors"
                   >
                     {/* Node Circle */}
-                    <div className={`h-5 w-5 shrink-0 rounded-full border-2 bg-bg-surface flex items-center justify-center transition-all duration-300 ${
-                      isCompleted
-                        ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                        : isActive
-                        ? "border-accent-main ring-4 ring-accent-main/20 bg-accent-main/10 scale-105"
-                        : "border-border-main/60 bg-bg-base/60"
-                    }`}>
-                      {isCompleted ? (
-                        <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                          <CheckCircle2 size={12} className="text-emerald-400 fill-emerald-500/30" />
-                        </motion.div>
-                      ) : isActive ? (
-                        <div className="w-2.5 h-2.5 rounded-full bg-accent-main animate-pulse" />
-                      ) : (
-                        <div className="w-1.5 h-1.5 rounded-full bg-txt-muted/40" />
+                    <div className="relative h-4 w-4 shrink-0 flex items-center justify-center">
+                      {isActive && (
+                        <div className="absolute -inset-1 rounded-full bg-accent-main/20 blur-[2.5px] pointer-events-none animate-pulse" />
                       )}
+                      {isCompleted && (
+                        <div className="absolute -inset-0.5 rounded-full bg-emerald-500/15 blur-[2px] pointer-events-none" />
+                      )}
+
+                      <div className={`relative z-10 h-4 w-4 rounded-full border-[1.5px] bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                        isCompleted
+                          ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_5px_rgba(16,185,129,0.18)]"
+                          : isActive
+                          ? "border-accent-main bg-bg-surface shadow-[0_0_6px_rgba(var(--color-accent-main),0.15)]"
+                          : "border-border-main/60 bg-bg-base/60"
+                      }`}>
+                        {isCompleted ? (
+                          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                            <CheckCircle2 size={10} className="text-emerald-400 fill-emerald-500/30" />
+                          </motion.div>
+                        ) : isActive ? (
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse shrink-0" />
+                        ) : (
+                          <span className="w-1 h-1 rounded-full bg-txt-muted/40 shrink-0" />
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-0.5 pt-0.5">
+                    <div className="flex flex-col gap-0.5 pt-[0.5px]">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-xs font-semibold ${
+                        <span className={`text-[11px] font-semibold leading-tight ${
                           isCompleted
                             ? "text-emerald-400 font-bold"
                             : isActive
@@ -3332,7 +3347,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           {item.title}
                         </span>
                       </div>
-                      <span className={`text-[10px] font-mono tracking-tight ${
+                      <span className={`text-[9px] font-mono tracking-tight ${
                         isCompleted 
                           ? "text-emerald-400/80 font-medium" 
                           : isActive 
@@ -3427,19 +3442,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Ambient Room</span>
               <button 
                 onClick={handleJoinRoom}
-                className={`h-7 px-3 rounded-sm font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1.5 ${
+                className={`h-7 px-3 rounded-sm font-mono text-[9px] leading-none tracking-wider uppercase transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer font-medium select-none ${
                   inRoom 
-                    ? "bg-coral border border-coral text-white bg-red-500" 
-                    : "border border-border-main/80 text-txt-main hover:bg-bg-card"
+                    ? "bg-red-500/10 border border-red-500/40 text-red-400 hover:bg-red-500/20" 
+                    : "border border-border-main/85 text-txt-main hover:bg-bg-card"
                 }`}
               >
-                {inRoom ? "Leave Call" : "Join Call"}
+                {inRoom ? <PhoneOff size={11} className="shrink-0" /> : <Phone size={11} className="shrink-0" />}
+                <span className="leading-none">{inRoom ? "Leave Call" : "Join Call"}</span>
               </button>
               <button 
                 onClick={() => setIsInviteModalOpen(true)}
-                className="h-7 px-3 rounded-sm border border-border-main/85 text-txt-main hover:bg-bg-card font-mono text-[9px] tracking-wider uppercase transition-colors flex items-center gap-1 cursor-pointer font-bold"
+                className="h-7 px-3 rounded-sm border border-border-main/85 text-txt-main hover:bg-bg-card font-mono text-[9px] leading-none tracking-wider uppercase transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer font-medium select-none"
               >
-                Invite
+                <UserPlus size={11} className="shrink-0" />
+                <span className="leading-none">Invite</span>
               </button>
             </div>
 
@@ -3833,24 +3850,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           setTempGit(githubRepo);
                           setIsEditingGit(true);
                         }}
-                        className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                        className="text-[9px] font-mono uppercase text-txt-sub hover:text-txt-main transition-colors cursor-pointer font-medium"
                       >
                         Edit
                       </button>
                     </div>
-                    <span className="text-xs font-mono text-txt-main truncate select-all">
+                    <span className="text-xs font-mono text-txt-main truncate select-all font-normal">
                       {githubRepo || "Not linked"}
                     </span>
                     {githubRepo && (
-                      <a 
-                        href={formatUrl(githubRepo)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1.5 self-start transition-colors"
-                      >
-                        Open Codebase
-                        <ExternalLink size={10} />
-                      </a>
+                      <div className="flex items-center gap-2 pt-1 border-t border-border-main/20 flex-wrap">
+                        <a 
+                          href={formatUrl(githubRepo)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors font-normal"
+                        >
+                          <ExternalLink size={11} />
+                          Open Codebase
+                        </a>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -3866,7 +3885,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         </button>
                         <button 
                           onClick={saveGitRepo}
-                          className="text-[9px] font-mono uppercase text-accent-main font-bold hover:underline cursor-pointer"
+                          className="text-[9px] font-mono uppercase text-accent-main font-semibold hover:underline cursor-pointer"
                         >
                           Save
                         </button>
@@ -3906,13 +3925,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           setTempDemo(liveDemo);
                           setIsEditingDemo(true);
                         }}
-                        className="text-[9px] font-mono uppercase text-accent-main hover:underline cursor-pointer"
+                        className="text-[9px] font-mono uppercase text-txt-sub hover:text-txt-main transition-colors cursor-pointer font-medium"
                       >
                         Edit
                       </button>
                     </div>
                     {liveDemo ? (
-                      <span className="text-xs font-mono text-txt-main truncate select-all font-semibold">
+                      <span className="text-xs font-mono text-txt-main truncate select-all font-normal">
                         {liveDemo}
                       </span>
                     ) : (
@@ -3925,53 +3944,51 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       </div>
                     )}
                     {liveDemo && (
-                      <div className="flex flex-col gap-2 pt-1 border-t border-border-main/20">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button 
-                            type="button"
-                            onClick={() => setShowDemoPreviewModal(true)}
-                            className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 bg-accent-main/5 border border-accent-main/30 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer font-bold"
-                          >
-                            <Eye size={11} />
-                            Live Web Preview
-                          </button>
+                      <div className="flex items-center gap-2 pt-1 border-t border-border-main/20 flex-wrap">
+                        <button 
+                          type="button"
+                          onClick={() => setShowDemoPreviewModal(true)}
+                          className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer font-normal"
+                        >
+                          <Eye size={11} />
+                          Live Web Preview
+                        </button>
 
-                          <button
-                            type="button"
-                            onClick={() => setIsInlineDemoPreviewOpen(prev => !prev)}
-                            className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Monitor size={11} />
-                            {isInlineDemoPreviewOpen ? "Hide Frame" : "Inline Frame"}
-                          </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsInlineDemoPreviewOpen(prev => !prev)}
+                          className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors cursor-pointer font-normal"
+                        >
+                          <Monitor size={11} />
+                          {isInlineDemoPreviewOpen ? "Hide Frame" : "Inline Frame"}
+                        </button>
 
-                          <a 
-                            href={formatUrl(liveDemo)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[10px] text-txt-muted hover:text-txt-main font-mono flex items-center gap-1 transition-colors ml-auto"
-                          >
-                            <span>Launch</span>
-                            <ExternalLink size={10} />
-                          </a>
+                        <a 
+                          href={formatUrl(liveDemo)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-mono text-txt-sub hover:text-txt-main bg-bg-card border border-border-main/50 px-2 py-1 rounded flex items-center gap-1.5 transition-colors font-normal"
+                        >
+                          <ExternalLink size={11} />
+                          Open Demo
+                        </a>
+                      </div>
+                    )}
+
+                    {isInlineDemoPreviewOpen && liveDemo && (
+                      <div className="mt-2 border border-border-main/60 rounded overflow-hidden bg-bg-base flex flex-col shadow-inner">
+                        <div className="flex justify-between items-center bg-bg-surface px-2.5 py-1 border-b border-border-main/40 text-[9px] font-mono text-txt-muted">
+                          <span className="truncate max-w-[200px]">{formatUrl(liveDemo)}</span>
+                          <button onClick={() => setDemoIframeKey(k => k + 1)} className="hover:text-txt-main p-0.5 cursor-pointer">
+                            <RefreshCw size={10} />
+                          </button>
                         </div>
-
-                        {isInlineDemoPreviewOpen && (
-                          <div className="mt-2 border border-border-main/60 rounded overflow-hidden bg-bg-base flex flex-col shadow-inner">
-                            <div className="flex justify-between items-center bg-bg-surface px-2.5 py-1 border-b border-border-main/40 text-[9px] font-mono text-txt-muted">
-                              <span className="truncate max-w-[200px]">{formatUrl(liveDemo)}</span>
-                              <button onClick={() => setDemoIframeKey(k => k + 1)} className="hover:text-txt-main p-0.5 cursor-pointer">
-                                <RefreshCw size={10} />
-                              </button>
-                            </div>
-                            <iframe
-                              key={demoIframeKey}
-                              src={formatUrl(liveDemo)}
-                              className="w-full h-[280px] bg-white border-0"
-                              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                            />
-                          </div>
-                        )}
+                        <iframe
+                          key={demoIframeKey}
+                          src={formatUrl(liveDemo)}
+                          className="w-full h-[280px] bg-white border-0"
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        />
                       </div>
                     )}
                   </>
@@ -4113,14 +4130,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
             return (
               <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Task & Milestone Manager</span>
-                    <span className="text-[9px] font-mono text-txt-muted/70 bg-bg-card/50 border border-border-main/40 px-2 py-0.5 rounded">
-                      {completedTasksCount} / {tasks.length || 1} Done
-                    </span>
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-4">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Task & Milestone Manager</span>
+                    <h2 className="font-display text-lg font-light text-txt-main">Workspace Action Items</h2>
                   </div>
-                  <h2 className="font-display text-lg font-light text-txt-main">Workspace Action Items</h2>
+                  <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card border border-border-main/60 px-2.5 py-1 rounded font-normal">
+                    {completedTasksCount} / {tasks.length || 1} Done
+                  </span>
                 </div>
 
                 {/* Scope Filter Tabs */}
@@ -4129,30 +4146,30 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     type="button"
                     onClick={() => setTaskFilter("all")}
                     className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
-                      taskFilter === "all" ? "bg-bg-surface text-txt-main font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                      taskFilter === "all" ? "bg-bg-surface text-txt-main font-medium border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main font-normal"
                     }`}
                   >
-                    <Layers size={10} className="shrink-0" />
+                    <Layers size={10} className="shrink-0 text-txt-muted" />
                     <span className="whitespace-nowrap">All Tasks ({tasks.length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTaskFilter("team")}
                     className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
-                      taskFilter === "team" ? "bg-bg-surface text-emerald-400 font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                      taskFilter === "team" ? "bg-bg-surface text-txt-main font-medium border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main font-normal"
                     }`}
                   >
-                    <Users size={10} className="shrink-0 text-emerald-400" />
+                    <Users size={10} className="shrink-0 text-txt-muted" />
                     <span className="whitespace-nowrap">Team ({teamTasksList.length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setTaskFilter("self")}
                     className={`flex-1 h-7 px-2 rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 leading-none whitespace-nowrap shrink-0 ${
-                      taskFilter === "self" ? "bg-bg-surface text-purple-400 font-bold border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main"
+                      taskFilter === "self" ? "bg-bg-surface text-txt-main font-medium border border-border-main/80 shadow-xs" : "text-txt-muted hover:text-txt-main font-normal"
                     }`}
                   >
-                    <User size={10} className="shrink-0 text-purple-400" />
+                    <User size={10} className="shrink-0 text-txt-muted" />
                     <span className="whitespace-nowrap">Self ({selfTasksList.length})</span>
                   </button>
                 </div>
@@ -4174,7 +4191,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         type="button"
                         onClick={() => setNewTaskScope("team")}
                         className={`px-2 py-1 rounded-xs transition-colors flex items-center gap-1 cursor-pointer ${
-                          newTaskScope === "team" ? "bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30" : "text-txt-muted hover:text-txt-main"
+                          newTaskScope === "team" ? "bg-bg-card text-txt-main font-medium border border-border-main/60" : "text-txt-muted hover:text-txt-main"
                         }`}
                       >
                         <Users size={9} /> Team
@@ -4183,7 +4200,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         type="button"
                         onClick={() => setNewTaskScope("self")}
                         className={`px-2 py-1 rounded-xs transition-colors flex items-center gap-1 cursor-pointer ${
-                          newTaskScope === "self" ? "bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30" : "text-txt-muted hover:text-txt-main"
+                          newTaskScope === "self" ? "bg-bg-card text-txt-main font-medium border border-border-main/60" : "text-txt-muted hover:text-txt-main"
                         }`}
                       >
                         <User size={9} /> Self
@@ -4202,7 +4219,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       </select>
                       <button
                         type="submit"
-                        className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider rounded-sm font-bold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                        className="h-7 px-3 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider rounded-sm font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
                       >
                         <Plus size={11} /> Add Task
                       </button>
@@ -4214,7 +4231,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 {(taskFilter === "all" || taskFilter === "team") && (
                   <div className="flex flex-col gap-2 border border-border-main/50 bg-bg-surface/30 p-3 rounded-sm">
                     <div className="flex items-center justify-between border-b border-border-main/30 pb-1.5">
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-emerald-400 font-bold flex items-center gap-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted flex items-center gap-1.5">
                         <Users size={11} /> Workspace Team ({teamTasksList.length})
                       </span>
                       <span className="text-[8px] font-mono text-txt-muted/70 uppercase">Shared with teammates</span>
@@ -4225,8 +4242,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         {teamTasksList.map(renderTaskCard)}
                       </div>
                     ) : (
-                      <span className="text-[10px] font-mono text-txt-muted/60 italic py-2 text-center">
-                        No team tasks created yet. Create one above for your teammates!
+                      <span className="text-[10px] font-mono text-txt-muted/60 font-light italic py-2 text-center">
+                        No team tasks created yet. Add a task above for your team.
                       </span>
                     )}
                   </div>
@@ -4236,7 +4253,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 {(taskFilter === "all" || taskFilter === "self") && (
                   <div className="flex flex-col gap-2 border border-border-main/50 bg-bg-surface/30 p-3 rounded-sm">
                     <div className="flex items-center justify-between border-b border-border-main/30 pb-1.5">
-                      <span className="font-mono text-[9px] uppercase tracking-widest text-purple-400 font-bold flex items-center gap-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted flex items-center gap-1.5">
                         <User size={11} /> Personal Self ({selfTasksList.length})
                       </span>
                       <span className="text-[8px] font-mono text-txt-muted/70 uppercase">Private to you</span>
@@ -4247,7 +4264,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         {selfTasksList.map(renderTaskCard)}
                       </div>
                     ) : (
-                      <span className="text-[10px] font-mono text-txt-muted/60 italic py-2 text-center">
+                      <span className="text-[10px] font-mono text-txt-muted/60 font-light italic py-2 text-center">
                         No personal tasks yet. Add a self task above for your private checklist.
                       </span>
                     )}
@@ -4260,12 +4277,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           {activeTab === "artifacts" && (
             <>
               {/* 4 Active Artifact Slots Header */}
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+              <div className="flex items-center justify-between border-b border-border-main/40 pb-4">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Project Artifact Vault (Max 4 Active Slots)</span>
-                  <h3 className="font-display text-sm font-light text-txt-main">Active Deliverable Decks</h3>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Project Artifact Vault</span>
+                  <h2 className="font-display text-lg font-light text-txt-main">Active Deliverable Decks</h2>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card border border-border-main/60 px-2.5 py-1 rounded font-normal">
                   {activeSlotArtifacts.filter(Boolean).length} / 4 Slots Filled
                 </span>
               </div>
@@ -4435,10 +4452,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           )}
 
           {activeTab === "notes" && (
-            <div className="flex flex-col gap-3">
-              <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Shared Scratchpad</span>
-                <span className="text-[8px] font-mono text-emerald-500 font-semibold">Live Auto-saved</span>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-border-main/40 pb-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Shared Scratchpad</span>
+                  <h2 className="font-display text-lg font-light text-txt-main">Collaborative Session Notes</h2>
+                </div>
+                <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card border border-border-main/60 px-2.5 py-1 rounded font-normal flex items-center gap-1.5">
+                  <span className="text-emerald-500/80 font-medium">●</span> Live Auto-saved
+                </span>
               </div>
               <textarea
                 rows={16}
@@ -4636,9 +4658,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Avatar with status shade */}
-                    <div className={`relative w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-bold text-txt-main border overflow-hidden flex-shrink-0 ${
-                      member.isOnline ? "border-emerald-500/40" : "border-border-main/80 bg-bg-card"
+                    {/* Avatar with status ring */}
+                    <div className={`relative w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-bold text-txt-main overflow-hidden flex-shrink-0 ${
+                      member.isOnline ? "ring-1 ring-emerald-500/85 border border-emerald-500/40" : "border border-border-main/80 bg-bg-card"
                     }`}>
                       {member.avatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -4650,11 +4672,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       ) : (
                         <span className="font-mono text-xs font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
                       )}
-                      
-                      {/* Status badge dot */}
-                      <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-bg-surface ${
-                        member.isOnline ? "bg-emerald-500 animate-pulse" : "bg-txt-muted"
-                      }`} />
                     </div>
 
                     <div className="flex flex-col min-w-0 text-left">

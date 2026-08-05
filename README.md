@@ -1,53 +1,78 @@
-# 🌌 LynDesk (EventTracker)
+# 🌌 LynDesk — Link Your Next Desk
 
-> **The collaborative event tracking and verified project portfolio platform for engineering students.**
+> **Link Your Next Desk**: The unified academic engine, collaborative workspace platform, and AI-powered engineering portfolio hub for student developers, faculty coordinators, and tech recruiters.
 
-LynDesk is a premium, minimal, and fully integrated platform designed to bridge the gap between engineering student accomplishments in hackathons and college-credit coordination, ultimately facilitating verified professional hiring pipelines.
-
----
-
-## 🎨 Visual Identity
-
-LynDesk features a handcrafted, minimal, obsidian-to-alabaster interface utilizing CSS hardware acceleration (120Hz smooth layouts) and strict typography styling:
-
-*   **Headings**: `Outfit` (Geometric serif cleanliness)
-*   **Body & UI**: `Inter`
-*   **Code & Logs**: `JetBrains Mono`
+LynDesk (**L**ink **Y**our **N**ext **Desk**) bridges student accomplishments in hackathons, daily competitive coding, and coursework directly into verified, recruiter-ready engineering portfolios and academic records.
 
 ---
 
-## 🚀 Key Features
+## 🏛️ The Three Core Desks
 
-### 1. 📂 Collaborative Workspaces
-*   **P2P WebRTC Voice & Video Rooms**: Live, ultra-low latency peer-to-peer audio/video calling built directly into rooms. Uses Supabase Realtime as a signaling channel, enabling direct browser-to-browser media streaming with no server lag.
-*   **Live Git Commit Feed**: Live ticker that polls local Git logs or queries the GitHub API directly to display real-time commit history without page refreshes.
-*   **Interactive Configurations**: Quick-edit toggles for Git repository links and hosted demo URLs that auto-sync to Supabase with click-to-launch safety formatters.
-*   **Artifact Registry**: Supports version-controlled uploads of project PDF/PPT pitch decks with rollback and download options.
+LynDesk is structured around three dedicated productivity desks tailored for engineering excellence:
 
-### 2. 🧠 AI Programming Portfolio Analyst (Google Gemini 1.5 Flash)
-*   Evaluates synced developer profiles (LeetCode, Codeforces, CodeChef).
-*   Synthesizes recruiter-ready summaries and a standardized 1-100 Coding Index score.
-*   Provides key insights and automated tags representing user strengths (e.g., *Dynamic Programming*, *Concurrency*).
+```
+                          ┌───────────────────────────┐
+                          │   🌌 LynDesk Architecture │
+                          └─────────────┬─────────────┘
+                                        │
+         ┌──────────────────────────────┼──────────────────────────────┐
+         ▼                              ▼                              ▼
+ 🚀 Event Desk                  💻 Coding Desk                 📚 Study Desk
+ (Workspaces & Hackathons)       (Competitive Ratings)          (Adaptive AI Paths)
+```
 
-### 3. 🏢 Faculty & Coordinator Dashboard
-*   **AI Report Assistant**: Input natural language requests (e.g. *"I want to download the LeetCode performance of CS department from 101 to 104 roll numbers"*).
-*   **Auto-compiled CSV Exports**: Filters the student registry based on natural language queries and complies a exportable CSV file.
-*   **Audit Ledgers**: Records access keys and coordination events in a secure live compliance logs ledger.
+### 1. 🚀 Event Desk (`/event-desk`)
+* **Collaborative Project Workspaces**: Dedicated team spaces for hackathon deliverables, stage management (*Ideation → MVP → Polished Demo*), and active task tracking.
+* **P2P WebRTC Video & Voice Rooms**: Embedded low-latency peer-to-peer audio and video rooms powered by Supabase Realtime signaling.
+* **Live GitHub Commit Ticker**: Synchronized commit feeds polling local Git logs or the GitHub API in real time.
+* **Deliverable Artifact Registry**: Version-controlled pitch decks (PDF/PPTX), hosted demo URLs, and code repository links.
 
-### 4. 💅 Unified Themed Dialog Framework
-*   Replaces native browser `alert()` and `confirm()` panels with a custom-styled, glassmorphic modal overlay.
-*   Dynamically switches layout states to support simple system alerts or critical verification prompts.
+### 2. 💻 Coding Desk (`/coding-desk`)
+* **Multi-Platform Handle Sync**: Automated aggregation across **LeetCode**, **Codeforces**, and **CodeChef**.
+* **Streak & Activity Verification**: Live daily challenge streak tracking with verified problem solve counters.
+* **Competitive Index**: Standardized scoring algorithm evaluating difficulty distribution (Easy, Medium, Hard) and rating brackets.
+
+### 3. 📚 Study Desk (`/study-desk`)
+* **AI Path Studio**: Drag-and-drop file uploader for lecture notes, PDFs, DOCX, and spreadsheets that automatically generates structured Duolingo-style study paths.
+* **Interactive Session Player**: Full-screen lesson overlay featuring concept teaching cards, multiple-choice questions, short-answer items, 5-heart life system, and celebration confetti.
+* **Depth & Pace Controls**: Generate targeted paths tuned for **Sprint (5 lessons)**, **Standard (15–20 lessons)**, or **Deep Dive (25–50 lessons)**.
+* **Error Bank & Adaptive Review**: Automated mistake queue for targeted re-testing and knowledge retention.
+* **30-Day Activity Grid & Leagues**: Visual heatmap tracking daily study habits and rank progression (*Bronze, Silver, Gold, Diamond*).
+
+---
+
+## 🧠 AI Engine & Co-Pilot (Groq Llama 3.3)
+
+LynDesk is powered by the **Groq AI Engine** (`llama-3.3-70b-versatile`), driving zero-latency intelligent workflows across the platform:
+
+* **LynAI Co-Pilot (`/api/ai/chat`)**: Context-aware assistant providing CS algorithm guidance, workspace navigation, and daily challenge tips.
+* **Curriculum Generator (`/api/study/generate-lessons`)**: High-speed JSON schema generation for bite-sized teaching cards and assessment quizzes.
+* **Short-Answer Evaluator (`/api/study/grade-answer`)**: Intelligent grading of written responses against model answers and key concepts.
+* **Faculty Coordinator Assistant (`/api/ai/coordinator-query`)**: Natural language query engine translating faculty prompts (e.g., *"Export LeetCode stats for CS roll 1001 to 2000"*) into instant CSV downloads.
+* **Recruiter Portfolio Summary (`/api/ai/portfolio-summary`)**: Synthesizes verified platform stats into executive recruiter overviews and skill tags.
+
+---
+
+## 🎨 Visual Identity & Aesthetic Directives
+
+LynDesk is built with a Swiss-grid minimalist aesthetic, dark mode precision, CSS hardware acceleration (120Hz smooth layouts), and curated Google Fonts typography:
+
+* **Headings**: `Outfit` (Clean, geometric elegance)
+* **Body & UI**: `Inter` (Humanist legibility)
+* **Code & Monospace**: `JetBrains Mono` / `Font Mono`
+* **Animations**: Micro-interactions and spring transitions powered by `framer-motion`
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Frontend Framework**: Next.js 16 (App Router)
-*   **Realtime Signaling & Database**: Supabase (PostgreSQL with Realtime Broadcast Channels)
-*   **AI Orchestration**: Google Gemini 1.5 Flash SDK (`@google/generative-ai`)
-*   **Styling**: TailwindCSS & Custom CSS Variables (supporting sync-safe Light/Dark mode)
-*   **Icons**: Lucide React
-*   **Communication protocol**: Peer-to-Peer WebRTC (MediaStream API + RTCPeerConnection)
+* **Frontend Framework**: Next.js 16 (App Router with Turbopack) & React 19
+* **Database & Auth**: Supabase (PostgreSQL, Row Level Security, Realtime Broadcast Channels)
+* **AI Orchestration**: Groq AI SDK (`llama-3.3-70b-versatile`)
+* **Styling**: Tailwind CSS v4 & Custom CSS Design Tokens
+* **Document Processing**: `pdf-parse`, `mammoth`, `xlsx`
+* **Icons**: Lucide React
+* **Realtime Media**: WebRTC (MediaStream API + RTCPeerConnection)
 
 ---
 
@@ -55,41 +80,40 @@ LynDesk features a handcrafted, minimal, obsidian-to-alabaster interface utilizi
 
 ### Prerequisites
 
-*   Node.js 18.x or later
-*   npm or yarn
+* Node.js 18.x or later
+* npm or yarn
 
-### Installation & Configuration
+### Installation & Local Setup
 
-1. Clone the repository and install dependencies:
+1. **Clone the repository and install dependencies**:
    ```bash
    npm install
    ```
 
-2. Create a `.env.local` file in the root directory and configure your credentials:
+2. **Configure Environment Variables**:
+   Create a `.env.local` file in the project root:
    ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   GEMINI_API_KEY=your_gemini_api_key
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   GROQ_API_KEY=gsk_your_groq_api_key
    ```
-   > [!NOTE]
-   > If `GEMINI_API_KEY` is not present, the portfolio summaries and coordinator reports will gracefully fall back to local mock evaluators.
 
-3. Start the local development server:
+3. **Apply Database Migrations**:
+   Run the SQL migration scripts in your Supabase SQL Editor:
+   - `supabase_migration.sql` — Core database tables (`profiles`, `events`, `project_spaces`, `workspace_tasks`)
+   - `supabase_study_desk.sql` — Study Desk tables (`study_paths`, `study_mistakes`, profile gamification columns)
+
+4. **Launch Development Server**:
    ```bash
    npm run dev
    ```
+   Navigate to [http://localhost:3000](http://localhost:3000).
 
-4. Open [http://localhost:3000](http://localhost:3000) to view the application.
-
----
-
-## 🏢 Supabase Schema Overview
-
-The database uses the migration layout defined in `supabase_migration.sql`. Key tables include:
-*   `profiles`: Contains developer usernames (LeetCode, Codeforces, CodeChef handles) linked to Supabase authentication.
-*   `project_spaces`: Holds hackathon team metadata (project names, git repository links, and hosted deployment URLs).
-*   `chat_messages`: Handles collaborative logs synced in real-time between project members.
-*   `artifacts`: Version-controlled files and slide-decks.
+5. **Verify Production Build**:
+   ```bash
+   npm run build
+   ```
 
 ---
 

@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { leetcode, codeforces, codechef } = body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
 
-    // Fallback: If no API key is configured, return mock data with a setup warning
-    if (!apiKey) {
-      // Generate some nice custom mock insights based on their actual numbers
+    if (!groqApiKey) {
       const lcSolved = leetcode?.solved || 0;
       const lcStreak = leetcode?.leetcodeStreak || 0;
       const cfRating = codeforces?.rating || 0;
@@ -24,90 +21,72 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         isMock: true,
-        summary: `Mock AI Profile Summary: You have solved ${lcSolved} problems on LeetCode with an active streak of ${lcStreak} days. Your competitive profiles show a Codeforces rating of ${cfRating} (${cfSolved} solved) and CodeChef rating of ${ccRating}. To get a real, customized AI analysis of your portfolio, generate a free Gemini API Key and add it to your .env.local file.`,
+        summary: `Developer Profile Summary: Solved ${lcSolved} problems on LeetCode with an active streak of ${lcStreak} days. Competitive profile shows Codeforces rating of ${cfRating} (${cfSolved} solved) and CodeChef rating of ${ccRating}.`,
         score: Math.min(100, Math.max(30, Math.floor((lcSolved / 5) + (cfRating / 40) + (ccRating / 40)))),
         skills: mockSkills,
         insights: [
           `Synced profiles track achievements across LeetCode, Codeforces, and CodeChef.`,
           lcSolved > 50 
-            ? `Your LeetCode solve count (${lcSolved}) shows solid progress in fundamental data structures.` 
-            : `Add more solved problems on LeetCode to build your foundational core.`,
+            ? `LeetCode solve count (${lcSolved}) demonstrates solid core data structures progress.` 
+            : `Solve more problems on LeetCode to build your core algorithmic foundation.`,
           lcStreak > 0 
             ? `An active ${lcStreak}-day streak demonstrates consistent daily coding discipline.` 
-            : `Try solving a daily challenge to establish a consecutive streak.`
+            : `Solve daily challenges to establish a consecutive coding streak.`
         ]
       });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    let model;
-    try {
-      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    } catch {
-      model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
-    }
+    const systemPrompt = `You are a senior tech recruiter and elite coding coach. Return ONLY JSON matching this format:
+{
+  "summary": "High-impact 2-3 sentence overview of candidate capability.",
+  "score": 85,
+  "skills": ["Skill1", "Skill2", "Skill3"],
+  "insights": [
+    "Bullet point 1 analysis",
+    "Bullet point 2 advice"
+  ]
+}`;
 
-    const statsPrompt = `
-      You are a senior tech recruiter and elite coding coach. Analyze this student's coding portfolio statistics and generate a premium, concise profile summary.
-      
-      Coding Statistics:
-      - LeetCode:
-        * Total Solved: ${leetcode?.solved || 0}
-        * Easy: ${leetcode?.easySolved || 0}, Medium: ${leetcode?.mediumSolved || 0}, Hard: ${leetcode?.hardSolved || 0}
-        * Active Streak: ${leetcode?.leetcodeStreak || 0} days
-      - Codeforces:
-        * Rating: ${codeforces?.rating || 0}
-        * Rank: ${codeforces?.rank || "Unrated"}
-        * Total Solved: ${codeforces?.solved || 0}
-      - CodeChef:
-        * Rating: ${codechef?.rating || 0}
-        * Global Rank: ${codechef?.globalRank || "N/A"}
-        * Stars: ${codechef?.stars || "N/A"}
-        * Total Solved: ${codechef?.solved || 0}
+    const userPrompt = `Coding Statistics:
+- LeetCode: Solved ${leetcode?.solved || 0} (Easy: ${leetcode?.easySolved || 0}, Med: ${leetcode?.mediumSolved || 0}, Hard: ${leetcode?.hardSolved || 0}), Streak: ${leetcode?.leetcodeStreak || 0} days
+- Codeforces: Rating ${codeforces?.rating || 0}, Rank: ${codeforces?.rank || "Unrated"}, Solved: ${codeforces?.solved || 0}
+- CodeChef: Rating ${codechef?.rating || 0}, Stars: ${codechef?.stars || "N/A"}, Solved: ${codechef?.solved || 0}`;
 
-      Return a JSON object conforming strictly to this format:
-      {
-        "summary": "A high-impact, professional 2-3 sentence overview of their developer capability, highlight key accomplishments or growth traits based on the numbers.",
-        "score": 85, // A numerical ranking from 30 to 100 representing their competitive profile strength
-        "skills": ["Skill1", "Skill2", "Skill3"], // Max 4 core programming strengths identified from their performance
-        "insights": [
-          "Detail bullet point 1 (analysis of consistency, difficulty balance, or CP rank)",
-          "Detail bullet point 2 (actionable advice on which topics/platforms to practice next to level up)"
-        ]
-      }
-
-      Respond ONLY with the raw JSON string. Do not include markdown codeblocks (no \`\`\`json).
-    `;
-
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: statsPrompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${groqApiKey.trim()}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.4,
+      }),
     });
 
-    const responseText = result.response.text();
-    
-    // Clean potential markdown backticks or formatting wrappers
-    let cleanedText = responseText.trim();
-    if (cleanedText.startsWith("```")) {
-      cleanedText = cleanedText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    if (groqRes.ok) {
+      const groqData = await groqRes.json();
+      const replyText = groqData?.choices?.[0]?.message?.content;
+      const data = JSON.parse(replyText || "{}");
+
+      return NextResponse.json({
+        isMock: false,
+        summary: data.summary || "Solid technical portfolio.",
+        score: typeof data.score === "number" ? data.score : 75,
+        skills: Array.isArray(data.skills) ? data.skills : ["Problem Solving"],
+        insights: Array.isArray(data.insights) ? data.insights : ["Keep practicing."]
+      });
     }
-    
-    const data = JSON.parse(cleanedText);
 
-    return NextResponse.json({
-      isMock: false,
-      summary: data.summary,
-      score: data.score,
-      skills: Array.isArray(data.skills) ? data.skills : [],
-      insights: Array.isArray(data.insights) ? data.insights : []
-    });
-
+    throw new Error("Groq API call failed.");
   } catch (error: any) {
-    console.error("AI Portfolio Summary Route Error:", error);
     return NextResponse.json(
-      { error: "Failed to generate portfolio summary: " + error.message },
+      { error: "Failed to generate portfolio summary: " + (error?.message || "Unknown error") },
       { status: 500 }
     );
   }

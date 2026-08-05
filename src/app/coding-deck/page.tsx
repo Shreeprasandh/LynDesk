@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import AppliedHackathonsModal from "../components/coding-desk/AppliedHackathonsModal";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Link from "next/link";
+import { normalizeTitleCase } from "../lib/textNormalization";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -13,7 +15,8 @@ import {
   AlertCircle, 
   TrendingUp,
   Sparkles,
-  RotateCw
+  RotateCw,
+  FolderKanban
 } from "lucide-react";
 
 interface PlatformStats {
@@ -55,12 +58,38 @@ export default function CodingDeckPage() {
 
 
 
-  // Platform usernames
-  const [leetcodeUser, setLeetcodeUser] = useState("");
-  const [codeforcesUser, setCodeforcesUser] = useState("");
-  const [codechefUser, setCodechefUser] = useState("");
-  const [unstopUser, setUnstopUser] = useState("");
-  const [hack2skillUser, setHack2skillUser] = useState("");
+  // Platform usernames - instant 0ms cache initialization
+  const [leetcodeUser, setLeetcodeUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_leetcode_handle") || "";
+    }
+    return "";
+  });
+  const [codeforcesUser, setCodeforcesUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_codeforces_handle") || "";
+    }
+    return "";
+  });
+  const [codechefUser, setCodechefUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_codechef_handle") || "";
+    }
+    return "";
+  });
+  const [unstopUser, setUnstopUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_unstop_handle") || "";
+    }
+    return "";
+  });
+  const [hack2skillUser, setHack2skillUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_hack2skill_handle") || "";
+    }
+    return "";
+  });
+  const [showAppliedModal, setShowAppliedModal] = useState(false);
 
   // Inline handle input state
   const [inputLcHandle, setInputLcHandle] = useState("");
@@ -763,7 +792,7 @@ export default function CodingDeckPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
           <div className="flex flex-col gap-1 min-w-0">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
-            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Deck & Platforms</h1>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Desk & Platforms</h1>
             <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
           </div>
           <button
@@ -953,18 +982,6 @@ export default function CodingDeckPage() {
 
                     </div>
 
-                    <div className="flex justify-between items-center bg-bg-base/30 border border-border-main/60 p-3 rounded-md">
-                      <span className="text-[10px] font-mono text-txt-muted uppercase">Leetcode Profile</span>
-                      <a 
-                        href={`https://leetcode.com/${leetcodeUser}/`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono"
-                      >
-                        @{leetcodeUser} <ExternalLink size={10} />
-                      </a>
-                    </div>
-
                     {/* Contribution Calendar Graph */}
                     {renderHeatmap()}
 
@@ -989,9 +1006,15 @@ export default function CodingDeckPage() {
                   </div>
 
                   {codechefUser && (
-                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
-                      @{codechefUser}
-                    </span>
+                    <a 
+                      href={`https://www.codechef.com/users/${codechefUser}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                    >
+                      <span className="truncate max-w-[140px]">@{codechefUser}</span>
+                      <ExternalLink size={10} className="shrink-0" />
+                    </a>
                   )}
                 </div>
 
@@ -1011,29 +1034,41 @@ export default function CodingDeckPage() {
                         </span>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Star Division</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rank}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Rating: {stats.codechef?.rating}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Contest Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rating ?? "N/A"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Active division score</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.solved}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Synced 5m ago</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Star Division</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.rank ?? "N/A"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Rating Stars tier</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
-                        <a 
-                          href={`https://www.codechef.com/users/${codechefUser}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
-                        >
-                          @{codechefUser} <ExternalLink size={10} />
-                        </a>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Solved Problems</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codechef?.solved ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Verified solves</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Global Rank</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {(stats.codechef as any)?.globalRank ? `#${(stats.codechef as any).globalRank}` : "N/A"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
+                          {(stats.codechef as any)?.countryRank ? `Country: #${(stats.codechef as any).countryRank}` : "Country: N/A"}
+                        </span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Peak Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {(stats.codechef as any)?.highestRating ?? "N/A"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">All-time highest</span>
                       </div>
                     </div>
                   </div>
@@ -1058,9 +1093,15 @@ export default function CodingDeckPage() {
                   </div>
 
                   {codeforcesUser && (
-                    <span className="text-[10px] font-mono text-txt-muted bg-bg-base/50 px-2 py-0.5 border border-border-main/60 rounded">
-                      @{codeforcesUser}
-                    </span>
+                    <a 
+                      href={`https://codeforces.com/profile/${codeforcesUser}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                    >
+                      <span className="truncate max-w-[140px]">@{codeforcesUser}</span>
+                      <ExternalLink size={10} className="shrink-0" />
+                    </a>
                   )}
                 </div>
 
@@ -1080,45 +1121,45 @@ export default function CodingDeckPage() {
                         </span>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-2">
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Division Rating</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.rating}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">{stats.codeforces?.rank}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Division Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.rating ?? "N/A"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
+                          {stats.codeforces?.rank ? normalizeTitleCase(stats.codeforces.rank) : "Unrated"}
+                        </span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Solved Problems</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.solved}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Unique problems</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Solved Problems</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.codeforces?.solved ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Unique problems</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Submissions</span>
-                        <span className="text-xl font-semibold text-txt-main font-display">{(stats.codeforces as any)?.totalSubmissions || 0}</span>
-                        <span className="text-[9px] text-txt-sub font-mono">Total runs</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Submissions</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{(stats.codeforces as any)?.totalSubmissions ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Total runs</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Acceptance Rate</span>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Acceptance Rate</span>
                         <span className="text-xl font-semibold text-txt-main font-display">
                           {((stats.codeforces as any)?.totalSubmissions 
                             ? (((stats.codeforces as any)?.acceptedSubmissions / (stats.codeforces as any)?.totalSubmissions) * 100).toFixed(1)
                             : "0.0")}%
                         </span>
-                        <span className="text-[9px] text-txt-sub font-mono">Correct runs ratio</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Correct solves ratio</span>
                       </div>
 
-                      <div className="border border-border-main/60 bg-bg-base/30 p-3 rounded flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-txt-muted uppercase">Platform Handle</span>
-                        <a 
-                          href={`https://codeforces.com/profile/${codeforcesUser}`} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-accent-main hover:underline flex items-center gap-1 font-mono pt-1.5"
-                        >
-                          @{codeforcesUser} <ExternalLink size={10} />
-                        </a>
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Peak Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {(stats.codeforces as any)?.maxRating ?? "N/A"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
+                          {(stats.codeforces as any)?.maxRank ? `Max: ${normalizeTitleCase((stats.codeforces as any).maxRank)}` : "Max: N/A"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1135,7 +1176,7 @@ export default function CodingDeckPage() {
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles size={14} className="text-amber-500 animate-pulse" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">AI Portfolio Analyst</span>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">AI Portfolio Analyst</span>
                   </div>
                 </div>
 
@@ -1254,46 +1295,89 @@ export default function CodingDeckPage() {
                 )}
               </div>
 
-              {/* Unstop / Hack2Skill Panel */}
+              {/* Hackathon Portals & Applied Workspaces Panel */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Hackathon Portals</span>
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
+                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
+                  </div>
+                  {(unstopUser || hack2skillUser) && (
+                    <button
+                      onClick={() => setShowAppliedModal(true)}
+                      className="text-[10px] font-mono uppercase text-accent-main hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                    >
+                      Manage Applications →
+                    </button>
+                  )}
+                </div>
                 
-                {/* Unstop */}
-                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-2">
+                {/* Unstop Row */}
+                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-txt-main">Unstop Integrations</span>
-                    {unstopUser && (
-                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.unstop?.registered} Applied</span>
+                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
+                    {unstopUser ? (
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.unstop?.registered} Applied
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
                     )}
                   </div>
-
                   {unstopUser ? (
-                    <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
                       <span>@{unstopUser}</span>
+                      <button
+                        onClick={() => setShowAppliedModal(true)}
+                        className="text-accent-main hover:underline font-semibold cursor-pointer"
+                      >
+                        View Applied ({stats.unstop?.registered})
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-txt-muted italic font-light">Link Unstop in your Profile Settings to sync metrics.</span>
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Unstop in Profile Settings to sync applications.
+                    </span>
                   )}
                 </div>
 
-                {/* Hack2Skill */}
-                <div className="flex flex-col gap-2">
+                {/* Hack2Skill Row */}
+                <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-txt-main">Hack2Skill Integrations</span>
-                    {hack2skillUser && (
-                      <span className="text-[9px] bg-bg-card px-2 py-0.5 border border-border-main/80 rounded">{stats.hack2skill?.registered} Applied</span>
+                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
+                    {hack2skillUser ? (
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.hack2skill?.registered} Applied
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
                     )}
                   </div>
-
                   {hack2skillUser ? (
-                    <div className="flex justify-between items-center text-[10px] font-mono text-txt-sub">
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
                       <span>@{hack2skillUser}</span>
+                      <button
+                        onClick={() => setShowAppliedModal(true)}
+                        className="text-accent-main hover:underline font-semibold cursor-pointer"
+                      >
+                        View Applied ({stats.hack2skill?.registered})
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-txt-muted italic font-light">Link Hack2Skill in your Profile Settings to sync metrics.</span>
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Hack2Skill in Profile Settings to sync applications.
+                    </span>
                   )}
                 </div>
 
+                {(unstopUser || hack2skillUser) && (
+                  <button
+                    onClick={() => setShowAppliedModal(true)}
+                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
+                  >
+                    <FolderKanban size={12} /> Manage Applied Hackathons & Workspaces
+                  </button>
+                )}
               </div>
 
               {/* Active / Upcoming Contests Feed */}
@@ -1301,7 +1385,7 @@ export default function CodingDeckPage() {
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2">
                     <TrendingUp size={14} className="text-accent-main" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Active Contest Feed</span>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Contest Feed</span>
                   </div>
                 </div>
 
@@ -1327,6 +1411,14 @@ export default function CodingDeckPage() {
         )}
 
       </main>
+
+      {showAppliedModal && (
+        <AppliedHackathonsModal
+          unstopUser={unstopUser}
+          hack2skillUser={hack2skillUser}
+          onClose={() => setShowAppliedModal(false)}
+        />
+      )}
 
       <Footer />
     </div>

@@ -5,6 +5,7 @@ import { useTheme } from "../components/ThemeProvider";
 import Link from "next/link";
 import { Sun, Moon, ArrowLeft } from "lucide-react";
 import LynDeskLogo from "../components/LynDeskLogo";
+import Footer from "../components/Footer";
 
 export default function PrivacyPolicy() {
   const { theme, toggleTheme } = useTheme();
@@ -115,16 +116,7 @@ export default function PrivacyPolicy() {
 
       </main>
 
-      {/* Footer */}
-      <footer className="h-12 flex items-center justify-between px-6 md:px-12 border-t border-border-main/60 bg-bg-surface text-txt-muted text-[10px] font-mono tracking-wider transition-colors duration-150 flex-shrink-0">
-        <div>© 2026 LYNDESK NETWORK INC.</div>
-        <div className="flex gap-6 uppercase font-mono">
-          <Link href="/privacy" className="text-txt-main">Privacy</Link>
-          <Link href="/terms" className="hover:text-txt-main transition-colors">Terms</Link>
-          <Link href="/help" className="hover:text-txt-main transition-colors">Help</Link>
-          <span className="text-txt-muted select-none">LDK:SYS</span>
-        </div>
-      </footer>
+      <Footer />
 
     </div>
   );

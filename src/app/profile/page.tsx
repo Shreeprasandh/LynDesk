@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
@@ -251,6 +252,7 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
 
 export default function ProfilePage() {
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
 
 
   
@@ -311,6 +313,31 @@ export default function ProfilePage() {
   const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearAutoDismissTimeout = () => {
+    if (messageTimeoutRef.current) {
+      clearTimeout(messageTimeoutRef.current);
+      messageTimeoutRef.current = null;
+    }
+  };
+
+  const setAutoDismissMessage = (msg: { text: string; type: "success" | "error" } | null, durationMs = 5000) => {
+    clearAutoDismissTimeout();
+    setMessage(msg);
+    if (msg && durationMs > 0) {
+      messageTimeoutRef.current = setTimeout(() => {
+        setMessage(null);
+        messageTimeoutRef.current = null;
+      }, durationMs);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearAutoDismissTimeout();
+    };
+  }, []);
   
   // Delete Account States
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -349,6 +376,8 @@ export default function ProfilePage() {
   const isInitialLoadRef = useRef(true);
 
   const handleStartEdit = () => {
+    clearAutoDismissTimeout();
+    setMessage(null);
     setBackupData({
       fullName,
       username,
@@ -370,6 +399,7 @@ export default function ProfilePage() {
   };
 
   const handleCancelEdit = () => {
+    clearAutoDismissTimeout();
     if (backupData) {
       setFullName(backupData.fullName);
       setUsername(backupData.username);
@@ -1120,7 +1150,7 @@ export default function ProfilePage() {
         localStorage.removeItem(`ldk_profile_draft_${user.id}`);
       }
 
-      setMessage({ text: "Profile details updated successfully.", type: "success" });
+      setAutoDismissMessage({ text: "Profile details updated successfully.", type: "success" }, 5000);
       setIsEditing(false); // Disable editing mode after successful save
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update profile records.";
@@ -1131,6 +1161,7 @@ export default function ProfilePage() {
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isEditing) return;
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -1322,7 +1353,7 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
@@ -1334,7 +1365,7 @@ export default function ProfilePage() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-bg-base/30 py-8 px-4 md:px-12 max-w-5xl w-full mx-auto flex flex-col gap-6">
+      <main className="flex-1 bg-bg-base/30 py-8 px-4 md:px-12 max-w-5xl w-full mx-auto flex flex-col gap-6">
         
         <Link 
           href="/"
@@ -1454,15 +1485,17 @@ export default function ProfilePage() {
                       <User size={24} className="text-txt-muted" />
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                    className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
-                    title="Upload Custom Profile Picture"
-                  >
-                    {uploadingAvatar ? "..." : "Edit"}
-                  </button>
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
+                      title="Upload Custom Profile Picture"
+                    >
+                      {uploadingAvatar ? "..." : "Edit"}
+                    </button>
+                  )}
                   <input 
                     type="file" 
                     ref={avatarInputRef}
@@ -1966,6 +1999,9 @@ export default function ProfilePage() {
                 <input 
                   type="text" 
                   value={collegeName}
+                  onFocus={() => {
+                    if (isEditing) setCollegeSuggestions(getAutocompleteSuggestions(collegeName, "college"));
+                  }}
                   onChange={(e) => {
                     const val = e.target.value;
                     setCollegeName(val);
@@ -2007,6 +2043,9 @@ export default function ProfilePage() {
                   <input 
                     type="text" 
                     value={department}
+                    onFocus={() => {
+                      if (isEditing) setDeptSuggestions(getAutocompleteSuggestions(department, "department"));
+                    }}
                     onChange={(e) => {
                       const val = e.target.value;
                       setDepartment(val);
@@ -2110,7 +2149,7 @@ export default function ProfilePage() {
                           type="button"
                           onClick={() => {
                             navigator.clipboard.writeText((collegeKey || "COLLEGE_SRM_FACULTY").replace("_FACULTY", ""));
-                            setMessage({ text: "College Registrar Key copied to clipboard.", type: "success" });
+                            showToast("College Registrar Key copied to clipboard");
                           }}
                           className="text-[9px] uppercase tracking-wider text-accent-main hover:opacity-80 font-bold cursor-pointer font-mono"
                         >
@@ -2235,20 +2274,20 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Coding & Platform Deck Integrations Panel */}
+                {/* Coding & Platform Desk Integrations Panel */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
                   <div className="flex flex-col gap-1 border-b border-border-main/40 pb-2">
-                    <span className="text-xs font-semibold text-txt-main">Coding & Hackathon Decks</span>
+                    <span className="text-xs font-semibold text-txt-main">Coding & Hackathon Desks</span>
                     <span className="text-[10px] text-txt-sub font-light leading-relaxed">
                       Link your profiles to aggregate solves, global ranks, and hackathon milestones.
                     </span>
                   </div>
                   <Link 
-                    href="/coding-deck"
+                    href="/coding-desk"
                     className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity"
                   >
-                    <Code2 size={12} /> Manage Coding Deck
+                    <Code2 size={12} /> Manage Coding Desk
                   </Link>
                 </div>
 

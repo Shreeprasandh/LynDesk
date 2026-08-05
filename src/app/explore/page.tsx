@@ -6,6 +6,7 @@ import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import {
   Search,
   UserPlus,
@@ -74,6 +75,7 @@ interface Friendship {
 
 export default function ExplorePage() {
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
 
   // Two Main Sub-Tabs: "events" | "friends"
   const [activeTab, setActiveTab] = useState<"events" | "friends">("events");
@@ -747,13 +749,13 @@ export default function ExplorePage() {
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(user.id);
-                    showCustomAlert("UID copied to clipboard!");
+                    showToast("UID copied to clipboard!");
                   }}
                   className="font-mono text-[10px] uppercase text-txt-muted bg-bg-base border border-border-main/80 px-3 py-1.5 rounded hover:text-txt-main hover:border-border-main transition-colors flex items-center gap-1.5 cursor-pointer"
                   title="Click to copy your UID"
                 >
                   <Copy size={11} className="text-accent-main" />
-                  <span>My UID: {user.id}</span>
+                  <span>My UID: {user.id ? `${user.id.slice(0, 8)}...${user.id.slice(-4)}` : ""}</span>
                 </button>
               </div>
 

@@ -110,7 +110,32 @@ export default function Header() {
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
   const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
-  const [headerAvatar, setHeaderAvatar] = useState<string>("");
+  const [headerAvatar, setHeaderAvatar] = useState<string>(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (rawPublic) {
+          const parsed = JSON.parse(rawPublic);
+          if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
+            return parsed.avatar_url;
+          }
+        }
+        const stored =
+          localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+          localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+          localStorage.getItem("ldk_avatar_url") ||
+          "";
+        if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
+          return stored;
+        }
+        const metaUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || "";
+        if (metaUrl && (metaUrl.startsWith("http") || metaUrl.startsWith("data:image/"))) {
+          return metaUrl;
+        }
+      } catch {}
+    }
+    return "";
+  });
 
   // Live avatar updates
   useEffect(() => {
@@ -545,7 +570,7 @@ export default function Header() {
             time: "Today",
             read: false,
             actionLabel: "Solve Challenge",
-            actionUrl: "/coding-deck"
+            actionUrl: "/coding-desk"
           };
 
           setNotifications(prev => {
@@ -829,7 +854,7 @@ export default function Header() {
                 <>
                   <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
                   <Link href="/event-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Event Desk</Link>
-                  <Link href="/coding-deck" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Deck</Link>
+                  <Link href="/coding-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Desk</Link>
                   <Link href="/study-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Study Desk</Link>
                   <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
                 </>
@@ -850,7 +875,7 @@ export default function Header() {
               >
                 <Bell size={14} />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full border border-red-500 opacity-85 bg-red-500/10" />
                 )}
               </button>
             )}
@@ -868,12 +893,12 @@ export default function Header() {
               <>
                 <Link 
                   href="/profile"
-                  className="p-1 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden w-8 h-8 shrink-0"
+                  className="w-8 h-8 rounded-full border border-border-main/80 hover:border-txt-main/40 text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden shrink-0 relative p-0"
                   title="View Profile"
                 >
                   {headerAvatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={headerAvatar} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                    <img src={headerAvatar} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <User size={14} />
                   )}
@@ -944,7 +969,7 @@ export default function Header() {
                   <>
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Dashboard</Link>
                     <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Event Desk</Link>
-                    <Link href="/coding-deck" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Coding Deck</Link>
+                    <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Coding Desk</Link>
                     <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Study Desk</Link>
                     <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
                   </>
@@ -1066,14 +1091,14 @@ export default function Header() {
                     >
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${
+                          <span className={`w-2.5 h-2.5 rounded-full border ${
                             item.type === "deadline" 
-                              ? "bg-red-500" 
+                              ? "border-red-500 opacity-85 bg-red-500/10" 
                               : item.type === "invite" 
-                              ? "bg-blue-500" 
+                              ? "border-blue-500 opacity-85 bg-blue-500/10" 
                               : item.type === "credit"
-                              ? "bg-emerald-500"
-                              : "bg-txt-muted"
+                              ? "border-emerald-500 opacity-85 bg-emerald-500/10"
+                              : "border-txt-muted opacity-85 bg-txt-muted/10"
                           }`} />
                           <h4 className="text-xs font-semibold text-txt-main">{item.title}</h4>
                         </div>
