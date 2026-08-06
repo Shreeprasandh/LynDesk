@@ -122,7 +122,12 @@ User Request: "${query}"`;
       });
     } catch (fetchErr) {
       console.error("Groq fetch error:", fetchErr);
-      return NextResponse.json(generateLocalQueryFallback(query, students));
+      return NextResponse.json({
+        isMock: true,
+        explanation: "Processed offline fallback query.",
+        header: ["Student", "Roll No", "LeetCode Solved"],
+        rows: (students || []).slice(0, 5).map((s: any) => [s.name || s.username || "Student", s.rollNo || "101", String(s.leetcodeSolved || 0)])
+      });
     }
 
     if (groqRes.ok) {

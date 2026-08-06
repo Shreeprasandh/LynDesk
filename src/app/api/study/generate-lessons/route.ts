@@ -206,7 +206,31 @@ ${sourceSummary || "General CS Topic"}`;
           });
         } catch (fetchErr) {
           console.error("Groq study fetch error:", fetchErr);
-          return NextResponse.json(generateLocalFallbackLessons(pathTitle, depthMode));
+          return NextResponse.json({
+            isMock: true,
+            title: pathTitle || "Structured Study Path",
+            sections: [
+              {
+                id: "sec_1",
+                pathId: "pending",
+                title: "Core Fundamentals & Foundations",
+                orderIndex: 0,
+                durationMinutes: 45,
+                lessons: [
+                  {
+                    id: "les_1",
+                    sectionId: "sec_1",
+                    title: "Overview & Principles",
+                    orderIndex: 0,
+                    summary: "Key concepts and theoretical foundations.",
+                    content: "Structured study content for key principles.",
+                    keyTakeaways: ["Master the fundamentals", "Review core definitions"],
+                    practiceQuestions: []
+                  }
+                ]
+              }
+            ]
+          });
         }
 
         if (groqRes.ok) {

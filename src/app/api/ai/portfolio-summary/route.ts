@@ -72,7 +72,13 @@ export async function POST(req: NextRequest) {
       });
     } catch (fetchErr) {
       console.error("Groq portfolio fetch error:", fetchErr);
-      return NextResponse.json(generateLocalFallback(leetcode, codeforces, codechef));
+      return NextResponse.json({
+        isMock: true,
+        summary: `Verified profile stats across LeetCode (${leetcode?.solved || 0} solved), Codeforces, and CodeChef.`,
+        score: Math.min(95, Math.max(50, Math.round(((leetcode?.solved || 0) / 300) * 100))),
+        skills: ["Data Structures", "Algorithms", "Competitive Programming"],
+        insights: ["Target hard problems to push your rating higher.", "Maintain daily streak consistency."]
+      });
     }
 
     if (groqRes.ok) {

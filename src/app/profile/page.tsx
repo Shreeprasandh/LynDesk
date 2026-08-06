@@ -2313,7 +2313,7 @@ export default function ProfilePage() {
                     href="/coding-desk"
                     className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity"
                   >
-                    <Code2 size={12} /> Manage Coding Desk
+                    <Code2 size={12} /> Manage Code Desk
                   </Link>
                 </div>
 

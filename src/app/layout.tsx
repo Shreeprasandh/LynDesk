@@ -28,7 +28,11 @@ export const metadata: Metadata = {
   description: "Link Your Next Desk — Pinned Events, Team Collaboration, and University Portals.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.jpg",
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico" }
+    ],
+    apple: "/apple-icon.png",
   },
   appleWebApp: {
     title: "LynDesk",

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import Header from "./components/Header";
+import LynDeskLogo from "./components/LynDeskLogo";
 import Footer from "./components/Footer";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -612,10 +613,13 @@ export default function Home() {
           
           {/* Left Column: Typographic layout */}
           <section className="lg:col-span-7 flex flex-col items-start gap-6 lg:gap-8 lg:pr-6">
-            <div className="flex flex-col gap-2">
-              <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-txt-muted font-semibold">
-                Link Your Next Desk
-              </span>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <LynDeskLogo size={28} />
+                <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-txt-muted font-semibold">
+                  Link Your Next Desk
+                </span>
+              </div>
               <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-light tracking-[-0.03em] text-txt-main leading-[1.08]">
                 The space where technical projects <span className="font-normal border-b border-txt-main/30">take shape.</span>
               </h1>
@@ -1101,7 +1105,7 @@ export default function Home() {
           </div>
 
           {/* ───────────────────────────────────────────────────────────────── */}
-          {/* COLUMN 2: CENTER DESK CARDS (Event Desk top, Coding Desk bottom) */}
+          {/* COLUMN 2: CENTER DESK CARDS (Event Desk top, Code Desk bottom)  */}
           {/* ───────────────────────────────────────────────────────────────── */}
           <div className="lg:col-span-6 flex flex-col gap-6">
 
@@ -1157,7 +1161,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* CARD 2: CODING DESK (BOTTOM) */}
+            {/* CARD 2: CODE DESK (BOTTOM) */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5">
               <div className="flex items-center justify-between border-b border-border-main/30 pb-4">
                 <div className="flex items-center gap-2.5">
@@ -1166,7 +1170,7 @@ export default function Home() {
                   </div>
                   <div className="flex flex-col">
                     <h2 className="font-display text-base font-medium text-txt-main">
-                      Coding Desk
+                      Code Desk
                     </h2>
                     <span className="text-[10px] font-mono text-txt-muted font-light">
                       Competitive platform statistics
@@ -1177,7 +1181,7 @@ export default function Home() {
                   href="/coding-desk"
                   className="text-[10px] font-mono text-txt-sub hover:text-txt-main uppercase font-medium flex items-center gap-1 transition-colors"
                 >
-                  Open Coding Desk <ArrowRight size={11} />
+                  Open Code Desk <ArrowRight size={11} />
                 </Link>
               </div>
 

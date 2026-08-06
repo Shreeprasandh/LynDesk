@@ -32,12 +32,12 @@ Here is everything I can help you with, ${name}:
 
 - **Programming & CS Concepts**: Ask me to explain data structures (Arrays, Trees, Hash Maps), algorithms, time complexity, or LeetCode challenges.
 - **Workspace & Project Tracking**: Monitor project milestone timelines, rule briefs, team task status, and repository specs.
-- **Coding Desk & Ratings**: Track your LeetCode daily streak, Codeforces rating, and CodeChef profile performance.
+- **Code Desk & Ratings**: Track your LeetCode daily streak, Codeforces rating, and CodeChef profile performance.
 - **Teammate Matchmaking**: Search student developer profiles by skills and invite peers to your hackathon teams.
 - **Study Desk & AI Tutor**: Generate structured curricula, practice quizzes, and interactive notes for any technical topic.
 
 How can I assist you with your projects or coding today?`,
-      actionLink: { label: "Explore Coding Desk", href: "/coding-desk" }
+      actionLink: { label: "Explore Code Desk", href: "/coding-desk" }
     };
   }
 
@@ -51,8 +51,8 @@ How can I assist you with your projects or coding today?`,
 
   if (p.includes("leetcode") || p.includes("coding") || p.includes("streak") || p.includes("problem") || p.includes("deck") || p.includes("desk")) {
     return {
-      response: `### Coding Desk\nSync your handles and verify your daily challenge streak on the Coding Desk:`,
-      actionLink: { label: "Go to Coding Desk", href: "/coding-desk" }
+      response: `### Code Desk\nSync your handles and verify your daily challenge streak on the Code Desk:`,
+      actionLink: { label: "Go to Code Desk", href: "/coding-desk" }
     };
   }
 
@@ -221,7 +221,7 @@ I am equipped to help you with:
 - **Data Structures & Algorithms**: Arrays, Trees, Graphs, Sorting, Big-O Complexity.
 - **Web Development**: React, Next.js, JavaScript, Python, Tailwind CSS, Supabase.
 - **Workspace & Projects**: Track stage timelines, repository specs, and team milestones.
-- **Coding Desk**: Monitor LeetCode daily targets, Codeforces, and CodeChef stats.
+- **Code Desk**: Monitor LeetCode daily targets, Codeforces, and CodeChef stats.
 
 What topic would you like to explore today?`
   };
@@ -236,8 +236,8 @@ function detectActionLink(userPrompt: string, replyText: string): { label: strin
   if (combined.includes("invite") || combined.includes("co-worker") || combined.includes("teammate") || combined.includes("directory") || combined.includes("matchmake")) {
     return { label: "Open Matchmaking Arena", href: "/explore" };
   }
-  if (combined.includes("streak") || combined.includes("coding desk") || combined.includes("daily challenge") || combined.includes("problem")) {
-    return { label: "Open Coding Desk", href: "/coding-desk" };
+  if (combined.includes("streak") || combined.includes("code desk") || combined.includes("coding desk") || combined.includes("daily challenge") || combined.includes("problem")) {
+    return { label: "Open Code Desk", href: "/coding-desk" };
   }
   if (combined.includes("event desk") || combined.includes("hackathon") || combined.includes("vault")) {
     return { label: "Open Event Desk", href: "/event-desk" };

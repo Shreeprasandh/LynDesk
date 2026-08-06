@@ -838,7 +838,7 @@ export default function Header() {
     <>
       <header className="sticky top-0 z-40 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <LynDeskLogo size={20} className="mr-1" />
+          <LynDeskLogo size={29} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>
@@ -866,7 +866,7 @@ export default function Header() {
                 <>
                   <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
                   <Link href="/event-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Event Desk</Link>
-                  <Link href="/coding-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Coding Desk</Link>
+                  <Link href="/coding-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Code Desk</Link>
                   <Link href="/study-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Study Desk</Link>
                   <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
                 </>
@@ -983,7 +983,7 @@ export default function Header() {
                   <>
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Dashboard</Link>
                     <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Event Desk</Link>
-                    <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Coding Desk</Link>
+                    <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Code Desk</Link>
                     <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Study Desk</Link>
                     <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
                   </>

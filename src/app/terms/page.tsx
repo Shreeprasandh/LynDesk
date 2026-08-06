@@ -28,7 +28,7 @@ export default function TermsOfService() {
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">
         <Link href="/" className="flex items-center gap-2 select-none cursor-pointer">
-          <LynDeskLogo size={20} className="mr-1" />
+          <LynDeskLogo size={29} className="mr-1" />
           <span className="font-display text-base font-semibold tracking-[0.25em] text-txt-main">
             LYNDESK
           </span>

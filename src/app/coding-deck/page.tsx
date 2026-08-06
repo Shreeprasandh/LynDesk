@@ -792,7 +792,7 @@ export default function CodingDeckPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
           <div className="flex flex-col gap-1 min-w-0">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
-            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Coding Desk & Platforms</h1>
+            <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Code Desk &amp; Platforms</h1>
             <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
           </div>
           <button
