@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "./ThemeProvider";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Link from "next/link";
 import LynAI from "./LynAI";
@@ -128,17 +129,16 @@ export default function Header() {
         if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
           return stored;
         }
-        const metaUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || "";
-        if (metaUrl && (metaUrl.startsWith("http") || metaUrl.startsWith("data:image/"))) {
-          return metaUrl;
-        }
+        const extracted = extractAvatarFromUser(user);
+        if (extracted) return extracted;
       } catch {}
     }
-    return "";
+    return extractAvatarFromUser(user);
   });
 
   // Live avatar updates
   useEffect(() => {
+    let isMounted = true;
     const resolveHeaderAvatar = () => {
       if (!user) {
         setHeaderAvatar("");
@@ -167,18 +167,35 @@ export default function Header() {
         }
       }
       if (!url) {
-        const metaUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || "";
-        if (metaUrl && (metaUrl.startsWith("http") || metaUrl.startsWith("data:image/"))) {
-          url = metaUrl;
-        }
+        url = extractAvatarFromUser(user);
       }
-      setHeaderAvatar(url);
+      if (url) {
+        setHeaderAvatar(url);
+      } else if (user?.id) {
+        // Query database profiles table as authoritative fallback
+        (async () => {
+          try {
+            const { data } = await supabase
+              .from("profiles")
+              .select("avatar_url")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (isMounted && data?.avatar_url && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
+              setHeaderAvatar(data.avatar_url);
+              try {
+                localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
+              } catch {}
+            }
+          } catch {}
+        })();
+      }
     };
 
     resolveHeaderAvatar();
     window.addEventListener("ldk_profile_update", resolveHeaderAvatar);
     window.addEventListener("storage", resolveHeaderAvatar);
     return () => {
+      isMounted = false;
       window.removeEventListener("ldk_profile_update", resolveHeaderAvatar);
       window.removeEventListener("storage", resolveHeaderAvatar);
     };
@@ -638,7 +655,9 @@ export default function Header() {
   useEffect(() => {
     if (isOpen && unreadCount > 0) {
       const updated = notifications.map(n => ({ ...n, read: true }));
-      setNotifications(updated);
+      queueMicrotask(() => {
+        setNotifications(updated);
+      });
       localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
       if (user?.id) {
         localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
@@ -912,7 +931,7 @@ export default function Header() {
                 >
                   {headerAvatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={headerAvatar} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={headerAvatar} alt="Profile" className="w-full h-full object-cover" onError={() => setHeaderAvatar("")} />
                   ) : (
                     <User size={14} />
                   )}

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
+import { extractAvatarFromUser } from "../lib/avatar";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -925,7 +926,7 @@ export default function Home() {
       const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
       if (localAvatar) return localAvatar;
     }
-    return user?.user_metadata?.avatar_url || user?.user_metadata?.picture || "";
+    return extractAvatarFromUser(user);
   })();
   const username = user?.user_metadata?.username || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
 
@@ -1286,7 +1287,7 @@ export default function Home() {
             }
           }
         });
-        let existingMemberIds: string[] = [user?.id || ""];
+        const existingMemberIds: string[] = [user?.id || ""];
         if (typeof window !== "undefined") {
           const localMembersStr = localStorage.getItem(`ldk_workspace_members_${eventId}`);
           if (localMembersStr) {

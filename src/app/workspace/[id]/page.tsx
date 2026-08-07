@@ -3474,15 +3474,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       member.isSpeaking ? "ring-2 ring-emerald-500 scale-105" : ""
                     }`}
                   >
-                    {member.avatarUrl ? (
+                    <span className="font-mono text-[8px] font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
+                    {member.avatarUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" 
+                      <img src={member.avatarUrl} alt={member.name} className="absolute inset-0 w-full h-full object-cover" 
                         onError={(e) => { 
                           (e.target as HTMLImageElement).style.display = 'none';
                         }} 
                       />
-                    ) : (
-                      <span className="font-mono text-[8px] font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
                     )}
                   </div>
                 ))}
@@ -4662,15 +4661,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     <div className={`relative w-8 h-8 rounded-full flex items-center justify-center font-mono text-xs font-bold text-txt-main overflow-hidden flex-shrink-0 ${
                       member.isOnline ? "ring-1 ring-emerald-500/85 border border-emerald-500/40" : "border border-border-main/80 bg-bg-card"
                     }`}>
-                      {member.avatarUrl ? (
+                      <span className="font-mono text-xs font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
+                      {member.avatarUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={member.avatarUrl} alt={member.name} className="w-full h-full object-cover" 
+                        <img src={member.avatarUrl} alt={member.name} className="absolute inset-0 w-full h-full object-cover" 
                           onError={(e) => { 
                             (e.target as HTMLImageElement).style.display = 'none';
                           }} 
                         />
-                      ) : (
-                        <span className="font-mono text-xs font-bold text-txt-main uppercase">{member.name.charAt(0)}</span>
                       )}
                     </div>
 

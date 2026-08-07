@@ -334,7 +334,7 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
               <div>
                 <h4 className="font-display text-lg font-light text-txt-main">Generating Learning Path...</h4>
                 <p className="text-xs text-txt-sub font-light mt-1">
-                  Structuring lessons, key takeaways, and practice questions for "{pathTitle}".
+                  Structuring lessons, key takeaways, and practice questions for &quot;{pathTitle}&quot;.
                 </p>
               </div>
             </div>

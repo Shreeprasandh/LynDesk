@@ -51,11 +51,13 @@ export default function PreferencePresetModal({ isOpen, onClose }: PreferencePre
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
-          setLocation(parsed.location || "");
-          setLocationMode(parsed.locationMode || "all");
-          setCategoryFocus(parsed.categoryFocus || "all");
-          setAcademicLevel(parsed.academicLevel || "all");
-          setTravelPreference(parsed.travelPreference || "global");
+          queueMicrotask(() => {
+            setLocation(parsed.location || "");
+            setLocationMode(parsed.locationMode || "all");
+            setCategoryFocus(parsed.categoryFocus || "all");
+            setAcademicLevel(parsed.academicLevel || "all");
+            setTravelPreference(parsed.travelPreference || "global");
+          });
           loaded = true;
         } catch {}
       }
@@ -63,14 +65,16 @@ export default function PreferencePresetModal({ isOpen, onClose }: PreferencePre
 
     if (!loaded && user?.user_metadata) {
       const meta = user.user_metadata;
-      if (meta.location) setLocation(meta.location);
-      if (meta.preference_preset) {
-        const p = meta.preference_preset;
-        if (p.locationMode) setLocationMode(p.locationMode);
-        if (p.categoryFocus) setCategoryFocus(p.categoryFocus);
-        if (p.academicLevel) setAcademicLevel(p.academicLevel);
-        if (p.travelPreference) setTravelPreference(p.travelPreference);
-      }
+      queueMicrotask(() => {
+        if (meta.location) setLocation(meta.location);
+        if (meta.preference_preset) {
+          const p = meta.preference_preset;
+          if (p.locationMode) setLocationMode(p.locationMode);
+          if (p.categoryFocus) setCategoryFocus(p.categoryFocus);
+          if (p.academicLevel) setAcademicLevel(p.academicLevel);
+          if (p.travelPreference) setTravelPreference(p.travelPreference);
+        }
+      });
     }
   }, [isOpen, user]);
 

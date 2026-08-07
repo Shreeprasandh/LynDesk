@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -41,18 +41,17 @@ export default function AppliedHackathonsModal({
   const { user } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"all" | "unstop" | "hack2skill">("all");
-  const [createdWorkspaces, setCreatedWorkspaces] = useState<Record<string, string>>({});
+  const [createdWorkspaces, setCreatedWorkspaces] = useState<Record<string, string>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("lyndesk_workspace_map");
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("lyndesk_workspace_map");
-      if (saved) {
-        setCreatedWorkspaces(JSON.parse(saved));
-      }
-    } catch {}
-  }, []);
 
   const appliedEvents: AppliedEventItem[] = [
     {
@@ -155,7 +154,7 @@ export default function AppliedHackathonsModal({
 
   const handleCreateWorkspace = async (eventItem: AppliedEventItem) => {
     setCreatingId(eventItem.id);
-    let newSpaceId = "ws_" + Math.random().toString(36).substring(2, 9);
+    let newSpaceId = `ws_${eventItem.id.replaceAll("-", "_")}`;
 
     try {
       if (user?.id) {

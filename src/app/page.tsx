@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
+import { extractAvatarFromUser } from "./lib/avatar";
 import Header from "./components/Header";
 import LynDeskLogo from "./components/LynDeskLogo";
 import Footer from "./components/Footer";
@@ -964,11 +965,11 @@ export default function Home() {
           <div className="flex items-center gap-4">
             {/* Avatar */}
             <div className="relative w-12 h-12 shrink-0 rounded-full overflow-hidden bg-bg-card border border-border-main/80 flex items-center justify-center font-mono text-sm font-semibold text-txt-main">
-              {profile?.avatar_url ? (
+              {(profile?.avatar_url || extractAvatarFromUser(user)) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar_url} alt={profile.full_name || "Profile"} className="w-full h-full object-cover" />
+                <img src={profile?.avatar_url || extractAvatarFromUser(user)} alt={profile?.full_name || "Profile"} className="w-full h-full object-cover" />
               ) : (
-                (profile?.full_name || "D").charAt(0).toUpperCase()
+                (profile?.full_name || user?.user_metadata?.full_name || user?.email || "D").charAt(0).toUpperCase()
               )}
             </div>
 

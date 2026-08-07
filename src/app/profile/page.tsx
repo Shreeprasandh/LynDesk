@@ -1,10 +1,11 @@
-"use client";
+  "use client";
 
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
+import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -506,9 +507,9 @@ export default function ProfilePage() {
           }
         }
 
-        // 2. Fetch detailed record metadata from Auth user metadata as fallback/extension
+        // 2. Fetch detailed record metadata from Auth user metadata & OAuth identities as fallback/extension
         const meta = user.user_metadata || {};
-        const bestAvatar = meta.avatar_url || meta.picture || profile?.avatar_url || "";
+        const bestAvatar = profile?.avatar_url || extractAvatarFromUser(user);
         if (bestAvatar) setAvatarUrl(bestAvatar);
 
         setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
@@ -1173,7 +1174,6 @@ export default function ProfilePage() {
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isEditing) return;
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -1193,7 +1193,7 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     setMessage(null);
     
-    const applyNewAvatar = (url: string) => {
+    const applyNewAvatar = async (url: string) => {
       setAvatarUrl(url);
       if (typeof window !== "undefined" && user?.id) {
         localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
@@ -1206,26 +1206,65 @@ export default function ProfilePage() {
         } catch {}
         window.dispatchEvent(new Event("ldk_profile_update"));
       }
+
+      // Persist avatar URL directly to database and user metadata
+      if (user?.id) {
+        try {
+          await supabase.from("profiles").update({ avatar_url: url, updated_at: new Date().toISOString() }).eq("id", user.id);
+          await supabase.auth.updateUser({ data: { avatar_url: url } });
+        } catch (dbErr) {
+          console.warn("Avatar database sync note:", dbErr);
+        }
+      }
     };
 
     try {
-      // 1. Instantly generate base64 data URL for 0ms delay preview
-      const getBase64 = (f: File): Promise<string> => {
+      // 1. Instantly downscale & compress image using canvas (~15-25KB)
+      const compressImage = (f: File, maxSize = 250): Promise<string> => {
         return new Promise((resolve) => {
           const reader = new FileReader();
-          reader.onload = (evt) => resolve((evt.target?.result as string) || "");
+          reader.onload = (evt) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              let width = img.width;
+              let height = img.height;
+              if (width > height) {
+                if (width > maxSize) {
+                  height = Math.round((height * maxSize) / width);
+                  width = maxSize;
+                }
+              } else {
+                if (height > maxSize) {
+                  width = Math.round((width * maxSize) / height);
+                  height = maxSize;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL("image/jpeg", 0.85));
+              } else {
+                resolve((evt.target?.result as string) || "");
+              }
+            };
+            img.onerror = () => resolve((evt.target?.result as string) || "");
+            img.src = (evt.target?.result as string) || "";
+          };
           reader.onerror = () => resolve("");
           reader.readAsDataURL(f);
         });
       };
 
-      const base64Url = await getBase64(file);
+      const base64Url = await compressImage(file);
       if (base64Url) {
         applyNewAvatar(base64Url);
       }
 
-      // 2. Background attempt to upload to Supabase storage bucket
-      const fileExt = file.name.split(".").pop();
+      // 2. Attempt to upload compressed file to Supabase storage bucket
+      const fileExt = "jpg";
       const fileName = `${user?.id || Date.now()}-avatar.${fileExt}`;
       
       const { error } = await supabase.storage
@@ -1239,9 +1278,36 @@ export default function ProfilePage() {
         if (publicUrl) applyNewAvatar(publicUrl);
       }
     } catch (err) {
-      console.warn("Storage upload notice (using local base64 preview fallback):", err);
+      console.warn("Storage upload notice (using lightweight canvas avatar preview fallback):", err);
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setAvatarUrl("");
+    if (typeof window !== "undefined" && user?.id) {
+      try {
+        localStorage.removeItem(`ldk_user_avatar_${user.id}`);
+        localStorage.removeItem(`ldk_avatar_url_${user.id}`);
+        localStorage.removeItem("ldk_avatar_url");
+        const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.avatar_url = "";
+          localStorage.setItem(`ldk_public_profile_${user.id}`, JSON.stringify(parsed));
+        }
+      } catch {}
+      window.dispatchEvent(new Event("ldk_profile_update"));
+    }
+
+    if (user?.id) {
+      try {
+        await supabase.from("profiles").update({ avatar_url: null, updated_at: new Date().toISOString() }).eq("id", user.id);
+        await supabase.auth.updateUser({ data: { avatar_url: null } });
+      } catch (dbErr) {
+        console.warn("Avatar removal database sync note:", dbErr);
+      }
     }
   };
 
@@ -1488,33 +1554,46 @@ export default function ProfilePage() {
               </span>
               
               <div className="flex flex-col sm:flex-row items-center gap-6 border-b border-border-main/40 pb-4">
-                <div className="relative group shrink-0">
-                  <div className="w-16 h-16 rounded-full border border-border-main overflow-hidden bg-bg-card flex items-center justify-center">
-                    {avatarUrl && (avatarUrl.startsWith("http") || avatarUrl.startsWith("data:image/")) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <User size={24} className="text-txt-muted" />
+                <div className="flex flex-col items-center gap-1.5 shrink-0">
+                  <div className="relative group shrink-0">
+                    <div className="w-16 h-16 rounded-full border border-border-main overflow-hidden bg-bg-card flex items-center justify-center">
+                      {avatarUrl && (avatarUrl.startsWith("http") || avatarUrl.startsWith("data:image/")) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <User size={24} className="text-txt-muted" />
+                      )}
+                    </div>
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
+                        title="Upload Custom Profile Picture"
+                      >
+                        {uploadingAvatar ? "..." : "Edit"}
+                      </button>
                     )}
+                    <input 
+                      type="file" 
+                      ref={avatarInputRef}
+                      onChange={handleAvatarUpload}
+                      className="hidden" 
+                      accept="image/*"
+                    />
                   </div>
-                  {isEditing && (
+                  {isEditing && avatarUrl && (
                     <button
                       type="button"
-                      onClick={() => avatarInputRef.current?.click()}
-                      disabled={uploadingAvatar}
-                      className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
-                      title="Upload Custom Profile Picture"
+                      onClick={handleRemoveAvatar}
+                      className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 font-mono transition-colors cursor-pointer"
+                      title="Remove Profile Picture"
                     >
-                      {uploadingAvatar ? "..." : "Edit"}
+                      <Trash2 size={11} />
+                      <span>Remove</span>
                     </button>
                   )}
-                  <input 
-                    type="file" 
-                    ref={avatarInputRef}
-                    onChange={handleAvatarUpload}
-                    className="hidden" 
-                    accept="image/*"
-                  />
                 </div>
 
                 <div className="flex-1 flex flex-col gap-3 w-full">

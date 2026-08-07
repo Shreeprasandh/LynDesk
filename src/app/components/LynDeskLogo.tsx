@@ -59,9 +59,9 @@ export default function LynDeskLogo({
             d="M281.295 187.994L313.354 188.448L308.912 220.201L281.295 187.994Z"
             className="fill-txt-main"
           />
-          {/* Polygon 1: Bottom left accent triangle */}
+          {/* Polygon 1: Accent triangle apex aligned with line top-left corner (203.5, 293) */}
           <path
-            d="M192.5 293L199.928 305H177L192.5 293Z"
+            d="M203.5 293L210.928 305H188L203.5 293Z"
             className="fill-txt-main"
           />
         </svg>
@@ -124,7 +124,7 @@ export default function LynDeskLogo({
       />
       {/* Polygon 1 */}
       <path
-        d="M192.5 293L199.928 305H177L192.5 293Z"
+        d="M203.5 293L210.928 305H188L203.5 293Z"
         className="fill-txt-main"
       />
     </svg>
