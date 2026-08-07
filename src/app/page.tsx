@@ -675,7 +675,7 @@ export default function Home() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -3 }}
                     transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col gap-4"
+                    className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
                       <h2 className="font-display text-base font-semibold tracking-tight text-txt-main">
@@ -770,7 +770,7 @@ export default function Home() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -3 }}
                     transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col gap-4"
+                    className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
                       <button 
@@ -863,7 +863,7 @@ export default function Home() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -3 }}
                     transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col gap-4"
+                    className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
                       <button 

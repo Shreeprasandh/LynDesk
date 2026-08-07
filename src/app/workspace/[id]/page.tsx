@@ -3595,9 +3595,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   layout
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
+                  exit={{ 
+                    opacity: 0, 
+                    scale: 0.95, 
+                    width: 0, 
+                    height: 0, 
+                    marginTop: 0, 
+                    marginBottom: 0, 
+                    paddingTop: 0, 
+                    paddingBottom: 0, 
+                    overflow: "hidden" 
+                  }}
                   transition={{ duration: 0.25 }}
-                  className="w-full sm:w-1/2 aspect-video relative border border-border-main/60 bg-bg-surface rounded-sm overflow-hidden flex items-center justify-center"
+                  className="relative z-10 w-full sm:w-1/2 aspect-video border border-border-main/60 bg-bg-surface rounded-sm overflow-hidden flex items-center justify-center"
                 >
                   <video 
                     ref={setRemoteVideoNode} 

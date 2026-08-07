@@ -1963,7 +1963,7 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence>
                       {events.map((ev, evIndex) => {
                         const resolvedTitle = (() => {
                           const localName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${ev.id}`) : null;
@@ -2023,9 +2023,18 @@ export default function Home() {
                             layout
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.92, height: 0, marginBottom: 0, padding: 0, overflow: "hidden" }}
+                            exit={{ 
+                              opacity: 0, 
+                              scale: 0.95, 
+                              height: 0, 
+                              marginTop: 0, 
+                              marginBottom: 0, 
+                              paddingTop: 0, 
+                              paddingBottom: 0, 
+                              overflow: "hidden" 
+                            }}
                             transition={{ duration: 0.35, ease: "easeInOut" }}
-                            className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
+                            className="relative z-10 border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
                           >
                             <div className="flex justify-between items-start">
                               <div className="flex flex-col gap-1 min-w-0">
