@@ -19,6 +19,7 @@ import ErrorBankModal from "../components/study-desk/ErrorBankModal";
 const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
 const STORAGE_MISTAKES_KEY = "lyndesk_study_mistakes_cache";
 const STORAGE_STATS_KEY = "lyndesk_study_stats_cache";
+const STORAGE_ACTIVE_PATH_KEY = "lyndesk_active_study_path_id";
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
@@ -62,6 +63,12 @@ export default function StudyDeskPage() {
   });
 
   const [activePathId, setActivePathId] = useState<string | undefined>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cachedActive = localStorage.getItem(STORAGE_ACTIVE_PATH_KEY);
+        if (cachedActive) return cachedActive;
+      } catch {}
+    }
     return paths.find((p) => p.isActive)?.id || paths[0]?.id;
   });
 
@@ -183,6 +190,11 @@ export default function StudyDeskPage() {
   // Path Handlers
   const handleSelectActivePath = (pathId: string) => {
     setActivePathId(pathId);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_ACTIVE_PATH_KEY, pathId);
+      } catch {}
+    }
     setPaths((prev) =>
       prev.map((p) => ({
         ...p,
@@ -206,6 +218,11 @@ export default function StudyDeskPage() {
 
     setPaths((prev) => [fullPath, ...prev]);
     setActivePathId(fullPath.id);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_ACTIVE_PATH_KEY, fullPath.id);
+      } catch {}
+    }
     setShowAIStudio(false);
     setActiveTab("active");
 
@@ -234,7 +251,13 @@ export default function StudyDeskPage() {
     setPaths((prev) => prev.filter((p) => p.id !== pathId));
     if (activePathId === pathId) {
       const remaining = paths.filter((p) => p.id !== pathId);
-      setActivePathId(remaining[0]?.id);
+      const nextId = remaining[0]?.id;
+      setActivePathId(nextId);
+      if (typeof window !== "undefined" && nextId) {
+        try {
+          localStorage.setItem(STORAGE_ACTIVE_PATH_KEY, nextId);
+        } catch {}
+      }
     }
 
     if (user) {
@@ -249,13 +272,41 @@ export default function StudyDeskPage() {
     if (!target) return;
 
     const dupId = "path_" + Math.random().toString(36).substring(2, 9);
+    
+    // Deep clone sections and lessons with fresh unique IDs
+    const clonedSections = (target.sections || []).map((sec, secIdx) => {
+      const newSecId = `sec_${secIdx + 1}_${Math.random().toString(36).substring(2, 6)}`;
+      const clonedLessons = (sec.lessons || []).map((les, lesIdx) => {
+        const newLesId = `les_${secIdx + 1}_${lesIdx + 1}_${Math.random().toString(36).substring(2, 7)}`;
+        return {
+          ...les,
+          id: newLesId,
+          sectionId: newSecId,
+          pathId: dupId,
+          completed: false,
+          score: undefined,
+          completedAt: undefined,
+        };
+      });
+
+      return {
+        ...sec,
+        id: newSecId,
+        pathId: dupId,
+        lessons: clonedLessons,
+      };
+    });
+
     const duplicated: StudyPath = {
       ...target,
       id: dupId,
       title: `${target.title} (Copy)`,
+      sections: clonedSections,
       completedLessons: 0,
       xpEarned: 0,
+      isActive: false,
       createdAt: new Date().toISOString(),
+      lastStudiedAt: new Date().toISOString(),
     };
 
     setPaths((prev) => [duplicated, ...prev]);

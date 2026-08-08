@@ -108,7 +108,7 @@ An **Array** is a linear data structure that stores a collection of elements in 
 \`\`\`javascript
 // JavaScript Array
 const fruits = ["Apple", "Banana", "Cherry"];
-console.log(fruits[0]); // "Apple" (O(1) Access)
+const firstFruit = fruits[0]; // "Apple" (O(1) Access)
 \`\`\``
     };
   }

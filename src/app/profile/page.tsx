@@ -1264,18 +1264,22 @@ export default function ProfilePage() {
       }
 
       // 2. Attempt to upload compressed file to Supabase storage bucket
-      const fileExt = "jpg";
-      const fileName = `${user?.id || Date.now()}-avatar.${fileExt}`;
-      
-      const { error } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
+      try {
+        const fileExt = "jpg";
+        const fileName = `${user?.id || Date.now()}-avatar.${fileExt}`;
         
-      if (!error) {
-        const { data: { publicUrl } } = supabase.storage
+        const { error } = await supabase.storage
           .from("avatars")
-          .getPublicUrl(fileName);
-        if (publicUrl) applyNewAvatar(publicUrl);
+          .upload(fileName, file, { upsert: true });
+          
+        if (!error) {
+          const { data: { publicUrl } } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(fileName);
+          if (publicUrl) applyNewAvatar(publicUrl);
+        }
+      } catch (storageErr) {
+        console.warn("Supabase storage bucket upload skipped:", storageErr);
       }
     } catch (err) {
       console.warn("Storage upload notice (using lightweight canvas avatar preview fallback):", err);

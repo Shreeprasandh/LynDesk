@@ -44,7 +44,17 @@ export default function ErrorBankModal({ mistakes, onRemoveMistake, onClose }: E
   const handleCheck = () => {
     let right = false;
     if (current.questionType === "mcq") {
-      right = selectedMcq?.trim().toLowerCase() === current.correctAnswer?.trim().toLowerCase();
+      const selNorm = (selectedMcq || "").trim().toLowerCase();
+      const ansNorm = (current.correctAnswer || "").trim().toLowerCase();
+      
+      right = selNorm === ansNorm;
+      if (!right && current.options && current.options.length > 0) {
+        const selIdx = current.options.findIndex((opt) => opt.trim().toLowerCase() === selNorm);
+        const ansIdx = current.options.findIndex((opt) => opt.trim().toLowerCase() === ansNorm);
+        if (selIdx !== -1 && ansIdx !== -1 && selIdx === ansIdx) {
+          right = true;
+        }
+      }
     } else {
       const lower = shortAnswerInput.toLowerCase();
       const lowerCorrect = current.correctAnswer.toLowerCase();
