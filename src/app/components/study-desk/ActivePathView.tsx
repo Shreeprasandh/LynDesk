@@ -15,7 +15,8 @@ import {
   Clock,
   Zap,
   Target,
-  FileText
+  FileText,
+  Video
 } from "lucide-react";
 import CertificateModal from "./CertificateModal";
 
@@ -29,6 +30,90 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [showCertificate, setShowCertificate] = useState(false);
+
+  const [isHydratingLesson, setIsHydratingLesson] = useState(false);
+  const [hydratingLessonTitle, setHydratingLessonTitle] = useState("");
+
+  const triggerBackgroundPrefetchNextLesson = (currentLesson: Lesson) => {
+    let foundCurrent = false;
+    let nextTarget: { lesson: Lesson; sectionTitle: string } | null = null;
+
+    for (const sec of path.sections) {
+      for (const les of sec.lessons) {
+        if (foundCurrent && !nextTarget) {
+          nextTarget = { lesson: les, sectionTitle: sec.title };
+          break;
+        }
+        if (les.id === currentLesson.id) {
+          foundCurrent = true;
+        }
+      }
+    }
+
+    if (nextTarget && (!nextTarget.lesson.cards || nextTarget.lesson.cards.length < 2)) {
+      const target = nextTarget;
+      fetch("/api/study/hydrate-lesson", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pathTitle: path.title,
+          sectionTitle: target.sectionTitle,
+          lessonTitle: target.lesson.title,
+          lessonDescription: target.lesson.description,
+          depthMode: path.depthMode || "standard"
+        })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.cards) {
+            target.lesson.cards = data.cards;
+            target.lesson.questions = data.questions;
+            if (data.practiceProblems) target.lesson.practiceProblems = data.practiceProblems;
+            if (data.videoResource) target.lesson.videoResource = data.videoResource;
+          }
+        })
+        .catch(() => {});
+    }
+  };
+
+  const handleSelectAndHydrateLesson = async (lesson: Lesson, sectionTitle: string) => {
+    if (lesson.cards && lesson.cards.length >= 2) {
+      setSelectedLesson(lesson);
+      triggerBackgroundPrefetchNextLesson(lesson);
+      return;
+    }
+
+    setIsHydratingLesson(true);
+    setHydratingLessonTitle(lesson.title);
+
+    try {
+      const res = await fetch("/api/study/hydrate-lesson", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pathTitle: path.title,
+          sectionTitle: sectionTitle,
+          lessonTitle: lesson.title,
+          lessonDescription: lesson.description,
+          depthMode: path.depthMode || "standard"
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.cards) {
+        lesson.cards = data.cards;
+        lesson.questions = data.questions;
+        if (data.practiceProblems) lesson.practiceProblems = data.practiceProblems;
+        if (data.videoResource) lesson.videoResource = data.videoResource;
+      }
+    } catch (err) {
+      console.error("Single lesson hydration error:", err);
+    } finally {
+      setIsHydratingLesson(false);
+      setSelectedLesson(lesson);
+      triggerBackgroundPrefetchNextLesson(lesson);
+    }
+  };
 
   if (!path || !path.sections || path.sections.length === 0) {
     return (
@@ -70,8 +155,8 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
       <div className="border border-border-main/80 bg-bg-surface p-6 md:p-8 rounded-md space-y-5 relative overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border-main/40 pb-4">
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="px-3 py-1 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase tracking-wider rounded">
-              ⚡ {path.depthMode ? `${path.depthMode.toUpperCase()} PATH` : "STANDARD PATH"}
+            <span className="px-3 py-1 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase tracking-wider rounded flex items-center gap-1">
+              <Zap size={11} /> {path.depthMode ? `${path.depthMode.toUpperCase()} PATH` : "STANDARD PATH"}
             </span>
             <span className="px-3 py-1 bg-bg-card border border-border-main/60 font-mono text-[10px] uppercase text-txt-muted rounded flex items-center gap-1.5">
               <FileText size={12} />
@@ -222,7 +307,7 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                           ? "bg-accent-main/15 text-accent-main border border-accent-main/30" 
                           : "bg-bg-card text-txt-muted border border-border-main/60"
                       }`}>
-                        {isGrandExamSection ? "🏆 FINAL MILESTONE" : `SECTION 0${secIdx + 1}`}
+                        {isGrandExamSection ? "FINAL MILESTONE" : `SECTION 0${secIdx + 1}`}
                       </span>
                       <span className="font-mono text-[10px] text-txt-muted">
                         {secCompletedCount}/{secLessons.length} Completed
@@ -279,16 +364,55 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                         {/* Lesson Info */}
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2 flex-wrap">
+                            {/* YouTube Learn Button (Placed directly to the LEFT of the status indicator) */}
+                            {(() => {
+                              const cleanTopic = lesson.title
+                                .replace(/^Lesson\s*\d+\s*[:\-]?\s*/gi, "")
+                                .replace(/^\d+[\.\)]\s*/g, "")
+                                .replace(/^Section\s*\d+\s*[:\-]?\s*/gi, "")
+                                .replace(/Module\s*\d+/gi, "")
+                                .replace(/\s+/g, " ")
+                                .trim();
+
+                              const videoUrl = lesson.videoResource?.url
+                                ? lesson.videoResource.url
+                                : `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTopic)}`;
+
+                              if (!isUnlocked) {
+                                return (
+                                  <span
+                                    className="px-2 py-0.5 bg-bg-card/30 border border-border-main/20 text-txt-muted/35 font-mono text-[9px] uppercase font-semibold rounded flex items-center gap-1 cursor-not-allowed select-none"
+                                    title="Complete previous lessons to unlock video tutorial"
+                                  >
+                                    <Video size={10} /> Learn
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <a
+                                  href={videoUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-0.5 bg-red-500/[0.02] hover:bg-red-500/[0.06] text-red-400/40 hover:text-red-400 border border-red-500/10 font-mono text-[9px] uppercase font-semibold rounded flex items-center gap-1 cursor-pointer transition-colors"
+                                  title={`Watch YouTube tutorial for ${cleanTopic}`}
+                                >
+                                  <Video size={10} /> Learn
+                                </a>
+                              );
+                            })()}
+
+                            {/* Status Indicator */}
                             {isCompleted ? (
-                              <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[9px] font-bold uppercase rounded flex items-center gap-1">
+                              <span className="px-2 py-0.5 bg-emerald-500/[0.02] border border-emerald-500/10 text-emerald-400/40 font-mono text-[9px] font-bold uppercase rounded flex items-center gap-1">
                                 <Check size={10} /> Completed
                               </span>
                             ) : isCurrentTarget ? (
-                              <span className="px-2 py-0.5 bg-accent-main text-bg-base font-mono text-[9px] font-bold uppercase rounded animate-pulse">
-                                🔥 Start Next
+                              <span className="px-2 py-0.5 bg-accent-main/90 text-bg-base font-mono text-[9px] font-bold uppercase rounded flex items-center gap-1">
+                                <Zap size={10} /> Start Next
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 bg-bg-card border border-border-main/60 text-txt-muted font-mono text-[9px] uppercase rounded flex items-center gap-1">
+                              <span className="px-2 py-0.5 bg-transparent border border-border-main/20 text-txt-muted/30 font-mono text-[9px] uppercase rounded flex items-center gap-1">
                                 <Lock size={10} /> Locked
                               </span>
                             )}
@@ -309,8 +433,8 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
 
                         {/* Start / View Button */}
                         <button
-                          onClick={() => isUnlocked && setSelectedLesson(lesson)}
-                          disabled={!isUnlocked}
+                          onClick={() => isUnlocked && handleSelectAndHydrateLesson(lesson, section.title)}
+                          disabled={!isUnlocked || isHydratingLesson}
                           className={`h-9 px-4 font-mono text-xs uppercase font-semibold rounded flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                             isCompleted
                               ? "border border-border-main/80 hover:bg-bg-card text-txt-main"
@@ -336,20 +460,20 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                 </div>
 
                 {/* Section Milestone Banner */}
-                <div className={`p-4 rounded-md border flex items-center justify-between text-xs font-mono ${
+                <div className={`p-3.5 rounded-md border flex items-center justify-between text-[11px] font-mono ${
                   isSectionFullyDone 
-                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                    : "bg-bg-card/40 border-border-main/40 text-txt-muted"
+                    ? "bg-emerald-500/[0.04] border-emerald-500/20 text-emerald-300/70"
+                    : "bg-bg-card/20 border-border-main/25 text-txt-muted/50"
                 }`}>
                   <div className="flex items-center gap-2">
-                    <Trophy size={14} className={isSectionFullyDone ? "text-emerald-400" : "text-txt-muted"} />
+                    <Trophy size={13} className={isSectionFullyDone ? "text-emerald-400/70" : "text-txt-muted/40"} />
                     <span>
                       {isSectionFullyDone 
                         ? `Section 0${secIdx + 1} Milestone Cleared! +50 Bonus XP Unlocked`
                         : `Complete all lessons in Section 0${secIdx + 1} to clear this Milestone.`}
                     </span>
                   </div>
-                  <span className="font-bold">{isSectionFullyDone ? "100%" : `${secCompletedCount}/${secLessons.length}`}</span>
+                  <span className="font-semibold text-[10px]">{isSectionFullyDone ? "100%" : `${secCompletedCount}/${secLessons.length}`}</span>
                 </div>
 
               </div>
@@ -419,6 +543,26 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
           userName="Sir"
           onClose={() => setShowCertificate(false)}
         />
+      )}
+
+      {/* On-Demand Single Lesson Hydration Overlay */}
+      {isHydratingLesson && (
+        <div className="fixed inset-0 bg-bg-base/95 backdrop-blur-md z-[10000] flex flex-col items-center justify-center text-center p-6 space-y-4 animate-fade-in">
+          <div className="w-14 h-14 rounded-full bg-accent-main/10 border border-accent-main/30 flex items-center justify-center text-accent-main animate-pulse">
+            <Sparkles size={24} />
+          </div>
+          <div className="space-y-1.5 max-w-md">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">
+              Hydrating World-Class Lesson Architecture
+            </span>
+            <h3 className="font-display text-xl font-light text-txt-main">
+              {hydratingLessonTitle || "Building Lesson Content"}
+            </h3>
+            <p className="text-xs text-txt-sub font-light leading-relaxed">
+              Generating 6 deep teaching cards, runnable code syntax, Mermaid flowcharts, and targeted assessment questions...
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

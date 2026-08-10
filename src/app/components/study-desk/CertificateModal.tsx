@@ -2,7 +2,7 @@
 
 import React from "react";
 import { StudyPath } from "../../study-desk/types";
-import { Award, Download, Printer, CheckCircle, Sparkles } from "lucide-react";
+import { Award, Download, Printer, CheckCircle, Sparkles, Zap } from "lucide-react";
 
 interface CertificateModalProps {
   path: StudyPath;
@@ -60,8 +60,8 @@ export default function CertificateModal({ path, userName = "Sir", onClose }: Ce
 
           <div className="p-3 bg-bg-card border border-border-main/70 rounded max-w-lg mx-auto">
             <h3 className="font-display text-lg font-medium text-txt-main">{path.title}</h3>
-            <span className="font-mono text-[10px] text-accent-main font-semibold uppercase block mt-0.5">
-              ⚡ {path.totalLessons} Total Lessons Mastered • +{path.xpEarned || 0} XP Earned
+            <span className="font-mono text-[10px] text-accent-main font-semibold uppercase flex items-center justify-center gap-1 mt-0.5">
+              <Zap size={11} /> {path.totalLessons} Total Lessons Mastered • +{path.xpEarned || 0} XP Earned
             </span>
           </div>
 

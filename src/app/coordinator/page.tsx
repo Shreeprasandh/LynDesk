@@ -17,7 +17,8 @@ import {
   Users, 
   FolderLock,
   Download,
-  Sparkles
+  Sparkles,
+  HelpCircle
 } from "lucide-react";
 
 interface CreditClaim {
@@ -1275,7 +1276,9 @@ useEffect(() => {
                     {/* Clarification Prompts check */}
                     {aiResult.clarificationNeeded ? (
                       <div className="flex flex-col gap-2 bg-yellow-500/10 border border-yellow-500/30 p-3 rounded text-[11px] font-mono text-yellow-500">
-                        <span className="font-bold">🤔 Clarification Request:</span>
+                        <span className="font-bold flex items-center gap-1">
+                          <HelpCircle size={12} /> Clarification Request:
+                        </span>
                         <p>{aiResult.clarificationMessage}</p>
                       </div>
                     ) : (

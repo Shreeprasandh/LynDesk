@@ -19,6 +19,8 @@ import {
   Bot,
   Send
 } from "lucide-react";
+import CodeIDEEditor from "./CodeIDEEditor";
+import MermaidVisualRenderer from "./MermaidVisualRenderer";
 
 interface SessionPlayerProps {
   lesson: Lesson;
@@ -42,9 +44,12 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
   const [hearts, setHearts] = useState(5);
   const [mistakesList, setMistakesList] = useState<StudyMistake[]>([]);
-  const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
+  const [firstTryCorrectCount, setFirstTryCorrectCount] = useState(0);
+  const [retryCorrectCount, setRetryCorrectCount] = useState(0);
+  const [failedQuestionIndices, setFailedQuestionIndices] = useState<Set<number>>(new Set());
   const [isFinished, setIsFinished] = useState(false);
   const [cardPaceTimeLeft, setCardPaceTimeLeft] = useState(0);
+  const [showLearnMore, setShowLearnMore] = useState(false);
 
   // Audio Speech Narrator State
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -55,7 +60,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
   const [aiCoachResponse, setAICoachResponse] = useState("");
   const [aiCoachLoading, setAICoachLoading] = useState(false);
 
-  // Audio Speech Handler
+  // Human Conversational Speech Queue & Breath Pause Engine
   const toggleSpeech = (textToRead: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
@@ -64,14 +69,101 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
       setIsSpeaking(false);
     } else {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(textToRead);
-      utterance.rate = 1.0;
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+
+      // Clean text formatting for natural human reading flow
+      const cleanText = textToRead
+        .replace(/[*#`_\-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Break text into natural conversational sentence chunks
+      const sentences = cleanText.match(/[^.!?:]+[.!?:]+/g) || [cleanText];
+      const voices = window.speechSynthesis.getVoices();
+
+      // Find highest quality human neural voice
+      const preferredVoice = voices.find(
+        (v) =>
+          v.lang.startsWith("en") &&
+          (v.name.includes("Natural") ||
+            v.name.includes("Online") ||
+            v.name.includes("Google") ||
+            v.name.includes("Neural") ||
+            v.name.includes("Samantha") ||
+            v.name.includes("Jenny") ||
+            v.name.includes("Aria") ||
+            v.name.includes("Guy"))
+      ) || voices.find((v) => v.lang.startsWith("en"));
+
       setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
+
+      // Speak sentences sequentially with natural human micro-pauses
+      let currentIdx = 0;
+
+      const speakNextSentence = () => {
+        if (currentIdx >= sentences.length) {
+          setIsSpeaking(false);
+          return;
+        }
+
+        const sentence = sentences[currentIdx].trim();
+        if (!sentence) {
+          currentIdx++;
+          speakNextSentence();
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(sentence);
+        if (preferredVoice) utterance.voice = preferredVoice;
+
+        // Human conversational pitch & cadence variation
+        if (currentIdx === 0) {
+          utterance.rate = 0.92; // Slightly slower, engaging opening
+          utterance.pitch = 1.04;
+        } else if (currentIdx === sentences.length - 1) {
+          utterance.rate = 0.88; // Thoughtful, deliberate conclusion
+          utterance.pitch = 0.96;
+        } else {
+          utterance.rate = 0.94; // Conversational body pace
+          utterance.pitch = 1.0;
+        }
+
+        utterance.onend = () => {
+          currentIdx++;
+          // Insert 180ms conversational breath pause between sentences
+          setTimeout(speakNextSentence, 180);
+        };
+
+        utterance.onerror = () => {
+          setIsSpeaking(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      };
+
+      speakNextSentence();
     }
   };
+
+  // Lock background body scroll and mark lesson active while player is open
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      document.body.setAttribute("data-lesson-active", "true");
+
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.removeAttribute("data-lesson-active");
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+      };
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -105,14 +197,25 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
     }
   };
 
-  // Enforce anti-spam card reading pace delay (1.2s per card)
+  // Reset Learn More drawer state on step change
+  useEffect(() => {
+    setShowLearnMore(false);
+  }, [currentStepIndex]);
+
+  // Enforce anti-spam card reading pace delay (5 seconds per card)
   useEffect(() => {
     if (currentStepIndex < totalCards) {
-      setCardPaceTimeLeft(1.2);
-      const timer = setTimeout(() => {
-        setCardPaceTimeLeft(0);
-      }, 1200);
-      return () => clearTimeout(timer);
+      setCardPaceTimeLeft(5);
+      const interval = setInterval(() => {
+        setCardPaceTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
     } else {
       setCardPaceTimeLeft(0);
     }
@@ -150,20 +253,38 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
   const handleCheckMcq = () => {
     if (!currentQuestion || selectedMcqOption === null) return;
 
+    const rawOpts = currentQuestion.options || [];
+    const safeOpts = rawOpts.length > 0 ? rawOpts : [
+      currentQuestion.correctAnswerText || currentQuestion.correctAnswer || "Primary Core Concept",
+      "Secondary Mechanism",
+      "External Parameter",
+      "Administrative Bound"
+    ];
+
+    const selectedText = safeOpts[selectedMcqOption] || "";
     const correctIdx = currentQuestion.correctAnswerIndex ?? 0;
-    const isRight = selectedMcqOption === correctIdx;
+    const targetCorrectText = currentQuestion.correctAnswerText || currentQuestion.correctAnswer || safeOpts[correctIdx] || safeOpts[0];
+
+    const isRight = selectedMcqOption === correctIdx || selectedText.trim().toLowerCase() === targetCorrectText.trim().toLowerCase();
+
+    const isFirstAttempt = !failedQuestionIndices.has(currentQuestionIndex);
 
     setIsCorrectAnswer(isRight);
     setIsAnswerChecked(true);
 
-    const correctOptionText = currentQuestion.options?.[correctIdx] || currentQuestion.correctAnswerText || "";
-
     if (isRight) {
-      setCorrectAnswersCount((prev) => prev + 1);
+      if (isFirstAttempt) {
+        setFirstTryCorrectCount((prev) => prev + 1);
+      } else {
+        setRetryCorrectCount((prev) => prev + 1);
+      }
       setAnswerFeedback(currentQuestion.explanation || "Excellent response!");
     } else {
+      if (isFirstAttempt) {
+        setFailedQuestionIndices((prev) => new Set(prev).add(currentQuestionIndex));
+      }
       setHearts((prev) => Math.max(0, prev - 1));
-      setAnswerFeedback(`Correct Answer: ${correctOptionText}. ${currentQuestion.explanation || ""}`);
+      setAnswerFeedback(`Correct Answer: ${targetCorrectText}. ${currentQuestion.explanation || ""}`);
 
       const mistake: StudyMistake = {
         id: "mistake_" + Math.random().toString(36).substring(2, 9),
@@ -171,9 +292,9 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
         lessonId: lesson.id,
         questionPrompt: currentQuestion.prompt,
         questionType: "mcq",
-        options: currentQuestion.options,
-        correctAnswer: correctOptionText,
-        userAnswer: currentQuestion.options?.[selectedMcqOption] || "",
+        options: safeOpts,
+        correctAnswer: targetCorrectText,
+        userAnswer: safeOpts[selectedMcqOption] || "",
         explanation: currentQuestion.explanation || "",
         createdAt: new Date().toISOString(),
       };
@@ -200,14 +321,22 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
       const data = await res.json();
       const isRight = Boolean(data.isCorrect);
+      const isFirstAttempt = !failedQuestionIndices.has(currentQuestionIndex);
 
       setIsCorrectAnswer(isRight);
       setAnswerFeedback(data.feedback || (isRight ? "Well explained!" : `Model Answer: ${currentQuestion.modelAnswer || ""}`));
       setIsAnswerChecked(true);
 
       if (isRight) {
-        setCorrectAnswersCount((prev) => prev + 1);
+        if (isFirstAttempt) {
+          setFirstTryCorrectCount((prev) => prev + 1);
+        } else {
+          setRetryCorrectCount((prev) => prev + 1);
+        }
       } else {
+        if (isFirstAttempt) {
+          setFailedQuestionIndices((prev) => new Set(prev).add(currentQuestionIndex));
+        }
         setHearts((prev) => Math.max(0, prev - 1));
         const mistake: StudyMistake = {
           id: "mistake_" + Math.random().toString(36).substring(2, 9),
@@ -251,8 +380,19 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
     setAnswerFeedback("");
   };
 
+  const calculateAccuracy = (): number => {
+    if (totalQuestions === 0) return 100;
+
+    // First-try correct = 1.0 weight (100%)
+    // Retry correct = 0.75 weight (75%) — generous reward for learning & mastering!
+    const weightedScore = (firstTryCorrectCount * 1.0) + (retryCorrectCount * 0.75);
+    const rawPct = (weightedScore / totalQuestions) * 100;
+
+    return Math.min(100, Math.max(0, Math.round(rawPct)));
+  };
+
   const handleFinishLesson = () => {
-    const accuracy = totalQuestions > 0 ? Math.round((correctAnswersCount / totalQuestions) * 100) : 100;
+    const accuracy = calculateAccuracy();
     const bonusXp = accuracy >= 80 ? 5 : 0;
     const finalXp = (lesson.xpValue || 10) + bonusXp;
 
@@ -260,7 +400,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
   };
 
   return (
-    <div className="fixed inset-0 bg-bg-base/98 backdrop-blur-md z-50 flex flex-col justify-between overflow-hidden font-sans text-txt-main">
+    <div className="fixed inset-0 bg-bg-base/98 backdrop-blur-md z-[10000] flex flex-col justify-between overflow-hidden font-sans text-txt-main">
       {/* Top Header Navigation */}
       <div className="max-w-3xl w-full mx-auto px-6 py-4 flex items-center gap-4 border-b border-border-main/50">
         <button
@@ -298,25 +438,30 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
         )}
 
         {/* Ask LynAI Tutor Button */}
-        <button
-          onClick={() => setShowAICoach(!showAICoach)}
-          className="h-8 px-2.5 rounded bg-accent-main/10 hover:bg-accent-main/20 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 cursor-pointer transition-colors"
-          title="Ask LynAI Tutor"
-        >
-          <Bot size={14} />
-          <span className="hidden sm:inline">Ask LynAI</span>
-        </button>
+        {!isFinished && hearts > 0 && (
+          <button
+            onClick={() => setShowAICoach(!showAICoach)}
+            className="h-8 px-2.5 rounded bg-accent-main/10 hover:bg-accent-main/20 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="Ask LynAI Tutor"
+          >
+            <Bot size={14} />
+            <span className="hidden sm:inline">Ask LynAI</span>
+          </button>
+        )}
 
         {/* Hearts Life Counter */}
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 border border-rose-500/30 rounded font-mono text-xs text-rose-400 font-semibold">
-          <Heart size={14} className="fill-rose-500 text-rose-500" />
-          <span>{hearts}</span>
-        </div>
+        {!isFinished && hearts > 0 && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/10 border border-rose-500/30 rounded font-mono text-xs text-rose-400 font-semibold">
+            <Heart size={14} className="fill-rose-500 text-rose-500" />
+            <span>{hearts}</span>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 max-w-2xl w-full mx-auto px-6 py-6 overflow-y-auto flex flex-col justify-center">
-        <AnimatePresence mode="wait">
+      <div className="flex-1 max-w-2xl w-full mx-auto px-6 overflow-y-auto font-sans">
+        <div className="min-h-full flex flex-col justify-center py-6 space-y-6">
+          <AnimatePresence mode="wait">
           {hearts <= 0 ? (
             /* Out of Hearts Review Screen */
             <motion.div
@@ -382,7 +527,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                 <div className="bg-bg-surface border border-border-main/70 rounded-md p-4 text-center">
                   <div className="text-[9px] font-mono uppercase text-txt-muted mb-1">Accuracy</div>
                   <div className="text-2xl font-mono font-bold text-txt-main">
-                    {totalQuestions > 0 ? Math.round((correctAnswersCount / totalQuestions) * 100) : 100}%
+                    {calculateAccuracy()}%
                   </div>
                 </div>
               </div>
@@ -403,61 +548,21 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
               exit={{ opacity: 0, y: -12 }}
               className="space-y-5"
             >
-              {currentCard.badge && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[9px] uppercase tracking-wider rounded">
-                  <Sparkles size={12} /> {currentCard.badge}
-                </span>
-              )}
-
-              <h2 className="font-display text-2xl md:text-3xl font-normal text-txt-main tracking-tight">
-                {currentCard.title}
-              </h2>
-
-              {/* YouTube Video Explainer Resource */}
-              {lesson.videoResource && (
-                <div className="border border-border-main/80 bg-bg-surface p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0">
-                      <Video size={20} />
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="font-mono text-[9px] uppercase tracking-wider text-txt-muted block">
-                        📺 Recommended Video Tutorial • {lesson.videoResource.channelName || "YouTube"}
-                      </span>
-                      <h4 className="text-xs font-medium text-txt-main line-clamp-1">{lesson.videoResource.title}</h4>
-                    </div>
-                  </div>
-                  <a
-                    href={lesson.videoResource.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-1.5 bg-bg-card hover:bg-border-main/40 border border-border-main/70 text-txt-main font-mono text-[10px] uppercase rounded flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
-                  >
-                    <span>Watch Tutorial →</span>
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-              )}
-
+              {/* Main Hero Teaching Card */}
               <div className="bg-bg-surface border border-border-main/80 rounded-md p-6 md:p-8 space-y-5 shadow-xs">
+                {currentCard.badge && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[9px] uppercase tracking-wider rounded">
+                    <Sparkles size={12} /> {currentCard.badge}
+                  </span>
+                )}
+
+                <h2 className="font-display text-2xl md:text-3xl font-normal text-txt-main tracking-tight">
+                  {currentCard.title}
+                </h2>
+
                 <p className="text-sm md:text-base text-txt-main font-normal leading-relaxed tracking-normal">
                   {currentCard.content}
                 </p>
-
-                {/* Concept Diagram / Mind Map */}
-                {currentCard.diagramMermaid && (
-                  <div className="border border-border-main/70 bg-bg-base/60 p-4 rounded-md text-xs font-mono space-y-2">
-                    <div className="flex items-center gap-1.5 text-txt-muted">
-                      <Layers size={14} className="text-accent-main" />
-                      <span className="text-[10px] uppercase tracking-widest font-semibold">
-                        Concept Flow & Architecture Map
-                      </span>
-                    </div>
-                    <pre className="text-xs text-accent-main whitespace-pre-wrap font-mono leading-relaxed bg-bg-card p-3 rounded border border-border-main/50 overflow-x-auto">
-                      {currentCard.diagramMermaid}
-                    </pre>
-                  </div>
-                )}
 
                 {currentCard.keyTakeaway && (
                   <div className="border-l-3 border-accent-main pl-4 py-2 text-xs md:text-sm text-txt-sub font-normal leading-relaxed bg-accent-main/5 rounded-r space-y-1">
@@ -466,50 +571,126 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                   </div>
                 )}
 
-                {currentCard.example && (
-                  <div className="border-l-3 border-border-main/80 pl-4 py-2 text-xs md:text-sm text-txt-sub font-mono leading-relaxed bg-bg-card/50 rounded-r space-y-1">
-                    <span className="font-mono text-[10px] uppercase text-txt-muted font-bold block tracking-wider">Practical Example</span>
-                    <p className="text-txt-main text-xs md:text-sm">{currentCard.example}</p>
+                {/* Interactive Visual Architecture Diagram / Flowchart */}
+                {currentCard.diagramMermaid && (
+                  <div className="pt-2">
+                    <MermaidVisualRenderer code={currentCard.diagramMermaid} />
                   </div>
+                )}
+
+                {/* Practical Example / Code Implementation Block */}
+                {currentCard.example && (
+                  (() => {
+                    const isCode = /class\s|void\s|int\s|public\s|private\s|def\s|return\s|import\s|#include|function\s|\{|\}/i.test(currentCard.example);
+                    return isCode ? (
+                      <div className="border border-border-main/80 bg-bg-base rounded-md overflow-hidden space-y-1 mt-3">
+                        <div className="bg-bg-surface px-4 py-2 border-b border-border-main/60 flex items-center justify-between">
+                          <span className="font-mono text-[10px] uppercase text-accent-main font-bold flex items-center gap-1.5">
+                            <Code2 size={12} /> Executable Code & Syntax Implementation
+                          </span>
+                        </div>
+                        <pre className="p-4 text-xs font-mono text-txt-main overflow-x-auto whitespace-pre leading-relaxed bg-black/40">
+                          <code>{currentCard.example}</code>
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="border-l-3 border-border-main/80 pl-4 py-2 text-xs md:text-sm text-txt-sub font-mono leading-relaxed bg-bg-card/50 rounded-r space-y-1">
+                        <span className="font-mono text-[10px] uppercase text-txt-muted font-bold block tracking-wider">Practical Example</span>
+                        <p className="text-txt-main text-xs md:text-sm">{currentCard.example}</p>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
-              {/* Practice Problems & LeetCode Challenges */}
-              {lesson.practiceProblems && lesson.practiceProblems.length > 0 && (
-                <div className="border border-border-main/80 bg-bg-surface p-4 rounded-md space-y-3 shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <Code2 size={16} className="text-accent-main" />
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-txt-main font-semibold">
-                      Target Practice & LeetCode Sums
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {lesson.practiceProblems.map((prob, pIdx) => (
-                      <div key={pIdx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-bg-card/50 p-3 rounded border border-border-main/50 text-xs gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 font-mono text-[9px] uppercase font-bold rounded ${
-                            prob.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
-                            prob.difficulty === 'Hard' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' :
-                            'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                          }`}>
-                            {prob.difficulty || 'Practice'}
-                          </span>
-                          <span className="text-txt-main font-medium">{prob.title}</span>
-                        </div>
-                        <a
-                          href={prob.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent-main font-mono text-[10px] uppercase font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+              {/* Subtle Low-Opacity Learn More Reveal Button - Rendered ONLY if card has coding practice lab */}
+              {(() => {
+                const isCodingSubject = /coding|program|software|algorithm|data structure|leetcode|python|javascript|typescript|c\+\+|java|sql|react|node|operating system/i.test(
+                  lesson.title + " " + (currentCard.badge || "")
+                );
+
+                if (!isCodingSubject) return null;
+
+                return (
+                  <>
+                    <div className="pt-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowLearnMore(!showLearnMore)}
+                        className="px-4 py-1.5 bg-bg-surface/50 hover:bg-bg-card border border-border-main/50 text-txt-sub/70 hover:text-txt-main font-mono text-[11px] uppercase tracking-wider rounded flex items-center justify-center gap-2 mx-auto transition-all cursor-pointer shadow-xs"
+                      >
+                        <span>{showLearnMore ? "Learn More ↑" : "Learn More ↓"}</span>
+                      </button>
+                    </div>
+
+                    <AnimatePresence>
+                      {showLearnMore && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-4 overflow-hidden pt-2"
                         >
-                          <span>Solve on {prob.platform || 'LeetCode'}</span>
-                          <ExternalLink size={11} />
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                          {(() => {
+                            const isCodingSubject = /coding|program|software|algorithm|data structure|leetcode|python|javascript|typescript|c\+\+|java|sql|react|node|operating system/i.test(
+                              lesson.title + " " + (currentCard.badge || "")
+                            );
+
+                            if (!isCodingSubject) return null;
+
+                            const practiceList = (lesson.practiceProblems && lesson.practiceProblems.length > 0)
+                              ? lesson.practiceProblems
+                              : [
+                                  {
+                                    title: `Target Practice Challenge: ${lesson.title}`,
+                                    url: `https://leetcode.com/problemset/all/?search=${encodeURIComponent(lesson.title)}`,
+                                    platform: "LeetCode",
+                                    difficulty: "Medium"
+                                  }
+                                ];
+
+                            return (
+                              <div className="border border-border-main/80 bg-bg-surface p-4 rounded-md space-y-3 shadow-xs">
+                                <div className="flex items-center gap-2">
+                                  <Code2 size={16} className="text-accent-main" />
+                                  <span className="font-mono text-[10px] uppercase tracking-wider text-txt-main font-semibold">
+                                    Coding Practice Lab & Problem Challenges
+                                  </span>
+                                </div>
+                                <div className="space-y-2">
+                                  {practiceList.map((prob, pIdx) => (
+                                    <div key={pIdx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-bg-card/50 p-3 rounded border border-border-main/50 text-xs gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 font-mono text-[9px] uppercase font-bold rounded ${
+                                          prob.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                                          prob.difficulty === 'Hard' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' :
+                                          'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                                        }`}>
+                                          {prob.difficulty || 'Practice'}
+                                        </span>
+                                        <span className="text-txt-main font-medium">{prob.title}</span>
+                                      </div>
+                                      <a
+                                        href={prob.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-accent-main font-mono text-[10px] uppercase font-semibold hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                                      >
+                                        <span>Solve on {prob.platform || 'LeetCode'}</span>
+                                        <ExternalLink size={11} />
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                );
+              })()}
             </motion.div>
           ) : currentQuestion ? (
             /* Assessment Question Screen */
@@ -522,7 +703,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
             >
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 bg-bg-card border border-border-main/60 font-mono text-[10px] uppercase tracking-wider text-txt-muted rounded font-semibold">
-                  {currentQuestion.type === "mcq" ? "Multiple Choice" : "Short Answer"}
+                  {currentQuestion.type === "mcq" ? "Multiple Choice" : "Written / Code Exercise"}
                 </span>
               </div>
 
@@ -532,50 +713,86 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
               {currentQuestion.type === "mcq" && (
                 <div className="space-y-3 pt-2">
-                  {currentQuestion.options?.map((option, idx) => {
-                    const isSelected = selectedMcqOption === idx;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => !isAnswerChecked && setSelectedMcqOption(idx)}
-                        disabled={isAnswerChecked}
-                        className={`w-full p-4 rounded border text-left text-sm font-normal transition-all flex items-center justify-between cursor-pointer ${
-                          isSelected
-                            ? "bg-accent-main/10 border-accent-main text-accent-main font-medium"
-                            : "bg-bg-surface border-border-main/70 text-txt-main hover:border-border-main"
-                        }`}
-                      >
-                        <span className="text-sm font-normal leading-normal">{option}</span>
-                        <div
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center font-mono text-[11px] shrink-0 ml-3 ${
+                  {(() => {
+                    const rawOpts = currentQuestion.options || [];
+                    const filteredOpts = rawOpts.filter((o) => typeof o === "string" && o.trim().length > 0);
+                    const safeMcqOptions = filteredOpts.length > 0
+                      ? filteredOpts
+                      : [
+                          currentQuestion.correctAnswerText || currentQuestion.correctAnswer || "Primary Core Concept",
+                          "Secondary Mechanism",
+                          "External Parameter",
+                          "Administrative Bound"
+                        ];
+
+                    return safeMcqOptions.map((option, idx) => {
+                      const isSelected = selectedMcqOption === idx;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => !isAnswerChecked && setSelectedMcqOption(idx)}
+                          disabled={isAnswerChecked}
+                          className={`w-full p-4 rounded border text-left text-sm font-normal transition-all flex items-center justify-between cursor-pointer ${
                             isSelected
-                              ? "bg-accent-main text-bg-base border-accent-main font-bold"
-                              : "border-border-main text-txt-muted"
+                              ? "bg-accent-main/10 border-accent-main text-accent-main font-medium"
+                              : "bg-bg-surface border-border-main/70 text-txt-main hover:border-border-main"
                           }`}
                         >
-                          {String.fromCharCode(65 + idx)}
-                        </div>
-                      </button>
-                    );
-                  })}
+                          <span className="text-sm font-normal leading-normal">{option}</span>
+                          <div
+                            className={`w-6 h-6 rounded-full border flex items-center justify-center font-mono text-[11px] shrink-0 ml-3 ${
+                              isSelected
+                                ? "bg-accent-main text-bg-base border-accent-main font-bold"
+                                : "border-border-main text-txt-muted"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + idx)}
+                          </div>
+                        </button>
+                      );
+                    });
+                  })()}
                 </div>
               )}
 
               {currentQuestion.type === "short_answer" && (
                 <div className="pt-2">
-                  <textarea
-                    value={shortAnswerInput}
-                    onChange={(e) => setShortAnswerInput(e.target.value)}
-                    disabled={isAnswerChecked}
-                    placeholder="Type your answer here..."
-                    rows={4}
-                    className="w-full p-4 rounded border border-border-main/80 bg-bg-surface text-sm font-normal text-txt-main focus:outline-none focus:border-accent-main placeholder:text-txt-muted/50 leading-relaxed"
-                  />
+                  {(() => {
+                    const isCodingExercise = Boolean(
+                      (currentQuestion as any).type === "code" ||
+                        /code|write|implement|function|program|script|class|java|python|javascript|typescript|c\+\+|java|sql|dsa|algorithm|stack|queue|array|linked list|tree|graph/i.test(
+                          currentQuestion.prompt + " " + lesson.title
+                        )
+                    );
+
+                    if (isCodingExercise) {
+                      return (
+                        <CodeIDEEditor
+                          value={shortAnswerInput}
+                          onChange={setShortAnswerInput}
+                          disabled={isAnswerChecked}
+                          placeholder="// Write your code solution here... (Tab key indents, {} [] () auto-close)"
+                        />
+                      );
+                    }
+
+                    return (
+                      <textarea
+                        value={shortAnswerInput}
+                        onChange={(e) => setShortAnswerInput(e.target.value)}
+                        disabled={isAnswerChecked}
+                        placeholder="Type your detailed explanation or answer here..."
+                        rows={4}
+                        className="w-full p-4 rounded border border-border-main/80 bg-bg-surface text-sm font-normal text-txt-main focus:outline-none focus:border-accent-main placeholder:text-txt-muted/50 leading-relaxed font-sans"
+                      />
+                    );
+                  })()}
                 </div>
               )}
             </motion.div>
           ) : null}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* Bottom Action Footer */}
@@ -628,7 +845,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                 disabled={cardPaceTimeLeft > 0}
                 className="px-6 py-2.5 bg-accent-main hover:opacity-90 disabled:opacity-40 text-bg-base font-mono text-xs uppercase tracking-wider font-semibold rounded cursor-pointer transition-opacity flex items-center gap-1.5"
               >
-                {cardPaceTimeLeft > 0 ? "Pacing..." : "Got It →"}
+                {cardPaceTimeLeft > 0 ? `Pacing (${cardPaceTimeLeft}s)...` : "Got It →"}
               </button>
             ) : isAnswerChecked ? (
               isCorrectAnswer ? (
@@ -645,7 +862,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                   onClick={handleRetryQuestion}
                   className="px-6 py-2.5 bg-rose-500 hover:opacity-90 font-mono text-xs uppercase tracking-wider font-semibold rounded cursor-pointer text-bg-base transition-opacity flex items-center gap-1.5"
                 >
-                  <span>Try Question Again 🔄</span>
+                  <span>Try Question Again</span>
                 </button>
               )
             ) : (
@@ -685,7 +902,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
             <div className="flex-1 overflow-y-auto space-y-3 font-mono text-xs">
               <div className="p-3 bg-bg-card/70 border border-border-main/50 rounded text-txt-sub leading-relaxed">
-                👋 Hello Sir! I am your LynAI Study Coach for <strong className="text-txt-main">{lesson.title}</strong>. Ask me anything about this card or question!
+                Hello Sir! I am your LynAI Study Coach for <strong className="text-txt-main">{lesson.title}</strong>. Ask me anything about this card or question!
               </div>
 
               {aiCoachResponse && (

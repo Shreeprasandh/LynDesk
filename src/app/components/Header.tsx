@@ -772,7 +772,7 @@ export default function Header() {
           recipientId: targetSenderId,
           senderId: user?.id || "guest",
           title: "Invitation Accepted",
-          message: `🟢 ${myName} accepted your workspace invitation.`,
+          message: `${myName} accepted your workspace invitation.`,
           type: "system",
           category: "updates",
           actionUrl: actionUrl || "/explore"
@@ -809,7 +809,7 @@ export default function Header() {
           recipientId: targetSenderId,
           senderId: user?.id || "guest",
           title: "Invitation Declined",
-          message: `🔴 ${myName} declined your workspace invitation.`,
+          message: `${myName} declined your workspace invitation.`,
           type: "warning",
           category: "updates",
           actionUrl: "/explore"

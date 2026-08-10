@@ -11,7 +11,8 @@ import {
   MoreVertical,
   Play,
   ArrowLeft,
-  Pencil
+  Pencil,
+  Sparkles
 } from "lucide-react";
 import ActivePathView from "./ActivePathView";
 
@@ -215,8 +216,8 @@ export default function LearningPathsView({
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <span className="font-mono text-[10px] text-accent-main font-semibold">
-                      ⚡ +{path.xpEarned || 0} XP
+                    <span className="font-mono text-[10px] text-accent-main font-semibold flex items-center gap-1">
+                      <Sparkles size={11} /> +{path.xpEarned || 0} XP
                     </span>
 
                     <button

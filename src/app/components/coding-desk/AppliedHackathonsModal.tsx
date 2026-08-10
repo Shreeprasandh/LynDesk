@@ -330,7 +330,7 @@ export default function AppliedHackathonsModal({
                       }}
                       className="h-8 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase font-bold rounded-sm flex items-center gap-1.5 cursor-pointer transition-opacity"
                     >
-                      <Sparkles size={11} /> Open Workspace 🚀
+                      <Sparkles size={11} /> Open Workspace
                     </button>
                   ) : (
                     <button

@@ -50,8 +50,21 @@ export default function LynAI() {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isLessonActive, setIsLessonActive] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Hide global floating LynAI when inside an active lesson session (since SessionPlayer has its own Ask LynAI tutor)
+  useEffect(() => {
+    const checkActive = () => {
+      if (typeof document !== "undefined") {
+        setIsLessonActive(document.body.getAttribute("data-lesson-active") === "true");
+      }
+    };
+    checkActive();
+    const interval = setInterval(checkActive, 300);
+    return () => clearInterval(interval);
+  }, []);
 
   // Auto-focus input when chat drawer opens
   useEffect(() => {
@@ -187,6 +200,8 @@ export default function LynAI() {
     setMessages(prev => [...prev, userMsg]);
     simulateAISponse(actionText);
   };
+
+  if (isLessonActive) return null;
 
   return (
     <>

@@ -983,7 +983,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             id: getUniqueId("sys_join"),
             sender_name: "LDK:BOT",
             sender_role: "SYSTEM",
-            content: `🎉 ${joiningUserName} accepted the invite and joined the shared workspace!`,
+            content: `${joiningUserName} accepted the invite and joined the shared workspace!`,
             created_at: new Date().toISOString(),
             isSystem: true
           };
@@ -1714,7 +1714,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   id: noticeId,
                   sender_name: "LDK:BOT",
                   sender_role: "SYSTEM",
-                  content: `🎉 ${newMember.name} joined the shared workspace!`,
+                  content: `${newMember.name} joined the shared workspace!`,
                   created_at: new Date().toISOString(),
                   isSystem: true
                 }
@@ -2144,7 +2144,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         id: getUniqueId("sys_call"),
         sender_name: "LDK:BOT",
         sender_role: "SYSTEM",
-        content: `🔊 ${myName} joined the call.`,
+        content: `${myName} joined the call.`,
         created_at: new Date().toISOString(),
         isSystem: true
       };
@@ -2368,7 +2368,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         id: getUniqueId("sys_leave"),
         sender_name: "LDK:BOT",
         sender_role: "SYSTEM",
-        content: `🔇 ${myName} left the call.`,
+        content: `${myName} left the call.`,
         created_at: new Date().toISOString(),
         isSystem: true
       };

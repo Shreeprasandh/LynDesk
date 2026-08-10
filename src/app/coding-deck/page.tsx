@@ -16,7 +16,8 @@ import {
   TrendingUp,
   Sparkles,
   RotateCw,
-  FolderKanban
+  FolderKanban,
+  Lock
 } from "lucide-react";
 
 interface PlatformStats {
@@ -684,7 +685,9 @@ export default function CodingDeckPage() {
 
         {isLeetcodePrivate && (
           <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs font-mono text-yellow-500 flex flex-col gap-1.5 mt-1">
-            <span className="font-bold flex items-center gap-1">🔒 LeetCode Submission Calendar is Private:</span>
+            <span className="font-bold flex items-center gap-1">
+              <Lock size={12} /> LeetCode Submission Calendar is Private:
+            </span>
             <span className="text-[10px] text-txt-muted font-sans leading-relaxed">
               To fetch and display your live contribution heatmap and calculate streaks correctly, you must log in to your LeetCode Account settings (https://leetcode.com/profile/settings/), look for the Privacy section, and turn off &quot;Make my submission calendar private&quot;.
             </span>

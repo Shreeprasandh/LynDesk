@@ -10,7 +10,11 @@ import {
   AlertCircle,
   FileText,
   PenTool,
-  Check
+  Check,
+  Zap,
+  BookOpen,
+  Compass,
+  Code2
 } from "lucide-react";
 
 interface AIPathStudioModalProps {
@@ -20,12 +24,13 @@ interface AIPathStudioModalProps {
 
 export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStudioModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [creationMode, setCreationMode] = useState<"materials" | "prompt">("materials");
+  const [creationMode, setCreationMode] = useState<"prompt" | "materials">("prompt");
 
   const [pathTitle, setPathTitle] = useState("");
   const [pathDescription, setPathDescription] = useState("");
   const [subtopics, setSubtopics] = useState("");
   const [depthMode, setDepthMode] = useState<DepthMode>("standard");
+  const [learningStyle, setLearningStyle] = useState<"balanced" | "coding">("balanced");
   const [uploadMode] = useState<UploadMode>("unified");
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -114,6 +119,7 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
           pathDescription,
           subtopics,
           depthMode,
+          learningStyle,
           creationMode,
           files: filesToUse,
         }),
@@ -334,6 +340,40 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
                 </div>
               )}
 
+              {/* Learning Style Focus Select */}
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-1.5">
+                  Course Track Focus
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLearningStyle("balanced")}
+                    className={`h-9 px-3 rounded border font-mono text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      learningStyle === "balanced"
+                        ? "bg-accent-main/10 border-accent-main text-accent-main font-bold"
+                        : "bg-bg-card border-border-main/60 text-txt-sub hover:border-border-main"
+                    }`}
+                  >
+                    <BookOpen size={12} />
+                    <span>Balanced Theory</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLearningStyle("coding")}
+                    className={`h-9 px-3 rounded border font-mono text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      learningStyle === "coding"
+                        ? "bg-accent-main/10 border-accent-main text-accent-main font-bold"
+                        : "bg-bg-card border-border-main/60 text-txt-sub hover:border-border-main"
+                    }`}
+                  >
+                    <Code2 size={12} />
+                    <span>Hands-On Code</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Depth Mode Select */}
               <div>
                 <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-1.5">
@@ -349,7 +389,9 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
                         : "bg-bg-card border-border-main/60 text-txt-sub hover:border-border-main"
                     }`}
                   >
-                    <div className="font-mono text-xs font-bold">⚡ Sprint</div>
+                    <div className="font-mono text-xs font-bold flex items-center gap-1">
+                      <Zap size={12} /> Sprint
+                    </div>
                     <div className="text-[10px] text-txt-muted">5 Lessons</div>
                   </button>
 
@@ -362,7 +404,9 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
                         : "bg-bg-card border-border-main/60 text-txt-sub hover:border-border-main"
                     }`}
                   >
-                    <div className="font-mono text-xs font-bold">📘 Standard</div>
+                    <div className="font-mono text-xs font-bold flex items-center gap-1">
+                      <BookOpen size={12} /> Standard
+                    </div>
                     <div className="text-[10px] text-txt-muted">15-20 Lessons</div>
                   </button>
 
@@ -375,7 +419,9 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
                         : "bg-bg-card border-border-main/60 text-txt-sub hover:border-border-main"
                     }`}
                   >
-                    <div className="font-mono text-xs font-bold">🔬 Deep Dive</div>
+                    <div className="font-mono text-xs font-bold flex items-center gap-1">
+                      <Compass size={12} /> Deep Dive
+                    </div>
                     <div className="text-[10px] text-txt-muted">25-50 Lessons</div>
                   </button>
                 </div>
@@ -393,7 +439,9 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
                     <span>Parsing Materials...</span>
                   </>
                 ) : (
-                  <span>Generate AI Learning Path ✨</span>
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles size={14} /> Generate AI Learning Path
+                  </span>
                 )}
               </button>
             </div>

@@ -14,7 +14,6 @@ import AIPathStudioModal from "../components/study-desk/AIPathStudioModal";
 import ProgressDashboardView from "../components/study-desk/ProgressDashboardView";
 import ErrorBankModal from "../components/study-desk/ErrorBankModal";
 import DSASystemMasteryView, { UserDSAProgressMap } from "../components/study-desk/DSASystemMasteryView";
-import MistakeVaultView from "../components/study-desk/MistakeVaultView";
 import { DSA_TRACKS, DSAProblem } from "./dsaMasteryData";
 
 const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
@@ -39,7 +38,7 @@ const calculateTotalDSAXp = (map: UserDSAProgressMap) => {
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"paths" | "dsa_way" | "mistakes" | "progress">("paths");
+  const [activeTab, setActiveTab] = useState<"paths" | "dsa_way" | "progress">("paths");
 
   // Synchronous 0ms local state initializers
   const [paths, setPaths] = useState<StudyPath[]>(() => {
@@ -726,22 +725,6 @@ export default function StudyDeskPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("mistakes")}
-              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === "mistakes" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              <span>Mistake Vault</span>
-              {mistakes.length > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full font-mono text-[9px] ${
-                  activeTab === "mistakes" ? "bg-bg-base text-accent-main" : "bg-amber-500/20 text-amber-400"
-                }`}>
-                  {mistakes.length}
-                </span>
-              )}
-            </button>
-
-            <button
               onClick={() => setActiveTab("progress")}
               className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
                 activeTab === "progress" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
@@ -773,28 +756,6 @@ export default function StudyDeskPage() {
             onToggleProblemStarred={handleToggleDSAProblemStarred}
             onSaveProblemNotes={handleSaveDSAProblemNotes}
             totalXpEarned={stats.totalXp}
-          />
-        )}
-
-        {activeTab === "mistakes" && (
-          <MistakeVaultView
-            mistakes={mistakes}
-            onClearMistake={async (id) => {
-              setMistakes((prev) => prev.filter((m) => m.id !== id));
-              if (user) {
-                try {
-                  await supabase.from("study_mistakes").delete().eq("id", id);
-                } catch {}
-              }
-            }}
-            onClearAllMistakes={async () => {
-              setMistakes([]);
-              if (user) {
-                try {
-                  await supabase.from("study_mistakes").delete().eq("user_id", user.id);
-                } catch {}
-              }
-            }}
           />
         )}
 
