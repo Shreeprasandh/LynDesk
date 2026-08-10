@@ -14,6 +14,7 @@ import AIPathStudioModal from "../components/study-desk/AIPathStudioModal";
 import ProgressDashboardView from "../components/study-desk/ProgressDashboardView";
 import ErrorBankModal from "../components/study-desk/ErrorBankModal";
 import DSASystemMasteryView, { UserDSAProgressMap } from "../components/study-desk/DSASystemMasteryView";
+import MistakeVaultView from "../components/study-desk/MistakeVaultView";
 import { DSA_TRACKS, DSAProblem } from "./dsaMasteryData";
 
 const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
@@ -38,7 +39,7 @@ const calculateTotalDSAXp = (map: UserDSAProgressMap) => {
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"paths" | "active" | "dsa_way" | "progress">("paths");
+  const [activeTab, setActiveTab] = useState<"paths" | "dsa_way" | "mistakes" | "progress">("paths");
 
   // Synchronous 0ms local state initializers
   const [paths, setPaths] = useState<StudyPath[]>(() => {
@@ -261,7 +262,7 @@ export default function StudyDeskPage() {
         isActive: p.id === pathId,
       }))
     );
-    setActiveTab("active");
+    setActiveTab("paths");
 
     // Sync active state to Supabase if logged in
     if (user) {
@@ -284,7 +285,7 @@ export default function StudyDeskPage() {
       } catch {}
     }
     setShowAIStudio(false);
-    setActiveTab("active");
+    setActiveTab("paths");
 
     // Persist to Supabase if logged in
     if (user) {
@@ -387,6 +388,27 @@ export default function StudyDeskPage() {
           xp_earned: 0,
           is_active: false,
         });
+      } catch {}
+    }
+  };
+
+  const handleRenamePath = async (pathId: string, newTitle: string, newDescription?: string) => {
+    setPaths((prev) =>
+      prev.map((p) =>
+        p.id === pathId ? { ...p, title: newTitle, description: newDescription ?? p.description } : p
+      )
+    );
+
+    if (user) {
+      try {
+        await supabase
+          .from("study_paths")
+          .update({
+            title: newTitle,
+            description: newDescription,
+            last_studied_at: new Date().toISOString(),
+          })
+          .eq("id", pathId);
       } catch {}
     }
   };
@@ -695,21 +717,28 @@ export default function StudyDeskPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("active")}
-              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "active" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
-              }`}
-            >
-              Active Way
-            </button>
-
-            <button
               onClick={() => setActiveTab("dsa_way")}
               className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
                 activeTab === "dsa_way" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
               DSA Way
+            </button>
+
+            <button
+              onClick={() => setActiveTab("mistakes")}
+              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === "mistakes" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+              }`}
+            >
+              <span>Mistake Vault</span>
+              {mistakes.length > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full font-mono text-[9px] ${
+                  activeTab === "mistakes" ? "bg-bg-base text-accent-main" : "bg-amber-500/20 text-amber-400"
+                }`}>
+                  {mistakes.length}
+                </span>
+              )}
             </button>
 
             <button
@@ -723,28 +752,6 @@ export default function StudyDeskPage() {
           </div>
         </div>
 
-        {/* Active Path Header Status Bar */}
-        {activePath && activeTab !== "active" && activeTab !== "dsa_way" && (
-          <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded flex items-center justify-between gap-4 font-mono text-xs">
-            <div className="flex items-center gap-3 truncate">
-              <span className="px-2 py-0.5 bg-accent-main/10 border border-accent-main/30 text-accent-main text-[9px] uppercase rounded">
-                ACTIVE
-              </span>
-              <span className="font-semibold text-txt-main truncate">{activePath.title}</span>
-              <span className="text-[10px] text-txt-muted hidden sm:inline">
-                {activePath.completedLessons}/{activePath.totalLessons} Lessons
-              </span>
-            </div>
-
-            <button
-              onClick={() => setActiveTab("active")}
-              className="text-accent-main hover:underline text-[10px] uppercase font-semibold shrink-0"
-            >
-              Resume Path →
-            </button>
-          </div>
-        )}
-
         {/* Tab Views */}
         {activeTab === "paths" && (
           <LearningPathsView
@@ -754,14 +761,8 @@ export default function StudyDeskPage() {
             onCreateNewPathClick={() => setShowAIStudio(true)}
             onDeletePath={handleDeletePath}
             onDuplicatePath={handleDuplicatePath}
-          />
-        )}
-
-        {activeTab === "active" && (
-          <ActivePathView
-            path={activePath}
+            onRenamePath={handleRenamePath}
             onStartLesson={(lesson) => setActiveLesson(lesson)}
-            onCreateNewPathClick={() => setShowAIStudio(true)}
           />
         )}
 
@@ -772,6 +773,28 @@ export default function StudyDeskPage() {
             onToggleProblemStarred={handleToggleDSAProblemStarred}
             onSaveProblemNotes={handleSaveDSAProblemNotes}
             totalXpEarned={stats.totalXp}
+          />
+        )}
+
+        {activeTab === "mistakes" && (
+          <MistakeVaultView
+            mistakes={mistakes}
+            onClearMistake={async (id) => {
+              setMistakes((prev) => prev.filter((m) => m.id !== id));
+              if (user) {
+                try {
+                  await supabase.from("study_mistakes").delete().eq("id", id);
+                } catch {}
+              }
+            }}
+            onClearAllMistakes={async () => {
+              setMistakes([]);
+              if (user) {
+                try {
+                  await supabase.from("study_mistakes").delete().eq("user_id", user.id);
+                } catch {}
+              }
+            }}
           />
         )}
 

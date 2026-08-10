@@ -8,8 +8,16 @@ import {
   Play, 
   Sparkles, 
   BookOpen, 
-  X
+  X,
+  Trophy,
+  Award,
+  ChevronRight,
+  Clock,
+  Zap,
+  Target,
+  FileText
 } from "lucide-react";
+import CertificateModal from "./CertificateModal";
 
 interface ActivePathViewProps {
   path: StudyPath;
@@ -19,6 +27,8 @@ interface ActivePathViewProps {
 
 export default function ActivePathView({ path, onStartLesson, onCreateNewPathClick }: ActivePathViewProps) {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [showCertificate, setShowCertificate] = useState(false);
 
   if (!path || !path.sections || path.sections.length === 0) {
     return (
@@ -46,151 +56,322 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
 
   let foundFirstUnlocked = false;
 
+  const scrollToSection = (secId: string) => {
+    setActiveSectionId(secId);
+    const el = document.getElementById(secId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
-    <div className="max-w-3xl mx-auto pb-16 space-y-8">
+    <div className="max-w-6xl mx-auto pb-16 space-y-8 text-left">
       {/* Path Header Banner */}
-      <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 relative overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="px-2.5 py-0.5 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[9px] uppercase tracking-wider rounded">
-            {path.depthMode ? `${path.depthMode.toUpperCase()} PATH` : "STANDARD PATH"}
-          </span>
-          <span className="px-2.5 py-0.5 bg-bg-card border border-border-main/60 font-mono text-[9px] uppercase text-txt-muted rounded">
-            {path.sourceFiles?.length || 0} Source File(s)
-          </span>
+      <div className="border border-border-main/80 bg-bg-surface p-6 md:p-8 rounded-md space-y-5 relative overflow-hidden shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border-main/40 pb-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="px-3 py-1 bg-accent-main/10 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase tracking-wider rounded">
+              ⚡ {path.depthMode ? `${path.depthMode.toUpperCase()} PATH` : "STANDARD PATH"}
+            </span>
+            <span className="px-3 py-1 bg-bg-card border border-border-main/60 font-mono text-[10px] uppercase text-txt-muted rounded flex items-center gap-1.5">
+              <FileText size={12} />
+              {path.sourceFiles?.length || 0} Source File(s)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 font-mono text-xs text-txt-sub">
+            <span className="flex items-center gap-1 text-accent-main font-bold">
+              <Zap size={14} /> +{path.xpEarned || 0} XP Earned
+            </span>
+          </div>
         </div>
 
         <div>
-          <h1 className="font-display text-2xl font-light text-txt-main tracking-tight">{path.title}</h1>
-          {path.description && <p className="text-xs text-txt-sub font-light mt-1">{path.description}</p>}
+          <h1 className="font-display text-2xl md:text-3xl font-light text-txt-main tracking-tight">
+            {path.title}
+          </h1>
+          {path.description && (
+            <p className="text-xs md:text-sm text-txt-sub font-light mt-1.5 leading-relaxed max-w-3xl">
+              {path.description}
+            </p>
+          )}
         </div>
 
-        {/* Progress Bar */}
-        <div className="space-y-1 pt-2">
-          <div className="flex justify-between text-[10px] font-mono text-txt-muted uppercase">
-            <span>Overall Progress</span>
-            <span>
-              {completedLessons}/{totalLessons} Lessons ({progressPercent}%)
+        {/* Overall Progress Bar & Meta */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-xs font-mono text-txt-muted uppercase">
+            <span className="flex items-center gap-1.5 text-txt-main font-semibold">
+              <Target size={14} className="text-accent-main" /> Path Mastery Progress
+            </span>
+            <span className="font-bold text-accent-main">
+              {completedLessons} / {totalLessons} Lessons ({progressPercent}%)
             </span>
           </div>
-          <div className="w-full h-2 bg-bg-card border border-border-main/50 rounded-full overflow-hidden">
+          <div className="w-full h-2.5 bg-bg-card border border-border-main/50 rounded-full overflow-hidden p-0.5">
             <div
-              className="h-full bg-accent-main rounded-full transition-all duration-500"
+              className="h-full bg-accent-main rounded-full transition-all duration-500 shadow-sm"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
       </div>
 
-      {/* Vertical Winding Zigzag Lesson Path */}
-      <div className="space-y-10">
-        {path.sections.map((section, secIdx) => (
-          <div key={section.id || `sec_${secIdx}`} className="space-y-6">
-            {/* Section Header Banner */}
-            <div className="border border-border-main/70 bg-bg-surface/60 p-4 rounded-md flex items-center justify-between">
-              <div>
-                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-semibold">
-                  Section {secIdx + 1}
-                </span>
-                <h2 className="font-display text-base font-light text-txt-main">{section.title}</h2>
-                {section.description && <p className="text-[11px] text-txt-sub font-light">{section.description}</p>}
-              </div>
-              <div className="w-8 h-8 rounded border border-border-main/60 bg-bg-card text-txt-main font-mono text-xs font-bold flex items-center justify-center">
-                0{secIdx + 1}
-              </div>
+      {/* Two-Column Split Workspace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Left Column: Sticky Section Stepper & Path Stats (4 cols) */}
+        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-20">
+          
+          {/* Section Stepper Card */}
+          <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md space-y-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-txt-muted font-semibold">
+                Curriculum Navigation
+              </span>
+              <span className="font-mono text-[10px] text-accent-main font-bold">
+                {path.sections.length} Sections
+              </span>
             </div>
 
-            {/* Zigzag Nodes Column */}
-            <div className="flex flex-col items-center gap-6 py-2">
-              {section.lessons?.map((lesson, lesIdx) => {
-                const isCompleted = lesson.completed;
-                let isUnlocked = false;
-
-                if (isCompleted) {
-                  isUnlocked = true;
-                } else if (!foundFirstUnlocked) {
-                  isUnlocked = true;
-                  foundFirstUnlocked = true;
-                }
-
-                // Horizontal zigzag offset
-                const offsetIdx = lesIdx % 4;
-                let translateX = "translate-x-0";
-                if (offsetIdx === 1) translateX = "-translate-x-10 sm:-translate-x-14";
-                else if (offsetIdx === 2) translateX = "translate-x-0";
-                else if (offsetIdx === 3) translateX = "translate-x-10 sm:translate-x-14";
-
-                const isCurrentTarget = isUnlocked && !isCompleted;
+            <div className="space-y-1.5">
+              {path.sections.map((sec, idx) => {
+                const secLessons = sec.lessons || [];
+                const secCompleted = secLessons.filter((l) => l.completed).length;
+                const isSecDone = secLessons.length > 0 && secCompleted === secLessons.length;
+                const secId = sec.id || `sec_${idx + 1}`;
+                const isSelected = activeSectionId === secId;
 
                 return (
-                  <div
-                    key={lesson.id || `les_${secIdx}_${lesIdx}`}
-                    className={`relative flex flex-col items-center ${translateX} transition-transform duration-200`}
+                  <button
+                    key={secId}
+                    onClick={() => scrollToSection(secId)}
+                    className={`w-full p-3 rounded text-left transition-all cursor-pointer flex items-center justify-between border ${
+                      isSelected
+                        ? "bg-accent-main/10 border-accent-main text-txt-main shadow-xs"
+                        : "bg-bg-card/40 border-border-main/50 hover:border-border-main text-txt-sub hover:text-txt-main"
+                    }`}
                   >
-                    {/* Active Target Floating Badge */}
-                    {isCurrentTarget && (
-                      <div className="absolute -top-7 animate-bounce z-10">
-                        <span className="px-2 py-0.5 bg-accent-main text-bg-base font-mono text-[9px] uppercase tracking-wider font-bold rounded shadow-sm">
-                          START →
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Circular Node Button */}
-                    <button
-                      onClick={() => isUnlocked && setSelectedLesson(lesson)}
-                      disabled={!isUnlocked}
-                      className={`w-16 h-16 rounded-full flex items-center justify-center font-mono font-bold text-lg transition-all cursor-pointer border ${
-                        isCompleted
-                          ? "bg-accent-main text-bg-base border-accent-main hover:opacity-90 shadow-sm"
-                          : isCurrentTarget
-                          ? "bg-bg-surface text-accent-main border-2 border-accent-main ring-4 ring-accent-main/20 animate-pulse hover:bg-bg-card"
-                          : "bg-bg-card border-border-main/40 text-txt-muted cursor-not-allowed opacity-50"
-                      }`}
-                    >
-                      {isCompleted ? (
-                        <Check size={24} />
-                      ) : isCurrentTarget ? (
-                        <Play size={20} className="fill-accent-main translate-x-0.5" />
-                      ) : (
-                        <Lock size={18} />
-                      )}
-                    </button>
-
-                    {/* Lesson Label */}
-                    <div className="mt-1.5 text-center max-w-[130px]">
-                      <span className="text-[11px] font-medium text-txt-main block truncate">
-                        {lesson.title}
+                    <div className="flex items-center gap-3 truncate">
+                      <span className={`w-6 h-6 rounded flex items-center justify-center font-mono text-[10px] font-bold shrink-0 ${
+                        isSecDone 
+                          ? "bg-accent-main text-bg-base"
+                          : "bg-bg-card border border-border-main text-txt-sub"
+                      }`}>
+                        {isSecDone ? "✓" : `0${idx + 1}`}
                       </span>
-                      <span className="font-mono text-[9px] text-txt-muted uppercase">
-                        +{lesson.xpValue || 10} XP
-                      </span>
+                      <span className="text-xs font-mono font-medium truncate">{sec.title}</span>
                     </div>
-                  </div>
+
+                    <span className="font-mono text-[9px] text-txt-muted shrink-0 ml-2">
+                      {secCompleted}/{secLessons.length}
+                    </span>
+                  </button>
                 );
               })}
+            </div>
+          </div>
 
-              {/* Milestone Node */}
-              <div className="mt-2 flex flex-col items-center">
-                <div className="w-12 h-12 rounded-md bg-bg-card border border-border-main/80 text-txt-main flex flex-col items-center justify-center shadow-sm">
-                  <span className="font-mono text-[9px] uppercase font-bold text-accent-main">SECTION</span>
-                  <span className="font-mono text-xs font-bold text-txt-main">{secIdx + 1}</span>
-                </div>
-                <span className="font-mono text-[9px] text-txt-muted uppercase tracking-wider mt-1">
-                  Milestone
+          {/* Path Trophy & Reward Summary Card */}
+          <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy size={16} className="text-txt-muted" />
+                <span className="font-mono text-[10px] uppercase tracking-wider text-txt-main font-semibold">
+                  Path Completion Rewards
                 </span>
               </div>
             </div>
+            <p className="text-xs text-txt-sub font-light leading-relaxed">
+              Complete all sections and the final cumulative exam to earn your <strong className="text-txt-main">Path Master Badge</strong> and claim bonus XP.
+            </p>
+            <div className="pt-2 border-t border-border-main/40 flex items-center justify-between text-xs font-mono">
+              <span className="text-txt-muted">Grand Certificate</span>
+              <button
+                type="button"
+                onClick={() => setShowCertificate(true)}
+                className="text-accent-main hover:underline text-[11px] font-semibold border border-accent-main/30 bg-accent-main/10 px-2.5 py-1 rounded flex items-center gap-1.5 cursor-pointer"
+              >
+                <Award size={13} /> View Certificate
+              </button>
+            </div>
           </div>
-        ))}
+
+        </div>
+
+        {/* Right Column: Full Timeline Content Canvas (8 cols) */}
+        <div className="lg:col-span-8 space-y-8">
+          {path.sections.map((section, secIdx) => {
+            const secId = section.id || `sec_${secIdx + 1}`;
+            const isGrandExamSection = section.title.toUpperCase().includes("GRAND PATH EXAM");
+            const secLessons = section.lessons || [];
+            const secCompletedCount = secLessons.filter((l) => l.completed).length;
+            const isSectionFullyDone = secLessons.length > 0 && secCompletedCount === secLessons.length;
+
+            return (
+              <div
+                key={secId}
+                id={secId}
+                className="space-y-4 scroll-mt-24"
+              >
+                {/* Section Header Card */}
+                <div className="p-5 rounded-md border bg-bg-surface border-border-main/80 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono text-[9px] uppercase tracking-widest font-semibold px-2 py-0.5 rounded ${
+                        isGrandExamSection 
+                          ? "bg-accent-main/15 text-accent-main border border-accent-main/30" 
+                          : "bg-bg-card text-txt-muted border border-border-main/60"
+                      }`}>
+                        {isGrandExamSection ? "🏆 FINAL MILESTONE" : `SECTION 0${secIdx + 1}`}
+                      </span>
+                      <span className="font-mono text-[10px] text-txt-muted">
+                        {secCompletedCount}/{secLessons.length} Completed
+                      </span>
+                    </div>
+                    <h2 className="font-display text-lg font-light text-txt-main">{section.title}</h2>
+                    {section.description && (
+                      <p className="text-xs text-txt-sub font-light leading-relaxed">{section.description}</p>
+                    )}
+                  </div>
+
+                  <div className="font-mono text-xs text-txt-muted shrink-0">
+                    {secLessons.length} Lessons
+                  </div>
+                </div>
+
+                {/* Lessons Timeline Cards List */}
+                <div className="space-y-3 pl-2 border-l-2 border-border-main/40 ml-4">
+                  {secLessons.map((lesson) => {
+                    const isCompleted = lesson.completed;
+                    let isUnlocked = false;
+
+                    if (isCompleted) {
+                      isUnlocked = true;
+                    } else if (!foundFirstUnlocked) {
+                      isUnlocked = true;
+                      foundFirstUnlocked = true;
+                    }
+
+                    const isCurrentTarget = isUnlocked && !isCompleted;
+
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`p-4 rounded-md border transition-all relative ml-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                          isCompleted
+                            ? "bg-bg-surface/80 border-border-main/60"
+                            : isCurrentTarget
+                            ? "bg-bg-surface border-2 border-accent-main ring-4 ring-accent-main/15 shadow-md"
+                            : "bg-bg-card/40 border-border-main/40 opacity-60"
+                        }`}
+                      >
+                        {/* Left Bullet Connector Node */}
+                        <div className={`absolute -left-[25px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          isCompleted
+                            ? "bg-accent-main border-accent-main"
+                            : isCurrentTarget
+                            ? "bg-bg-surface border-accent-main ring-2 ring-accent-main/40"
+                            : "bg-bg-base border-border-main"
+                        }`}>
+                          {isCompleted && <div className="w-1.5 h-1.5 bg-bg-base rounded-full" />}
+                        </div>
+
+                        {/* Lesson Info */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {isCompleted ? (
+                              <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[9px] font-bold uppercase rounded flex items-center gap-1">
+                                <Check size={10} /> Completed
+                              </span>
+                            ) : isCurrentTarget ? (
+                              <span className="px-2 py-0.5 bg-accent-main text-bg-base font-mono text-[9px] font-bold uppercase rounded animate-pulse">
+                                🔥 Start Next
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-bg-card border border-border-main/60 text-txt-muted font-mono text-[9px] uppercase rounded flex items-center gap-1">
+                                <Lock size={10} /> Locked
+                              </span>
+                            )}
+
+                            <span className="font-mono text-[10px] text-accent-main font-bold">
+                              +{lesson.xpValue || 10} XP
+                            </span>
+                            <span className="font-mono text-[10px] text-txt-muted flex items-center gap-1">
+                              <Clock size={11} /> ~{lesson.estimatedMinutes || 5} mins
+                            </span>
+                          </div>
+
+                          <h3 className="font-display text-base font-light text-txt-main">{lesson.title}</h3>
+                          {lesson.description && (
+                            <p className="text-xs text-txt-sub font-light line-clamp-2">{lesson.description}</p>
+                          )}
+                        </div>
+
+                        {/* Start / View Button */}
+                        <button
+                          onClick={() => isUnlocked && setSelectedLesson(lesson)}
+                          disabled={!isUnlocked}
+                          className={`h-9 px-4 font-mono text-xs uppercase font-semibold rounded flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                            isCompleted
+                              ? "border border-border-main/80 hover:bg-bg-card text-txt-main"
+                              : isCurrentTarget
+                              ? "bg-accent-main hover:opacity-90 text-bg-base shadow-sm"
+                              : "bg-bg-card border border-border-main/40 text-txt-muted cursor-not-allowed"
+                          }`}
+                        >
+                          {isCompleted ? (
+                            <span>Review →</span>
+                          ) : isCurrentTarget ? (
+                            <>
+                              <Play size={12} className="fill-bg-base" />
+                              <span>Start Lesson</span>
+                            </>
+                          ) : (
+                            <span>Locked</span>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Section Milestone Banner */}
+                <div className={`p-4 rounded-md border flex items-center justify-between text-xs font-mono ${
+                  isSectionFullyDone 
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                    : "bg-bg-card/40 border-border-main/40 text-txt-muted"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <Trophy size={14} className={isSectionFullyDone ? "text-emerald-400" : "text-txt-muted"} />
+                    <span>
+                      {isSectionFullyDone 
+                        ? `Section 0${secIdx + 1} Milestone Cleared! +50 Bonus XP Unlocked`
+                        : `Complete all lessons in Section 0${secIdx + 1} to clear this Milestone.`}
+                    </span>
+                  </div>
+                  <span className="font-bold">{isSectionFullyDone ? "100%" : `${secCompletedCount}/${secLessons.length}`}</span>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+
       </div>
 
-      {/* Lesson Details Modal Popover */}
+      {/* Lesson Details Popover Modal */}
       {selectedLesson && (
-        <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-bg-surface rounded-md max-w-md w-full p-6 border border-border-main/80 shadow-2xl relative space-y-4">
-            <div className="flex items-center justify-between">
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedLesson(null)}
+        >
+          <div 
+            className="bg-bg-surface rounded-md max-w-md w-full p-6 border border-border-main/80 shadow-2xl relative space-y-4 text-left font-sans animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
               <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-semibold">
-                Lesson Overview
+                Lesson Overview & Launch
               </span>
               <button
                 onClick={() => setSelectedLesson(null)}
@@ -202,16 +383,16 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
 
             <h3 className="font-display text-xl font-light text-txt-main">{selectedLesson.title}</h3>
             {selectedLesson.description && (
-              <p className="text-xs text-txt-sub font-light">{selectedLesson.description}</p>
+              <p className="text-xs text-txt-sub font-light leading-relaxed">{selectedLesson.description}</p>
             )}
 
-            <div className="grid grid-cols-2 gap-3 bg-bg-card p-3 rounded border border-border-main/60 font-mono text-xs">
+            <div className="grid grid-cols-2 gap-3 bg-bg-card p-3.5 rounded border border-border-main/60 font-mono text-xs">
               <div>
                 <span className="text-[9px] text-txt-muted uppercase block">XP Reward</span>
                 <span className="text-accent-main font-bold">+{selectedLesson.xpValue || 10} XP</span>
               </div>
               <div>
-                <span className="text-[9px] text-txt-muted uppercase block">Est. Time</span>
+                <span className="text-[9px] text-txt-muted uppercase block">Estimated Time</span>
                 <span className="text-txt-main font-bold">~{selectedLesson.estimatedMinutes || 5} Mins</span>
               </div>
             </div>
@@ -225,10 +406,19 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
               className="w-full py-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-xs uppercase tracking-wider font-semibold rounded cursor-pointer transition-opacity flex items-center justify-center gap-2"
             >
               <Play size={14} className="fill-bg-base" />
-              {selectedLesson.completed ? "Practice Again" : "Start Lesson"}
+              {selectedLesson.completed ? "Review Lesson Again" : "Launch Interactive Lesson"}
             </button>
           </div>
         </div>
+      )}
+
+      {/* Official Certificate Modal */}
+      {showCertificate && (
+        <CertificateModal
+          path={path}
+          userName="Sir"
+          onClose={() => setShowCertificate(false)}
+        />
       )}
     </div>
   );

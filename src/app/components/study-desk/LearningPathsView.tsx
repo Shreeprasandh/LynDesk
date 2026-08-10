@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { StudyPath } from "../../study-desk/types";
+import { StudyPath, Lesson } from "../../study-desk/types";
 import { 
   BookOpen, 
   Plus, 
@@ -9,8 +9,11 @@ import {
   Trash2, 
   Copy, 
   MoreVertical,
-  Play
+  Play,
+  ArrowLeft,
+  Pencil
 } from "lucide-react";
+import ActivePathView from "./ActivePathView";
 
 interface LearningPathsViewProps {
   paths: StudyPath[];
@@ -19,6 +22,8 @@ interface LearningPathsViewProps {
   onCreateNewPathClick: () => void;
   onDeletePath: (pathId: string) => void;
   onDuplicatePath: (pathId: string) => void;
+  onRenamePath?: (pathId: string, newTitle: string, newDescription?: string) => void;
+  onStartLesson?: (lesson: Lesson) => void;
 }
 
 export default function LearningPathsView({
@@ -28,9 +33,44 @@ export default function LearningPathsView({
   onCreateNewPathClick,
   onDeletePath,
   onDuplicatePath,
+  onRenamePath,
+  onStartLesson,
 }: LearningPathsViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [resumedPathId, setResumedPathId] = useState<string | null>(null);
+
+  // Rename Modal state
+  const [renameTarget, setRenameTarget] = useState<StudyPath | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+
+  const resumedPath = paths.find((p) => p.id === (resumedPathId || activePathId));
+
+  if (resumedPathId && resumedPath) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between border-b border-border-main/40 pb-4">
+          <button
+            onClick={() => setResumedPathId(null)}
+            className="flex items-center gap-2 font-mono text-xs text-txt-muted hover:text-txt-main uppercase tracking-wider transition-colors cursor-pointer"
+          >
+            <ArrowLeft size={14} /> Back to All Learning Paths
+          </button>
+
+          <span className="font-mono text-[10px] text-accent-main uppercase border border-accent-main/30 bg-accent-main/10 px-2 py-0.5 rounded">
+            Studying: {resumedPath.title}
+          </span>
+        </div>
+
+        <ActivePathView
+          path={resumedPath}
+          onStartLesson={(lesson) => onStartLesson && onStartLesson(lesson)}
+          onCreateNewPathClick={onCreateNewPathClick}
+        />
+      </div>
+    );
+  }
 
   const filteredPaths = paths.filter((p) =>
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,6 +165,18 @@ export default function LearningPathsView({
                       <div className="absolute right-0 top-6 w-36 bg-bg-surface border border-border-main/80 rounded shadow-xl py-1 z-20 font-mono text-[10px]">
                         <button
                           onClick={() => {
+                            setRenameTarget(path);
+                            setEditTitle(path.title);
+                            setEditDesc(path.description || "");
+                            setMenuOpenId(null);
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-txt-main hover:bg-bg-card flex items-center gap-2 cursor-pointer"
+                        >
+                          <Pencil size={12} /> Rename
+                        </button>
+
+                        <button
+                          onClick={() => {
                             onDuplicatePath(path.id);
                             setMenuOpenId(null);
                           }}
@@ -168,16 +220,86 @@ export default function LearningPathsView({
                     </span>
 
                     <button
-                      onClick={() => onSelectActivePath(path.id)}
+                      onClick={() => {
+                        onSelectActivePath(path.id);
+                        setResumedPathId(path.id);
+                      }}
                       className="h-8 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-semibold rounded flex items-center gap-1 cursor-pointer transition-opacity"
                     >
-                      <Play size={10} className="fill-bg-base" /> {isActive ? "Resume Path" : "Set Active"}
+                      <Play size={10} className="fill-bg-base" /> Resume Path
                     </button>
                   </div>
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Rename Modal */}
+      {renameTarget && (
+        <div className="fixed inset-0 z-50 bg-bg-base/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main/80 max-w-md w-full p-6 rounded-md shadow-2xl space-y-4 text-left font-sans">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Learning Path Registry</span>
+              <button 
+                onClick={() => setRenameTarget(null)}
+                className="text-txt-muted hover:text-txt-main cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <h3 className="font-display text-base font-semibold text-txt-main">Rename Learning Path</h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-1">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full h-9 px-3 border border-border-main/80 bg-bg-base text-xs font-mono text-txt-main rounded focus:outline-none focus:border-accent-main"
+                />
+              </div>
+
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted block mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={2.5}
+                  className="w-full p-2.5 border border-border-main/80 bg-bg-base text-xs font-light text-txt-main rounded focus:outline-none focus:border-accent-main"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRenameTarget(null)}
+                className="h-8 px-3 border border-border-main/80 text-txt-sub font-mono text-[10px] uppercase rounded cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (renameTarget && editTitle.trim() && onRenamePath) {
+                    onRenamePath(renameTarget.id, editTitle.trim(), editDesc.trim());
+                  }
+                  setRenameTarget(null);
+                }}
+                className="h-8 px-4 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-semibold rounded cursor-pointer"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

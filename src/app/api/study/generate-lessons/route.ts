@@ -65,15 +65,30 @@ function generateFallbackSections(
         title: `${secTopic.title}: Part ${l + 1}`,
         description: `${descPrefix}${lesTopic.desc}`,
         xpValue: 10,
-        estimatedMinutes: 4 + (l % 3),
+        estimatedMinutes: 5,
         completed: false,
+        videoResource: {
+          title: `Comprehensive Guide to ${secTopic.title}`,
+          url: "https://www.youtube.com/results?search_query=" + encodeURIComponent(title + " " + secTopic.title),
+          channelName: "Verified Educator",
+          duration: "12:30"
+        },
+        practiceProblems: [
+          {
+            title: `Practice Challenge: ${secTopic.title} Foundations`,
+            url: "https://leetcode.com/problemset/all/?search=" + encodeURIComponent(secTopic.title),
+            platform: "LeetCode",
+            difficulty: l % 2 === 0 ? "Easy" : "Medium"
+          }
+        ],
         cards: [
           {
             title: `Overview of ${lesTopic.title}`,
             badge: lesTopic.badge,
-            content: `Master the essential principles of ${title} regarding ${lesTopic.title.toLowerCase()}. Focus on foundational mechanisms and key definitions.`,
+            content: `Master the essential principles of ${title} regarding ${lesTopic.title.toLowerCase()}. Focus on foundational mechanisms, edge cases, and key definitions.`,
             keyTakeaway: `Understand how ${lesTopic.title.toLowerCase()} connects to the main system of ${title}.`,
             example: `In production, ${lesTopic.title.toLowerCase()} ensures efficient resource utilization and minimal overhead.`,
+            diagramMermaid: `graph TD;\n  A[Input State] --> B[Process ${lesTopic.title}];\n  B --> C[Verify Boundary];\n  C --> D[Target Output];`
           },
           {
             title: "Summary & Practical Rule",
@@ -124,7 +139,14 @@ function generateFallbackSections(
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { pathTitle, pathDescription, depthMode = "standard", files = [] } = body;
+    const { 
+      pathTitle, 
+      pathDescription, 
+      subtopics = "", 
+      depthMode = "standard", 
+      creationMode = "prompt",
+      files = [] 
+    } = body;
 
     const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
 
@@ -133,11 +155,15 @@ export async function POST(req: Request) {
         let sourceSummary = "";
         files.forEach((f: SourceFileInput, idx: number) => {
           sourceSummary += `--- File ${idx + 1}: ${f.name} ---\n`;
-          sourceSummary += (f.rawTextPreview || "").slice(0, 4000) + "\n\n";
+          sourceSummary += (f.rawTextPreview || "").slice(0, 3500) + "\n\n";
         });
 
-        const systemPrompt = `You are a world-class CS educator. Output ONLY valid JSON matching this schema:
+        const lessonTargetCount = depthMode === "sprint" ? "5 lessons total" : depthMode === "deep" ? "25 to 35 lessons total" : "15 to 20 lessons total";
+
+        const systemPrompt = `You are a world-class adaptive educator and curriculum architect. Output ONLY valid JSON matching this schema:
 {
+  "extractedTitle": "Auto-extracted concise topic title",
+  "extractedDescription": "Auto-extracted concise 1-2 sentence description",
   "sections": [
     {
       "title": "Section Title",
@@ -147,28 +173,43 @@ export async function POST(req: Request) {
           "title": "Bite-sized Lesson Title",
           "description": "Short 1-sentence description",
           "estimatedMinutes": 5,
+          "videoResource": {
+            "title": "Recommended Video Explainer",
+            "url": "https://www.youtube.com/results?search_query=topic_name",
+            "channelName": "Verified Educational Channel",
+            "duration": "10:15"
+          },
+          "practiceProblems": [
+            {
+              "title": "Relevant Practice Challenge or LeetCode Sum",
+              "url": "https://leetcode.com/problemset/all/",
+              "platform": "LeetCode",
+              "difficulty": "Medium"
+            }
+          ],
           "cards": [
             {
               "title": "Concept Heading",
               "badge": "Key Concept",
-              "content": "2-3 sentence clear explanation",
-              "keyTakeaway": "Bullet summary",
-              "example": "Practical example"
+              "content": "Comprehensive 3-4 sentence detailed explanation.",
+              "keyTakeaway": "Bullet summary takeaway",
+              "example": "Practical code, math equation, or case study example",
+              "diagramMermaid": "graph TD; A[Concept] --> B[Execution]"
             }
           ],
           "questions": [
             {
               "type": "mcq",
-              "prompt": "Clear question stem",
+              "prompt": "Clear assessment question prompt",
               "options": ["Correct Choice", "Distractor 1", "Distractor 2", "Distractor 3"],
               "correctAnswerIndex": 0,
               "correctAnswerText": "Correct Choice",
-              "explanation": "Why choice 0 is correct"
+              "explanation": "Detailed explanation of the correct choice"
             },
             {
               "type": "short_answer",
-              "prompt": "Short written answer prompt",
-              "modelAnswer": "Ideal answer",
+              "prompt": "Written answer prompt",
+              "modelAnswer": "Ideal response",
               "keywords": ["key1", "key2"]
             }
           ]
@@ -176,14 +217,24 @@ export async function POST(req: Request) {
       ]
     }
   ]
-}`;
+}
 
-        const userPrompt = `Build a structured study path titled "${pathTitle || "Study Path"}".
-Description/Context: ${pathDescription || "Study Guide"}
-Depth Mode: ${depthMode}
+IMPORTANT RULES:
+1. TARGET LESSON COUNT: Build approximately ${lessonTargetCount} across multiple distinct modules without truncation.
+2. SUBTOPICS: ${subtopics ? `Strictly cover these requested subtopics: "${subtopics}".` : "Build a thorough curriculum covering all essential subtopics from basics to advanced."}
+3. MATERIALS & TOPIC ALIGNMENT: ${creationMode === "materials" ? "Deeply analyze the source text. Extract the true subject. If title mismatches document content, correct extractedTitle." : "Focus strictly on Provided Title and subtopics."}
+4. VIDEO & PRACTICE RESOURCES: Provide specific, high-yield YouTube search/watch links and LeetCode/Khan Academy practice problems for every lesson.
+5. FINAL MILESTONE: Always append a final section titled "SECTION: GRAND PATH EXAM & FINAL MILESTONE" containing 1 comprehensive lesson with cumulative questions.`;
 
-Source text preview:
-${sourceSummary || "General CS Topic"}`;
+        const userPrompt = `Build a structured study path.
+Mode: ${creationMode}
+Title Input: "${pathTitle || ""}"
+Description Input: "${pathDescription || ""}"
+Subtopics Input: "${subtopics || ""}"
+Depth Mode: ${depthMode} (${lessonTargetCount})
+
+Source text preview from uploaded files:
+${sourceSummary || "None (Prompt-driven mode)"}`;
 
         let groqRes: Response;
         try {
@@ -201,7 +252,7 @@ ${sourceSummary || "General CS Topic"}`;
               ],
               response_format: { type: "json_object" },
               temperature: 0.4,
-              max_tokens: 3500,
+              max_tokens: 3800,
             }),
           });
         } catch (fetchErr) {
@@ -209,27 +260,7 @@ ${sourceSummary || "General CS Topic"}`;
           return NextResponse.json({
             isMock: true,
             title: pathTitle || "Structured Study Path",
-            sections: [
-              {
-                id: "sec_1",
-                pathId: "pending",
-                title: "Core Fundamentals & Foundations",
-                orderIndex: 0,
-                durationMinutes: 45,
-                lessons: [
-                  {
-                    id: "les_1",
-                    sectionId: "sec_1",
-                    title: "Overview & Principles",
-                    orderIndex: 0,
-                    summary: "Key concepts and theoretical foundations.",
-                    content: "Structured study content for key principles.",
-                    keyTakeaways: ["Master the fundamentals", "Review core definitions"],
-                    practiceQuestions: []
-                  }
-                ]
-              }
-            ]
+            sections: generateFallbackSections(pathTitle, depthMode, files)
           });
         }
 
@@ -239,6 +270,9 @@ ${sourceSummary || "General CS Topic"}`;
           const parsed = JSON.parse(jsonText || "{}");
 
           if (parsed.sections && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+            const finalTitle = parsed.extractedTitle || pathTitle || "Structured Study Path";
+            const finalDesc = parsed.extractedDescription || pathDescription || "Adaptive AI learning curriculum.";
+
             const processedSections = parsed.sections.map((sec: any, secIdx: number) => ({
               id: `sec_${secIdx + 1}`,
               pathId: "pending",
@@ -250,7 +284,7 @@ ${sourceSummary || "General CS Topic"}`;
                 pathId: "pending",
                 title: sanitizeString(les.title) || `Lesson ${lesIdx + 1}`,
                 description: sanitizeString(les.description) || "Practice and review.",
-                xpValue: 10,
+                xpValue: sec.title.toUpperCase().includes("GRAND PATH EXAM") ? 50 : 10,
                 estimatedMinutes: typeof les.estimatedMinutes === "number" ? les.estimatedMinutes : 5,
                 completed: false,
                 cards: (les.cards || []).map((c: any) => ({
@@ -286,7 +320,12 @@ ${sourceSummary || "General CS Topic"}`;
               })),
             }));
 
-            return NextResponse.json({ success: true, sections: processedSections });
+            return NextResponse.json({ 
+              success: true, 
+              title: finalTitle, 
+              description: finalDesc, 
+              sections: processedSections 
+            });
           }
         }
       } catch (groqErr) {

@@ -10,6 +10,20 @@ export interface SourceFile {
   uploadedAt: string;
 }
 
+export interface VideoResource {
+  title: string;
+  url: string;
+  channelName: string;
+  duration?: string;
+}
+
+export interface PracticeProblem {
+  title: string;
+  url: string;
+  platform: 'LeetCode' | 'HackerRank' | 'KhanAcademy' | 'GeneralPractice' | 'EssayPrompt';
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+}
+
 export interface TeachingCard {
   id?: string;
   title: string;
@@ -17,6 +31,7 @@ export interface TeachingCard {
   content: string;
   keyTakeaway?: string;
   example?: string;
+  diagramMermaid?: string;
 }
 
 export interface Question {
@@ -45,6 +60,8 @@ export interface Lesson {
   completed: boolean;
   score?: number;
   completedAt?: string;
+  videoResource?: VideoResource;
+  practiceProblems?: PracticeProblem[];
 }
 
 export interface Section {

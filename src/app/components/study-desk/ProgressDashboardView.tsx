@@ -299,11 +299,55 @@ export default function ProgressDashboardView({
                 />
               </div>
 
-              <span className="font-mono text-[9px] text-txt-muted block pt-1">
-                Earn +{nextRankTarget - stats.totalXp} XP by completing study lessons or DSA problems to reach next tier rank.
-              </span>
+              <p className="text-xs text-txt-sub font-light leading-relaxed pt-1">
+                Earn XP by completing lessons, practice sums, and error retries to advance to higher tier scholar ranks.
+              </p>
             </div>
           </div>
+
+          {/* Skill Proficiency & Topic Radar Card */}
+          <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 shadow-xs">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Activity size={16} className="text-accent-main" />
+                <h3 className="font-display text-base font-light text-txt-main">Skill Proficiency Radar</h3>
+              </div>
+              <span className="font-mono text-[10px] text-txt-muted uppercase">Active Mastery</span>
+            </div>
+
+            <div className="space-y-3 font-mono text-xs">
+              <div>
+                <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
+                  <span>Arrays & Memory Layout</span>
+                  <span className="text-accent-main font-bold">100% Mastered</span>
+                </div>
+                <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
+                  <div className="h-full bg-accent-main rounded-full" style={{ width: "100%" }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
+                  <span>Two Pointers & Sliding Window</span>
+                  <span className="text-emerald-400 font-bold">85% Advanced</span>
+                </div>
+                <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: "85%" }} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
+                  <span>Algorithmic Optimization</span>
+                  <span className="text-amber-400 font-bold">60% Intermediate</span>
+                </div>
+                <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-400 rounded-full" style={{ width: "60%" }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
