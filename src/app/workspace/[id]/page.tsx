@@ -3167,7 +3167,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         >
           <div className="flex items-center justify-between gap-2">
             <Link 
-              href="/"
+              href="/event-desk"
               className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase"
             >
               <ArrowLeft size={12} />
@@ -3437,9 +3437,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         >
           
           {/* Header strip: Voice channels & members */}
-          <div className="h-14 border-b border-border-main/50 bg-bg-surface/50 backdrop-blur px-5 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Ambient Room</span>
+          <div className="h-14 border-b border-border-main/50 bg-bg-surface/50 backdrop-blur px-5 flex items-center justify-between flex-shrink-0 gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted hidden sm:inline">Voice & Chat</span>
               <button 
                 onClick={handleJoinRoom}
                 className={`h-7 px-3 rounded-sm font-mono text-[9px] leading-none tracking-wider uppercase transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer font-medium select-none ${
@@ -3460,17 +3460,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               </button>
             </div>
 
-            {/* Speaking visual strip */}
+            {/* Active Online Members Pill Section */}
             <div 
               onClick={() => setShowActiveMembersModal(true)}
-              className="flex items-center gap-2.5 cursor-pointer hover:opacity-85 transition-opacity"
+              className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity bg-bg-card/40 border border-border-main/60 px-2.5 py-1 rounded"
+              title="Click to view all Active Workspace Members"
             >
-              <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider hidden sm:inline">Active:</span>
-              <div className="flex -space-x-2">
+              <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider hidden sm:inline">Online ({onlineMembers.length}):</span>
+              <div className="flex -space-x-1.5 overflow-hidden">
                 {onlineMembers.map(member => (
                   <div 
                     key={member.id} 
-                    className={`w-6 h-6 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 ${
+                    title={`${member.name} (${member.id === user?.id ? "You" : "Teammate"})`}
+                    className={`w-5 h-5 rounded-full border border-bg-surface bg-bg-card flex items-center justify-center font-mono text-[8px] font-bold text-txt-main overflow-hidden select-none transition-all duration-300 relative ${
                       member.isSpeaking ? "ring-2 ring-emerald-500 scale-105" : ""
                     }`}
                   >
@@ -3504,7 +3506,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                     Live Call in Progress
                   </span>
                   <span className="text-[9px] font-mono text-txt-sub">
-                    ({callCallerName || "Teammate"} is in the call)
+                    ({callCallerName || (onlineMembers.find(m => m.id !== user?.id)?.name || "Teammate")} is in the call)
                   </span>
                 </div>
               </div>

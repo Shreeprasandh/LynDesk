@@ -13,17 +13,32 @@ import SessionPlayer from "../components/study-desk/SessionPlayer";
 import AIPathStudioModal from "../components/study-desk/AIPathStudioModal";
 import ProgressDashboardView from "../components/study-desk/ProgressDashboardView";
 import ErrorBankModal from "../components/study-desk/ErrorBankModal";
-
-
+import DSASystemMasteryView, { UserDSAProgressMap } from "../components/study-desk/DSASystemMasteryView";
+import { DSA_TRACKS, DSAProblem } from "./dsaMasteryData";
 
 const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
 const STORAGE_MISTAKES_KEY = "lyndesk_study_mistakes_cache";
 const STORAGE_STATS_KEY = "lyndesk_study_stats_cache";
 const STORAGE_ACTIVE_PATH_KEY = "lyndesk_active_study_path_id";
+const STORAGE_DSA_PROGRESS_KEY = "lyndesk_dsa_progress_cache";
+
+const calculateTotalDSAXp = (map: UserDSAProgressMap) => {
+  let dsaXp = 0;
+  DSA_TRACKS.forEach((track) => {
+    track.steps.forEach((step) => {
+      step.problems.forEach((prob) => {
+        if (map[prob.id]?.status === "completed") {
+          dsaXp += prob.difficulty === "Easy" ? 15 : prob.difficulty === "Medium" ? 25 : 40;
+        }
+      });
+    });
+  });
+  return dsaXp;
+};
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"paths" | "active" | "progress">("paths");
+  const [activeTab, setActiveTab] = useState<"paths" | "active" | "dsa_way" | "progress">("paths");
 
   // Synchronous 0ms local state initializers
   const [paths, setPaths] = useState<StudyPath[]>(() => {
@@ -60,6 +75,16 @@ export default function StudyDeskPage() {
       lastStudiedDate: "",
       activeDays: [],
     };
+  });
+
+  const [dsaProgressMap, setDsaProgressMap] = useState<UserDSAProgressMap>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem(STORAGE_DSA_PROGRESS_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return {};
   });
 
   const [activePathId, setActivePathId] = useState<string | undefined>(() => {
@@ -102,6 +127,14 @@ export default function StudyDeskPage() {
     }
   }, [stats]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_DSA_PROGRESS_KEY, JSON.stringify(dsaProgressMap));
+      } catch {}
+    }
+  }, [dsaProgressMap]);
+
   // Fetch Supabase data when logged in
   useEffect(() => {
     if (!user) return;
@@ -116,8 +149,9 @@ export default function StudyDeskPage() {
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
+        let mappedPaths: StudyPath[] = [];
         if (cloudPaths && cloudPaths.length > 0) {
-          const mapped: StudyPath[] = cloudPaths.map((cp: any) => ({
+          mappedPaths = cloudPaths.map((cp: any) => ({
             id: cp.id,
             userId: cp.user_id,
             title: cp.title,
@@ -133,9 +167,9 @@ export default function StudyDeskPage() {
             createdAt: cp.created_at,
             lastStudiedAt: cp.last_studied_at,
           }));
-          setPaths(mapped);
+          setPaths(mappedPaths);
           if (!activePathId) {
-            const active = mapped.find((p) => p.isActive) || mapped[0];
+            const active = mappedPaths.find((p) => p.isActive) || mappedPaths[0];
             if (active) setActivePathId(active.id);
           }
         }
@@ -163,16 +197,42 @@ export default function StudyDeskPage() {
           setMistakes(mappedM);
         }
 
-        // 3. Fetch Profile Stats
+        // 3. Fetch User DSA Progress
+        const { data: cloudDsa } = await supabase
+          .from("user_dsa_progress")
+          .select("*")
+          .eq("user_id", user.id);
+
+        let loadedDsaMap: UserDSAProgressMap = dsaProgressMap;
+        if (cloudDsa && cloudDsa.length > 0) {
+          const map: UserDSAProgressMap = {};
+          cloudDsa.forEach((row: any) => {
+            map[row.problem_id] = {
+              status: row.status || "completed",
+              isStarred: row.is_starred || false,
+              notes: row.notes || "",
+            };
+          });
+          loadedDsaMap = map;
+          setDsaProgressMap(map);
+        }
+
+        // 4. Fetch Profile Stats with self-healing exact total XP verification
         const { data: profile } = await supabase
           .from("profiles")
           .select("study_xp, study_streak, study_longest_streak, study_last_date, study_active_days")
           .eq("id", user.id)
           .single();
 
+        const pathXpSum = mappedPaths.reduce((acc, p) => acc + (p.xpEarned || 0), 0);
+        const dsaXpSum = calculateTotalDSAXp(loadedDsaMap);
+        const calculatedExactTotalXp = pathXpSum + dsaXpSum;
+
+        const verifiedTotalXp = Math.max(profile?.study_xp || 0, calculatedExactTotalXp);
+
         if (profile) {
           setStats({
-            totalXp: profile.study_xp || 0,
+            totalXp: verifiedTotalXp,
             streakCount: profile.study_streak || 0,
             longestStreak: profile.study_longest_streak || 0,
             lastStudiedDate: profile.study_last_date || "",
@@ -442,6 +502,161 @@ export default function StudyDeskPage() {
     }
   };
 
+  // DSA Way Handlers
+  const handleToggleDSAProblemCompleted = async (problem: DSAProblem, trackId: string) => {
+    const current = dsaProgressMap[problem.id];
+    const isCurrentlyDone = current?.status === "completed";
+    const nextStatus = isCurrentlyDone ? "not_started" : "completed";
+
+    const updated: UserDSAProgressMap = {
+      ...dsaProgressMap,
+      [problem.id]: {
+        status: nextStatus,
+        isStarred: current?.isStarred || false,
+        notes: current?.notes || "",
+      },
+    };
+
+    setDsaProgressMap(updated);
+
+    const xpAmount = problem.difficulty === "Easy" ? 15 : problem.difficulty === "Medium" ? 25 : 40;
+    const xpDelta = isCurrentlyDone ? -xpAmount : xpAmount;
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const activeDays = new Set(stats.activeDays || []);
+    if (!isCurrentlyDone) {
+      activeDays.add(todayStr);
+    }
+
+    let newStreak = stats.streakCount;
+    if (!isCurrentlyDone && stats.lastStudiedDate !== todayStr) {
+      newStreak = (stats.streakCount || 0) + 1;
+    }
+    const newLongest = Math.max(stats.longestStreak || 0, newStreak);
+    const newTotalXp = Math.max(0, (stats.totalXp || 0) + xpDelta);
+
+    const newStats: StudyStats = {
+      totalXp: newTotalXp,
+      streakCount: newStreak,
+      longestStreak: newLongest,
+      lastStudiedDate: !isCurrentlyDone ? todayStr : stats.lastStudiedDate,
+      activeDays: Array.from(activeDays),
+    };
+    setStats(newStats);
+
+    if (user) {
+      try {
+        await supabase
+          .from("profiles")
+          .update({
+            study_xp: newTotalXp,
+            study_streak: newStreak,
+            study_longest_streak: newLongest,
+            study_last_date: !isCurrentlyDone ? todayStr : stats.lastStudiedDate,
+            study_active_days: Array.from(activeDays),
+          })
+          .eq("id", user.id);
+      } catch {}
+    }
+
+    if (user) {
+      try {
+        const rowId = `${user.id}_${problem.id}`;
+        if (nextStatus === "completed" || current?.isStarred || current?.notes) {
+          await supabase.from("user_dsa_progress").upsert({
+            id: rowId,
+            user_id: user.id,
+            track_id: trackId,
+            problem_id: problem.id,
+            status: nextStatus,
+            is_starred: current?.isStarred || false,
+            notes: current?.notes || "",
+            updated_at: new Date().toISOString(),
+          });
+        } else {
+          await supabase.from("user_dsa_progress").delete().eq("id", rowId);
+        }
+      } catch {}
+    }
+  };
+
+  const handleToggleDSAProblemStarred = async (problem: DSAProblem, trackId: string) => {
+    const current = dsaProgressMap[problem.id];
+    const nextStarred = !Boolean(current?.isStarred);
+
+    const updated: UserDSAProgressMap = {
+      ...dsaProgressMap,
+      [problem.id]: {
+        status: current?.status || "not_started",
+        isStarred: nextStarred,
+        notes: current?.notes || "",
+      },
+    };
+
+    setDsaProgressMap(updated);
+
+    if (nextStarred) {
+      const revisionItem: StudyMistake = {
+        id: "revision_" + problem.id,
+        pathId: trackId,
+        lessonId: problem.id,
+        questionType: "short_answer",
+        questionPrompt: `[Revision Queue] ${problem.title} (${problem.difficulty})`,
+        correctAnswer: problem.keyTakeaway,
+        userAnswer: "Flagged for Revision in DSA Way",
+        explanation: problem.summary,
+        createdAt: new Date().toISOString(),
+      };
+      setMistakes((prev) => [revisionItem, ...prev.filter((m) => m.id !== revisionItem.id)]);
+    }
+
+    if (user) {
+      try {
+        const rowId = `${user.id}_${problem.id}`;
+        await supabase.from("user_dsa_progress").upsert({
+          id: rowId,
+          user_id: user.id,
+          track_id: trackId,
+          problem_id: problem.id,
+          status: current?.status || "not_started",
+          is_starred: nextStarred,
+          notes: current?.notes || "",
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    }
+  };
+
+  const handleSaveDSAProblemNotes = async (problemId: string, notes: string) => {
+    const current = dsaProgressMap[problemId];
+    const updated: UserDSAProgressMap = {
+      ...dsaProgressMap,
+      [problemId]: {
+        status: current?.status || "not_started",
+        isStarred: current?.isStarred || false,
+        notes,
+      },
+    };
+
+    setDsaProgressMap(updated);
+
+    if (user) {
+      try {
+        const rowId = `${user.id}_${problemId}`;
+        await supabase.from("user_dsa_progress").upsert({
+          id: rowId,
+          user_id: user.id,
+          track_id: "dsa_way",
+          problem_id: problemId,
+          status: current?.status || "not_started",
+          is_starred: current?.isStarred || false,
+          notes,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {}
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
@@ -464,7 +679,7 @@ export default function StudyDeskPage() {
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Engine</span>
             <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Study Desk</h1>
             <p className="text-xs text-txt-sub">
-              Upload notes or slides to generate adaptive AI study paths, practice bite-sized lessons, and review mistakes.
+              Adaptive AI study paths, bite-sized lessons, DSA curriculum roadmaps, and error bank review.
             </p>
           </div>
 
@@ -476,7 +691,7 @@ export default function StudyDeskPage() {
                 activeTab === "paths" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Learning Paths ({paths.length})
+              Learning Way
             </button>
 
             <button
@@ -485,7 +700,16 @@ export default function StudyDeskPage() {
                 activeTab === "active" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Active Path View
+              Active Way
+            </button>
+
+            <button
+              onClick={() => setActiveTab("dsa_way")}
+              className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
+                activeTab === "dsa_way" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+              }`}
+            >
+              DSA Way
             </button>
 
             <button
@@ -494,13 +718,13 @@ export default function StudyDeskPage() {
                 activeTab === "progress" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Progress & Stats
+              Progress
             </button>
           </div>
         </div>
 
         {/* Active Path Header Status Bar */}
-        {activePath && activeTab !== "active" && (
+        {activePath && activeTab !== "active" && activeTab !== "dsa_way" && (
           <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded flex items-center justify-between gap-4 font-mono text-xs">
             <div className="flex items-center gap-3 truncate">
               <span className="px-2 py-0.5 bg-accent-main/10 border border-accent-main/30 text-accent-main text-[9px] uppercase rounded">
@@ -538,6 +762,16 @@ export default function StudyDeskPage() {
             path={activePath}
             onStartLesson={(lesson) => setActiveLesson(lesson)}
             onCreateNewPathClick={() => setShowAIStudio(true)}
+          />
+        )}
+
+        {activeTab === "dsa_way" && (
+          <DSASystemMasteryView
+            progressMap={dsaProgressMap}
+            onToggleProblemCompleted={handleToggleDSAProblemCompleted}
+            onToggleProblemStarred={handleToggleDSAProblemStarred}
+            onSaveProblemNotes={handleSaveDSAProblemNotes}
+            totalXpEarned={stats.totalXp}
           />
         )}
 

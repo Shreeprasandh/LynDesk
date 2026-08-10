@@ -1197,7 +1197,6 @@ export default function ProfilePage() {
       setAvatarUrl(url);
       if (typeof window !== "undefined" && user?.id) {
         localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
-        localStorage.setItem("ldk_avatar_url", url);
         try {
           const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
           const parsed = raw ? JSON.parse(raw) : {};
@@ -1294,7 +1293,6 @@ export default function ProfilePage() {
       try {
         localStorage.removeItem(`ldk_user_avatar_${user.id}`);
         localStorage.removeItem(`ldk_avatar_url_${user.id}`);
-        localStorage.removeItem("ldk_avatar_url");
         const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
         if (raw) {
           const parsed = JSON.parse(raw);

@@ -52,6 +52,11 @@ export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
 
+  const isNavActive = (targetPath: string) => {
+    if (targetPath === "/") return pathname === "/";
+    return pathname === targetPath || pathname.startsWith(`${targetPath}/`);
+  };
+
   // Global authentication route guard: redirects unauthorized sessions immediately to landing page
   useEffect(() => {
     if (loading) return; // Wait until authentication check completes!
@@ -63,10 +68,12 @@ export default function Header() {
 
   // Derived state for notifications based on the current user's role
   const activeNotifRole = isFaculty ? "faculty" : isRecruiter ? "recruiter" : "student";
-  const filteredNotifications = notifications.filter(n => {
-    if (n.role && n.role !== activeNotifRole) return false;
-    return true;
-  });
+  const filteredNotifications = notifications
+    .map(n => ({ ...n, category: n.category || "alerts" }))
+    .filter(n => {
+      if (n.role && n.role !== activeNotifRole) return false;
+      return true;
+    });
 
   // Compute unread count dynamically during render
   const unreadCount = filteredNotifications.filter(n => !n.read).length;
@@ -111,6 +118,26 @@ export default function Header() {
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
   const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
+
+  // Legal Agreement & Gating States
+  const [oPrivacyRead, setOPrivacyRead] = useState(false);
+  const [oPrivacyChecked, setOPrivacyChecked] = useState(false);
+  const [oTermsRead, setOTermsRead] = useState(false);
+  const [oTermsChecked, setOTermsChecked] = useState(false);
+  const [activeLegalModal, setActiveLegalModal] = useState<"privacy" | "terms" | null>(null);
+  const [legalModalScrolledBottom, setLegalModalScrolledBottom] = useState(false);
+
+  const handleLegalScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollTop + clientHeight >= scrollHeight - 35) {
+      setLegalModalScrolledBottom(true);
+      if (activeLegalModal === "privacy") {
+        setOPrivacyRead(true);
+      } else if (activeLegalModal === "terms") {
+        setOTermsRead(true);
+      }
+    }
+  };
   const [headerAvatar, setHeaderAvatar] = useState<string>(() => {
     if (typeof window !== "undefined" && user) {
       try {
@@ -124,7 +151,6 @@ export default function Header() {
         const stored =
           localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
           localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
-          localStorage.getItem("ldk_avatar_url") ||
           "";
         if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
           return stored;
@@ -159,7 +185,6 @@ export default function Header() {
           const stored =
             localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
             localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
-            localStorage.getItem("ldk_avatar_url") ||
             "";
           if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
             url = stored;
@@ -651,19 +676,23 @@ export default function Header() {
     };
   }, [user]);
 
-  // Automatically mark all notifications as read when the notification drawer opens
-  useEffect(() => {
-    if (isOpen && unreadCount > 0) {
-      const updated = notifications.map(n => ({ ...n, read: true }));
-      queueMicrotask(() => {
-        setNotifications(updated);
+  // Mark notifications in active drawer tab as read when closing the drawer
+  const handleCloseDrawer = () => {
+    setIsOpen(false);
+    if (unreadCount > 0) {
+      const updated = notifications.map(n => {
+        if ((n.category || "alerts") === drawerTab && !n.read) {
+          return { ...n, read: true };
+        }
+        return n;
       });
+      setNotifications(updated);
       localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
       if (user?.id) {
         localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
       }
     }
-  }, [isOpen, unreadCount, notifications, user?.id]);
+  };
 
   const handleClearTab = () => {
     const updated = notifications.filter(n => n.category !== drawerTab);
@@ -870,24 +899,24 @@ export default function Header() {
             <nav className="hidden lg:flex items-center gap-6 font-mono text-[10px] uppercase tracking-wider">
               {isFaculty ? (
                 <>
-                  <Link href="/coordinator?tab=overview" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Overview</Link>
-                  <Link href="/coordinator?tab=talent_registry" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Talent Registry</Link>
-                  <Link href="/coordinator?tab=broadcasts" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Broadcasts</Link>
-                  <Link href="/coordinator?tab=verifications" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Claims Queue</Link>
-                  <Link href="/coordinator?tab=staff_access" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Staff Access</Link>
+                  <Link href="/coordinator?tab=overview" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Overview</Link>
+                  <Link href="/coordinator?tab=talent_registry" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Talent Registry</Link>
+                  <Link href="/coordinator?tab=broadcasts" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Broadcasts</Link>
+                  <Link href="/coordinator?tab=verifications" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Claims Queue</Link>
+                  <Link href="/coordinator?tab=staff_access" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Staff Access</Link>
                 </>
               ) : isRecruiter ? (
                 <>
-                  <Link href="/recruiter" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">HR Console</Link>
-                  <Link href="/profile" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">My Profile</Link>
+                  <Link href="/recruiter" className={`pb-0.5 transition-opacity ${isNavActive("/recruiter") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>HR Console</Link>
+                  <Link href="/profile" className={`pb-0.5 transition-opacity ${isNavActive("/profile") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>My Profile</Link>
                 </>
               ) : (
                 <>
-                  <Link href="/" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Dashboard</Link>
-                  <Link href="/event-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Event Desk</Link>
-                  <Link href="/coding-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Code Desk</Link>
-                  <Link href="/study-desk" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Study Desk</Link>
-                  <Link href="/explore" className="text-txt-sub hover:text-txt-main transition-colors pb-0.5">Explore</Link>
+                  <Link href="/" className={`pb-0.5 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
+                  <Link href="/event-desk" className={`pb-0.5 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
+                  <Link href="/coding-desk" className={`pb-0.5 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
+                  <Link href="/study-desk" className={`pb-0.5 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
+                  <Link href="/explore" className={`pb-0.5 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>
                 </>
               )}
             </nav>
@@ -1000,11 +1029,11 @@ export default function Header() {
                   </>
                 ) : (
                   <>
-                    <Link href="/" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Dashboard</Link>
-                    <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Event Desk</Link>
-                    <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Code Desk</Link>
-                    <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Study Desk</Link>
-                    <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Explore</Link>
+                    <Link href="/" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
+                    <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
+                    <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
+                    <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
+                    <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>
                   </>
                 )}
               </nav>
@@ -1038,7 +1067,7 @@ export default function Header() {
           {/* Backdrop */}
           <div 
             className="absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity" 
-            onClick={() => setIsOpen(false)}
+            onClick={handleCloseDrawer}
           />
 
           <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
@@ -1058,7 +1087,7 @@ export default function Header() {
                     Clear Tab
                   </button>
                   <button 
-                    onClick={() => setIsOpen(false)}
+                    onClick={handleCloseDrawer}
                     className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
                   >
                     <X size={16} />
@@ -1070,23 +1099,29 @@ export default function Header() {
               <div className="flex border-b border-border-main/40 bg-bg-card px-6 py-2.5 font-mono text-[10px] uppercase tracking-wider gap-6">
                 <button
                   onClick={() => setDrawerTab("alerts")}
-                  className={`pb-1 cursor-pointer transition-all border-b-2 font-medium ${
+                  className={`pb-1 cursor-pointer transition-all border-b-2 font-medium flex items-center gap-1.5 ${
                     drawerTab === "alerts" 
                       ? "text-txt-main border-txt-main" 
                       : "text-txt-muted border-transparent hover:text-txt-main"
                   }`}
                 >
-                  Personal Alerts ({filteredNotifications.filter(n => n.category === "alerts" && !n.read).length})
+                  Personal Alerts ({filteredNotifications.filter(n => (n.category || "alerts") === "alerts").length})
+                  {filteredNotifications.some(n => (n.category || "alerts") === "alerts" && !n.read) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent-main inline-block" />
+                  )}
                 </button>
                 <button
                   onClick={() => setDrawerTab("updates")}
-                  className={`pb-1 cursor-pointer transition-all border-b-2 font-medium ${
+                  className={`pb-1 cursor-pointer transition-all border-b-2 font-medium flex items-center gap-1.5 ${
                     drawerTab === "updates" 
                       ? "text-txt-main border-txt-main" 
                       : "text-txt-muted border-transparent hover:text-txt-main"
                   }`}
                 >
-                  General Feed ({filteredNotifications.filter(n => n.category === "updates" && !n.read).length})
+                  General Feed ({filteredNotifications.filter(n => n.category === "updates").length})
+                  {filteredNotifications.some(n => n.category === "updates" && !n.read) && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent-main inline-block" />
+                  )}
                 </button>
               </div>
 
@@ -1112,8 +1147,8 @@ export default function Header() {
 
               {/* Notification Items List */}
               <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-4">
-                {filteredNotifications.filter(n => n.category === drawerTab).length > 0 ? (
-                  filteredNotifications.filter(n => n.category === drawerTab).map((item, idx) => (
+                {filteredNotifications.filter(n => (n.category || "alerts") === drawerTab).length > 0 ? (
+                  filteredNotifications.filter(n => (n.category || "alerts") === drawerTab).map((item, idx) => (
                     <div 
                       key={`${item.id}_${idx}`} 
                       className={`p-4 border rounded-sm flex flex-col gap-3 transition-colors ${
@@ -1152,7 +1187,7 @@ export default function Header() {
                         {item.message}
                       </p>
 
-                      {item.actionLabel && !item.read && !item.title?.toLowerCase().includes("declined") && !item.title?.toLowerCase().includes("accepted") && (
+                      {item.actionLabel && !item.title?.toLowerCase().includes("declined") && !item.title?.toLowerCase().includes("accepted") && (
                         <div className="flex gap-2 justify-end pt-1">
                           {item.type === "invite" && (
                             <button
@@ -1505,10 +1540,75 @@ export default function Header() {
                 )}
               </div>
 
+              {/* Mandatory Legal Consent Section */}
+              <div className="border border-border-main/60 p-3.5 rounded bg-bg-base/30 flex flex-col gap-2.5">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Legal Consent & Policy Agreement *</span>
+
+                {/* Privacy Policy Checkbox Row */}
+                <div className="flex items-center gap-2.5">
+                  <input 
+                    type="checkbox"
+                    id="onboarding_cb_privacy"
+                    disabled={!oPrivacyRead}
+                    checked={oPrivacyChecked}
+                    onChange={(e) => setOPrivacyChecked(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded-sm border-border-main/80 accent-accent-main cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed shrink-0"
+                  />
+                  <label htmlFor="onboarding_cb_privacy" className="text-txt-sub text-xs font-light cursor-pointer select-none">
+                    I accept the{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveLegalModal("privacy");
+                        setLegalModalScrolledBottom(oPrivacyRead);
+                      }}
+                      className="text-accent-main font-semibold hover:underline cursor-pointer"
+                    >
+                      Privacy Policy
+                    </button>
+                  </label>
+                  {!oPrivacyRead ? (
+                    <span className="text-[9px] font-mono text-txt-muted/70 ml-auto shrink-0">(Click text to scroll)</span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-emerald-400 ml-auto shrink-0 font-semibold">&check; Read</span>
+                  )}
+                </div>
+
+                {/* Terms & Conditions Checkbox Row */}
+                <div className="flex items-center gap-2.5">
+                  <input 
+                    type="checkbox"
+                    id="onboarding_cb_terms"
+                    disabled={!oTermsRead}
+                    checked={oTermsChecked}
+                    onChange={(e) => setOTermsChecked(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded-sm border-border-main/80 accent-accent-main cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed shrink-0"
+                  />
+                  <label htmlFor="onboarding_cb_terms" className="text-txt-sub text-xs font-light cursor-pointer select-none">
+                    I accept the{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveLegalModal("terms");
+                        setLegalModalScrolledBottom(oTermsRead);
+                      }}
+                      className="text-accent-main font-semibold hover:underline cursor-pointer"
+                    >
+                      Terms & Conditions
+                    </button>
+                  </label>
+                  {!oTermsRead ? (
+                    <span className="text-[9px] font-mono text-txt-muted/70 ml-auto shrink-0">(Click text to scroll)</span>
+                  ) : (
+                    <span className="text-[9px] font-mono text-emerald-400 ml-auto shrink-0 font-semibold">&check; Read</span>
+                  )}
+                </div>
+              </div>
+
               <button 
                 type="submit"
-                disabled={onboardingLoading}
-                className="w-full h-11 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity cursor-pointer mt-2"
+                disabled={onboardingLoading || !oPrivacyChecked || !oTermsChecked}
+                className="w-full h-11 bg-accent-main hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-bg-base font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-opacity cursor-pointer mt-2"
               >
                 {onboardingLoading ? (
                   <span className="h-4 w-4 rounded-full border border-bg-base/30 border-t-bg-base animate-spin" />
@@ -1518,6 +1618,149 @@ export default function Header() {
               </button>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* Full Legal Document Viewer Modal */}
+      {activeLegalModal && (
+        <div className="fixed inset-0 z-[10005] bg-bg-base/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main max-w-2xl w-full h-[85vh] rounded-md flex flex-col shadow-2xl animate-fade-in overflow-hidden text-left">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-border-main/50 bg-bg-card/40 flex items-center justify-between shrink-0">
+              <div className="flex flex-col">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">LynDesk Legal Registry</span>
+                <h2 className="font-display text-lg font-semibold text-txt-main">
+                  {activeLegalModal === "privacy" ? "Privacy Policy" : "Terms & Conditions"}
+                </h2>
+              </div>
+              <button 
+                onClick={() => setActiveLegalModal(null)}
+                className="p-1 rounded-full hover:bg-bg-card text-txt-muted hover:text-txt-main cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Document Container */}
+            <div 
+              onScroll={handleLegalScroll}
+              className="flex-1 p-6 md:p-8 overflow-y-auto font-sans text-xs text-txt-sub font-light leading-relaxed space-y-5 select-text"
+            >
+              {activeLegalModal === "privacy" ? (
+                <>
+                  <p className="text-sm font-normal text-txt-main">
+                    At LynDesk (&quot;Link Your Next Desk&quot;), we believe technical accomplishment should be documented transparently and protected securely. This Policy details how we collect, store, and utilize your information across the LynDesk Campus network.
+                  </p>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">1. Scope of Data Collection</h3>
+                    <p>We collect personal information required to establish your technical dashboard and university connection:</p>
+                    <ul className="list-disc list-inside pl-2 space-y-1 text-[11px] text-txt-sub">
+                      <li><strong>Authentication Data</strong>: Full name, email address, date of birth, location, and OAuth authentication tokens (from Google, GitHub, and Discord).</li>
+                      <li><strong>Academic Portfolios</strong>: Project names, registration deadlines, co-worker associations, slide decks, and project reports.</li>
+                      <li><strong>Integration Metadata</strong>: Public GitHub repository URLs, commit metrics, LeetCode/Codeforces stats, and chat communications inside project spaces.</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">2. Academic Record Protection (FERPA)</h3>
+                    <p>For university-mandated credit claims, LynDesk operates in compliance with the Family Educational Rights and Privacy Act (FERPA) regulations protecting student education records:</p>
+                    <ul className="list-disc list-inside pl-2 space-y-1 text-[11px] text-txt-sub">
+                      <li>Project accomplishment logs and credit requests are shared strictly with verified department deans and faculty advisors.</li>
+                      <li>Students retain full ownership of their extracurricular histories and can opt to make their profiles public or private at any time.</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">3. Data Sharing and Third-Party API Integrations</h3>
+                    <p>We do not sell student profile metadata to third-party advertisers or recruitment brokers. Information is shared strictly in these cases:</p>
+                    <ul className="list-disc list-inside pl-2 space-y-1 text-[11px] text-txt-sub">
+                      <li><strong>Within Project Teams</strong>: Shared chat logs, slide decks, and codebases are visible to co-workers you invite.</li>
+                      <li><strong>To Institutional Admins</strong>: Submitting credit requests routes verified files to your university&apos;s grading console.</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">4. Security Standards & Encryption</h3>
+                    <p>All data transfers are encrypted in transit via SSL/TLS, and authentication sessions are guarded by Supabase Row Level Security (RLS) policies. Databases are hosted in secure, isolated cloud centers.</p>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3 pb-6">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">5. User Data Rights & Account Deletion</h3>
+                    <p>You may request export or deletion of your profile data at any time from your profile settings or by contacting privacy@lyndesk.com.</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-normal text-txt-main">
+                    Welcome to LynDesk (&quot;Link Your Next Desk&quot;). By accessing or utilizing our workspace dashboards, tracking registries, and institutional portals, you agree to comply with the terms detailed below.
+                  </p>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">1. Access and Account Registration</h3>
+                    <p>
+                      To enter your college&apos;s network directory and workspaces, you must establish an account using a supported email address or OAuth login (Google, GitHub, Discord). You are responsible for safeguarding your session tokens and password keys. LynDesk is not liable for unauthorized access resulting from negligence.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">2. Intellectual Property and Content Ownership</h3>
+                    <p>
+                      <strong>You retain 100% ownership of your work.</strong> Any project documentation, source code repositories, slide decks, technical PDFs, or messages uploaded to your project spaces remain your intellectual property. LynDesk claims no proprietary rights or license over student creations.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">3. Acceptable Use Guidelines</h3>
+                    <p>By utilizing LynDesk workspaces, you agree not to engage in the following prohibited activities:</p>
+                    <ul className="list-disc list-inside pl-2 space-y-1 text-[11px] text-txt-sub">
+                      <li>Uploading malware, corrupted files, or scripts designed to interrupt platform operations.</li>
+                      <li>Plagiarizing project codebases or falsifying credentials during academic credit claims.</li>
+                      <li>Using project chat channels to propagate harassment or violate university student codes of conduct.</li>
+                    </ul>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">4. University Credits & Verification Disclaimer</h3>
+                    <p>
+                      LynDesk acts solely as a tracking coordinator and cryptographic validation platform for extracurricular activity points. <strong>The final approval and awarding of university academic credits or graduation points rests entirely with your institution&apos;s administration and faculty verifiers.</strong> LynDesk makes no guarantee that submission logs will be approved by your university department.
+                    </p>
+                  </div>
+                  <div className="space-y-1.5 border-t border-border-main/40 pt-3 pb-6">
+                    <h3 className="font-display text-sm font-semibold text-txt-main">5. Limitation of Liability</h3>
+                    <p>
+                      LynDesk is provided on an &quot;as is&quot; and &quot;as available&quot; basis. We make no warranty that operations will be completely uninterrupted. We are not liable for project deadlines missed due to internet outages, GitHub API down-times, or database synchronizer latency.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Sticky Bottom Action Bar */}
+            <div className="p-4 border-t border-border-main/50 bg-bg-card flex items-center justify-between shrink-0 gap-4">
+              <div className="flex items-center gap-2 text-xs font-mono">
+                {!legalModalScrolledBottom ? (
+                  <span className="text-amber-400 flex items-center gap-1.5 animate-pulse">
+                    <span>&darr;</span> Scroll to the end of the document to unlock checkbox
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                    <span>&check;</span> Document End Reached — Checkbox Unlocked
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                disabled={!legalModalScrolledBottom}
+                onClick={() => {
+                  if (activeLegalModal === "privacy") {
+                    setOPrivacyRead(true);
+                    setOPrivacyChecked(true);
+                  } else if (activeLegalModal === "terms") {
+                    setOTermsRead(true);
+                    setOTermsChecked(true);
+                  }
+                  setActiveLegalModal(null);
+                }}
+                className="h-9 px-4 bg-accent-main hover:opacity-90 disabled:opacity-40 text-bg-base font-semibold font-mono text-xs uppercase rounded cursor-pointer disabled:cursor-not-allowed transition-opacity shrink-0"
+              >
+                {legalModalScrolledBottom ? "I Accept & Close" : "Scroll to Accept"}
+              </button>
+            </div>
 
           </div>
         </div>

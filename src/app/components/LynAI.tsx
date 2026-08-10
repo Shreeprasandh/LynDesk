@@ -14,7 +14,8 @@ import {
   Award, 
   Compass, 
   BookOpen,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 
 interface Message {
@@ -48,7 +49,19 @@ export default function LynAI() {
     return cachedMessages;
   });
   const [isTyping, setIsTyping] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input when chat drawer opens
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   // Sync state with global cache
   useEffect(() => {
@@ -212,7 +225,7 @@ export default function LynAI() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
-                    onClick={handleClearChat}
+                    onClick={() => setShowClearConfirm(true)}
                     title="Clear Chat History"
                     className="px-2 py-1 rounded text-[9px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main hover:bg-bg-card border border-border-main/50 cursor-pointer transition-colors flex items-center gap-1 font-bold"
                   >
@@ -227,6 +240,43 @@ export default function LynAI() {
                   </button>
                 </div>
               </div>
+
+              {/* Themed Clear Chat Confirmation Modal */}
+              {showClearConfirm && (
+                <div className="absolute inset-0 bg-bg-base/80 backdrop-blur-sm z-[10010] flex items-center justify-center p-6 text-left">
+                  <div className="w-full max-w-xs bg-bg-surface border border-border-main/80 rounded-md p-6 shadow-2xl space-y-4 animate-fade-in">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0">
+                        <AlertTriangle size={16} />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-display text-sm font-light text-txt-main">Clear Chat History?</h3>
+                        <p className="text-[11px] text-txt-sub font-light leading-relaxed">
+                          This will reset your current conversation transcript with LynAI.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 font-mono text-[10px] uppercase">
+                      <button
+                        onClick={() => setShowClearConfirm(false)}
+                        className="flex-1 h-9 rounded border border-border-main/80 bg-bg-card hover:bg-border-main/30 text-txt-muted hover:text-txt-main cursor-pointer transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleClearChat();
+                          setShowClearConfirm(false);
+                        }}
+                        className="flex-1 h-9 rounded bg-rose-500 hover:opacity-90 text-white font-semibold cursor-pointer transition-opacity"
+                      >
+                        Clear Chat
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Chat messages viewport */}
               <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
@@ -317,6 +367,7 @@ export default function LynAI() {
               {/* Form Input Message bar */}
               <form onSubmit={handleSend} className="p-4 border-t border-border-main/40 bg-bg-card/25 flex gap-2">
                 <input 
+                  ref={inputRef}
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}

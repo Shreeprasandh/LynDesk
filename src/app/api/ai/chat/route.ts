@@ -228,21 +228,23 @@ What topic would you like to explore today?`
 }
 
 function detectActionLink(userPrompt: string, replyText: string): { label: string; href: string } | undefined {
-  const combined = ((userPrompt || "") + " " + (replyText || "")).toLowerCase();
+  const p = (userPrompt || "").toLowerCase();
+  const r = (replyText || "").toLowerCase();
 
-  if (combined.includes("profile") || combined.includes("handle") || combined.includes("username") || combined.includes("leetcode") || combined.includes("settings") || combined.includes("codeforces") || combined.includes("codechef") || combined.includes("bio")) {
+  // ONLY attach platform navigation action links if user explicitly asks for platform navigation OR response explicitly directs to a route path.
+  if (/\b(my profile|edit profile|change username|my settings|update handle|leetcode handle|codeforces handle)\b/i.test(p) || r.includes("navigate to /profile")) {
     return { label: "Go to Profile Settings", href: "/profile" };
   }
-  if (combined.includes("invite") || combined.includes("co-worker") || combined.includes("teammate") || combined.includes("directory") || combined.includes("matchmake")) {
+  if (/\b(find teammate|matchmaking|student directory|invite team)\b/i.test(p) || r.includes("navigate to /explore")) {
     return { label: "Open Matchmaking Arena", href: "/explore" };
   }
-  if (combined.includes("streak") || combined.includes("code desk") || combined.includes("coding desk") || combined.includes("daily challenge") || combined.includes("problem")) {
+  if (/\b(code desk|daily challenge|my streak|coding desk)\b/i.test(p) || r.includes("navigate to /coding-desk")) {
     return { label: "Open Code Desk", href: "/coding-desk" };
   }
-  if (combined.includes("event desk") || combined.includes("hackathon") || combined.includes("vault")) {
+  if (/\b(event desk|hackathon vault)\b/i.test(p) || r.includes("navigate to /event-desk")) {
     return { label: "Open Event Desk", href: "/event-desk" };
   }
-  if (combined.includes("study desk") || combined.includes("tutor") || combined.includes("quiz") || combined.includes("curriculum")) {
+  if (/\b(study desk|ai tutor|generate curriculum)\b/i.test(p) || r.includes("navigate to /study-desk")) {
     return { label: "Open Study Desk", href: "/study-desk" };
   }
   return undefined;
@@ -262,40 +264,13 @@ export async function POST(req: NextRequest) {
     const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     const liveDate = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-    const contextPrompt = `You are LynAI, the personal portfolio & workspace co-pilot on LynDesk.
+    const contextPrompt = `You are LynAI, an intelligent and helpful AI assistant co-pilot on LynDesk.
 
-User Profile Context:
-- Name: ${profileContext?.name || "Kaizzcer"}
-- College: ${profileContext?.college || "SRM Easwari"}
-- Department: ${profileContext?.department || "Information Technology"}
-
-Current System Environment:
-- Live Local Time: ${liveTime} (${liveDate})
-- Active Project: ${workspaceContext?.projectName || "No active project"}
-
-LYNDESK COMPREHENSIVE PLATFORM MANUAL & FEATURE DIRECTORY:
-1. **Profile, Usernames & Handles** (\`/profile\`):
-   - **Change Username / Handle**: Navigate to \`/profile\`. Edit Username, Name, Department, Year, Bio, or Skills and click **Save Changes**.
-   - **Competitive Handles**: Enter your LeetCode, Codeforces, or CodeChef handles on \`/profile\` to auto-sync your problem counts and ratings across LynDesk.
-2. **Workspaces & Project Management** (\`/workspace/[id]\`):
-   - **Rename Workspace**: Click the **Rename** button next to the workspace title header.
-   - **Visit Event Page & Rules**: Click **Visit Event Page** to open the hackathon link, or **Event Brief & Rules** to view AI-analyzed guidelines.
-   - **Invite Teammates**: Under the **Active Co-Workers** panel, click **+ Add Co-Worker** to add peers, OR search in **Explore Arena** (\`/explore\`) and click **Invite to Team**.
-3. **Event Desk & Hackathons** (\`/event-desk\`):
-   - **Hackathon Vault & URL Parser**: Paste any hackathon URL into the parser box to auto-extract timelines, deadlines, and stage guidelines into your vault.
-4. **Coding Deck & Streaks** (\`/coding-deck\`):
-   - **LeetCode Daily Challenge**: View the live daily LeetCode challenge with direct links and streak validation.
-5. **Explore & Matchmaking Arena** (\`/explore\`):
-   - **Student Directory**: Filter student developers by Tech Stack (React, Python, Node, ML), Department, and Academic Year.
-6. **Study Desk & AI Tutor** (\`/study-desk\`):
-   - **AI Tutor Curriculum Generator**: Enter any technical topic to generate a step-by-step curriculum with interactive quizzes after each section.
-
-STRICT RESPONSE DIRECTIVES:
-1. BE WARM, PLEASING, AND CONCISE. Keep responses friendly, encouraging, and short (1-3 sentences max).
-2. Do NOT write dry, cold robotic theory. Talk like a friendly, supportive co-pilot!
-3. When guiding users to perform an action (like changing handles, usernames, or inviting teammates), state it warmly in 1 short sentence and mention that an instant action button is provided below to take them directly there!
-4. When asked for the time, answer directly using the Live Local Time (${liveTime}). Address the user as ${profileContext?.name || "Kaizzcer"}.
-5. ABSOLUTELY DO NOT USE ANY EMOJIS (such as ⚙️, 🚀, 💻, 📚, 🤝) in your response or action link labels. Use clean text and standard markdown formatting only.`;
+CORE DIRECTIVES:
+1. ACCURACY FIRST: For general knowledge, anime, history, science, celebrities, pop culture, or programming queries, provide 100% accurate, direct, and factually correct answers. (e.g. Eiichiro Oda is the creator and author of One Piece).
+2. PLATFORM GUIDANCE: For questions about LynDesk, guide users accurately to feature areas (/profile, /coding-desk, /study-desk, /event-desk, /explore).
+3. MEDIA REQUESTS: If asked for a picture or image, politely explain that you are a text assistant and suggest web search. Do NOT attach unasked platform navigation links.
+4. ABSOLUTELY NO EMOJIS: Keep all answers clean, clear, professional, and free of emojis.`;
 
     // 1. Try Groq API (Hyper-fast free LLaMA 3.3 70B model)
     const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;

@@ -438,7 +438,7 @@ export default function Home() {
           if (rawDraft) draft = JSON.parse(rawDraft);
           const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
           if (rawPublic) publicProf = JSON.parse(rawPublic);
-          localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
+          localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
         } catch {}
       }
 

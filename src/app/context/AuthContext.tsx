@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("faculty_staff_member");
       localStorage.removeItem("company_recruiter_member");
       localStorage.removeItem("ldk_recruiter_session");
+      localStorage.removeItem("ldk_avatar_url");
     }
     try {
       await supabase.auth.signOut();

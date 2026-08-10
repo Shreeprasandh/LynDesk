@@ -923,7 +923,7 @@ export default function Home() {
           if (parsed?.avatar_url) return parsed.avatar_url;
         }
       } catch {}
-      const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || localStorage.getItem("ldk_avatar_url") || "";
+      const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
       if (localAvatar) return localAvatar;
     }
     return extractAvatarFromUser(user);
@@ -2011,10 +2011,11 @@ export default function Home() {
                           ];
                         })();
 
-                        const isEventEnded = isDatePassed(ev.deadline);
+                        const lastStageDeadline = stageObjects[stageObjects.length - 1]?.deadline || ev.deadline;
+                        const isEventEnded = isDatePassed(lastStageDeadline);
                         const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
                         const allPassed = firstUnpassed === -1;
-                        const activeIdx = (isEventEnded || allPassed) ? stageObjects.length - 1 : (firstUnpassed >= 0 ? firstUnpassed : stageObjects.length - 1);
+                        const activeIdx = (allPassed || isEventEnded) ? stageObjects.length - 1 : (firstUnpassed >= 0 ? firstUnpassed : 0);
                         const maxIdx = Math.max(stageObjects.length - 1, 1);
 
                         return (
@@ -2150,7 +2151,7 @@ export default function Home() {
                                   
                                 {stageObjects.map((stgObj: { stage: string; deadline: string }, idx: number) => {
                                   const isPassed = isDatePassed(stgObj.deadline);
-                                  const isCompleted = isEventEnded || allPassed || isPassed || idx < activeIdx;
+                                  const isCompleted = isPassed || (allPassed) || (firstUnpassed > -1 && idx < firstUnpassed);
                                   const isCurrent = !isCompleted && idx === activeIdx;
                                   const isLastStage = idx === stageObjects.length - 1;
                                   const isLastStageCompleted = isLastStage && isCompleted;
