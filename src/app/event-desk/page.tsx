@@ -295,90 +295,86 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const loadOpps = () => {
+        const now = new Date();
+        const d1 = new Date(now.getTime() + 17 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        const d2 = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        const d3 = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        const d4 = new Date(now.getTime() + 5 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        const d5 = new Date(now.getTime() + 8 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        const d6 = new Date(now.getTime() + 40 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+
         const defaultOpps = [
           {
             id: "opp_1",
-            title: "MIT HackHarvard 2026",
+            title: "Uber HackTag 2026 Hackathon",
             category: "hackathon",
-            deadline: "Oct 12, 2026",
-            location: "hybrid",
-            level: "global",
-            url: "https://hackharvard.org",
-            description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+            deadline: d1,
+            location: "online",
+            level: "national",
+            url: "https://unstop.com/hackathons/uber-hacktag-2026",
+            description: "Official Uber software competition featuring algorithmic and system design challenges.",
             facultyRecommended: true,
-            createdDate: "Oct 14"
+            createdDate: "Today"
           },
           {
             id: "opp_2",
-            title: "Google Developer Hackathon India",
+            title: "Tata Crucible Campus Hack 2026",
             category: "hackathon",
-            deadline: "Nov 02, 2026",
-            location: "online",
+            deadline: d2,
+            location: "hybrid",
             level: "national",
-            url: "https://build.google.com",
-            description: "National developer jam leveraging Google Cloud and AI agents.",
+            url: "https://unstop.com/competitions/tata-crucible-campus-2026",
+            description: "Premier campus innovation and software development track across top technology institutes.",
             facultyRecommended: true,
-            createdDate: "Oct 14"
+            createdDate: "Today"
           },
           {
             id: "opp_3",
-            title: "Stanford TreeHacks 2026",
+            title: "Flipkart GRID 6.0 Software Track",
             category: "hackathon",
-            deadline: "Nov 18, 2026",
-            location: "in_person",
-            level: "global",
-            url: "https://treehacks.com",
-            description: "Stanford's landmark hackathon focusing on engineering solutions for social good.",
-            facultyRecommended: false,
-            createdDate: "Oct 14"
+            deadline: d3,
+            location: "online",
+            level: "national",
+            url: "https://unstop.com/competitions/flipkart-grid-6",
+            description: "Flagship engineering challenge tackling e-commerce scalability, GenAI, and distributed systems.",
+            facultyRecommended: true,
+            createdDate: "Today"
           },
           {
             id: "opp_4",
-            title: "Codeforces Round 995 (Div. 2)",
+            title: "Codeforces Round 972 (Div. 2)",
             category: "contest",
-            deadline: "Sep 28, 2026",
+            deadline: d4,
             location: "online",
             level: "global",
-            url: "https://codeforces.com",
-            description: "Official Div. 2 programming contest with rating updates.",
-            facultyRecommended: true,
-            createdDate: "Oct 14"
+            url: "https://codeforces.com/contests",
+            description: "Official Div. 2 competitive programming challenge with live global rating updates.",
+            facultyRecommended: false,
+            createdDate: "Today"
           },
           {
             id: "opp_5",
-            title: "LeetCode Weekly Contest 420",
+            title: "LeetCode Biweekly Contest 137",
             category: "contest",
-            deadline: "Sep 20, 2026",
+            deadline: d5,
             location: "online",
             level: "global",
-            url: "https://leetcode.com",
-            description: "Weekly algorithmic challenge with globally ranked leaderboard.",
+            url: "https://leetcode.com/contest/",
+            description: "Biweekly 90-minute algorithmic competition with global rank leaderboard.",
             facultyRecommended: false,
-            createdDate: "Oct 14"
+            createdDate: "Today"
           },
           {
             id: "opp_6",
-            title: "Smart India Hackathon (SIH) 2026",
+            title: "Smart India Hackathon 2026 (SIH)",
             category: "hackathon",
-            deadline: "Sept 15, 2026",
+            deadline: d6,
             location: "hybrid",
             level: "national",
-            url: "https://sih.gov.in",
-            description: "Nationwide initiative to provide students with a platform to solve pressing problems.",
+            url: "https://hack2skill.com/hackathons/sih2026",
+            description: "Nationwide government initiative solving real-world challenges across AI, IoT, and CleanTech.",
             facultyRecommended: true,
-            createdDate: "Oct 14"
-          },
-          {
-            id: "opp_7",
-            title: "Next.js 16 Conference Keynote Details",
-            category: "news",
-            deadline: "Oct 25, 2026",
-            location: "online",
-            level: "global",
-            url: "https://nextjs.org/conf",
-            description: "Vercel announces Next.js 16 featuring compiler optimizations and Server Component refinements.",
-            facultyRecommended: false,
-            createdDate: "Oct 14"
+            createdDate: "Today"
           }
         ];
 
@@ -395,6 +391,33 @@ export default function Home() {
           setOpportunities(defaultOpps);
           localStorage.setItem("ldk_opportunities", JSON.stringify(defaultOpps));
         }
+
+        // Fetch live active events from scraper API
+        fetch("/api/scrape")
+          .then(res => res.json())
+          .then(data => {
+            if (data.events && Array.isArray(data.events) && data.events.length > 0) {
+              const liveMapped = data.events.map((ev: any, idx: number) => ({
+                id: ev.id || `live_opp_${idx}`,
+                title: ev.title,
+                category: "hackathon",
+                deadline: ev.deadline,
+                location: "online",
+                level: "national",
+                url: ev.portalUrl || ev.url || "https://unstop.com",
+                description: ev.description || `${ev.title} on ${ev.portal || "Unstop"}. Prizes: ${ev.prizes || "Cash Prizes & Certificates"}`,
+                facultyRecommended: true,
+                createdDate: "Live"
+              }));
+              setOpportunities(prev => {
+                const existingTitles = new Set(prev.map(p => p.title.toLowerCase()));
+                const filteredNew = liveMapped.filter((lm: any) => !existingTitles.has(lm.title.toLowerCase()));
+                const merged = [...filteredNew, ...prev];
+                return merged;
+              });
+            }
+          })
+          .catch(err => console.warn("Live events fetch notice:", err));
       };
       loadOpps();
       window.addEventListener("ldk_opportunities_update", loadOpps);

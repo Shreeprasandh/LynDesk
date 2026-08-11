@@ -162,8 +162,10 @@ function CoordinatorConsoleContent() {
         if (stored) {
           setScheduledBroadcasts(JSON.parse(stored));
         } else {
+          const now = new Date();
+          const nextDate = new Date(now.getTime() + 7 * 86400000).toISOString().split("T")[0];
           const defaultScheduled = [
-            { id: "sch-1", title: "Upcoming Coding Contest", message: "CodeChef Starters 148 is scheduled for next Friday. Make sure to participate!", type: "system", target: "all", date: "2026-07-24", time: "12:00" }
+            { id: "sch-1", title: "Upcoming Coding Contest", message: "CodeChef Starters 150 is scheduled for next Wednesday. Make sure to participate!", type: "system", target: "all", date: nextDate, time: "18:00" }
           ];
           setScheduledBroadcasts(defaultScheduled);
           localStorage.setItem("ldk_scheduled_notifications", JSON.stringify(defaultScheduled));

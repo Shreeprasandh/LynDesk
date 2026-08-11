@@ -237,23 +237,51 @@ export default function CodingDeckPage() {
 
   useEffect(() => {
     const isCompleted = stats.leetcode?.dailyChallenge?.completed;
-    if (isCompleted !== undefined && isCompleted !== null) {
-      if (prevCompleted === false && isCompleted === true) {
-        setTimeout(() => {
-          setShowSuccessBanner(true);
-          setPrevCompleted(true);
-        }, 0);
-        const timer = setTimeout(() => {
-          setShowSuccessBanner(false);
-        }, 15000);
-        return () => clearTimeout(timer);
-      } else if (prevCompleted !== isCompleted) {
-        setTimeout(() => {
-          setPrevCompleted(isCompleted);
-        }, 0);
+    const challengeDate = stats.leetcode?.dailyChallenge?.date || new Date().toISOString().split("T")[0];
+    const storageKey = `ldk_seen_daily_banner_${challengeDate}`;
+
+    if (isCompleted === true) {
+      if (typeof window !== "undefined" && sessionStorage.getItem(storageKey)) {
+        setShowSuccessBanner(false);
+        setPrevCompleted(true);
+        return;
       }
+
+      if (prevCompleted === false) {
+        setShowSuccessBanner(true);
+        setPrevCompleted(true);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(storageKey, "true");
+        }
+      } else if (prevCompleted === null) {
+        if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
+          setShowSuccessBanner(true);
+          sessionStorage.setItem(storageKey, "true");
+        } else {
+          setShowSuccessBanner(false);
+        }
+        setPrevCompleted(true);
+      }
+    } else if (isCompleted === false) {
+      setShowSuccessBanner(false);
+      setPrevCompleted(false);
     }
-  }, [stats.leetcode?.dailyChallenge?.completed, prevCompleted]);
+  }, [stats.leetcode?.dailyChallenge?.completed, stats.leetcode?.dailyChallenge?.date, prevCompleted]);
+
+  // Auto-hide Daily Challenge Verified banner after exactly 10 seconds & persist dismissal state
+  useEffect(() => {
+    if (showSuccessBanner) {
+      const challengeDate = stats.leetcode?.dailyChallenge?.date || new Date().toISOString().split("T")[0];
+      const storageKey = `ldk_seen_daily_banner_${challengeDate}`;
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(storageKey, "true");
+      }
+      const timer = setTimeout(() => {
+        setShowSuccessBanner(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessBanner, stats.leetcode?.dailyChallenge?.date]);
 
   // Load platform details from Supabase Auth user metadata & localStorage
   useEffect(() => {
@@ -315,8 +343,8 @@ export default function CodingDeckPage() {
           leetcode: leetcodeStats,
           codeforces: codeforcesStats,
           codechef: codechefStats,
-          unstop: un ? { registered: 6, completed: 4, rank: 42 } : null,
-          hack2skill: h2s ? { registered: 3, completed: 3, rank: 12 } : null,
+          unstop: un ? { registered: 4, completed: 2, rank: 42 } : null,
+          hack2skill: h2s ? { registered: 2, completed: 1, rank: 12 } : null,
         };
 
         setStats(updatedStats);
@@ -755,13 +783,52 @@ export default function CodingDeckPage() {
     );
   };
 
-  // Upcoming coding contests listing
-  const contests = [
-    { platform: "LeetCode", title: "Biweekly Contest 135", time: "July 20, 2026 - 08:00 PM", url: "https://leetcode.com/contest/" },
-    { platform: "Codeforces", title: "Codeforces Round 970 (Div. 2)", time: "July 22, 2026 - 06:35 PM", url: "https://codeforces.com/contests" },
-    { platform: "CodeChef", title: "Starters 148", time: "July 24, 2026 - 08:00 PM", url: "https://www.codechef.com/contests" },
-    { platform: "Unstop", title: "Uber HackTag 2026 Hackathon", time: "Registration ends in 2 days", url: "https://unstop.com/" },
-  ];
+  // Upcoming active coding contests listing (dynamically synchronized with current and upcoming future dates)
+  const contests = React.useMemo(() => {
+    const now = new Date();
+
+    // Next Saturday 8:00 PM IST for LeetCode Biweekly Contest
+    const nextSat = new Date(now);
+    nextSat.setDate(now.getDate() + ((6 - now.getDay() + 7) % 7 || 7));
+    const satStr = nextSat.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+    // Next Sunday 6:35 PM IST for Codeforces Round
+    const nextSun = new Date(now);
+    nextSun.setDate(now.getDate() + ((0 - now.getDay() + 7) % 7 || 7));
+    const sunStr = nextSun.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+    // Next Wednesday 8:00 PM IST for CodeChef Starters
+    const nextWed = new Date(now);
+    nextWed.setDate(now.getDate() + ((3 - now.getDay() + 7) % 7 || 7));
+    const wedStr = nextWed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+    return [
+      {
+        platform: "LeetCode",
+        title: "Biweekly Contest 137",
+        time: `${satStr} - 08:00 PM IST`,
+        url: "https://leetcode.com/contest/"
+      },
+      {
+        platform: "Codeforces",
+        title: "Codeforces Round 972 (Div. 2)",
+        time: `${sunStr} - 06:35 PM IST`,
+        url: "https://codeforces.com/contests"
+      },
+      {
+        platform: "CodeChef",
+        title: "Starters 150",
+        time: `${wedStr} - 08:00 PM IST`,
+        url: "https://www.codechef.com/contests"
+      },
+      {
+        platform: "Unstop",
+        title: "Uber HackTag 2026 Hackathon",
+        time: "Aug 28, 2026 - Registration Open",
+        url: "https://unstop.com/hackathons/uber-hacktag-2026"
+      }
+    ];
+  }, []);
 
   if (authLoading) {
     return (
@@ -1174,6 +1241,99 @@ export default function CodingDeckPage() {
             {/* ================= RIGHT COLUMN: CONTESTS FEED & HACKATHONS (4 Columns) ================= */}
             <div className="lg:col-span-4 flex flex-col gap-6">
               
+              {/* Hackathon Portals & Applied Workspaces Panel */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
+                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
+                  </div>
+                  {(unstopUser || hack2skillUser) && (
+                    <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2.5 py-1 border border-border-main/70 rounded-sm font-semibold uppercase tracking-wider">
+                      {((stats.unstop?.registered || 0) + (stats.hack2skill?.registered || 0))} Total Applied
+                    </span>
+                  )}
+                </div>
+                
+                {/* Unstop Row */}
+                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
+                    {!unstopUser && (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    )}
+                  </div>
+                  {unstopUser ? (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
+                      <span>@{unstopUser}</span>
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.unstop?.registered} Applied
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Unstop in Profile Settings to sync applications.
+                    </span>
+                  )}
+                </div>
+
+                {/* Hack2Skill Row */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
+                    {!hack2skillUser && (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    )}
+                  </div>
+                  {hack2skillUser ? (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
+                      <span>@{hack2skillUser}</span>
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.hack2skill?.registered} Applied
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Hack2Skill in Profile Settings to sync applications.
+                    </span>
+                  )}
+                </div>
+
+                {(unstopUser || hack2skillUser) && (
+                  <button
+                    onClick={() => setShowAppliedModal(true)}
+                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
+                  >
+                    <FolderKanban size={12} /> Manage Applied Hackathons
+                  </button>
+                )}
+              </div>
+
+              {/* Active / Upcoming Contests Feed */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={14} className="text-accent-main" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Contest Feed</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {contests.map((c, idx) => (
+                    <div key={idx} className="border border-border-main/40 p-3 rounded bg-bg-base/30 flex flex-col gap-1.5 hover:border-txt-main transition-colors duration-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-mono tracking-wider font-bold bg-bg-card px-2 py-0.5 rounded border border-border-main/60 text-txt-main">{c.platform}</span>
+                        <a href={c.url} target="_blank" rel="noreferrer" className="text-[9px] text-txt-muted hover:text-txt-main flex items-center gap-0.5">
+                          Open <ExternalLink size={8} />
+                        </a>
+                      </div>
+                      <span className="text-xs font-semibold text-txt-main font-mono truncate">{c.title}</span>
+                      <span className="text-[9px] text-txt-sub">{c.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* AI Programming Portfolio Analyst Panel */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
@@ -1296,116 +1456,6 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Hackathon Portals & Applied Workspaces Panel */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
-                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
-                  </div>
-                  {(unstopUser || hack2skillUser) && (
-                    <button
-                      onClick={() => setShowAppliedModal(true)}
-                      className="text-[10px] font-mono uppercase text-accent-main hover:underline flex items-center gap-1 font-semibold cursor-pointer"
-                    >
-                      Manage Applications →
-                    </button>
-                  )}
-                </div>
-                
-                {/* Unstop Row */}
-                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
-                    {unstopUser ? (
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.unstop?.registered} Applied
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
-                    )}
-                  </div>
-                  {unstopUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{unstopUser}</span>
-                      <button
-                        onClick={() => setShowAppliedModal(true)}
-                        className="text-accent-main hover:underline font-semibold cursor-pointer"
-                      >
-                        View Applied ({stats.unstop?.registered})
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Unstop in Profile Settings to sync applications.
-                    </span>
-                  )}
-                </div>
-
-                {/* Hack2Skill Row */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
-                    {hack2skillUser ? (
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.hack2skill?.registered} Applied
-                      </span>
-                    ) : (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
-                    )}
-                  </div>
-                  {hack2skillUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{hack2skillUser}</span>
-                      <button
-                        onClick={() => setShowAppliedModal(true)}
-                        className="text-accent-main hover:underline font-semibold cursor-pointer"
-                      >
-                        View Applied ({stats.hack2skill?.registered})
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Hack2Skill in Profile Settings to sync applications.
-                    </span>
-                  )}
-                </div>
-
-                {(unstopUser || hack2skillUser) && (
-                  <button
-                    onClick={() => setShowAppliedModal(true)}
-                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
-                  >
-                    <FolderKanban size={12} /> Manage Applied Hackathons & Workspaces
-                  </button>
-                )}
-              </div>
-
-              {/* Active / Upcoming Contests Feed */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={14} className="text-accent-main" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Contest Feed</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {contests.map((c, idx) => (
-                    <div key={idx} className="border border-border-main/40 p-3 rounded bg-bg-base/30 flex flex-col gap-1.5 hover:border-txt-main transition-colors duration-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-mono tracking-wider font-bold bg-bg-card px-2 py-0.5 rounded border border-border-main/60 text-txt-main">{c.platform}</span>
-                        <a href={c.url} target="_blank" rel="noreferrer" className="text-[9px] text-txt-muted hover:text-txt-main flex items-center gap-0.5">
-                          Open <ExternalLink size={8} />
-                        </a>
-                      </div>
-                      <span className="text-xs font-semibold text-txt-main font-mono truncate">{c.title}</span>
-                      <span className="text-[9px] text-txt-sub">{c.time}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
 
             </div>

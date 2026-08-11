@@ -385,7 +385,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [demoIframeKey, setDemoIframeKey] = useState(0);
   // Event Details & Brief Modal States
   const [showBriefModal, setShowBriefModal] = useState(false);
-  const [eventMetadata] = useState<{
+  const [eventMetadata, setEventMetadata] = useState<{
     title: string;
     description: string;
     organization: string;
@@ -397,9 +397,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     title: "Adobe University Hackathon 2026",
     description: "Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.",
     organization: "Adobe Systems & Campus Track",
-    prizes: "$15,000 Prize Pool & Internship Fast-Track Offers",
-    rules: "1. All code must be submitted before deadline.\n2. Teams can have up to 4 members.\n3. Original projects only.",
-    deadline: "Nov 02, 2026",
+    prizes: "1st Prize: MacBook Pro for each member • Top 50: PPIs & Internship (₹1,10,000/mo stipend)",
+    rules: "1. All code must be submitted before deadline.\n2. Teams can have up to 3 members.\n3. Original projects only.",
+    deadline: "Oct 16, 2026",
     url: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333"
   });
 
@@ -410,11 +410,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     brief?: string;
   };
 
+  const now = new Date();
+  const dAug = new Date(now.getTime() + 7 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  const dSep = new Date(now.getTime() + 21 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  const dOct = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  const dNov = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+
   const defaultRealStages: RealStageItem[] = [
-    { title: "Round 1 - Online Assessment", deadline: "09 Aug 2026", brief: "15 MCQs & 1 Coding Challenge." },
-    { title: "Round 2 - Development Round", deadline: "06 Sep 2026", brief: "Build software solution per official problem brief." },
-    { title: "Round 3 - Prototype Showcase", deadline: "27 Sep 2026", brief: "Build working interactive prototype." },
-    { title: "Round 4 - Grand Finale", deadline: "02 Nov 2026", brief: "Final project presentation to leadership." }
+    { title: "Round 1 - Online Assessment", deadline: dAug, brief: "15 MCQs & 1 Coding Challenge." },
+    { title: "Round 2 - Development Round", deadline: dSep, brief: "Build software solution per official problem brief." },
+    { title: "Round 3 - Prototype Showcase", deadline: dOct, brief: "Build working interactive prototype." },
+    { title: "Round 4 - Grand Finale", deadline: dNov, brief: "Final project presentation to leadership." }
   ];
 
   const [realStageItems, setRealStageItems] = useState<RealStageItem[]>(defaultRealStages);
@@ -444,15 +450,27 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data.stages) && data.stages.length > 0) {
-            const extracted: RealStageItem[] = data.stages.map((s: any, idx: number) => ({
-              title: s.stage || s.title || `Round ${idx + 1}`,
-              deadline: s.deadline || "Target Active",
-              brief: s.brief || ""
-            }));
-            setRealStageItems(extracted);
-            if (typeof window !== "undefined") {
-              localStorage.setItem(`ldk_workspace_real_stages_${id}`, JSON.stringify(extracted));
+          if (data && !data.error) {
+            if (data.deadline) {
+              setEventMetadata(prev => ({
+                ...prev,
+                title: data.title || prev.title,
+                description: data.description || prev.description,
+                organization: data.organization || prev.organization,
+                prizes: data.prizes || prev.prizes,
+                deadline: data.deadline || prev.deadline
+              }));
+            }
+            if (Array.isArray(data.stages) && data.stages.length > 0) {
+              const extracted: RealStageItem[] = data.stages.map((s: any, idx: number) => ({
+                title: s.stage || s.title || `Round ${idx + 1}`,
+                deadline: s.deadline || "Target Active",
+                brief: s.brief || ""
+              }));
+              setRealStageItems(extracted);
+              if (typeof window !== "undefined") {
+                localStorage.setItem(`ldk_workspace_real_stages_${id}`, JSON.stringify(extracted));
+              }
             }
           }
         }
@@ -4836,45 +4854,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 <span className="text-[10px] font-mono uppercase tracking-wider text-txt-muted font-bold">Stage-by-Stage Timeline & Briefs</span>
                 
                 <div className="flex flex-col gap-3">
-                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-txt-main font-display">1. Ideation & Proposal</span>
-                      <span className="text-[9px] font-mono text-emerald-400 font-bold uppercase">Completed Oct 08</span>
-                    </div>
-                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
-                      Problem statement selection, team role assignment, technical architecture deck draft submission.
-                    </p>
-                  </div>
+                  {realStageItems.map((stg, idx) => {
+                    const isPast = isDatePassed(stg.deadline);
+                    const isCurrentActive = !isPast && (idx === 0 || isDatePassed(realStageItems[idx - 1]?.deadline));
 
-                  <div className="p-3.5 bg-bg-base/50 border border-accent-main/40 rounded flex flex-col gap-1 ring-1 ring-accent-main/20">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-accent-main font-display">2. Prototype Development</span>
-                      <span className="text-[9px] font-mono text-accent-main font-bold uppercase">Active (Target Oct 12)</span>
-                    </div>
-                    <p className="text-[11px] text-txt-sub font-light leading-relaxed">
-                      Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-txt-main font-display">3. QA & User Testing</span>
-                      <span className="text-[9px] font-mono text-txt-muted font-bold uppercase">Target Oct 24</span>
-                    </div>
-                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
-                      Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 bg-bg-base/50 border border-border-main/60 rounded flex flex-col gap-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-semibold text-txt-main font-display">4. Final Submission</span>
-                      <span className="text-[9px] font-mono text-txt-muted font-bold uppercase">Final submission Nov 02</span>
-                    </div>
-                    <p className="text-[11px] text-txt-muted font-light leading-relaxed">
-                      Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry.
-                    </p>
-                  </div>
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`p-3.5 bg-bg-base/50 rounded flex flex-col gap-1 ${
+                          isCurrentActive 
+                            ? "border border-accent-main/40 ring-1 ring-accent-main/20" 
+                            : "border border-border-main/60"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center gap-2">
+                          <span className={`text-xs font-semibold font-display ${isCurrentActive ? "text-accent-main" : "text-txt-main"}`}>
+                            {idx + 1}. {stg.title}
+                          </span>
+                          <span className={`text-[9px] font-mono font-bold uppercase shrink-0 ${
+                            isPast 
+                              ? "text-emerald-400" 
+                              : isCurrentActive 
+                                ? "text-accent-main" 
+                                : "text-txt-muted"
+                          }`}>
+                            {isPast ? `Completed (${stg.deadline})` : isCurrentActive ? `Active (Target ${stg.deadline})` : `Target ${stg.deadline}`}
+                          </span>
+                        </div>
+                        {stg.brief && (
+                          <p className="text-[11px] text-txt-sub font-light leading-relaxed">
+                            {stg.brief}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

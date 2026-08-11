@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -53,7 +53,7 @@ export default function AppliedHackathonsModal({
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const appliedEvents: AppliedEventItem[] = [
+  const initialEvents: AppliedEventItem[] = [
     {
       id: "unstop_uber_2026",
       title: "Uber HackTag 2026 Hackathon",
@@ -61,7 +61,7 @@ export default function AppliedHackathonsModal({
       handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
       role: "Team Captain",
       status: "Round 2 Active",
-      deadline: "July 24, 2026",
+      deadline: "August 28, 2026",
       portalUrl: "https://unstop.com/hackathons/uber-hacktag-2026"
     },
     {
@@ -71,7 +71,7 @@ export default function AppliedHackathonsModal({
       handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
       role: "Full-Stack Developer",
       status: "Round 1 Submitted",
-      deadline: "July 18, 2026",
+      deadline: "September 15, 2026",
       portalUrl: "https://unstop.com/competitions/tata-crucible-campus-2026"
     },
     {
@@ -81,7 +81,7 @@ export default function AppliedHackathonsModal({
       handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
       role: "Backend Architect",
       status: "Semi-Finals",
-      deadline: "June 30, 2026",
+      deadline: "October 10, 2026",
       portalUrl: "https://unstop.com/competitions/flipkart-grid-6"
     },
     {
@@ -90,29 +90,9 @@ export default function AppliedHackathonsModal({
       portal: "Unstop",
       handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
       role: "AI Lead",
-      status: "Registered",
-      deadline: "June 14, 2026",
+      status: "Registration Open",
+      deadline: "November 05, 2026",
       portalUrl: "https://unstop.com/competitions/loreal-brandstorm-2026"
-    },
-    {
-      id: "unstop_walmart_code8",
-      title: "Walmart Code8 Tech Hackathon",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "Member",
-      status: "Quarter-Finals",
-      deadline: "May 22, 2026",
-      portalUrl: "https://unstop.com/hackathons/walmart-code8"
-    },
-    {
-      id: "unstop_myntra_hacker",
-      title: "Myntra HackerRamp 2026",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "Frontend Dev",
-      status: "Registered",
-      deadline: "April 10, 2026",
-      portalUrl: "https://unstop.com/competitions/myntra-hacker-ramp"
     },
     {
       id: "h2s_sih_2026",
@@ -121,7 +101,7 @@ export default function AppliedHackathonsModal({
       handle: hack2skillUser ? `@${hack2skillUser}` : "@h2s_user",
       role: "Team Captain",
       status: "Internal Shortlist",
-      deadline: "July 28, 2026",
+      deadline: "September 30, 2026",
       portalUrl: "https://hack2skill.com/hackathons/sih2026"
     },
     {
@@ -131,20 +111,44 @@ export default function AppliedHackathonsModal({
       handle: hack2skillUser ? `@${hack2skillUser}` : "@h2s_user",
       role: "AI Engineer",
       status: "Building MVP",
-      deadline: "July 12, 2026",
+      deadline: "August 25, 2026",
       portalUrl: "https://hack2skill.com/hackathons/google-cloud-ai"
-    },
-    {
-      id: "h2s_ms_imagine",
-      title: "Microsoft Imagine Cup India Round",
-      portal: "Hack2Skill",
-      handle: hack2skillUser ? `@${hack2skillUser}` : "@h2s_user",
-      role: "Lead Developer",
-      status: "Phase 1 Verified",
-      deadline: "June 05, 2026",
-      portalUrl: "https://hack2skill.com/hackathons/imagine-cup-india"
     }
   ];
+
+  const [appliedEvents, setAppliedEvents] = useState<AppliedEventItem[]>(initialEvents);
+
+  useEffect(() => {
+    initialEvents.forEach(item => {
+      if (item.portalUrl && item.portal === "Unstop") {
+        fetch("/api/scrape", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: item.portalUrl })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data && !data.error) {
+              setAppliedEvents(prev => prev.map(ev => {
+                if (ev.id === item.id) {
+                  return {
+                    ...ev,
+                    title: data.title || ev.title,
+                    status: data.status || ev.status,
+                    deadline: data.deadline || ev.deadline
+                  };
+                }
+                return ev;
+              }));
+            }
+          })
+          .catch(err => console.warn("Live event scrape notice:", err));
+      }
+    });
+  }, []);
+
+  const unstopCount = appliedEvents.filter((item) => item.portal === "Unstop").length;
+  const h2sCount = appliedEvents.filter((item) => item.portal === "Hack2Skill").length;
 
   const filteredEvents = appliedEvents.filter((item) => {
     if (activeTab === "unstop") return item.portal === "Unstop";
@@ -216,10 +220,10 @@ export default function AppliedHackathonsModal({
         <div className="p-6 border-b border-border-main/40 flex items-center justify-between bg-bg-surface">
           <div className="flex flex-col gap-1">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-              Hackathon Portals & Workspace Center
+              Hackathon Portals
             </span>
             <h2 className="font-display text-xl font-light text-txt-main tracking-tight">
-              Applied Hackathons & Workspaces
+              Applied Hackathons
             </h2>
           </div>
 
@@ -249,7 +253,7 @@ export default function AppliedHackathonsModal({
                 : "border-transparent text-txt-muted hover:text-txt-main"
             }`}
           >
-            All Applied ({appliedEvents.length})
+            All ({appliedEvents.length})
           </button>
           <button
             onClick={() => setActiveTab("unstop")}
@@ -259,17 +263,17 @@ export default function AppliedHackathonsModal({
                 : "border-transparent text-txt-muted hover:text-txt-main"
             }`}
           >
-            Unstop (6)
+            Unstop ({unstopCount})
           </button>
           <button
             onClick={() => setActiveTab("hack2skill")}
             className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer ${
               activeTab === "hack2skill"
-                ? "border-transparent text-txt-muted hover:text-txt-main"
+                ? "border-accent-main text-accent-main"
                 : "border-transparent text-txt-muted hover:text-txt-main"
             }`}
           >
-            Hack2Skill (3)
+            Hack2Skill ({h2sCount})
           </button>
         </div>
 
@@ -291,7 +295,8 @@ export default function AppliedHackathonsModal({
                     <h3 className="text-xs font-semibold text-txt-main">{item.title}</h3>
                   </div>
 
-                  <span className="px-2 py-0.5 bg-bg-card border border-border-main/60 font-mono text-[9px] text-txt-muted uppercase rounded-sm">
+                  <span className="px-2 py-0.5 bg-emerald-500/[0.02] border border-emerald-500/10 text-emerald-400/50 font-mono text-[9px] uppercase rounded-sm flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-emerald-400/50" />
                     {item.status}
                   </span>
                 </div>
@@ -316,10 +321,10 @@ export default function AppliedHackathonsModal({
                   <a
                     href={item.portalUrl}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="text-[10px] font-mono text-txt-muted hover:text-txt-main flex items-center gap-1 transition-colors"
                   >
-                    View Listing Page <ExternalLink size={10} />
+                    View Hackathon <ExternalLink size={10} />
                   </a>
 
                   {linkedSpaceId ? (
