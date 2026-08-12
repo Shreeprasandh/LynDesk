@@ -1115,6 +1115,10 @@ export default function ProfilePage() {
           }
           if (avatarUrl) {
             localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
+            localStorage.setItem(`ldk_avatar_url_${user.id}`, avatarUrl);
+          } else {
+            localStorage.removeItem(`ldk_user_avatar_${user.id}`);
+            localStorage.removeItem(`ldk_avatar_url_${user.id}`);
           }
         }
       } catch (dbErr) {
@@ -1161,6 +1165,8 @@ export default function ProfilePage() {
 
       if (typeof window !== "undefined" && user?.id) {
         localStorage.removeItem(`ldk_profile_draft_${user.id}`);
+        // Dispatch live profile update event across Header, Dashboard, and Explore
+        window.dispatchEvent(new Event("ldk_profile_update"));
       }
 
       setAutoDismissMessage({ text: "Profile details updated successfully.", type: "success" }, 5000);

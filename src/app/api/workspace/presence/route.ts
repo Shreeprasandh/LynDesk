@@ -122,7 +122,9 @@ export async function POST(req: NextRequest) {
       }, { onConflict: "workspace_id,user_id" });
 
     if (upsertError) {
-      console.warn("Failed upserting workspace_presence row:", upsertError.message);
+      if (!upsertError.message?.includes("schema cache") && !upsertError.message?.includes("does not exist")) {
+        console.warn("Failed upserting workspace_presence row:", upsertError.message);
+      }
     }
 
     return NextResponse.json({

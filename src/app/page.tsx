@@ -23,7 +23,11 @@ import {
   Award,
   Globe,
   Mail,
-  SlidersHorizontal
+  SlidersHorizontal,
+  BookOpen,
+  Zap,
+  Target,
+  ChevronRight
 } from "lucide-react";
 import PreferencePresetModal from "./components/PreferencePresetModal";
 
@@ -58,16 +62,6 @@ interface DashboardProfile {
   department?: string;
   leetcode_username?: string;
   github_url?: string;
-}
-
-interface OnlineFriend {
-  id: string;
-  full_name: string;
-  username: string;
-  avatar_url?: string;
-  department?: string;
-  inSharedWorkspace: boolean;
-  workspaceName?: string;
 }
 
 export default function Home() {
@@ -148,32 +142,41 @@ export default function Home() {
   });
   const [leetcodeHandle, setLeetcodeHandle] = useState<string>("");
 
-  // Online friends state - 0ms instant cache initialization
-  const [onlineFriends, setOnlineFriends] = useState<OnlineFriend[]>(() => {
-    if (typeof window !== "undefined" && user) {
+  // Study Desk Live Focus & Track State
+  const [studyCardStats, setStudyCardStats] = useState<{
+    streakCount: number;
+    totalXp: number;
+    solvedProblemsCount: number;
+    activePathTitle: string;
+    activePathProgress: number;
+  }>(() => {
+    if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(`ldk_online_friends_${user.id}`);
-        if (cached) return JSON.parse(cached);
+        const statsStr = localStorage.getItem("lyndesk_study_stats_cache");
+        const stats = statsStr ? JSON.parse(statsStr) : null;
+        const dsaMapStr = localStorage.getItem("lyndesk_dsa_progress_cache");
+        const dsaMap = dsaMapStr ? JSON.parse(dsaMapStr) : {};
+        const solvedCount = Object.values(dsaMap).filter((p: any) => p?.status === "completed").length;
+        const pathsStr = localStorage.getItem("lyndesk_study_paths_cache");
+        const paths = pathsStr ? JSON.parse(pathsStr) : [];
+        const activePath = paths.find((p: any) => p.isActive) || paths[0];
+
+        return {
+          streakCount: stats?.streakCount || 1,
+          totalXp: stats?.totalXp || 120,
+          solvedProblemsCount: solvedCount || 8,
+          activePathTitle: activePath?.title || "DSA Systems & Algorithms",
+          activePathProgress: activePath?.progress || 42
+        };
       } catch {}
     }
-    return [
-      {
-        id: "friend_1",
-        full_name: "Aarav Sharma",
-        username: "aarav_dev",
-        department: "Computer Science",
-        inSharedWorkspace: true,
-        workspaceName: "HackHarvard Vault",
-      },
-      {
-        id: "friend_2",
-        full_name: "Priya Patel",
-        username: "priya_p",
-        department: "Information Technology",
-        inSharedWorkspace: true,
-        workspaceName: "AI Research Lab",
-      },
-    ];
+    return {
+      streakCount: 1,
+      totalXp: 120,
+      solvedProblemsCount: 8,
+      activePathTitle: "DSA Systems & Algorithms",
+      activePathProgress: 42
+    };
   });
 
   // Deadlines & workspace counts - 0ms Cache Readers
@@ -486,88 +489,31 @@ export default function Home() {
       window.addEventListener("ldk_profile_update", fetchProfile);
     }
 
-    // 4. Fetch Online Friends (Prioritizing Workspace co-members)
-    const fetchOnlineFriends = async () => {
+    // 4. Fetch Live Study Desk Focus Stats & DSA Track Progress
+    const fetchStudyDeskStats = async () => {
       try {
-        const { data: friendships } = await supabase
-          .from("friendships")
-          .select(`
-            sender:sender_id ( id, username, full_name, avatar_url, department ),
-            receiver:receiver_id ( id, username, full_name, avatar_url, department )
-          `)
-          .eq("status", "accepted");
+        if (typeof window !== "undefined") {
+          const statsStr = localStorage.getItem("lyndesk_study_stats_cache");
+          const stats = statsStr ? JSON.parse(statsStr) : null;
+          const dsaMapStr = localStorage.getItem("lyndesk_dsa_progress_cache");
+          const dsaMap = dsaMapStr ? JSON.parse(dsaMapStr) : {};
+          const solvedCount = Object.values(dsaMap).filter((p: any) => p?.status === "completed").length;
+          const pathsStr = localStorage.getItem("lyndesk_study_paths_cache");
+          const paths = pathsStr ? JSON.parse(pathsStr) : [];
+          const activePath = paths.find((p: any) => p.isActive) || paths[0];
 
-        const rawFriends: OnlineFriend[] = [];
-
-        if (friendships) {
-          friendships.forEach((item: any) => {
-            const partner = item.sender?.id === user.id ? item.receiver : item.sender;
-            if (partner && partner.id !== user.id) {
-              rawFriends.push({
-                id: partner.id,
-                full_name: partner.full_name || partner.username || "Peer",
-                username: partner.username || "peer",
-                avatar_url: partner.avatar_url,
-                department: partner.department || "Engineering",
-                inSharedWorkspace: false,
-              });
-            }
+          setStudyCardStats({
+            streakCount: stats?.streakCount || 1,
+            totalXp: stats?.totalXp || 120,
+            solvedProblemsCount: solvedCount || 8,
+            activePathTitle: activePath?.title || "DSA Systems & Algorithms",
+            activePathProgress: activePath?.progress || 42
           });
         }
-
-        // Add mock workspace co-members if list is short
-        if (rawFriends.length === 0) {
-          rawFriends.push(
-            {
-              id: "friend_1",
-              full_name: "Aarav Sharma",
-              username: "aarav_dev",
-              department: "Computer Science",
-              inSharedWorkspace: true,
-              workspaceName: "HackHarvard Vault",
-            },
-            {
-              id: "friend_2",
-              full_name: "Priya Patel",
-              username: "priya_p",
-              department: "Information Technology",
-              inSharedWorkspace: true,
-              workspaceName: "AI Research Lab",
-            }
-          );
-        }
-
-        // Sort: co-members in shared workspace first
-        rawFriends.sort((a, b) => (b.inSharedWorkspace ? 1 : 0) - (a.inSharedWorkspace ? 1 : 0));
-        const finalFriends = rawFriends.slice(0, 5);
-        setOnlineFriends(finalFriends);
-        if (typeof window !== "undefined" && user?.id) {
-          localStorage.setItem(`ldk_online_friends_${user.id}`, JSON.stringify(finalFriends));
-        }
-      } catch {
-        const defaultFriends = [
-          {
-            id: "friend_1",
-            full_name: "Aarav Sharma",
-            username: "aarav_dev",
-            department: "Computer Science",
-            inSharedWorkspace: true,
-            workspaceName: "HackHarvard Vault",
-          },
-          {
-            id: "friend_2",
-            full_name: "Priya Patel",
-            username: "priya_p",
-            department: "Information Technology",
-            inSharedWorkspace: true,
-            workspaceName: "AI Research Lab",
-          },
-        ];
-        setOnlineFriends(defaultFriends);
-      }
+      } catch {}
     };
 
-    fetchOnlineFriends();
+    fetchStudyDeskStats();
 
     return () => {
       if (typeof window !== "undefined") {
@@ -1049,57 +995,58 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 2. Online Friends (Prioritizing Shared Workspaces) */}
+            {/* 2. Study Desk Focus & DSA Track Card */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-                  Online Friends
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-txt-main" />
+                  Study Desk Focus
+                </span>
+                <span className="text-[8px] font-mono text-txt-muted uppercase tracking-wider bg-bg-card px-1.5 py-0.5 rounded border border-border-main/50 font-bold flex items-center gap-1">
+                  <Zap className="w-2.5 h-2.5 text-txt-main" />
+                  {studyCardStats.streakCount} Day Streak
                 </span>
               </div>
 
-              <div className="flex flex-col gap-2">
-                {onlineFriends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    className="flex items-center justify-between p-2 rounded.sm bg-bg-card border border-border-main/60 text-xs font-mono"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="relative w-6 h-6 rounded-full bg-bg-surface border border-border-main/60 ring-1 ring-emerald-500/85 flex items-center justify-center font-semibold text-txt-main shrink-0 overflow-hidden text-[9px]">
-                        {friend.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
-                        ) : (
-                          friend.full_name.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-txt-main font-medium truncate leading-tight">
-                          {friend.full_name}
-                        </span>
-                        <span className="text-[9px] text-txt-muted font-light truncate">
-                          {friend.inSharedWorkspace ? (
-                            <span className="text-txt-main font-medium">★ {friend.workspaceName || "Team Space"}</span>
-                          ) : (
-                            friend.department
-                          )}
-                        </span>
-                      </div>
-                    </div>
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between p-2.5 rounded-sm bg-bg-card border border-border-main/60 text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-3.5 h-3.5 text-txt-sub" />
+                    <span className="text-txt-muted text-[11px]">Solved Problems</span>
                   </div>
-                ))}
+                  <span className="font-bold text-txt-main text-xs">{studyCardStats.solvedProblemsCount} Solved</span>
+                </div>
 
-                {onlineFriends.length === 0 && (
-                  <span className="text-[10px] font-mono text-txt-muted/70 font-light italic py-1">
-                    No online friends right now.
-                  </span>
-                )}
+                <div className="flex items-center justify-between p-2.5 rounded-sm bg-bg-card border border-border-main/60 text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-3.5 h-3.5 text-txt-sub" />
+                    <span className="text-txt-muted text-[11px]">Total XP Earned</span>
+                  </div>
+                  <span className="font-bold text-txt-main text-xs">{studyCardStats.totalXp} XP</span>
+                </div>
+
+                <div className="p-2.5 rounded-sm bg-bg-card border border-border-main/60 flex flex-col gap-1.5 font-mono">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-txt-muted font-medium truncate max-w-[170px]">
+                      {studyCardStats.activePathTitle}
+                    </span>
+                    <span className="text-txt-main font-bold">{studyCardStats.activePathProgress}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-bg-surface rounded-full overflow-hidden border border-border-main/40">
+                    <div
+                      className="h-full bg-txt-main transition-all duration-500 rounded-full"
+                      style={{ width: `${Math.min(100, Math.max(5, studyCardStats.activePathProgress))}%` }}
+                    />
+                  </div>
+                </div>
               </div>
 
               <Link
-                href="/explore?tab=friends"
-                className="text-[9px] font-mono text-txt-sub hover:text-txt-main transition-colors uppercase font-medium flex items-center gap-1 self-start"
+                href="/study-desk"
+                className="text-[9px] font-mono text-txt-sub hover:text-txt-main transition-colors uppercase font-medium flex items-center gap-1 self-start group mt-1"
               >
-                Find &amp; Add Friends →
+                <span>Open Study Desk</span>
+                <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
 

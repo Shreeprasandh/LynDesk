@@ -155,64 +155,71 @@ export default function Header() {
         if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
           return stored;
         }
-        const extracted = extractAvatarFromUser(user);
-        if (extracted) return extracted;
       } catch {}
     }
     return extractAvatarFromUser(user);
   });
 
-  // Live avatar updates
+  // Live avatar updates prioritizing database profiles record & localStorage over OAuth initial picture
   useEffect(() => {
     let isMounted = true;
-    const resolveHeaderAvatar = () => {
+    const resolveHeaderAvatar = async () => {
       if (!user) {
         setHeaderAvatar("");
         return;
       }
-      let url = "";
+
+      // 1. Instant local storage cache check
+      let localUrl = "";
       if (typeof window !== "undefined") {
         try {
           const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
           if (rawPublic) {
             const parsed = JSON.parse(rawPublic);
             if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
-              url = parsed.avatar_url;
+              localUrl = parsed.avatar_url;
             }
           }
         } catch {}
-        if (!url) {
+        if (!localUrl) {
           const stored =
             localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
             localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
             "";
           if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
-            url = stored;
+            localUrl = stored;
           }
         }
       }
-      if (!url) {
-        url = extractAvatarFromUser(user);
+
+      if (localUrl && isMounted) {
+        setHeaderAvatar(localUrl);
       }
-      if (url) {
-        setHeaderAvatar(url);
-      } else if (user?.id) {
-        // Query database profiles table as authoritative fallback
-        (async () => {
-          try {
-            const { data } = await supabase
-              .from("profiles")
-              .select("avatar_url")
-              .eq("id", user.id)
-              .maybeSingle();
-            if (isMounted && data?.avatar_url && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
-              setHeaderAvatar(data.avatar_url);
-              try {
-                localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
-              } catch {}
+
+      // 2. Query authoritative database profiles table record
+      if (user?.id) {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("avatar_url")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (data?.avatar_url && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
+            if (isMounted) setHeaderAvatar(data.avatar_url);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
+              localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
             }
-          } catch {}
-        })();
+            return;
+          }
+        } catch {}
+      }
+
+      // 3. Fallback to OAuth metadata if no custom profile picture set in DB or localStorage
+      if (!localUrl && isMounted) {
+        const oauthUrl = extractAvatarFromUser(user);
+        setHeaderAvatar(oauthUrl || "");
       }
     };
 

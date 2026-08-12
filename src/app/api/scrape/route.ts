@@ -12,7 +12,12 @@ export async function GET(request: Request) {
 
     if (res.ok) {
       const json = await res.json();
-      const rawList = json?.data?.data || json?.data || [];
+      const rawList = Array.isArray(json?.data?.data)
+        ? json.data.data
+        : Array.isArray(json?.data)
+          ? json.data
+          : [];
+      
       const liveEvents = rawList.map((item: any) => ({
         id: `unstop_${item.id || item.seo_url}`,
         title: item.title || item.name,
@@ -149,22 +154,34 @@ export async function POST(request: Request) {
               const nowTs = Date.now();
 
               if (comp.rounds && Array.isArray(comp.rounds) && comp.rounds.length > 0) {
-                stageBriefs = comp.rounds.map((r: { title?: string; name?: string; start_regn_dt?: string; end_regn_dt?: string; description?: string; details?: string }, idx: number) => {
-                  const rTitle = r.title || r.name || `Round ${idx + 1}`;
-                  let rDeadline = "Target Active";
-                  if (r.end_regn_dt) {
-                    const rd = new Date(r.end_regn_dt);
+                const rawStages = comp.rounds.map((r: any, idx: number) => {
+                  const det = Array.isArray(r.details) && r.details.length > 0 ? r.details[0] : (r.details || r);
+                  const rTitle = det.title || det.name || r.title || r.name || `Round ${idx + 1}`;
+                  let rDeadline = "Date not specified";
+                  const endRaw = det.end_date || det.end_regn_dt || r.end_regn_dt || r.end_date;
+                  if (endRaw) {
+                    const rd = new Date(endRaw);
                     if (!isNaN(rd.getTime())) {
                       rDeadline = rd.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
                     }
                   }
-                  const rawBrief = r.description || r.details || `Execute tasks and complete submission requirements for ${rTitle}.`;
-                  const cleanBrief = rawBrief.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+                  const rawBriefVal = det.display_text || det.description || r.description || `Execute tasks and complete submission requirements for ${rTitle}.`;
+                  const rawBriefStr = typeof rawBriefVal === "string" ? rawBriefVal : String(rawBriefVal || "");
+                  const cleanBrief = rawBriefStr.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
                   return {
-                    stage: rTitle,
+                    stage: rTitle.trim(),
                     deadline: rDeadline,
                     brief: cleanBrief.substring(0, 250) || `Complete requirements for ${rTitle}.`
                   };
+                });
+
+                // Deduplicate stage rounds by normalized title
+                const seenTitles = new Set<string>();
+                stageBriefs = rawStages.filter((stg: { stage: string; deadline: string; brief: string }) => {
+                  const norm = stg.stage.toLowerCase().replace(/\s+/g, " ");
+                  if (seenTitles.has(norm)) return false;
+                  seenTitles.add(norm);
+                  return true;
                 });
 
                 // Sequential Roll-Over Deadline Engine:
@@ -177,10 +194,12 @@ export async function POST(request: Request) {
                   let foundNextRound = false;
                   for (let idx = 0; idx < comp.rounds.length; idx++) {
                     const r = comp.rounds[idx];
-                    const rEndTs = r.end_regn_dt ? new Date(r.end_regn_dt).getTime() : 0;
+                    const det = Array.isArray(r.details) && r.details.length > 0 ? r.details[0] : (r.details || r);
+                    const endRaw = det.end_date || det.end_regn_dt || r.end_regn_dt || r.end_date;
+                    const rEndTs = endRaw ? new Date(endRaw).getTime() : 0;
                     if (rEndTs === 0 || nowTs <= rEndTs) {
-                      const rTitle = r.title || r.name || `Round ${idx + 1}`;
-                      const rDateStr = r.end_regn_dt ? new Date(r.end_regn_dt).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "Target Active";
+                      const rTitle = det.title || det.name || r.title || r.name || `Round ${idx + 1}`;
+                      const rDateStr = endRaw ? new Date(endRaw).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "Active";
                       nextActiveDeadlineStr = `${rTitle}: ${rDateStr}`;
                       calculatedStatus = `${rTitle} Active`;
                       foundNextRound = true;
@@ -341,9 +360,7 @@ export async function POST(request: Request) {
       ? rawDesc 
       : `Official ${cleanTitle} challenge. Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.`;
 
-    const now = new Date();
-    const fallbackDeadline = new Date(now.getTime() + 45 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-    const deadline = extractDeadline() || fallbackDeadline;
+    const deadline = extractDeadline() || "Date not specified";
 
     let organization = "Global Tech Track";
     if (/adobe/i.test(url) || /adobe/i.test(cleanTitle) || /adobe/i.test(html)) organization = "Adobe Systems";
@@ -357,6 +374,7 @@ export async function POST(request: Request) {
       if (prizeMatch) prizes = `${prizeMatch[0]} Prize Pool & Internship Fast-track`;
     }
 
+    const now = new Date();
     const dAug = new Date(now.getTime() + 7 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
     const dSep = new Date(now.getTime() + 21 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
     const dOct = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });

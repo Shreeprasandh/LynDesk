@@ -143,7 +143,7 @@ const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 function isDatePassed(dateStr?: string | null): boolean {
   if (!dateStr) return false;
   const clean = dateStr.trim().toLowerCase();
-  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none")) {
+  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none") || clean.includes("not specified") || clean.includes("tbd") || clean.includes("date not") || clean.includes("to be announced")) {
     return false;
   }
 
@@ -153,13 +153,13 @@ function isDatePassed(dateStr?: string | null): boolean {
 
     raw = raw.replace(/Sept/i, "Sep");
 
-    let parsedTime = Date.parse(raw);
-
-    if (isNaN(parsedTime)) {
+    // Ensure 4-digit year is present so Date.parse doesn't default to year 2001
+    if (!/\b20\d{2}\b/.test(raw)) {
       const currentYear = new Date().getFullYear();
       raw = `${raw}, ${currentYear}`;
-      parsedTime = Date.parse(raw);
     }
+
+    const parsedTime = Date.parse(raw);
 
     if (!isNaN(parsedTime)) {
       const targetDate = new Date(parsedTime);
@@ -222,7 +222,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
   const { id } = use(params);
   const workspaceUuid = useMemo(() => getWorkspaceUuid(id), [id]);
-  const { user } = useAuth();
+  const { user, isUserOnline, onlineUserIds } = useAuth();
   const { showToast } = useToast();
   const [userUsername, setUserUsername] = useState<string>("");
 
@@ -394,13 +394,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     deadline: string;
     url: string;
   }>({
-    title: "Adobe University Hackathon 2026",
-    description: "Build innovative software solutions, collaborate with teammates, and submit your project prototype before the deadline.",
-    organization: "Adobe Systems & Campus Track",
-    prizes: "1st Prize: MacBook Pro for each member • Top 50: PPIs & Internship (₹1,10,000/mo stipend)",
-    rules: "1. All code must be submitted before deadline.\n2. Teams can have up to 3 members.\n3. Original projects only.",
-    deadline: "Oct 16, 2026",
-    url: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333"
+    title: "Project Workspace",
+    description: "Official project workspace. Collaborate with your team, assign tasks, and track stage milestones.",
+    organization: "LynDesk Workspace",
+    prizes: "Certificate & Project Awards",
+    rules: "1. All code must be submitted before deadline.\n2. Teams can have up to 4 members.\n3. Original projects only.",
+    deadline: "Target Active",
+    url: ""
   });
 
   // Real Event Stage Item Type
@@ -417,22 +417,61 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const dNov = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 
   const defaultRealStages: RealStageItem[] = [
-    { title: "Round 1 - Online Assessment", deadline: dAug, brief: "15 MCQs & 1 Coding Challenge." },
-    { title: "Round 2 - Development Round", deadline: dSep, brief: "Build software solution per official problem brief." },
-    { title: "Round 3 - Prototype Showcase", deadline: dOct, brief: "Build working interactive prototype." },
-    { title: "Round 4 - Grand Finale", deadline: dNov, brief: "Final project presentation to leadership." }
+    { title: "Ideation & Proposal", deadline: "Aug 19", brief: "Problem statement selection, team role assignment, technical architecture deck draft submission." },
+    { title: "Prototype Development", deadline: "Sep 02", brief: "Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync." },
+    { title: "QA & User Testing", deadline: "Sep 16", brief: "Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations." },
+    { title: "Final Submission", deadline: "Oct 01", brief: "Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry." }
   ];
 
   const [realStageItems, setRealStageItems] = useState<RealStageItem[]>(defaultRealStages);
 
+  const WORKSPACE_EVENT_URL_MAP: Record<string, { title: string; portalUrl: string }> = {
+    "ws_unstop_uber_2026": { title: "Uber HackTag 2026 Hackathon", portalUrl: "https://unstop.com/hackathons/uber-hacktag-2026" },
+    "ws_unstop_tata_2026": { title: "Tata Crucible Campus Hack 2026", portalUrl: "https://unstop.com/competitions/tata-crucible-campus-2026" },
+    "ws_unstop_flipkart_grid": { title: "Flipkart GRID 6.0 Software Track", portalUrl: "https://unstop.com/competitions/flipkart-grid-6" },
+    "ws_unstop_loreal_brandstorm": { title: "L'Oréal Brandstorm Tech Challenge", portalUrl: "https://unstop.com/competitions/loreal-brandstorm-2026" },
+    "ws_h2s_sih_2026": { title: "Smart India Hackathon 2026 (SIH)", portalUrl: "https://hack2skill.com/hackathons/sih2026" },
+    "ws_h2s_google_cloud": { title: "Google Cloud AI Hackathon India", portalUrl: "https://hack2skill.com/hackathons/google-cloud-ai" },
+    "0d72f1f4-cf25-4a99-bac4-37685be55df1": { title: "Adobe University Hackathon 2026", portalUrl: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333" }
+  };
+
   useEffect(() => {
+    if (!id) return;
+
+    // 1. Resolve workspace-specific URL mapping
+    const mapped = WORKSPACE_EVENT_URL_MAP[id];
+    if (mapped) {
+      setEventMetadata(prev => ({
+        ...prev,
+        title: mapped.title,
+        url: mapped.portalUrl
+      }));
+    }
+
+    // 2. Load workspace-specific metadata from local storage / cache
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`ldk_workspace_real_stages_${id}`);
-      if (saved) {
+      const savedMeta = localStorage.getItem(`ldk_workspace_meta_${id}`);
+      if (savedMeta) {
         try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setTimeout(() => setRealStageItems(parsed), 0);
+          const parsedMeta = JSON.parse(savedMeta);
+          if (parsedMeta && typeof parsedMeta === "object") {
+            setTimeout(() => {
+              setEventMetadata(prev => ({
+                ...prev,
+                ...parsedMeta
+              }));
+            }, 0);
+          }
+        } catch {}
+      }
+
+      // 3. Load workspace-specific stages from local storage / cache
+      const savedStages = localStorage.getItem(`ldk_workspace_real_stages_${id}`);
+      if (savedStages) {
+        try {
+          const parsedStages = JSON.parse(savedStages);
+          if (Array.isArray(parsedStages) && parsedStages.length > 0) {
+            setTimeout(() => setRealStageItems(parsedStages), 0);
           }
         } catch {}
       }
@@ -440,7 +479,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   }, [id]);
 
   useEffect(() => {
-    if (!eventMetadata?.url) return;
+    if (!eventMetadata?.url || eventMetadata.url.trim() === "") return;
     const fetchLiveWebDates = async () => {
       try {
         const res = await fetch("/api/scrape", {
@@ -451,20 +490,26 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         if (res.ok) {
           const data = await res.json();
           if (data && !data.error) {
-            if (data.deadline) {
-              setEventMetadata(prev => ({
-                ...prev,
-                title: data.title || prev.title,
-                description: data.description || prev.description,
-                organization: data.organization || prev.organization,
-                prizes: data.prizes || prev.prizes,
-                deadline: data.deadline || prev.deadline
-              }));
+            const updatedMeta = {
+              title: data.title || eventMetadata.title,
+              description: data.description || eventMetadata.description,
+              organization: data.organization || eventMetadata.organization,
+              prizes: data.prizes || eventMetadata.prizes,
+              rules: data.rules || eventMetadata.rules,
+              deadline: data.deadline || eventMetadata.deadline,
+              url: eventMetadata.url
+            };
+
+            setEventMetadata(updatedMeta);
+
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`ldk_workspace_meta_${id}`, JSON.stringify(updatedMeta));
             }
+
             if (Array.isArray(data.stages) && data.stages.length > 0) {
               const extracted: RealStageItem[] = data.stages.map((s: any, idx: number) => ({
                 title: s.stage || s.title || `Round ${idx + 1}`,
-                deadline: s.deadline || "Target Active",
+                deadline: s.deadline || "TBD",
                 brief: s.brief || ""
               }));
               setRealStageItems(extracted);
@@ -475,7 +520,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           }
         }
       } catch (err) {
-        console.error("Failed fetching live web dates:", err);
+        console.warn("Live event resync note (retaining stored DB/cache snapshot):", err);
       }
     };
     fetchLiveWebDates();
@@ -859,7 +904,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 id: prof.id,
                 name: prof.full_name || prof.username || "Collaborator",
                 avatarUrl: getBestAvatarUrl(prof),
-                isOnline: false,
+                isOnline: isUserOnline(prof.id),
                 customStatus: "Active",
                 lastSeenAt: "Recently"
               }));
@@ -921,13 +966,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
       }
 
-      setRoomMembers(Array.from(uniqueMap.values()));
+      const finalMembers = Array.from(uniqueMap.values()).map(m => ({
+        ...m,
+        isOnline: isUserOnline(m.id) || m.isOnline
+      }));
+
+      setRoomMembers(finalMembers);
     };
 
     if (user) {
       loadMembers();
     }
-  }, [id, user, workspaceTrigger, workspaceUuid]);
+  }, [id, user, workspaceTrigger, workspaceUuid, onlineUserIds]);
 
   // Load sent invites from local storage
   useEffect(() => {
@@ -1240,6 +1290,14 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           if (typeof window !== "undefined") {
             if (finalGit) localStorage.setItem(`ldk_workspace_git_${id}`, finalGit);
             if (finalDemo) localStorage.setItem(`ldk_workspace_demo_${id}`, finalDemo);
+          }
+
+          const dbEventUrl = data.events?.source_url || data.source_url;
+          if (dbEventUrl && typeof dbEventUrl === "string" && dbEventUrl.startsWith("http")) {
+            setEventMetadata(prev => ({
+              ...prev,
+              url: dbEventUrl
+            }));
           }
 
           // If DB was missing git/demo URL but local storage had it, sync DB (only for authenticated users)
@@ -4781,17 +4839,41 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         .eq("project_space_id", workspaceUuid)
                         .eq("profile_id", user.id);
                     }
-                    const storedKey = `ldk_workspace_members_${id}`;
-                    const storedStr = localStorage.getItem(storedKey);
-                    if (storedStr) {
-                      const storedList = JSON.parse(storedStr);
-                      const updated = storedList.filter((m: any) => m.id !== user?.id);
-                      localStorage.setItem(storedKey, JSON.stringify(updated));
+                    if (typeof window !== "undefined") {
+                      const storedKey = `ldk_workspace_members_${id}`;
+                      const storedStr = localStorage.getItem(storedKey);
+                      if (storedStr) {
+                        const storedList = JSON.parse(storedStr);
+                        const updated = storedList.filter((m: any) => m.id !== user?.id);
+                        localStorage.setItem(storedKey, JSON.stringify(updated));
+                      }
+
+                      const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+                      const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
+                      const filteredJoined = joinedIds.filter(jId => jId !== id);
+                      localStorage.setItem("ldk_joined_workspaces", JSON.stringify(filteredJoined));
+
+                      const eventsStr = localStorage.getItem("ldk_events");
+                      if (eventsStr) {
+                        const eventsList = JSON.parse(eventsStr);
+                        const filteredEvents = eventsList.filter((e: any) => e.id !== id);
+                        localStorage.setItem("ldk_events", JSON.stringify(filteredEvents));
+                      }
+
+                      const deletedStr = localStorage.getItem("ldk_deleted_workspaces");
+                      const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+                      if (!deletedIds.includes(id)) {
+                        deletedIds.push(id);
+                        localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(deletedIds));
+                      }
+
+                      localStorage.removeItem(`ldk_sent_invites_${id}`);
+                      window.dispatchEvent(new CustomEvent("ldk_events_update"));
                     }
-                    router.push("/");
+                    router.push("/event-desk");
                   } catch (err) {
                     console.error("Error leaving workspace: ", err);
-                    router.push("/");
+                    router.push("/event-desk");
                   }
                 }}
                 className="flex-1 h-8 rounded bg-red-500/90 hover:bg-red-500 text-white text-xs font-mono uppercase tracking-wider font-bold transition-opacity cursor-pointer shadow-sm"
@@ -4878,7 +4960,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                                 ? "text-accent-main" 
                                 : "text-txt-muted"
                           }`}>
-                            {isPast ? `Completed (${stg.deadline})` : isCurrentActive ? `Active (Target ${stg.deadline})` : `Target ${stg.deadline}`}
+                            {stg.deadline === "Date not specified" || stg.deadline === "TBD"
+                              ? "Date not specified"
+                              : isPast
+                                ? `Completed (${stg.deadline})`
+                                : isCurrentActive
+                                  ? `Active (${stg.deadline})`
+                                  : `Target (${stg.deadline})`}
                           </span>
                         </div>
                         {stg.brief && (

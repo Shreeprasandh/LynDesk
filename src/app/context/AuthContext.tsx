@@ -11,6 +11,8 @@ type AuthContextType = {
   session: Session | null;
   userRole: UserRole;
   loading: boolean;
+  onlineUserIds: Set<string>;
+  isUserOnline: (userId: string) => boolean;
   signOut: () => Promise<void>;
 };
 
@@ -21,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("student");
   const [loading, setLoading] = useState(true);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
 
   const resolveRole = (u: User | null): UserRole => {
     const metaRole = u?.user_metadata?.role;
@@ -78,8 +81,147 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) {
+      queueMicrotask(() => setOnlineUserIds(new Set()));
+      return;
+    }
+
+    // 1. Single Global Supabase WebSockets Realtime Presence Channel
+    const globalPresenceChannel = supabase.channel("global_presence", {
+      config: { presence: { key: user.id } }
+    });
+
+    globalPresenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = globalPresenceChannel.presenceState();
+        const onlineSet = new Set<string>();
+        Object.keys(state).forEach(key => {
+          if (key) onlineSet.add(key);
+        });
+        onlineSet.add(user.id);
+        setOnlineUserIds(onlineSet);
+      })
+      .on("presence", { event: "join" }, ({ key }) => {
+        if (key) {
+          setOnlineUserIds(prev => new Set(prev).add(key));
+        }
+      })
+      .on("presence", { event: "leave" }, ({ key }) => {
+        if (key) {
+          setOnlineUserIds(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await globalPresenceChannel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString()
+          });
+        }
+      });
+
+    // 2. Database presence heartbeat (fallback and persistent profiles tracking)
+    const sendPresence = async (isOnline: boolean) => {
+      try {
+        fetch("/api/workspace/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId: "global_online",
+            userId: user.id,
+            statusText: isOnline ? "Active" : "Offline",
+            isOnline
+          })
+        }).catch(() => {});
+
+        supabase
+          .from("profiles")
+          .update({
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", user.id)
+          .then(() => {});
+      } catch {}
+    };
+
+    sendPresence(true);
+
+    const interval = setInterval(() => {
+      sendPresence(true);
+    }, 25000);
+
+    const handleUnload = () => {
+      sendPresence(false);
+      globalPresenceChannel.untrack().then(() => {
+        supabase.removeChannel(globalPresenceChannel);
+      });
+      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+        try {
+          const blob = new Blob([
+            JSON.stringify({
+              workspaceId: "global_online",
+              userId: user.id,
+              statusText: "Offline",
+              isOnline: false
+            })
+          ], { type: "application/json" });
+          navigator.sendBeacon("/api/workspace/presence", blob);
+        } catch {}
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        sendPresence(false);
+      } else if (document.visibilityState === "visible") {
+        sendPresence(true);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("beforeunload", handleUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      sendPresence(false);
+      supabase.removeChannel(globalPresenceChannel);
+    };
+  }, [user?.id]);
+
+  const isUserOnline = (userId: string): boolean => {
+    if (!userId) return false;
+    if (user?.id && userId === user.id) return true;
+    return onlineUserIds.has(userId);
+  };
+
   const signOut = async () => {
     setLoading(true);
+    if (user?.id) {
+      try {
+        await fetch("/api/workspace/presence", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId: "global_online",
+            userId: user.id,
+            statusText: "Offline",
+            isOnline: false
+          })
+        });
+        await supabase
+          .from("profiles")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", user.id);
+      } catch {}
+    }
+
     if (typeof window !== "undefined") {
       localStorage.removeItem("faculty_staff_member");
       localStorage.removeItem("company_recruiter_member");
@@ -94,11 +236,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     setUserRole("student");
+    setOnlineUserIds(new Set());
     setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, userRole, loading, onlineUserIds, isUserOnline, signOut }}>
       {children}
     </AuthContext.Provider>
   );
