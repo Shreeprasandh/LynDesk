@@ -13,6 +13,7 @@ type AuthContextType = {
   loading: boolean;
   onlineUserIds: Set<string>;
   isUserOnline: (userId: string) => boolean;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -240,8 +241,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
+  const refreshUser = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser(data.user);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_profile_update", refreshUser);
+      return () => {
+        window.removeEventListener("ldk_profile_update", refreshUser);
+      };
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, onlineUserIds, isUserOnline, signOut }}>
+    <AuthContext.Provider value={{ user, session, userRole, loading, onlineUserIds, isUserOnline, refreshUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );

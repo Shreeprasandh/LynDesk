@@ -6,27 +6,32 @@
 export function extractAvatarFromUser(user: any): string {
   if (!user) return "";
 
-  // 1. Direct metadata properties
   const meta = user.user_metadata || {};
-  const metaUrl = meta.avatar_url || meta.picture || meta.avatarUrl || meta.avatar || meta.image || "";
-  if (metaUrl && typeof metaUrl === "string" && (metaUrl.startsWith("http") || metaUrl.startsWith("data:image/"))) {
-    return metaUrl;
+
+  // 0. If user explicitly removed their avatar or set it to empty/null, do NOT fall back to OAuth pictures
+  if (meta.avatar_removed === true || meta.avatar_url === null || meta.avatar_url === "") {
+    return "";
   }
 
-  // 2. OAuth Identities array (e.g. Google OAuth, GitHub OAuth linked to email)
-  if (Array.isArray(user.identities)) {
+  // 1. Direct metadata avatar_url (newest user-chosen avatar)
+  if (meta.avatar_url && typeof meta.avatar_url === "string" && meta.avatar_url.trim().length > 0) {
+    return meta.avatar_url.trim();
+  }
+
+  // 2. User top-level properties
+  if (user.avatar_url && typeof user.avatar_url === "string" && user.avatar_url.trim().length > 0) {
+    return user.avatar_url.trim();
+  }
+
+  // 3. OAuth Identities fallback ONLY if never removed or custom updated
+  if (!meta.avatar_updated && Array.isArray(user.identities)) {
     for (const identity of user.identities) {
       const idData = identity?.identity_data || {};
       const idUrl = idData.avatar_url || idData.picture || idData.avatarUrl || idData.avatar || idData.image || "";
       if (idUrl && typeof idUrl === "string" && (idUrl.startsWith("http") || idUrl.startsWith("data:image/"))) {
-        return idUrl;
+        return idUrl.trim();
       }
     }
-  }
-
-  // 3. User top-level properties
-  if (user.avatar_url && typeof user.avatar_url === "string" && (user.avatar_url.startsWith("http") || user.avatar_url.startsWith("data:image/"))) {
-    return user.avatar_url;
   }
 
   return "";

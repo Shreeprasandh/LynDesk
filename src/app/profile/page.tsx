@@ -76,9 +76,9 @@ export function extractPlatformHandle(input: string, platform: string): { handle
   if (clean.includes("/") || clean.includes(".")) {
     try {
       const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-      const url = new URL(urlString);
-      const host = url.hostname.toLowerCase();
-      const pathSegments = url.pathname.split("/").filter(Boolean);
+      const urlObj = new URL(urlString);
+      const host = urlObj?.hostname ? urlObj.hostname.toLowerCase() : "";
+      const pathSegments = urlObj?.pathname ? urlObj.pathname.split("/").filter(Boolean) : [];
 
       if (platform === "LeetCode") {
         if (!host.includes("leetcode")) {
@@ -176,11 +176,12 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
     if (clean.includes("/") || clean.includes(".")) {
       try {
         const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-        const url = new URL(urlString);
-        if (!url.hostname.toLowerCase().includes("github")) {
+        const urlObj = new URL(urlString);
+        const host = urlObj?.hostname ? urlObj.hostname.toLowerCase() : "";
+        if (!host.includes("github")) {
           return { url: "", error: "Invalid GitHub URL. Must be a github.com profile link." };
         }
-        const user = url.pathname.split("/").filter(Boolean)[0];
+        const user = urlObj.pathname.split("/").filter(Boolean)[0];
         if (!user) return { url: "", error: "Could not extract GitHub username from URL." };
         return { url: `https://github.com/${user}` };
       } catch {
@@ -198,11 +199,12 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
     if (clean.includes("/") || clean.includes(".")) {
       try {
         const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-        const url = new URL(urlString);
-        if (!url.hostname.toLowerCase().includes("linkedin")) {
+        const urlObj = new URL(urlString);
+        const host = urlObj?.hostname ? urlObj.hostname.toLowerCase() : "";
+        if (!host.includes("linkedin")) {
           return { url: "", error: "Invalid LinkedIn URL. Must be a linkedin.com profile link." };
         }
-        const segments = url.pathname.split("/").filter(Boolean);
+        const segments = urlObj.pathname.split("/").filter(Boolean);
         const user = segments[segments.length - 1] || "";
         if (!user) return { url: "", error: "Could not extract LinkedIn username from URL." };
         return { url: `https://linkedin.com/in/${user}` };
@@ -509,8 +511,14 @@ export default function ProfilePage() {
 
         // 2. Fetch detailed record metadata from Auth user metadata & OAuth identities as fallback/extension
         const meta = user.user_metadata || {};
-        const bestAvatar = profile?.avatar_url || extractAvatarFromUser(user);
-        if (bestAvatar) setAvatarUrl(bestAvatar);
+        const hasRemovedAvatar = meta.avatar_removed === true;
+        const bestAvatar = hasRemovedAvatar
+          ? ""
+          : (profile?.avatar_url && profile.avatar_url.trim().length > 0)
+          ? profile.avatar_url.trim()
+          : extractAvatarFromUser(user);
+
+        setAvatarUrl(bestAvatar);
 
         setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
         setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
@@ -1216,7 +1224,7 @@ export default function ProfilePage() {
       if (user?.id) {
         try {
           await supabase.from("profiles").update({ avatar_url: url, updated_at: new Date().toISOString() }).eq("id", user.id);
-          await supabase.auth.updateUser({ data: { avatar_url: url } });
+          await supabase.auth.updateUser({ data: { avatar_url: url, picture: url, avatarUrl: url, avatar: url, avatar_removed: false } });
         } catch (dbErr) {
           console.warn("Avatar database sync note:", dbErr);
         }
@@ -1312,7 +1320,7 @@ export default function ProfilePage() {
     if (user?.id) {
       try {
         await supabase.from("profiles").update({ avatar_url: null, updated_at: new Date().toISOString() }).eq("id", user.id);
-        await supabase.auth.updateUser({ data: { avatar_url: null } });
+        await supabase.auth.updateUser({ data: { avatar_url: null, picture: null, avatarUrl: null, avatar: null, image: null, avatar_removed: true } });
       } catch (dbErr) {
         console.warn("Avatar removal database sync note:", dbErr);
       }

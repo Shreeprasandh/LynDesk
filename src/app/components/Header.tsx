@@ -169,7 +169,48 @@ export default function Header() {
         return;
       }
 
-      // 1. Instant local storage cache check
+      // Check if user explicitly removed their avatar
+      const meta = user.user_metadata || {};
+      if (meta.avatar_removed === true) {
+        if (isMounted) setHeaderAvatar("");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`ldk_user_avatar_${user.id}`);
+          localStorage.removeItem(`ldk_avatar_url_${user.id}`);
+          localStorage.removeItem(`ldk_public_profile_${user.id}`);
+        }
+        return;
+      }
+
+      // 1. Authoritative database profiles record check
+      if (user?.id) {
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("avatar_url")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (data) {
+            if (data.avatar_url === null || data.avatar_url === "") {
+              if (isMounted) setHeaderAvatar("");
+              if (typeof window !== "undefined") {
+                localStorage.removeItem(`ldk_user_avatar_${user.id}`);
+                localStorage.removeItem(`ldk_avatar_url_${user.id}`);
+              }
+              return;
+            } else if (typeof data.avatar_url === "string" && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
+              if (isMounted) setHeaderAvatar(data.avatar_url);
+              if (typeof window !== "undefined") {
+                localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
+                localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
+              }
+              return;
+            }
+          }
+        } catch {}
+      }
+
+      // 2. Instant local storage cache check
       let localUrl = "";
       if (typeof window !== "undefined") {
         try {
@@ -194,30 +235,11 @@ export default function Header() {
 
       if (localUrl && isMounted) {
         setHeaderAvatar(localUrl);
+        return;
       }
 
-      // 2. Query authoritative database profiles table record
-      if (user?.id) {
-        try {
-          const { data } = await supabase
-            .from("profiles")
-            .select("avatar_url")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (data?.avatar_url && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
-            if (isMounted) setHeaderAvatar(data.avatar_url);
-            if (typeof window !== "undefined") {
-              localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
-              localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
-            }
-            return;
-          }
-        } catch {}
-      }
-
-      // 3. Fallback to OAuth metadata if no custom profile picture set in DB or localStorage
-      if (!localUrl && isMounted) {
+      // 3. Fallback to extractAvatarFromUser
+      if (isMounted) {
         const oauthUrl = extractAvatarFromUser(user);
         setHeaderAvatar(oauthUrl || "");
       }
