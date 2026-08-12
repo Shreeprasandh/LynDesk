@@ -558,38 +558,6 @@ export default function Home() {
           };
         });
 
-        joinedIds.forEach(id => {
-          if (!enrichedEvents.some(e => e.id === id)) {
-            const customName = localStorage.getItem(`ldk_workspace_name_${id}`);
-            const customStatus = localStorage.getItem(`ldk_workspace_status_${id}`);
-            const metaStr = localStorage.getItem(`ldk_workspace_meta_${id}`);
-            
-            let metaTitle = "";
-            if (metaStr) {
-              try {
-                const meta = JSON.parse(metaStr);
-                if (meta && meta.title) metaTitle = meta.title;
-              } catch {}
-            }
-            const title = (customName && !customName.startsWith("Loading Project") && customName !== "Hackathon Project Desk" && customName !== "Workspace Desk")
-              ? customName
-              : metaTitle
-              ? metaTitle
-              : "Smart India Hackathon 2026 (SIH)";
-
-            enrichedEvents.unshift({
-              id,
-              title,
-              deadline: "Ongoing",
-              location: "online",
-              level: "global",
-              url: `/workspace/${id}`,
-              status: (customStatus as any) || "development",
-              stages: ["Ideation", "Development", "Testing", "Submitted"]
-            });
-          }
-        });
-
         if (enrichedEvents.length > 0) {
           setEvents(enrichedEvents);
         }
@@ -807,7 +775,7 @@ export default function Home() {
         // 2. Add DB events
         dbEvents.forEach(item => { if (item && item.id) map.set(item.id, item); });
 
-        // 3. Add joined workspace IDs from localStorage
+        // 3. Add joined workspace IDs from localStorage ONLY if a real title exists
         joinedIds.forEach(id => {
           if (!map.has(id)) {
             const customName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${id}`) : null;
@@ -819,22 +787,24 @@ export default function Home() {
                 if (meta && meta.title) metaTitle = meta.title;
               } catch {}
             }
-            const resolvedTitle = customName && !customName.startsWith("Loading Project")
+            const resolvedTitle = (customName && !customName.startsWith("Loading Project") && customName !== "Hackathon Project Desk" && customName !== "Workspace Desk")
               ? customName
               : metaTitle
               ? metaTitle
-              : "Hackathon Project Desk";
+              : "";
 
-            map.set(id, {
-              id,
-              title: resolvedTitle,
-              deadline: "Ongoing",
-              location: "online",
-              level: "global",
-              url: `/workspace/${id}`,
-              status: "development",
-              stages: ["Ideation", "Development", "Final Submission"]
-            });
+            if (resolvedTitle) {
+              map.set(id, {
+                id,
+                title: resolvedTitle,
+                deadline: "Ongoing",
+                location: "online",
+                level: "global",
+                url: `/workspace/${id}`,
+                status: "development",
+                stages: ["Ideation", "Development", "Final Submission"]
+              });
+            }
           }
         });
 
