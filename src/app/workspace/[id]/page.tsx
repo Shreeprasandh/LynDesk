@@ -84,6 +84,7 @@ interface FriendProfile {
   id: string;
   username: string;
   full_name: string;
+  avatar_url?: string;
   academic_credits?: number;
 }
 
@@ -845,11 +846,21 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     if (!item) return "";
     if (typeof item === "string") return item;
     
-    const direct = item.avatar_url || item.avatarUrl || item.picture || item.avatar;
-    if (direct && typeof direct === "string" && direct.trim().length > 0) {
-      return direct.trim();
+    // Check local storage override first for current logged-in user to eliminate 0ms flash
+    if (typeof window !== "undefined" && item.id && user?.id && item.id === user.id) {
+      const localUpdated = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`);
+      if (localUpdated && localUpdated.trim().length > 0) {
+        return localUpdated.trim();
+      }
     }
-    
+
+    // 1. Prioritize custom updated profile picture (DB profiles table / custom upload)
+    const customAvatar = item.avatar_url || item.avatarUrl;
+    if (customAvatar && typeof customAvatar === "string" && customAvatar.trim().length > 0) {
+      return customAvatar.trim();
+    }
+
+    // 2. Only if no custom profile update was done, fall back to Google OAuth profile picture
     const meta = item.raw_user_meta_data || item.user_metadata;
     if (meta) {
       const metaAvatar = meta.avatar_url || meta.picture || meta.avatar;
@@ -858,11 +869,17 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
     }
 
-    const email = item.email || meta?.email;
-    if (email && typeof email === "string" && email.includes("@")) {
-      return `https://unavatar.io/${encodeURIComponent(email)}`;
+    if (Array.isArray(item.identities)) {
+      for (const identity of item.identities) {
+        const idData = identity?.identity_data || {};
+        const idUrl = idData.avatar_url || idData.picture || idData.avatarUrl || idData.avatar;
+        if (idUrl && typeof idUrl === "string" && idUrl.trim().length > 0) {
+          return idUrl.trim();
+        }
+      }
     }
 
+    // 3. Fallback strictly to default SVG profile icon / letter badge
     return "";
   };
 
@@ -972,6 +989,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }));
 
       setRoomMembers(finalMembers);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`ldk_workspace_members_${id}`, JSON.stringify(finalMembers));
+      }
     };
 
     if (user) {
@@ -1180,19 +1200,45 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 }
               }
             });
+            if (friendsList.length === 0) {
+              const { data: profs } = await supabase
+                .from("profiles")
+                .select("id, username, full_name, avatar_url")
+                .neq("id", user.id)
+                .limit(20);
+
+              if (profs && profs.length > 0) {
+                profs.forEach((p: any) => {
+                  friendsList.push({
+                    id: p.id,
+                    username: p.username || p.full_name?.toLowerCase().replace(/\s+/g, "_") || "user",
+                    full_name: p.full_name || p.username || "Classmate",
+                    avatar_url: p.avatar_url || "",
+                    academic_credits: 0
+                  });
+                });
+              }
+            }
             setFriendsToInvite(friendsList);
           } else {
-            setFriendsToInvite([
-              { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter", academic_credits: 0 },
-              { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen", academic_credits: 0 }
-            ]);
+            const { data: profs } = await supabase
+              .from("profiles")
+              .select("id, username, full_name, avatar_url")
+              .neq("id", user.id)
+              .limit(20);
+
+            const realList: FriendProfile[] = (profs || []).map((p: any) => ({
+              id: p.id,
+              username: p.username || p.full_name?.toLowerCase().replace(/\s+/g, "_") || "user",
+              full_name: p.full_name || p.username || "Classmate",
+              avatar_url: p.avatar_url || "",
+              academic_credits: 0
+            }));
+            setFriendsToInvite(realList);
           }
         } catch (e) {
           console.error(e);
-          setFriendsToInvite([
-            { id: "mock_f1", username: "alex_carter", full_name: "Alex Carter", academic_credits: 0 },
-            { id: "mock_f2", username: "mira_sen", full_name: "Mira Sen", academic_credits: 0 }
-          ]);
+          setFriendsToInvite([]);
         }
       };
       fetchFriendsForInvite();
@@ -1496,7 +1542,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const savedArtList: Artifact[] = savedArtStr ? JSON.parse(savedArtStr) : [];
 
       try {
-        let { data: dbArtifacts, error: artError } = await supabase
+        const { data: dbArtifacts, error: artError } = await supabase
           .from("project_artifacts")
           .select(`
             id,
@@ -1511,28 +1557,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           `)
           .eq("project_space_id", workspaceUuid)
           .order("created_at", { ascending: false });
-
-        if (artError) {
-          const { data: fallbackArts } = await supabase
-            .from("project_artifacts")
-            .select(`
-              id,
-              file_name,
-              file_url,
-              version,
-              is_active,
-              created_at,
-              profiles:uploaded_by ( username )
-            `)
-            .eq("project_space_id", workspaceUuid)
-            .order("created_at", { ascending: false });
-
-          dbArtifacts = (fallbackArts || []).map((a: any) => ({
-            ...a,
-            slot_index: 0,
-            slot_name: ""
-          }));
-        }
 
         if (!artError && dbArtifacts && dbArtifacts.length > 0) {
           const loadedArtifacts: Artifact[] = dbArtifacts.map(a => ({
@@ -1890,7 +1914,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setRoomMembers((prev) => {
               const exists = prev.some((m) => m.id === ping.id);
               if (exists) {
-                return prev.map((m) => (m.id === ping.id ? { ...m, isOnline: !!ping.isOnline, avatarUrl: ping.avatarUrl || m.avatarUrl } : m));
+                return prev.map((m) => (m.id === ping.id ? { 
+                  ...m, 
+                  isOnline: !!ping.isOnline, 
+                  avatarUrl: (ping.avatarUrl && typeof ping.avatarUrl === "string" && ping.avatarUrl.trim().length > 0) ? ping.avatarUrl : m.avatarUrl 
+                } : m));
               }
               return [
                 ...prev,

@@ -3,8 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
+    const reqUrl = await Promise.resolve(new URL(request.url));
+    const userId = reqUrl.searchParams.get("userId");
 
     if (!userId) {
       return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
