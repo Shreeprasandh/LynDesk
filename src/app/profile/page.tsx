@@ -9,6 +9,7 @@ import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import AvatarCropModal from "../components/AvatarCropModal";
 import { 
   ArrowLeft, 
   Save, 
@@ -318,6 +319,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const messageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1187,115 +1189,55 @@ export default function ProfilePage() {
     }
   };
 
+  const applyNewAvatar = async (url: string) => {
+    setAvatarUrl(url);
+    if (typeof window !== "undefined" && user?.id) {
+      localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
+      localStorage.setItem(`ldk_avatar_url_${user.id}`, url);
+      try {
+        const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        const parsed = raw ? JSON.parse(raw) : {};
+        parsed.avatar_url = url;
+        localStorage.setItem(`ldk_public_profile_${user.id}`, JSON.stringify(parsed));
+      } catch {}
+      window.dispatchEvent(new Event("ldk_profile_update"));
+    }
+
+    if (user?.id) {
+      try {
+        await supabase.from("profiles").update({ avatar_url: url, updated_at: new Date().toISOString() }).eq("id", user.id);
+        await supabase.auth.updateUser({ data: { avatar_url: url, picture: url, avatarUrl: url, avatar: url, avatar_removed: false } });
+      } catch (dbErr) {
+        console.warn("Avatar database sync note:", dbErr);
+      }
+    }
+  };
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-    
-    // Check file size (e.g., 5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage({ text: "Please upload an image file under 5MB.", type: "error" });
+    if (file.size > 8 * 1024 * 1024) {
+      showToast("Avatar image must be smaller than 8MB", "info");
       return;
     }
-    
-    // Check image mime type
-    if (!file.type.startsWith("image/")) {
-      setMessage({ text: "Please upload a valid image file (PNG, JPG, WebP).", type: "error" });
-      return;
-    }
-    
-    setUploadingAvatar(true);
-    setMessage(null);
-    
-    const applyNewAvatar = async (url: string) => {
-      setAvatarUrl(url);
-      if (typeof window !== "undefined" && user?.id) {
-        localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
-        try {
-          const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
-          const parsed = raw ? JSON.parse(raw) : {};
-          parsed.avatar_url = url;
-          localStorage.setItem(`ldk_public_profile_${user.id}`, JSON.stringify(parsed));
-        } catch {}
-        window.dispatchEvent(new Event("ldk_profile_update"));
-      }
 
-      // Persist avatar URL directly to database and user metadata
-      if (user?.id) {
-        try {
-          await supabase.from("profiles").update({ avatar_url: url, updated_at: new Date().toISOString() }).eq("id", user.id);
-          await supabase.auth.updateUser({ data: { avatar_url: url, picture: url, avatarUrl: url, avatar: url, avatar_removed: false } });
-        } catch (dbErr) {
-          console.warn("Avatar database sync note:", dbErr);
-        }
-      }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const src = evt.target?.result as string;
+      if (src) setCropImageSrc(src);
     };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
+  const handleCropSave = async (croppedDataUrl: string) => {
+    setCropImageSrc(null);
+    setUploadingAvatar(true);
     try {
-      // 1. Instantly downscale & compress image using canvas (~15-25KB)
-      const compressImage = (f: File, maxSize = 250): Promise<string> => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            const img = new Image();
-            img.onload = () => {
-              const canvas = document.createElement("canvas");
-              let width = img.width;
-              let height = img.height;
-              if (width > height) {
-                if (width > maxSize) {
-                  height = Math.round((height * maxSize) / width);
-                  width = maxSize;
-                }
-              } else {
-                if (height > maxSize) {
-                  width = Math.round((width * maxSize) / height);
-                  height = maxSize;
-                }
-              }
-              canvas.width = width;
-              canvas.height = height;
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                ctx.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL("image/jpeg", 0.85));
-              } else {
-                resolve((evt.target?.result as string) || "");
-              }
-            };
-            img.onerror = () => resolve((evt.target?.result as string) || "");
-            img.src = (evt.target?.result as string) || "";
-          };
-          reader.onerror = () => resolve("");
-          reader.readAsDataURL(f);
-        });
-      };
-
-      const base64Url = await compressImage(file);
-      if (base64Url) {
-        applyNewAvatar(base64Url);
-      }
-
-      // 2. Attempt to upload compressed file to Supabase storage bucket
-      try {
-        const fileExt = "jpg";
-        const fileName = `${user?.id || Date.now()}-avatar.${fileExt}`;
-        
-        const { error } = await supabase.storage
-          .from("avatars")
-          .upload(fileName, file, { upsert: true });
-          
-        if (!error) {
-          const { data: { publicUrl } } = supabase.storage
-            .from("avatars")
-            .getPublicUrl(fileName);
-          if (publicUrl) applyNewAvatar(publicUrl);
-        }
-      } catch (storageErr) {
-        console.warn("Supabase storage bucket upload skipped:", storageErr);
-      }
-    } catch (err) {
-      console.warn("Storage upload notice (using lightweight canvas avatar preview fallback):", err);
+      await applyNewAvatar(croppedDataUrl);
+    } catch {
+      showToast("Failed to apply avatar crop", "info");
     } finally {
       setUploadingAvatar(false);
     }
@@ -2711,6 +2653,15 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Avatar Crop Modal Overlay */}
+      {cropImageSrc && (
+        <AvatarCropModal
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropSave}
+          onCancel={() => setCropImageSrc(null)}
+        />
       )}
 
       <Footer />

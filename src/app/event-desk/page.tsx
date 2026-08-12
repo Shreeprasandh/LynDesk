@@ -203,15 +203,25 @@ export default function Home() {
   const { showToast } = useToast();
   const [likelyHasSession, setLikelyHasSession] = useState(false);
 
-  useEffect(() => {
+  // Smart Reload-Only Session Loading State
+  const [isHardReloading, setIsHardReloading] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      const keys = Object.keys(localStorage);
-      const hasToken = keys.some(key => key.startsWith("sb-") && key.endsWith("-auth-token"));
-      queueMicrotask(() => {
-        setLikelyHasSession(hasToken);
-      });
+      const alreadyLoaded = sessionStorage.getItem("ldk_event_desk_session_loaded");
+      if (alreadyLoaded) return false;
+      sessionStorage.setItem("ldk_event_desk_session_loaded", "true");
+      return true;
     }
-  }, []);
+    return true;
+  });
+
+  useEffect(() => {
+    if (isHardReloading) {
+      const timer = setTimeout(() => {
+        setIsHardReloading(false);
+      }, 450);
+      return () => clearTimeout(timer);
+    }
+  }, [isHardReloading]);
 
   const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "success" | "faculty_login">("idle");
   const [email, setEmail] = useState("");
@@ -561,11 +571,11 @@ export default function Home() {
                 if (meta && meta.title) metaTitle = meta.title;
               } catch {}
             }
-            const title = customName && !customName.startsWith("Loading Project")
+            const title = (customName && !customName.startsWith("Loading Project") && customName !== "Hackathon Project Desk" && customName !== "Workspace Desk")
               ? customName
               : metaTitle
               ? metaTitle
-              : "Hackathon Project Desk";
+              : "Smart India Hackathon 2026 (SIH)";
 
             enrichedEvents.unshift({
               id,
@@ -656,29 +666,11 @@ export default function Home() {
       let onlineTeammates: { id?: string; name: string; role: string; active: boolean }[] = [];
       const seenTeammateIds = new Set<string>();
 
-      // 1. Fetch live presence heartbeats
-      const { data: presenceData } = await supabase
-        .from("workspace_presence")
-        .select("user_id, is_online, last_seen_at")
-        .neq("user_id", user.id)
-        .eq("is_online", true);
-
-      const activePresenceSet = new Set<string>();
-      const now = Date.now();
-      const MAX_IDLE_MS = 10 * 60 * 1000;
-
-      (presenceData || []).forEach((p: any) => {
-        const ts = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
-        if (p.is_online && (ts === 0 || now - ts <= MAX_IDLE_MS)) {
-          activePresenceSet.add(p.user_id);
-        }
-      });
-
       if (mySpaceIds.length > 0) {
-        // 2. Fetch teammate profiles across your workspaces
+        // 1. Fetch teammate profiles across your workspaces
         const { data: teammateMembers } = await supabase
           .from("project_members")
-          .select("profile_id, profiles(id, full_name, username, department, is_online, last_seen_at, updated_at)")
+          .select("profile_id, profiles(id, full_name, username, department, updated_at)")
           .in("project_space_id", mySpaceIds)
           .neq("profile_id", user.id);
 
@@ -688,7 +680,7 @@ export default function Home() {
           if (p && p.id && p.id !== user.id) profileMap.set(p.id, p);
         });
 
-        // 3. Include local workspace members
+        // 2. Include local workspace members
         mySpaceIds.forEach(spId => {
           if (typeof window !== "undefined") {
             const raw = localStorage.getItem(`ldk_workspace_members_${spId}`);
@@ -702,8 +694,7 @@ export default function Home() {
                         id: m.id,
                         full_name: m.name || m.username || "Collaborator",
                         username: m.username || "collaborator",
-                        department: "Teammate",
-                        is_online: m.isOnline ?? false
+                        department: "Teammate"
                       });
                     }
                   });
@@ -713,15 +704,14 @@ export default function Home() {
           }
         });
 
+        const MAX_IDLE_MS = 10 * 60 * 1000;
+        const now = Date.now();
+
         onlineTeammates = Array.from(profileMap.values())
           .filter(p => {
-            const lastSeen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
             const updated = p.updated_at ? new Date(p.updated_at).getTime() : 0;
             const onlineSignal =
               isUserOnline(p.id) ||
-              p.is_online === true ||
-              activePresenceSet.has(p.id) ||
-              (lastSeen > 0 && now - lastSeen <= MAX_IDLE_MS) ||
               (updated > 0 && now - updated <= MAX_IDLE_MS);
 
             if (onlineSignal) {
@@ -742,20 +732,18 @@ export default function Home() {
       if (onlineTeammates.length < 3) {
         const { data: activeProfiles } = await supabase
           .from("profiles")
-          .select("id, username, full_name, department, is_online, last_seen_at, updated_at")
+          .select("id, username, full_name, department, updated_at")
           .neq("id", user.id);
 
         if (activeProfiles) {
+          const MAX_IDLE_MS = 10 * 60 * 1000;
+          const now = Date.now();
           activeProfiles.forEach((p: any) => {
             if (onlineTeammates.length >= 5) return;
             if (p.id && !seenTeammateIds.has(p.id)) {
-              const lastSeen = p.last_seen_at ? new Date(p.last_seen_at).getTime() : 0;
               const updated = p.updated_at ? new Date(p.updated_at).getTime() : 0;
               const onlineSignal =
                 isUserOnline(p.id) ||
-                p.is_online === true ||
-                activePresenceSet.has(p.id) ||
-                (lastSeen > 0 && now - lastSeen <= MAX_IDLE_MS) ||
                 (updated > 0 && now - updated <= MAX_IDLE_MS);
 
               if (onlineSignal) {
@@ -782,7 +770,14 @@ export default function Home() {
           if (space || m.project_space_id) {
             const spaceId = space?.id || m.project_space_id;
             const localWorkspaceName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${spaceId}`) : null;
-            const resolvedTitle = localWorkspaceName || space?.project_name || ev?.title || "Hackathon Project Desk";
+            const realTitle = space?.project_name || ev?.title;
+            const resolvedTitle = (localWorkspaceName && localWorkspaceName !== "Hackathon Project Desk" && localWorkspaceName !== "Workspace Desk") 
+              ? localWorkspaceName 
+              : realTitle || "Smart India Hackathon 2026 (SIH)";
+
+            if (typeof window !== "undefined" && realTitle) {
+              localStorage.setItem(`ldk_workspace_name_${spaceId}`, realTitle);
+            }
 
             dbEvents.push({
               id: spaceId,
@@ -1928,10 +1923,10 @@ export default function Home() {
                     alt="Profile" 
                     width={40}
                     height={40}
-                    className="rounded-full border border-border-main/60 object-cover"
+                    className="rounded-full border border-border-main/60 object-cover object-center aspect-square shrink-0"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-full border border-border-main/80 bg-bg-card flex items-center justify-center text-txt-muted flex-shrink-0">
+                  <div className="h-10 w-10 rounded-full border border-border-main/80 bg-bg-card flex items-center justify-center text-txt-muted shrink-0 aspect-square">
                     <User size={18} className="stroke-[1.5]" />
                   </div>
                 )}
