@@ -126,73 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
-    // 2. Database presence heartbeat (fallback and persistent profiles tracking)
-    const sendPresence = async (isOnline: boolean) => {
-      try {
-        fetch("/api/workspace/presence", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            workspaceId: "global_online",
-            userId: user.id,
-            statusText: isOnline ? "Active" : "Offline",
-            isOnline
-          })
-        }).catch(() => {});
-
-        supabase
-          .from("profiles")
-          .update({
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", user.id)
-          .then(() => {});
-      } catch {}
-    };
-
-    sendPresence(true);
-
-    const interval = setInterval(() => {
-      sendPresence(true);
-    }, 25000);
-
-    const handleUnload = () => {
-      sendPresence(false);
+    return () => {
       globalPresenceChannel.untrack().then(() => {
         supabase.removeChannel(globalPresenceChannel);
       });
-      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
-        try {
-          const blob = new Blob([
-            JSON.stringify({
-              workspaceId: "global_online",
-              userId: user.id,
-              statusText: "Offline",
-              isOnline: false
-            })
-          ], { type: "application/json" });
-          navigator.sendBeacon("/api/workspace/presence", blob);
-        } catch {}
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        sendPresence(false);
-      } else if (document.visibilityState === "visible") {
-        sendPresence(true);
-      }
-    };
-
-    window.addEventListener("beforeunload", handleUnload);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("beforeunload", handleUnload);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      sendPresence(false);
-      supabase.removeChannel(globalPresenceChannel);
     };
   }, [user?.id]);
 

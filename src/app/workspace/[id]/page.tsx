@@ -1057,6 +1057,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           };
 
           queueMicrotask(() => {
+            // Clear workspaceId from ldk_deleted_workspaces on re-join
+            const deletedStr = localStorage.getItem("ldk_deleted_workspaces");
+            if (deletedStr) {
+              try {
+                const deletedList: string[] = JSON.parse(deletedStr);
+                const cleanedDeleted = deletedList.filter(dId => dId !== id && dId !== workspaceUuid);
+                localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(cleanedDeleted));
+              } catch {}
+            }
+
             setSentInviteIds(prev => {
               const cleanList = prev.filter(fid => fid !== joiningUserId);
               localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
@@ -1486,7 +1496,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const savedArtList: Artifact[] = savedArtStr ? JSON.parse(savedArtStr) : [];
 
       try {
-        const { data: dbArtifacts, error: artError } = await supabase
+        let { data: dbArtifacts, error: artError } = await supabase
           .from("project_artifacts")
           .select(`
             id,
@@ -1497,10 +1507,32 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             version,
             is_active,
             created_at,
-            profiles ( username )
+            profiles:uploaded_by ( username )
           `)
           .eq("project_space_id", workspaceUuid)
           .order("created_at", { ascending: false });
+
+        if (artError) {
+          const { data: fallbackArts } = await supabase
+            .from("project_artifacts")
+            .select(`
+              id,
+              file_name,
+              file_url,
+              version,
+              is_active,
+              created_at,
+              profiles:uploaded_by ( username )
+            `)
+            .eq("project_space_id", workspaceUuid)
+            .order("created_at", { ascending: false });
+
+          dbArtifacts = (fallbackArts || []).map((a: any) => ({
+            ...a,
+            slot_index: 0,
+            slot_name: ""
+          }));
+        }
 
         if (!artError && dbArtifacts && dbArtifacts.length > 0) {
           const loadedArtifacts: Artifact[] = dbArtifacts.map(a => ({
@@ -1766,8 +1798,12 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         (payload) => {
           const newMember = payload.payload;
           if (newMember && newMember.id && newMember.id !== user?.id) {
+            let isAlreadyMember = false;
             setRoomMembers((prev) => {
-              if (prev.some((m) => m.id === newMember.id)) return prev;
+              isAlreadyMember = prev.some((m) => m.id === newMember.id);
+              if (isAlreadyMember) {
+                return prev.map((m) => (m.id === newMember.id ? { ...m, isOnline: true, avatarUrl: newMember.avatarUrl || m.avatarUrl } : m));
+              }
               const updated = [
                 ...prev,
                 {
@@ -1781,16 +1817,60 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               return updated;
             });
 
+            // Only post "joined" system chat message if this is a genuine first-time join event
+            if (newMember.isNewJoin === true && !isAlreadyMember) {
+              setChatMessages((prev) => {
+                const noticeId = `sys_rt_${newMember.id}`;
+                if (prev.some((m) => m.id === noticeId)) return prev;
+                const updated = [
+                  ...prev,
+                  {
+                    id: noticeId,
+                    sender_name: "LDK:BOT",
+                    sender_role: "SYSTEM",
+                    content: `${newMember.name} joined the shared workspace!`,
+                    created_at: new Date().toISOString(),
+                    isSystem: true
+                  }
+                ];
+                localStorage.setItem(`ldk_chat_messages_${id}`, JSON.stringify(updated));
+                return updated;
+              });
+            }
+          }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "member_left" },
+        (payload) => {
+          const leftData = payload.payload;
+          const leftUserId = leftData?.userId || leftData?.id;
+          const leftUserName = leftData?.userName || "Teammate";
+          if (leftUserId) {
+            setRoomMembers((prev) => {
+              const updated = prev.filter((m) => m.id !== leftUserId);
+              localStorage.setItem(`ldk_workspace_members_${id}`, JSON.stringify(updated));
+              return updated;
+            });
+
+            // Clear left user from sent invites list
+            setSentInviteIds((prev) => {
+              const cleanList = prev.filter((fid) => fid !== leftUserId);
+              localStorage.setItem(`ldk_sent_invites_${id}`, JSON.stringify(cleanList));
+              return cleanList;
+            });
+
+            // Post system chat notice
             setChatMessages((prev) => {
-              const noticeId = `sys_rt_${newMember.id}`;
-              if (prev.some((m) => m.id === noticeId)) return prev;
+              const noticeId = `sys_left_${leftUserId}_${Date.now()}`;
               const updated = [
                 ...prev,
                 {
                   id: noticeId,
                   sender_name: "LDK:BOT",
                   sender_role: "SYSTEM",
-                  content: `${newMember.name} joined the shared workspace!`,
+                  content: `${leftUserName} left the shared workspace.`,
                   created_at: new Date().toISOString(),
                   isSystem: true
                 }
@@ -4122,7 +4202,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               </div>
 
               {/* Live Git Commit Ticker */}
-              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 mt-auto">
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Git Commit Feed</span>
                   <Clock size={11} className="text-txt-main animate-pulse" />
@@ -4833,10 +4913,20 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   setShowLeaveConfirmModal(false);
                   try {
                     if (user) {
+                      fetch("/api/workspace/leave", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          workspaceId: id,
+                          workspaceUuid: workspaceUuid || id,
+                          userId: user.id
+                        })
+                      }).catch(() => {});
+
                       await supabase
                         .from("project_members")
                         .delete()
-                        .eq("project_space_id", workspaceUuid)
+                        .or(`project_space_id.eq.${workspaceUuid},project_space_id.eq.${id}`)
                         .eq("profile_id", user.id);
                     }
                     if (typeof window !== "undefined") {

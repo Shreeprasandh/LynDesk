@@ -480,31 +480,16 @@ export default function Header() {
         }
       }
 
-      // Fetch real database notifications for recipient from Supabase if table exists
+      // Fetch server notifications via same-origin route handler
       let dbNotifs: NotificationItem[] = [];
       if (user?.id) {
         try {
-          const { data: dbData, error: dbErr } = await supabase
-            .from("notifications")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false });
-
-          if (!dbErr && dbData && dbData.length > 0) {
-            dbNotifs = dbData.map((d: any) => {
-              const isRealInvite = d.type === "invite" && !d.title?.toLowerCase().includes("declined") && !d.title?.toLowerCase().includes("accepted");
-              return {
-                id: d.id,
-                title: d.title || "Notification",
-                message: d.content || d.message || "",
-                type: isRealInvite ? "invite" : (d.type || "warning"),
-                category: "alerts",
-                time: "Just now",
-                read: d.is_read ?? false,
-                actionLabel: isRealInvite ? "Accept Invite" : undefined,
-                actionUrl: d.link_url || "/explore"
-              };
-            });
+          const res = await fetch(`/api/user/notifications?userId=${user.id}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json.notifications)) {
+              dbNotifs = json.notifications;
+            }
           }
         } catch {}
       }
@@ -705,21 +690,34 @@ export default function Header() {
     };
   }, [user]);
 
-  // Mark notifications in active drawer tab as read when closing the drawer
+  // Mark notifications as read and auto-clear seen informational alerts (e.g. Invitation Accepted/Declined) when closing drawer
   const handleCloseDrawer = () => {
     setIsOpen(false);
-    if (unreadCount > 0) {
-      const updated = notifications.map(n => {
-        if ((n.category || "alerts") === drawerTab && !n.read) {
-          return { ...n, read: true };
-        }
-        return n;
-      });
-      setNotifications(updated);
-      localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
-      if (user?.id) {
-        localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
-      }
+
+    // Identify informational update alerts that have been seen (e.g. "Invitation Accepted", "Invitation Declined")
+    const toAutoClear = notifications.filter(n => {
+      const titleLower = (n.title || "").toLowerCase();
+      const msgLower = (n.message || "").toLowerCase();
+      const isInformational = titleLower.includes("accepted") || 
+                              titleLower.includes("declined") ||
+                              msgLower.includes("accepted") || 
+                              msgLower.includes("declined") ||
+                              n.type === "system";
+      return isInformational;
+    });
+
+    // Delete auto-cleared informational notifications from DB
+    toAutoClear.forEach(n => deleteNotificationFromDB(n.id));
+
+    // Retain only actionable items or non-informational alerts, marked as read
+    const updated = notifications
+      .filter(n => !toAutoClear.some(tc => tc.id === n.id))
+      .map(n => ({ ...n, read: true }));
+
+    setNotifications(updated);
+    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    if (user?.id) {
+      localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
     }
   };
 
@@ -733,26 +731,48 @@ export default function Header() {
     window.dispatchEvent(new Event("ldk_notifications_update"));
   };
 
-  const handleDismissNotification = (id: string) => {
-    const updated = notifications.filter(n => n.id !== id);
+  const deleteNotificationFromDB = async (id: string, title?: string, actionUrl?: string) => {
+    if (!id) return;
+    try {
+      if (!id.startsWith("n_cron_") && !id.startsWith("notif_local_")) {
+        await supabase.from("notifications").delete().eq("id", id);
+      }
+      if (user?.id) {
+        if (title) {
+          await supabase.from("notifications").delete().eq("user_id", user.id).eq("title", title);
+        }
+        if (actionUrl) {
+          await supabase.from("notifications").delete().eq("user_id", user.id).eq("link_url", actionUrl);
+        }
+      }
+    } catch {}
+  };
+
+  const handleDismissNotification = async (id: string) => {
+    const target = notifications.find(n => n.id === id);
+    deleteNotificationFromDB(id, target?.title, target?.actionUrl);
+
+    const updated = notifications.filter(n => n.id !== id && (target?.title ? n.title !== target.title : true));
     setNotifications(updated);
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    
     if (user?.id) {
       const userKey = `ldk_user_notifications_${user.id}`;
-      const userStored = localStorage.getItem(userKey);
-      if (userStored) {
-        try {
-          const parsed = JSON.parse(userStored);
-          const cleaned = parsed.filter((n: any) => n.id !== id);
-          localStorage.setItem(userKey, JSON.stringify(cleaned));
-        } catch {}
-      }
+      localStorage.setItem(userKey, JSON.stringify(updated));
+    }
+    const globalStored = localStorage.getItem("ldk_global_notifications");
+    if (globalStored) {
+      try {
+        const parsed = JSON.parse(globalStored);
+        const cleaned = parsed.filter((n: any) => n.id !== id && (target?.title ? n.title !== target.title : true));
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+      } catch {}
     }
     window.dispatchEvent(new Event("ldk_notifications_update"));
   };
 
-  const handleNotificationAction = (id: string, actionUrl?: string) => {
+  const handleNotificationAction = async (id: string, actionUrl?: string) => {
     const targetNotif = notifications.find(n => n.id === id);
+    deleteNotificationFromDB(id, targetNotif?.title, actionUrl);
     const targetSenderId = targetNotif?.senderId;
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
 
@@ -768,6 +788,16 @@ export default function Header() {
           if (!joinedList.includes(workspaceId)) {
             joinedList.push(workspaceId);
             localStorage.setItem("ldk_joined_workspaces", JSON.stringify(joinedList));
+          }
+
+          // Clear workspaceId from ldk_deleted_workspaces on re-join
+          const deletedStr = localStorage.getItem("ldk_deleted_workspaces");
+          if (deletedStr) {
+            try {
+              const deletedList: string[] = JSON.parse(deletedStr);
+              const cleanedDeleted = deletedList.filter(dId => dId !== workspaceId);
+              localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(cleanedDeleted));
+            } catch {}
           }
 
           // Save workspace card to ldk_events so dashboard renders it immediately
@@ -809,13 +839,20 @@ export default function Header() {
       }).catch(() => {});
     }
 
-    // Dismiss accepted notification from drawer so it disappears
-    const updated = notifications.filter(n => n.id !== id);
+    // Dismiss accepted notification from drawer so it disappears permanently
+    const updated = notifications.filter(n => n.id !== id && (targetNotif?.title ? n.title !== targetNotif.title : true));
     setNotifications(updated);
-    if (user) {
-      localStorage.setItem(`ldk_notifications_${user.id}`, JSON.stringify(updated));
+    if (user?.id) {
+      localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
     }
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    const globalStored = localStorage.getItem("ldk_global_notifications");
+    if (globalStored) {
+      try {
+        const parsed = JSON.parse(globalStored);
+        const cleaned = parsed.filter((n: any) => n.id !== id && (targetNotif?.title ? n.title !== targetNotif.title : true));
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+      } catch {}
+    }
     window.dispatchEvent(new Event("ldk_notifications_update"));
 
     if (actionUrl) {
@@ -824,8 +861,9 @@ export default function Header() {
     }
   };
 
-  const handleNotificationReject = (id: string, actionUrl?: string) => {
+  const handleNotificationReject = async (id: string, actionUrl?: string) => {
     const targetNotif = notifications.find(n => n.id === id);
+    deleteNotificationFromDB(id, targetNotif?.title, actionUrl);
     const targetSenderId = targetNotif?.senderId;
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
 
@@ -846,13 +884,20 @@ export default function Header() {
       }).catch(() => {});
     }
 
-    // Dismiss declined notification from drawer so it disappears
-    const updated = notifications.filter(n => n.id !== id);
+    // Dismiss declined notification from drawer so it disappears permanently
+    const updated = notifications.filter(n => n.id !== id && (targetNotif?.title ? n.title !== targetNotif.title : true));
     setNotifications(updated);
-    if (user) {
-      localStorage.setItem(`ldk_notifications_${user.id}`, JSON.stringify(updated));
+    if (user?.id) {
+      localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(updated));
     }
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
+    const globalStored = localStorage.getItem("ldk_global_notifications");
+    if (globalStored) {
+      try {
+        const parsed = JSON.parse(globalStored);
+        const cleaned = parsed.filter((n: any) => n.id !== id && (targetNotif?.title ? n.title !== targetNotif.title : true));
+        localStorage.setItem("ldk_global_notifications", JSON.stringify(cleaned));
+      } catch {}
+    }
 
     if (actionUrl) {
       try {
@@ -1201,14 +1246,16 @@ export default function Header() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] font-mono text-txt-muted">{item.time}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDismissNotification(item.id)}
-                            className="p-1 rounded hover:bg-bg-surface text-txt-muted hover:text-red-400 transition-colors cursor-pointer"
-                            title="Dismiss notification"
-                          >
-                            <X size={10} />
-                          </button>
+                          {item.type !== "invite" && (
+                            <button
+                              type="button"
+                              onClick={() => handleDismissNotification(item.id)}
+                              className="p-1 rounded hover:bg-bg-surface text-txt-muted hover:text-red-400 transition-colors cursor-pointer"
+                              title="Dismiss notification"
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
                         </div>
                       </div>
 

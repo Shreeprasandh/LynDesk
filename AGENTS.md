@@ -15,12 +15,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Proactive Commit Prompt**: If substantial code changes or multiple file edits accumulate without a commit, proactively ask Sir if he would like to review and commit the changes (which will also invoke **The Seven Shadows** pre-commit audit).
 
 ## 1. Database Management & Schema Integrity
-- **No Workarounds / Roundabout Solutions**: When a database error occurs due to a non-existent table, column, or row, **NEVER** use workarounds, dummy fallbacks, or temporary bypass hacks.
+- **No Workarounds / Roundabout Solutions**: When a database error occurs due to a non-existent table, column, or row, **NEVER** use workarounds, dummy fallbacks, or temporary bypass hacks. Always implement gold-standard, production-grade industry solutions.
 - **Schema Creation Priority**: Always prioritize creating the necessary database table, column, or seed data.
 - **Mandatory Schema Permission**: **ALWAYS ask Sir for explicit permission** every time before creating, altering, or running migrations for database tables, columns, or rows.
 
-## 2. Strict Edit Scope & Verification Protocol
+## 2. Strict Edit Scope, Diagnostic Q&A & Permission Protocol
 - **Strict Scope Boundary**: When Sir asks to change a specific feature, component, or file, touch **ONLY** the elements explicitly requested. Do NOT touch or edit unrelated files or components.
+- **Diagnostic Q&A Boundary**: When Sir asks a diagnostic, explanatory, or verification question (e.g. *"why is this happening?"*, *"yes or no?"*, *"what is going on?"*), **NEVER** edit files or mutate code automatically. Answer Sir's question clearly first and await explicit permission/instruction (*"fix it"*, *"do it"*) before modifying code.
+- **No Unprompted Undos / Reverts**: Never run unprompted `git checkout` or code undo operations unless explicitly requested or approved by Sir.
 - **Verification for Auxiliary Edits**: If editing adjacent or dependent files is necessary or beneficial, **ALWAYS ask Sir and verify permission first** before making edits outside the requested scope.
 
 ## 3. Human Masterpiece UI & Aesthetic Directives

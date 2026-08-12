@@ -101,6 +101,8 @@ ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.project_artifacts (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     project_space_id UUID REFERENCES public.project_spaces ON DELETE CASCADE NOT NULL,
+    slot_index INTEGER DEFAULT 0 NOT NULL,
+    slot_name TEXT DEFAULT '' NOT NULL,
     file_name TEXT NOT NULL,
     file_url TEXT NOT NULL,
     version INTEGER DEFAULT 1 NOT NULL,

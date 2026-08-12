@@ -33,6 +33,7 @@ import {
   Trash2,
   LogOut,
   Copy,
+  Calendar,
   SlidersHorizontal
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
@@ -763,20 +764,17 @@ export default function Home() {
         });
       }
 
-      setEvents(prev => {
+      setEvents(() => {
         const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
         
         const map = new Map<string, EventItem>();
-        
-        // 1. Add prev state items
-        prev.forEach(item => { if (item && item.id) map.set(item.id, item); });
 
-        // 2. Add DB events
+        // 1. Add DB events
         dbEvents.forEach(item => { if (item && item.id) map.set(item.id, item); });
 
-        // 3. Add joined workspace IDs from localStorage ONLY if a real title exists
-        joinedIds.forEach(id => {
+        // 2. Add joined workspace IDs from localStorage ONLY if a real custom name exists (newest first)
+        joinedIds.slice().reverse().forEach(id => {
           if (!map.has(id)) {
             const customName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${id}`) : null;
             const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${id}`) : null;
@@ -811,8 +809,28 @@ export default function Home() {
         const deletedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_deleted_workspaces") : null;
         const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
 
-        const mergedList = Array.from(map.values()).filter(e => !deletedIds.includes(e.id));
+        let mergedList = Array.from(map.values()).filter(e => !deletedIds.includes(e.id));
+
         if (typeof window !== "undefined") {
+          const userOrderKey = user?.id ? `ldk_custom_workspace_order_${user.id}` : "ldk_custom_workspace_order";
+          const customOrderStr = localStorage.getItem(userOrderKey);
+
+          if (customOrderStr) {
+            try {
+              const customOrderIds: string[] = JSON.parse(customOrderStr);
+              mergedList.sort((a, b) => {
+                const indexA = customOrderIds.indexOf(a.id);
+                const indexB = customOrderIds.indexOf(b.id);
+                if (indexA === -1 && indexB === -1) return 0;
+                if (indexA === -1) return -1; // Unordered/new track stays at the top
+                if (indexB === -1) return 1;
+                return indexA - indexB;
+              });
+            } catch {}
+          } else {
+            // Default: newest created workspaces stay at the top
+            mergedList = mergedList.slice().reverse();
+          }
           localStorage.setItem("ldk_events", JSON.stringify(mergedList));
         }
         return mergedList;
@@ -949,6 +967,9 @@ export default function Home() {
     setEvents(newEvents);
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_events", JSON.stringify(newEvents));
+      const userOrderKey = user?.id ? `ldk_custom_workspace_order_${user.id}` : "ldk_custom_workspace_order";
+      const customOrderIds = newEvents.map(e => e.id);
+      localStorage.setItem(userOrderKey, JSON.stringify(customOrderIds));
       window.dispatchEvent(new CustomEvent("ldk_events_update"));
     }
   };
@@ -2119,7 +2140,7 @@ export default function Home() {
                         const firstUnpassed = stageObjects.findIndex((s: { stage: string; deadline: string }) => !isDatePassed(s.deadline));
                         const allPassed = firstUnpassed === -1;
                         const activeIdx = (allPassed || isEventEnded) ? stageObjects.length - 1 : (firstUnpassed >= 0 ? firstUnpassed : 0);
-                        const maxIdx = Math.max(stageObjects.length - 1, 1);
+                        const activeStageObj = stageObjects[activeIdx] || stageObjects[0];
 
                         return (
                           <motion.div 
@@ -2240,8 +2261,13 @@ export default function Home() {
                                 )}
 
                                 <div className="flex flex-col items-end gap-1">
-                                  <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted">Deadline</span>
-                                  <span className="text-xs text-txt-main font-medium">{ev.deadline}</span>
+                                  <span className="text-[9px] font-mono tracking-wider uppercase text-txt-muted max-w-[140px] truncate" title={activeStageObj?.stage || "Next Milestone"}>
+                                    {activeStageObj?.stage || "Next Milestone"}
+                                  </span>
+                                  <span className="text-xs text-txt-main font-medium font-mono flex items-center gap-1">
+                                    <Calendar size={11} className="text-accent-main" />
+                                    {activeStageObj?.deadline || ev.deadline || "Ongoing"}
+                                  </span>
                                 </div>
                               </div>
                             </div>
