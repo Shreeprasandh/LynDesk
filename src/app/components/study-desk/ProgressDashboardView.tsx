@@ -391,12 +391,12 @@ export default function ProgressDashboardView({
             </div>
           </div>
 
-          {/* VanguarDZ Typing Suite Card (Placed under Skill Proficiency Radar) */}
+          {/* VanguarDZ Typing Game Card (Placed under Skill Proficiency Radar) */}
           <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 shadow-xs relative overflow-hidden">
             <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
               <div className="flex items-center gap-2">
                 <Gamepad2 size={18} className="text-accent-main" />
-                <h3 className="font-display text-base font-light text-txt-main">VanguarDZ Typing Suite</h3>
+                <h3 className="font-display text-base font-light text-txt-main">VanguarDZ Typing Game</h3>
               </div>
               <span className="font-mono text-[9px] text-accent-main border border-accent-main/30 bg-accent-main/10 px-2 py-0.5 rounded font-semibold uppercase">
                 vanguardz.in

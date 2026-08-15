@@ -38,7 +38,7 @@ const calculateTotalDSAXp = (map: UserDSAProgressMap) => {
 
 export default function StudyDeskPage() {
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<"paths" | "dsa_way" | "progress">("paths");
+  const [activeTab, setActiveTab] = useState<"progress" | "dsa_way" | "paths">("progress");
 
   // Synchronous 0ms local state initializers
   const [paths, setPaths] = useState<StudyPath[]>(() => {
@@ -707,12 +707,12 @@ export default function StudyDeskPage() {
           {/* Sub-Tab Navigation Bar */}
           <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 self-start font-mono text-[10px] tracking-wider uppercase flex-wrap gap-0.5">
             <button
-              onClick={() => setActiveTab("paths")}
+              onClick={() => setActiveTab("progress")}
               className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "paths" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+                activeTab === "progress" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Learning Way
+              Progress
             </button>
 
             <button
@@ -725,12 +725,12 @@ export default function StudyDeskPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab("progress")}
+              onClick={() => setActiveTab("paths")}
               className={`px-3.5 py-1.5 rounded-sm transition-colors cursor-pointer ${
-                activeTab === "progress" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
+                activeTab === "paths" ? "bg-accent-main text-bg-base font-semibold" : "text-txt-sub hover:text-txt-main"
               }`}
             >
-              Progress
+              Learning Way
             </button>
           </div>
         </div>

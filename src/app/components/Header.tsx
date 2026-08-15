@@ -181,7 +181,34 @@ export default function Header() {
         return;
       }
 
-      // 1. Authoritative database profiles record check
+      // 1. Instant 0ms local storage cache check (prevents flash of Google OAuth picture)
+      let localUrl = "";
+      if (typeof window !== "undefined") {
+        try {
+          const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+          if (rawPublic) {
+            const parsed = JSON.parse(rawPublic);
+            if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
+              localUrl = parsed.avatar_url;
+            }
+          }
+        } catch {}
+        if (!localUrl) {
+          const stored =
+            localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+            localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+            "";
+          if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
+            localUrl = stored;
+          }
+        }
+      }
+
+      if (localUrl && isMounted) {
+        setHeaderAvatar(localUrl);
+      }
+
+      // 2. Authoritative database profiles record check (syncs in background)
       if (user?.id) {
         try {
           const { data } = await supabase
@@ -210,36 +237,8 @@ export default function Header() {
         } catch {}
       }
 
-      // 2. Instant local storage cache check
-      let localUrl = "";
-      if (typeof window !== "undefined") {
-        try {
-          const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
-          if (rawPublic) {
-            const parsed = JSON.parse(rawPublic);
-            if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
-              localUrl = parsed.avatar_url;
-            }
-          }
-        } catch {}
-        if (!localUrl) {
-          const stored =
-            localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
-            localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
-            "";
-          if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
-            localUrl = stored;
-          }
-        }
-      }
-
-      if (localUrl && isMounted) {
-        setHeaderAvatar(localUrl);
-        return;
-      }
-
-      // 3. Fallback to extractAvatarFromUser
-      if (isMounted) {
+      // 3. Fallback to extractAvatarFromUser ONLY if localUrl was not found
+      if (!localUrl && isMounted) {
         const oauthUrl = extractAvatarFromUser(user);
         setHeaderAvatar(oauthUrl || "");
       }

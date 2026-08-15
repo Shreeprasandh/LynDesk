@@ -863,7 +863,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     // 2. Only if no custom profile update was done, fall back to Google OAuth profile picture
     const meta = item.raw_user_meta_data || item.user_metadata;
     if (meta) {
-      const metaAvatar = meta.avatar_url || meta.picture || meta.avatar;
+      const metaAvatar = meta.avatar_url || meta.avatar;
       if (metaAvatar && typeof metaAvatar === "string" && metaAvatar.trim().length > 0) {
         return metaAvatar.trim();
       }

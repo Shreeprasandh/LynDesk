@@ -346,7 +346,7 @@ export default function ExplorePage() {
           codechef_username: meta.codechef_username || "",
           unstop_username: meta.unstop_username || "",
           hack2skill_username: meta.hack2skill_username || "",
-          avatar_url: meta.avatar_url || meta.picture || "",
+          avatar_url: meta.avatar_url || "",
           full_name: meta.full_name || "",
           username: meta.username || "",
           college_name: meta.college_name || "",
@@ -993,7 +993,6 @@ export default function ExplorePage() {
                         draft.avatar_url ||
                         publicCached.avatar_url ||
                         meta.avatar_url ||
-                        meta.picture ||
                         "";
 
                       const leetcode =
