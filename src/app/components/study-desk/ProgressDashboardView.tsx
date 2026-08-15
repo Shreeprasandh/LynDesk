@@ -11,8 +11,15 @@ import {
   ArrowRight,
   Award,
   Activity,
-  Layers,
-  TrendingUp
+  TrendingUp,
+  Gamepad2,
+  ExternalLink,
+  Lock,
+  CheckCircle2,
+  Sparkles,
+  KeyRound,
+  X,
+  RefreshCw
 } from "lucide-react";
 
 interface ProgressDashboardViewProps {
@@ -30,6 +37,71 @@ export default function ProgressDashboardView({
   onOpenErrorBank,
   onResumePath,
 }: ProgressDashboardViewProps) {
+  // VanguarDZ Account Connection State
+  const [vanguardzAccount, setVanguardzAccount] = React.useState<{ username: string; highScore: number } | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("ldk_vanguardz_account");
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return null;
+  });
+
+  const [isConnectModalOpen, setIsConnectModalOpen] = React.useState(false);
+  const [vgUsername, setVgUsername] = React.useState("");
+  const [vgPassword, setVgPassword] = React.useState("");
+  const [vgLoading, setVgLoading] = React.useState(false);
+  const [vgError, setVgError] = React.useState<string | null>(null);
+
+  const handleConnectVanguarDZ = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vgUsername.trim() || !vgPassword.trim()) {
+      setVgError("Please enter both username and password.");
+      return;
+    }
+    setVgLoading(true);
+    setVgError(null);
+
+    try {
+      const res = await fetch("/api/vanguardz/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: vgUsername.trim(), password: vgPassword.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const accountData = { username: data.username, highScore: data.highScore };
+        setVanguardzAccount(accountData);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ldk_vanguardz_account", JSON.stringify(accountData));
+        }
+        setIsConnectModalOpen(false);
+        setVgPassword("");
+      } else {
+        setVgError(data.message || "Failed to authenticate VanguarDZ account.");
+      }
+    } catch {
+      setVgError("Network error connecting to VanguarDZ.");
+    } finally {
+      setVgLoading(false);
+    }
+  };
+
+  const handleRefreshVgStats = async () => {
+    if (!vanguardzAccount?.username) return;
+    try {
+      const res = await fetch(`/api/vanguardz/connect?username=${encodeURIComponent(vanguardzAccount.username)}`);
+      const data = await res.json();
+      if (data.success && typeof data.highScore === "number") {
+        const updated = { username: vanguardzAccount.username, highScore: data.highScore };
+        setVanguardzAccount(updated);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ldk_vanguardz_account", JSON.stringify(updated));
+        }
+      }
+    } catch {}
+  };
   // Generate 30-day activity grid
   const daysGrid: { dateStr: string; isActive: boolean; dayNum: number }[] = [];
   const todayMs = new Date().getTime();
@@ -244,37 +316,8 @@ export default function ProgressDashboardView({
           </div>
         </div>
 
-        {/* Right Column (5 cols): DSA Way Summary & Rank Progress */}
+        {/* Right Column (5 cols): Rank Progress, Skill Radar & VanguarDZ Suite */}
         <div className="lg:col-span-5 space-y-6">
-          {/* DSA Way Curriculum Overview */}
-          <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 shadow-xs">
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-              <div className="flex items-center gap-2">
-                <Layers size={16} className="text-accent-main" />
-                <h3 className="font-display text-base font-light text-txt-main">DSA Way Curriculums</h3>
-              </div>
-              <span className="font-mono text-[10px] text-txt-muted uppercase">6 Tracks</span>
-            </div>
-
-            <div className="space-y-3">
-              {DSA_TRACKS.map((track) => (
-                <div
-                  key={track.id}
-                  className="p-3 bg-bg-base/60 border border-border-main/60 rounded flex items-center justify-between gap-3 font-mono text-xs"
-                >
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <span className="text-[9px] uppercase tracking-wider text-accent-main font-semibold block">
-                      {track.badge}
-                    </span>
-                    <h4 className="font-display text-xs font-semibold text-txt-main truncate">{track.title}</h4>
-                  </div>
-                  <span className="text-[10px] text-txt-muted bg-bg-card px-2 py-0.5 rounded border border-border-main/40 shrink-0">
-                    {track.steps.reduce((acc, s) => acc + s.problems.length, 0)} Problems
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Academic Rank Advancement Card */}
           <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 shadow-xs">
@@ -348,8 +391,150 @@ export default function ProgressDashboardView({
             </div>
           </div>
 
+          {/* VanguarDZ Typing Suite Card (Placed under Skill Proficiency Radar) */}
+          <div className="border border-border-main/80 bg-bg-surface p-6 rounded-md space-y-4 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Gamepad2 size={18} className="text-accent-main" />
+                <h3 className="font-display text-base font-light text-txt-main">VanguarDZ Typing Suite</h3>
+              </div>
+              <span className="font-mono text-[9px] text-accent-main border border-accent-main/30 bg-accent-main/10 px-2 py-0.5 rounded font-semibold uppercase">
+                vanguardz.in
+              </span>
+            </div>
+
+            <p className="text-xs text-txt-sub font-light leading-relaxed">
+              Practice your typing skills with VanguarDZ — play while you get better and level up your developer velocity!
+            </p>
+
+            {/* Account Link & High Score Status */}
+            {vanguardzAccount ? (
+              <div className="bg-bg-base/70 border border-border-main/70 rounded p-3.5 space-y-2 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-txt-main font-semibold">
+                    <CheckCircle2 size={14} className="text-accent-main" />
+                    <span>@{vanguardzAccount.username}</span>
+                  </div>
+                  <button
+                    onClick={handleRefreshVgStats}
+                    title="Refresh high score"
+                    className="text-txt-muted hover:text-txt-main p-1 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw size={12} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-border-main/40 text-[11px]">
+                  <span className="text-txt-sub font-light">VanguarDZ High Score</span>
+                  <span className="text-accent-main font-bold flex items-center gap-1">
+                    <Sparkles size={12} /> {vanguardzAccount.highScore} pts
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-bg-card/40 border border-border-main/50 rounded p-3 text-center space-y-2">
+                <p className="text-[11px] text-txt-muted font-mono font-light">
+                  Connect your VanguarDZ account to display your live high score here.
+                </p>
+                <button
+                  onClick={() => setIsConnectModalOpen(true)}
+                  className="px-3 py-1.5 bg-bg-surface hover:bg-border-main/30 border border-border-main text-txt-main font-mono text-[10px] uppercase font-semibold rounded cursor-pointer transition-colors inline-flex items-center gap-1.5"
+                >
+                  <KeyRound size={12} className="text-accent-main" /> Connect Account
+                </button>
+              </div>
+            )}
+
+            {/* Primary Action Play Button */}
+            <a
+              href="https://vanguardz.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-xs uppercase tracking-wider font-semibold rounded cursor-pointer transition-opacity flex items-center justify-center gap-2 shadow-xs text-center"
+            >
+              Play VanguarDZ → <ExternalLink size={14} />
+            </a>
+          </div>
+
         </div>
       </div>
+
+      {/* VanguarDZ Connect Account Modal */}
+      {isConnectModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main/90 rounded-md p-6 max-w-md w-full space-y-5 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <div className="flex items-center gap-2">
+                <Gamepad2 size={18} className="text-accent-main" />
+                <h3 className="font-display text-lg font-normal text-txt-main">Connect VanguarDZ Account</h3>
+              </div>
+              <button
+                onClick={() => setIsConnectModalOpen(false)}
+                className="text-txt-muted hover:text-txt-main p-1 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="text-xs text-txt-sub font-light leading-relaxed">
+              Enter your VanguarDZ player credentials to connect your typing account and display your live high score in LynDesk.
+            </p>
+
+            {vgError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono rounded">
+                {vgError}
+              </div>
+            )}
+
+            <form onSubmit={handleConnectVanguarDZ} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="font-mono text-[10px] uppercase text-txt-muted font-bold block">
+                  VanguarDZ Username
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vgUsername}
+                  onChange={(e) => setVgUsername(e.target.value)}
+                  placeholder="Enter your VanguarDZ username"
+                  className="w-full px-3.5 py-2.5 bg-bg-base border border-border-main/80 rounded text-sm text-txt-main focus:border-accent-main focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="font-mono text-[10px] uppercase text-txt-muted font-bold block">
+                  VanguarDZ Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={vgPassword}
+                  onChange={(e) => setVgPassword(e.target.value)}
+                  placeholder="Enter your VanguarDZ password"
+                  className="w-full px-3.5 py-2.5 bg-bg-base border border-border-main/80 rounded text-sm text-txt-main focus:border-accent-main focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConnectModalOpen(false)}
+                  className="px-4 py-2 text-xs font-mono uppercase text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={vgLoading}
+                  className="px-5 py-2.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-xs uppercase font-semibold rounded cursor-pointer transition-opacity flex items-center gap-2"
+                >
+                  {vgLoading ? "Verifying..." : "Connect Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
