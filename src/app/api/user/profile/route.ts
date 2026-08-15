@@ -3,14 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
   try {
-    const reqUrl = await Promise.resolve(new URL(request.url));
-    const userId = reqUrl.searchParams.get("userId");
+    const { searchParams: urlParams } = new URL(request.url);
+    const userId = urlParams.get("userId");
 
     if (!userId) {
       return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dsqkxedafwzkjtcupzwx.supabase.co";
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {

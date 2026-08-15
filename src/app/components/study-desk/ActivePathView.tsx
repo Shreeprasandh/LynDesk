@@ -50,6 +50,10 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
       }
     }
 
+    const extractedMaterial = Array.isArray(path.sourceFiles)
+      ? path.sourceFiles.map((sf: any) => sf.rawTextPreview || "").filter(Boolean).join("\n\n").slice(0, 12000)
+      : "";
+
     if (nextTarget && (!nextTarget.lesson.cards || nextTarget.lesson.cards.length < 2)) {
       const target = nextTarget;
       fetch("/api/study/hydrate-lesson", {
@@ -60,7 +64,8 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
           sectionTitle: target.sectionTitle,
           lessonTitle: target.lesson.title,
           lessonDescription: target.lesson.description,
-          depthMode: path.depthMode || "standard"
+          depthMode: path.depthMode || "standard",
+          materialContext: extractedMaterial || undefined
         })
       })
         .then((res) => res.json())
@@ -86,6 +91,10 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
     setIsHydratingLesson(true);
     setHydratingLessonTitle(lesson.title);
 
+    const extractedMaterial = Array.isArray(path.sourceFiles)
+      ? path.sourceFiles.map((sf: any) => sf.rawTextPreview || "").filter(Boolean).join("\n\n").slice(0, 12000)
+      : "";
+
     try {
       const res = await fetch("/api/study/hydrate-lesson", {
         method: "POST",
@@ -95,7 +104,8 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
           sectionTitle: sectionTitle,
           lessonTitle: lesson.title,
           lessonDescription: lesson.description,
-          depthMode: path.depthMode || "standard"
+          depthMode: path.depthMode || "standard",
+          materialContext: extractedMaterial || undefined
         })
       });
 
@@ -374,9 +384,9 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                                 .replace(/\s+/g, " ")
                                 .trim();
 
-                              const videoUrl = lesson.videoResource?.url
+                              const videoUrl = (lesson.videoResource?.url && !lesson.videoResource.url.includes("search_query=Lesson"))
                                 ? lesson.videoResource.url
-                                : `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTopic)}`;
+                                : `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTopic + " tutorial")}`;
 
                               if (!isUnlocked) {
                                 return (

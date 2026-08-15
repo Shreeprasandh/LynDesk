@@ -250,20 +250,65 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
     }
   };
 
+  const shuffledMcqData = React.useMemo(() => {
+    if (!currentQuestion || currentQuestion.type !== "mcq") return null;
+
+    const rawOpts = currentQuestion.options || [];
+    const filteredOpts = rawOpts.filter((o) => typeof o === "string" && o.trim().length > 0);
+    const baseOpts = filteredOpts.length > 0
+      ? filteredOpts
+      : [
+          currentQuestion.correctAnswerText || currentQuestion.correctAnswer || "Primary Core Concept",
+          "Secondary Mechanism",
+          "External Parameter",
+          "Administrative Bound"
+        ];
+
+    const origCorrectIdx = currentQuestion.correctAnswerIndex ?? 0;
+    const correctText = currentQuestion.correctAnswerText || currentQuestion.correctAnswer || baseOpts[origCorrectIdx] || baseOpts[0];
+
+    const promptKey = (currentQuestion.prompt || "") + currentStepIndex;
+    let hash = 0;
+    for (let i = 0; i < promptKey.length; i++) {
+      hash = (hash << 5) - hash + promptKey.charCodeAt(i);
+      hash |= 0;
+    }
+
+    const indexedOpts = baseOpts.map((opt, i) => ({
+      text: opt,
+      isCorrect: i === origCorrectIdx || opt.trim().toLowerCase() === correctText.trim().toLowerCase()
+    }));
+
+    const shuffled = [...indexedOpts];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const pseudoRandom = Math.abs((hash + i * 31) % (i + 1));
+      const temp = shuffled[i];
+      shuffled[i] = shuffled[pseudoRandom];
+      shuffled[pseudoRandom] = temp;
+    }
+
+    const newCorrectIdx = shuffled.findIndex((o) => o.isCorrect);
+
+    return {
+      options: shuffled.map((o) => o.text),
+      correctIndex: newCorrectIdx >= 0 ? newCorrectIdx : 0,
+      correctText
+    };
+  }, [currentQuestion, currentStepIndex]);
+
   const handleCheckMcq = () => {
     if (!currentQuestion || selectedMcqOption === null) return;
 
-    const rawOpts = currentQuestion.options || [];
-    const safeOpts = rawOpts.length > 0 ? rawOpts : [
+    const safeOpts = shuffledMcqData ? shuffledMcqData.options : (currentQuestion.options && currentQuestion.options.length > 0 ? currentQuestion.options : [
       currentQuestion.correctAnswerText || currentQuestion.correctAnswer || "Primary Core Concept",
       "Secondary Mechanism",
       "External Parameter",
       "Administrative Bound"
-    ];
+    ]);
 
     const selectedText = safeOpts[selectedMcqOption] || "";
-    const correctIdx = currentQuestion.correctAnswerIndex ?? 0;
-    const targetCorrectText = currentQuestion.correctAnswerText || currentQuestion.correctAnswer || safeOpts[correctIdx] || safeOpts[0];
+    const correctIdx = shuffledMcqData ? shuffledMcqData.correctIndex : (currentQuestion.correctAnswerIndex ?? 0);
+    const targetCorrectText = shuffledMcqData ? shuffledMcqData.correctText : (currentQuestion.correctAnswerText || currentQuestion.correctAnswer || safeOpts[correctIdx] || safeOpts[0]);
 
     const isRight = selectedMcqOption === correctIdx || selectedText.trim().toLowerCase() === targetCorrectText.trim().toLowerCase();
 
@@ -564,12 +609,32 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                   {currentCard.content}
                 </p>
 
-                {currentCard.keyTakeaway && (
-                  <div className="border-l-3 border-accent-main pl-4 py-2 text-xs md:text-sm text-txt-sub font-normal leading-relaxed bg-accent-main/5 rounded-r space-y-1">
-                    <span className="font-mono text-[10px] uppercase text-accent-main font-bold block tracking-wider">Key Takeaway</span>
-                    <p className="text-txt-main font-medium">{currentCard.keyTakeaway}</p>
-                  </div>
-                )}
+                {/* High-Yield Key Takeaway (Rendered ONLY if useful & non-tautological) */}
+                {(() => {
+                  if (!currentCard.keyTakeaway) return null;
+                  const kw = currentCard.keyTakeaway.trim().toLowerCase();
+                  const title = currentCard.title.trim().toLowerCase();
+                  const cleanTitle = title.replace(/^\d+[\.\)]\s*/, "").replace(/^[a-z0-9\s]+:\s*/i, "").trim().toLowerCase();
+                  const cleanKw = kw.replace(/^key\s*takeaway\s*[:\-]?\s*/i, "").trim();
+
+                  if (cleanKw.length < 25) return null;
+
+                  const kwWords = cleanKw.split(/\s+/).filter(w => w.length > 3);
+                  const titleWords = cleanTitle.split(/\s+/).filter(w => w.length > 3);
+                  if (titleWords.length > 0 && kwWords.length > 0) {
+                    const matchingWords = kwWords.filter(w => titleWords.includes(w));
+                    if (matchingWords.length >= titleWords.length || (matchingWords.length / kwWords.length) > 0.5) {
+                      return null;
+                    }
+                  }
+
+                  return (
+                    <div className="border-l-3 border-accent-main pl-4 py-2 text-xs md:text-sm text-txt-sub font-normal leading-relaxed bg-accent-main/5 rounded-r space-y-1">
+                      <span className="font-mono text-[10px] uppercase text-accent-main font-bold block tracking-wider">Key Takeaway</span>
+                      <p className="text-txt-main font-medium">{currentCard.keyTakeaway}</p>
+                    </div>
+                  );
+                })()}
 
                 {/* Interactive Visual Architecture Diagram / Flowchart */}
                 {currentCard.diagramMermaid && (
@@ -578,38 +643,61 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                   </div>
                 )}
 
-                {/* Practical Example / Code Implementation Block */}
-                {currentCard.example && (
-                  (() => {
-                    const isCode = /class\s|void\s|int\s|public\s|private\s|def\s|return\s|import\s|#include|function\s|\{|\}/i.test(currentCard.example);
-                    return isCode ? (
-                      <div className="border border-border-main/80 bg-bg-base rounded-md overflow-hidden space-y-1 mt-3">
-                        <div className="bg-bg-surface px-4 py-2 border-b border-border-main/60 flex items-center justify-between">
-                          <span className="font-mono text-[10px] uppercase text-accent-main font-bold flex items-center gap-1.5">
-                            <Code2 size={12} /> Executable Code & Syntax Implementation
-                          </span>
-                        </div>
-                        <pre className="p-4 text-xs font-mono text-txt-main overflow-x-auto whitespace-pre leading-relaxed bg-black/40">
-                          <code>{currentCard.example}</code>
-                        </pre>
+                {/* Practical Example / Code Implementation Block (Rendered ONLY if useful & non-tautological) */}
+                {(() => {
+                  if (!currentCard.example) return null;
+                  const ex = currentCard.example.trim().toLowerCase();
+                  const isCode = /class\s|void\s|int\s|public\s|private\s|def\s|return\s|import\s|#include|function\s|\{|\}/i.test(currentCard.example);
+
+                  if (!isCode) {
+                    if (/^(examples?\s*of\s*operating\s*systems\s*include\s*)?(windows|macos|linux|android|ios)(\s*,\s*(windows|macos|linux|android|ios))*$/i.test(ex) ||
+                        (ex.includes("windows") && ex.includes("macos") && ex.includes("linux") && ex.length < 50)) {
+                      return null;
+                    }
+
+                    const title = currentCard.title.trim().toLowerCase();
+                    const cleanTitle = title.replace(/^\d+[\.\)]\s*/, "").replace(/^[a-z0-9\s]+:\s*/i, "").trim().toLowerCase();
+                    if (ex === title || ex === cleanTitle || ex.length < 25) return null;
+                  }
+
+                  return isCode ? (
+                    <div className="border border-border-main/80 bg-bg-base rounded-md overflow-hidden space-y-1 mt-3">
+                      <div className="bg-bg-surface px-4 py-2 border-b border-border-main/60 flex items-center justify-between">
+                        <span className="font-mono text-[10px] uppercase text-accent-main font-bold flex items-center gap-1.5">
+                          <Code2 size={12} /> Executable Code & Syntax Implementation
+                        </span>
                       </div>
-                    ) : (
-                      <div className="border-l-3 border-border-main/80 pl-4 py-2 text-xs md:text-sm text-txt-sub font-mono leading-relaxed bg-bg-card/50 rounded-r space-y-1">
-                        <span className="font-mono text-[10px] uppercase text-txt-muted font-bold block tracking-wider">Practical Example</span>
-                        <p className="text-txt-main text-xs md:text-sm">{currentCard.example}</p>
-                      </div>
-                    );
-                  })()
-                )}
+                      <pre className="p-4 text-xs font-mono text-txt-main overflow-x-auto whitespace-pre leading-relaxed bg-black/40">
+                        <code>{currentCard.example}</code>
+                      </pre>
+                    </div>
+                  ) : (
+                    <div className="border-l-3 border-border-main/80 pl-4 py-2 text-xs md:text-sm text-txt-sub font-mono leading-relaxed bg-bg-card/50 rounded-r space-y-1">
+                      <span className="font-mono text-[10px] uppercase text-txt-muted font-bold block tracking-wider">Practical Example</span>
+                      <p className="text-txt-main text-xs md:text-sm">{currentCard.example}</p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Subtle Low-Opacity Learn More Reveal Button - Rendered ONLY if card has coding practice lab */}
               {(() => {
-                const isCodingSubject = /coding|program|software|algorithm|data structure|leetcode|python|javascript|typescript|c\+\+|java|sql|react|node|operating system/i.test(
-                  lesson.title + " " + (currentCard.badge || "")
+                const cleanTopicTitle = lesson.title
+                  .replace(/^Lesson\s*\d+\s*[:\-]?\s*/gi, "")
+                  .replace(/^\d+[\.\)]\s*/g, "")
+                  .replace(/^Section\s*\d+\s*[:\-]?\s*/gi, "")
+                  .replace(/Module\s*\d+/gi, "")
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+                const isCodingSubject = /coding|program|algorithm|data structure|leetcode|codeforces|codechef|python|javascript|typescript|c\+\+|java|sql|react|node|tree|graph|array|linked list|dynamic programming/i.test(
+                  cleanTopicTitle + " " + (currentCard.badge || "")
                 );
 
-                if (!isCodingSubject) return null;
+                const hasExplicitPractice = Array.isArray(lesson.practiceProblems) && lesson.practiceProblems.length > 0;
+                const shouldShowPractice = isCodingSubject || hasExplicitPractice;
+
+                if (!shouldShowPractice) return null;
 
                 return (
                   <>
@@ -632,18 +720,19 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                           className="space-y-4 overflow-hidden pt-2"
                         >
                           {(() => {
-                            const isCodingSubject = /coding|program|software|algorithm|data structure|leetcode|python|javascript|typescript|c\+\+|java|sql|react|node|operating system/i.test(
-                              lesson.title + " " + (currentCard.badge || "")
-                            );
-
-                            if (!isCodingSubject) return null;
-
                             const practiceList = (lesson.practiceProblems && lesson.practiceProblems.length > 0)
-                              ? lesson.practiceProblems
+                              ? lesson.practiceProblems.map(prob => {
+                                  let targetUrl = prob.url;
+                                  if (!targetUrl || targetUrl.includes("search=Lesson") || targetUrl.includes("search_query=Lesson")) {
+                                    const cleanQuery = encodeURIComponent(`${cleanTopicTitle} problem`);
+                                    targetUrl = `https://leetcode.com/problemset/all/?search=${cleanQuery}`;
+                                  }
+                                  return { ...prob, url: targetUrl };
+                                })
                               : [
                                   {
-                                    title: `Target Practice Challenge: ${lesson.title}`,
-                                    url: `https://leetcode.com/problemset/all/?search=${encodeURIComponent(lesson.title)}`,
+                                    title: `Practice Challenge: ${cleanTopicTitle}`,
+                                    url: `https://leetcode.com/problemset/all/?search=${encodeURIComponent(cleanTopicTitle + " problem")}`,
                                     platform: "LeetCode",
                                     difficulty: "Medium"
                                   }
@@ -716,14 +805,14 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                   {(() => {
                     const rawOpts = currentQuestion.options || [];
                     const filteredOpts = rawOpts.filter((o) => typeof o === "string" && o.trim().length > 0);
-                    const safeMcqOptions = filteredOpts.length > 0
+                    const safeMcqOptions = shuffledMcqData ? shuffledMcqData.options : (filteredOpts.length > 0
                       ? filteredOpts
                       : [
                           currentQuestion.correctAnswerText || currentQuestion.correctAnswer || "Primary Core Concept",
                           "Secondary Mechanism",
                           "External Parameter",
                           "Administrative Bound"
-                        ];
+                        ]);
 
                     return safeMcqOptions.map((option, idx) => {
                       const isSelected = selectedMcqOption === idx;

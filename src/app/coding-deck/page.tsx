@@ -17,7 +17,12 @@ import {
   Sparkles,
   RotateCw,
   FolderKanban,
-  Lock
+  Lock,
+  ChevronDown,
+  ChevronUp,
+  Puzzle,
+  Download,
+  BookOpen
 } from "lucide-react";
 
 interface PlatformStats {
@@ -91,6 +96,8 @@ export default function CodingDeckPage() {
     return "";
   });
   const [showAppliedModal, setShowAppliedModal] = useState(false);
+  const [showAllContests, setShowAllContests] = useState(false);
+  const [showLeetieGuide, setShowLeetieGuide] = useState(false);
 
   // Inline handle input state
   const [inputLcHandle, setInputLcHandle] = useState("");
@@ -504,7 +511,7 @@ export default function CodingDeckPage() {
       };
       
       pollStats();
-    }, 5000); // 5 seconds live auto-poll
+    }, 15000); // 15 seconds live auto-poll
     
     return () => clearInterval(interval);
   }, [user, leetcodeUser, codeforcesUser, codechefUser, selectedLcYear]);
@@ -1236,104 +1243,6 @@ export default function CodingDeckPage() {
                 )}
               </div>
 
-            </div>
-
-            {/* ================= RIGHT COLUMN: CONTESTS FEED & HACKATHONS (4 Columns) ================= */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              
-              {/* Hackathon Portals & Applied Workspaces Panel */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
-                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
-                  </div>
-                  {(unstopUser || hack2skillUser) && (
-                    <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2.5 py-1 border border-border-main/70 rounded-sm font-semibold uppercase tracking-wider">
-                      {((stats.unstop?.registered || 0) + (stats.hack2skill?.registered || 0))} Total Applied
-                    </span>
-                  )}
-                </div>
-                
-                {/* Unstop Row */}
-                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
-                    {!unstopUser && (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
-                    )}
-                  </div>
-                  {unstopUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{unstopUser}</span>
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.unstop?.registered} Applied
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Unstop in Profile Settings to sync applications.
-                    </span>
-                  )}
-                </div>
-
-                {/* Hack2Skill Row */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
-                    {!hack2skillUser && (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
-                    )}
-                  </div>
-                  {hack2skillUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{hack2skillUser}</span>
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.hack2skill?.registered} Applied
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Hack2Skill in Profile Settings to sync applications.
-                    </span>
-                  )}
-                </div>
-
-                {(unstopUser || hack2skillUser) && (
-                  <button
-                    onClick={() => setShowAppliedModal(true)}
-                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
-                  >
-                    <FolderKanban size={12} /> Manage Applied Hackathons
-                  </button>
-                )}
-              </div>
-
-              {/* Active / Upcoming Contests Feed */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp size={14} className="text-accent-main" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Contest Feed</span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {contests.map((c, idx) => (
-                    <div key={idx} className="border border-border-main/40 p-3 rounded bg-bg-base/30 flex flex-col gap-1.5 hover:border-txt-main transition-colors duration-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[9px] font-mono tracking-wider font-bold bg-bg-card px-2 py-0.5 rounded border border-border-main/60 text-txt-main">{c.platform}</span>
-                        <a href={c.url} target="_blank" rel="noreferrer" className="text-[9px] text-txt-muted hover:text-txt-main flex items-center gap-0.5">
-                          Open <ExternalLink size={8} />
-                        </a>
-                      </div>
-                      <span className="text-xs font-semibold text-txt-main font-mono truncate">{c.title}</span>
-                      <span className="text-[9px] text-txt-sub">{c.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* AI Programming Portfolio Analyst Panel */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
@@ -1456,6 +1365,185 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+            </div>
+
+            {/* ================= RIGHT COLUMN: CONTESTS FEED & HACKATHONS (4 Columns) ================= */}
+            <div className="lg:col-span-4 flex flex-col gap-6 lg:sticky lg:top-24">
+              
+              {/* Hackathon Portals & Applied Workspaces Panel */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
+                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
+                  </div>
+                  {(unstopUser || hack2skillUser) && (
+                    <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2.5 py-1 border border-border-main/70 rounded-sm font-semibold uppercase tracking-wider">
+                      {((stats.unstop?.registered || 0) + (stats.hack2skill?.registered || 0))} Total Applied
+                    </span>
+                  )}
+                </div>
+                
+                {/* Unstop Row */}
+                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
+                    {!unstopUser && (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    )}
+                  </div>
+                  {unstopUser ? (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
+                      <span>@{unstopUser}</span>
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.unstop?.registered} Applied
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Unstop in Profile Settings to sync applications.
+                    </span>
+                  )}
+                </div>
+
+                {/* Hack2Skill Row */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
+                    {!hack2skillUser && (
+                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    )}
+                  </div>
+                  {hack2skillUser ? (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
+                      <span>@{hack2skillUser}</span>
+                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                        {stats.hack2skill?.registered} Applied
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
+                      Link Hack2Skill in Profile Settings to sync applications.
+                    </span>
+                  )}
+                </div>
+
+                {(unstopUser || hack2skillUser) && (
+                  <button
+                    onClick={() => setShowAppliedModal(true)}
+                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
+                  >
+                    <FolderKanban size={12} /> Manage Applied Hackathons
+                  </button>
+                )}
+              </div>
+
+              {/* Active / Upcoming Contests Feed */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={14} className="text-accent-main" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Active Contest Feed</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-txt-muted">
+                    {contests.length} Available
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {(showAllContests ? contests : contests.slice(0, 3)).map((c, idx) => (
+                    <div key={idx} className="border border-border-main/40 p-3 rounded bg-bg-base/30 flex flex-col gap-1.5 hover:border-txt-main transition-colors duration-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-mono tracking-wider font-bold bg-bg-card px-2 py-0.5 rounded border border-border-main/60 text-txt-main">{c.platform}</span>
+                        <a href={c.url} target="_blank" rel="noreferrer" className="text-[9px] text-txt-muted hover:text-txt-main flex items-center gap-0.5">
+                          Open <ExternalLink size={8} />
+                        </a>
+                      </div>
+                      <span className="text-xs font-semibold text-txt-main font-mono truncate">{c.title}</span>
+                      <span className="text-[9px] text-txt-sub">{c.time}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {contests.length > 3 && (
+                  <button
+                    onClick={() => setShowAllContests((prev) => !prev)}
+                    className="w-full pt-1 text-[10px] font-mono tracking-wider text-txt-muted hover:text-txt-main opacity-60 hover:opacity-100 transition-all duration-200 flex items-center justify-center gap-1 cursor-pointer select-none"
+                  >
+                    <span>{showAllContests ? "Show Less" : `Show More (${contests.length - 3} more)`}</span>
+                    {showAllContests ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                )}
+              </div>
+
+              {/* Leetie Extension Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Puzzle size={14} className="text-accent-main" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Browser Extension</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
+                    v1.0.0
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <h4 className="text-xs font-bold font-mono text-txt-main flex items-center gap-1.5">
+                    Leetie Extension
+                  </h4>
+                  <p className="text-[11px] text-txt-muted font-light leading-snug">
+                    Auto-archive accepted LeetCode solutions directly to your GitHub repository.
+                  </p>
+                </div>
+
+                {/* Download Button */}
+                <a
+                  href="/leetie-v1.0.0.zip"
+                  download="leetie-v1.0.0.zip"
+                  className="w-full py-2 bg-accent-main hover:opacity-90 text-bg-base text-[10px] uppercase font-mono tracking-wider font-bold transition-opacity rounded-sm flex items-center justify-center gap-1.5 cursor-pointer no-underline"
+                >
+                  <Download size={12} />
+                  Download Leetie v1.0.0 (.zip)
+                </a>
+
+                {/* Collapsible Installation Guide (Option A Accordion) */}
+                <div className="border-t border-border-main/30 pt-2 flex flex-col gap-2">
+                  <button
+                    onClick={() => setShowLeetieGuide((prev) => !prev)}
+                    className="w-full text-left text-[10px] font-mono uppercase tracking-wider font-semibold text-txt-muted hover:text-txt-main flex items-center justify-between py-1 transition-colors cursor-pointer select-none"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <BookOpen size={11} className="text-accent-main" />
+                      How to Install & Setup
+                    </span>
+                    {showLeetieGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+
+                  {showLeetieGuide && (
+                    <div className="p-3 bg-bg-base/40 border border-border-main/40 rounded flex flex-col gap-2.5 text-xs text-txt-sub font-light leading-relaxed animate-in fade-in duration-200">
+                      <ol className="flex flex-col gap-2 list-decimal list-inside text-[11px] text-txt-sub">
+                        <li className="leading-snug">
+                          <strong className="text-txt-main font-semibold">Unzip</strong> the downloaded <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie-v1.0.0.zip</code> file.
+                        </li>
+                        <li className="leading-snug">
+                          Open <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"chrome://extensions"}</code> or <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"edge://extensions"}</code>.
+                        </li>
+                        <li className="leading-snug">
+                          Toggle <strong className="text-txt-main font-semibold">Developer mode</strong> (top right).
+                        </li>
+                        <li className="leading-snug">
+                          Click <strong className="text-txt-main font-semibold">Load unpacked</strong> and select the unzipped <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie</code> folder.
+                        </li>
+                        <li className="leading-snug">
+                          Open the extension popup to connect your <strong className="text-txt-main font-semibold">GitHub Token</strong> & repo. Your accepted solutions will auto-sync!
+                        </li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
               </div>
 
             </div>

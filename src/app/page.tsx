@@ -77,13 +77,14 @@ export default function Home() {
         const rawDraft = localStorage.getItem(`ldk_profile_draft_${user.id}`);
         const draft = rawDraft ? JSON.parse(rawDraft) : {};
 
+        const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
         const fullName = publicProf.full_name || draft.fullName || meta.full_name || meta.name || "";
         const username = publicProf.username || draft.username || meta.username || user.email?.split("@")[0] || "";
         if (fullName || username) {
           return {
             full_name: fullName,
             username: username,
-            avatar_url: publicProf.avatar_url || draft.avatarUrl || meta.avatar_url || meta.picture || "",
+            avatar_url: localAvatar || publicProf.avatar_url || draft.avatarUrl || meta.avatar_url || "",
             college_name: publicProf.college_name || draft.collegeName || meta.college_name || "",
             department: publicProf.department || draft.department || meta.department || "",
             leetcode_username: publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || "",
@@ -346,8 +347,36 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Resolve LeetCode handle from user_metadata or localStorage
     const meta = user.user_metadata || {};
+
+    // 0ms Synchronous local profile initialization to avoid avatar image flicker on reload
+    if (typeof window !== "undefined") {
+      try {
+        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        const publicProf = rawPublic ? JSON.parse(rawPublic) : {};
+        const rawDraft = localStorage.getItem(`ldk_profile_draft_${user.id}`);
+        const draft = rawDraft ? JSON.parse(rawDraft) : {};
+        const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
+
+        const fullName = publicProf.full_name || draft.fullName || meta.full_name || meta.name || "";
+        const username = publicProf.username || draft.username || meta.username || user.email?.split("@")[0] || "";
+        const avatarUrl = localAvatar || publicProf.avatar_url || draft.avatarUrl || meta.avatar_url || extractAvatarFromUser(user) || "";
+
+        if (fullName || username || avatarUrl) {
+          setProfile(prev => ({
+            full_name: fullName || prev?.full_name || "",
+            username: username || prev?.username || "",
+            avatar_url: avatarUrl || prev?.avatar_url || "",
+            college_name: publicProf.college_name || draft.collegeName || meta.college_name || prev?.college_name || "",
+            department: publicProf.department || draft.department || meta.department || prev?.department || "",
+            leetcode_username: publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || prev?.leetcode_username || "",
+            github_url: publicProf.github_url || draft.githubUrl || meta.github_url || prev?.github_url || "",
+          }));
+        }
+      } catch {}
+    }
+
+    // 1. Resolve LeetCode handle from user_metadata or localStorage
     let handle = meta.leetcode_username || "";
     if (!handle && typeof window !== "undefined") {
       handle =
@@ -451,14 +480,13 @@ export default function Home() {
       const username = dbProfile?.username || publicProf.username || draft.username || fallbackUsername;
       const isValidImage = (s: any) => typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:image/"));
       const rawAvatar = [
+        localAvatar,
         dbProfile?.avatar_url,
         publicProf.avatar_url,
         draft.avatarUrl,
         draft.avatar_url,
-        localAvatar,
-        meta.avatar_url,
-        meta.picture
-      ].find(isValidImage) || "";
+        meta.avatar_url
+      ].find(isValidImage) || extractAvatarFromUser(user) || "";
       const avatarUrl = rawAvatar;
       const collegeName = dbProfile?.college_name || publicProf.college_name || draft.collegeName || meta.college_name || "University Student";
       const department = dbProfile?.department || publicProf.department || draft.department || meta.department || "Computer Science";

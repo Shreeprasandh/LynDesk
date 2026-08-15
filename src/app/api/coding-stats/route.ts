@@ -128,32 +128,7 @@ export async function GET(request: Request) {
           console.warn("LeetCode secondary backup fetch error:", bErr);
         }
 
-        return NextResponse.json({
-          platform: "leetcode",
-          username: cleanUsername,
-          solved: 342,
-          solvedEasy: 154,
-          solvedMedium: 148,
-          solvedHard: 40,
-          totalSolved: 342,
-          easySolved: 154,
-          mediumSolved: 148,
-          hardSolved: 40,
-          rating: 1540,
-          rank: "Top 8%",
-          globalRank: 12500,
-          leetcodeStreak: 3,
-          recentSubmissions: [],
-          submissionCalendar: {},
-          submissionCalendarPrivate: false,
-          dailyChallenge: {
-            title: dailyChallengeData?.question?.title || "Find Missing Elements",
-            link: dailyChallengeData?.link ? `https://leetcode.com${dailyChallengeData.link}` : "https://leetcode.com/problemset/all/",
-            difficulty: dailyChallengeData?.question?.difficulty || "Easy",
-            date: dailyChallengeData?.date || new Date().toISOString().split("T")[0],
-            completed: false
-          }
-        });
+        return NextResponse.json({ error: "Could not fetch LeetCode profile for @" + cleanUsername }, { status: 502 });
       }
 
       const submissions = matchedUser.submitStatsGlobal?.acSubmissionNum || [];
@@ -553,10 +528,10 @@ export async function GET(request: Request) {
     }
 
     if (platform === "codechef") {
-      let rating = 1400;
+      let rating = 0;
       let rank = "1★";
       let solved = 0;
-      let highestRating = 1400;
+      let highestRating = 0;
       let globalRank = 0;
       let countryRank = 0;
       let fetchedSuccessfully = false;
@@ -569,22 +544,22 @@ export async function GET(request: Request) {
         if (apiRes.ok) {
           const apiData = await apiRes.json();
           if (apiData.currentRating || apiData.rating) {
-            rating = apiData.currentRating || apiData.rating || 1400;
+            rating = parseInt(apiData.currentRating || apiData.rating || 0);
             const stars = apiData.stars || apiData.ratingStar;
             rank = stars ? (String(stars).includes("★") ? String(stars) : `${stars}★`) : "1★";
-            solved = apiData.totalSolved || apiData.fullySolved?.count || 0;
-            highestRating = apiData.highestRating || rating;
-            globalRank = apiData.globalRank || 0;
-            countryRank = apiData.countryRank || 0;
-            fetchedSuccessfully = true;
+            solved = parseInt(apiData.totalSolved || apiData.fullySolved?.count || 0);
+            highestRating = parseInt(apiData.highestRating || rating);
+            globalRank = parseInt(apiData.globalRank || 0);
+            countryRank = parseInt(apiData.countryRank || 0);
+            if (rating > 0) fetchedSuccessfully = true;
           }
         }
       } catch (err) {
         console.warn("CodeChef API fallback failed:", err);
       }
 
-      // Method 2: If API didn't fetch, try direct scraping with realistic browser headers
-      if (!fetchedSuccessfully) {
+      // Method 2: Direct HTML scraping with realistic browser headers
+      if (!fetchedSuccessfully || rating === 0) {
         try {
           const response = await fetch(`https://www.codechef.com/users/${cleanUsername}?t=${Date.now()}`, {
             headers: {
@@ -599,39 +574,78 @@ export async function GET(request: Request) {
           if (response.ok) {
             const html = await response.text();
 
-            const ratingMatch = html.match(/class="rating-number"[^>]*>(\d+)/) || 
-                                html.match(/rating-number[^>]*>(\d+)/) || 
-                                html.match(/rating-header[\s\S]*?(\d{3,4})/) ||
-                                html.match(/"rating":\s*(\d+)/);
-            if (ratingMatch) rating = parseInt(ratingMatch[1]);
+            // Extract rating: 1) Try exact rating-number HTML DOM block first
+            const ratingHeaderMatch = html.match(/rating-number[^>]*>\s*(\d+)/i) ||
+                                html.match(/class="rating-number"[^>]*>\s*(\d+)/i);
+            if (ratingHeaderMatch) {
+              rating = parseInt(ratingHeaderMatch[1]);
+            } else {
+              // 2) Try embedded contest JSON array (last element = current active rating)
+              const ratingAllMatch = html.match(/"rating"\s*:\s*\{\s*"all"\s*:\s*(\[[\s\S]*?\])/);
+              if (ratingAllMatch) {
+                try {
+                  const contestList = JSON.parse(ratingAllMatch[1]);
+                  if (Array.isArray(contestList) && contestList.length > 0) {
+                    const latest = contestList[contestList.length - 1];
+                    if (latest?.rating) rating = parseInt(latest.rating);
+                  }
+                } catch {}
+              }
+            }
 
-            const starsMatch = html.match(/rating[^>]*>.*?(\d+)★/) || html.match(/(\d)★/);
+            // Extract highest rating
+            const highestMatch = html.match(/\(Highest Rating\s*(\d+)\)/i) ||
+                                 html.match(/Highest Rating\s*(\d+)/i) ||
+                                 html.match(/"highestRating":\s*(\d+)/);
+            if (highestMatch) highestRating = parseInt(highestMatch[1]);
+            if (!highestRating) highestRating = rating;
+
+            // Extract stars
+            const starsMatch = html.match(/(\d+)★/) || html.match(/(\d+)\s*★/);
             if (starsMatch) rank = `${starsMatch[1]}★`;
 
-            const solvedMatch = html.match(/Fully Solved[\s\S]*?\((\d+)\)/) || html.match(/Fully Solved[\s\S]*?(\d+)/);
+            // Extract problems solved
+            const solvedMatch = html.match(/Total Problems Solved:\s*(\d+)/i) ||
+                                html.match(/Fully Solved\s*\((\d+)\)/i) || 
+                                html.match(/Fully Solved[\s\S]*?(\d+)/i);
             if (solvedMatch) solved = parseInt(solvedMatch[1]);
 
-            const highestMatch = html.match(/Highest Rating[\s\S]*?(\d{3,4})/);
-            if (highestMatch) highestRating = parseInt(highestMatch[1]);
+            // Extract global rank
+            const globalMatch = html.match(/href="\/ratings\/all"[\s\S]*?<strong>\s*(\d+)\s*<\/strong>/i) ||
+                                html.match(/<strong>\s*(\d+)\s*<\/strong>\s*[\r\n\s]*Global Rank/i) ||
+                                html.match(/"globalRank":\s*(\d+)/);
+            if (globalMatch) globalRank = parseInt(globalMatch[1]);
 
-            fetchedSuccessfully = true;
+            // Extract country rank
+            const countryMatch = html.match(/href="\/ratings\/all\?filterBy=Country[\s\S]*?<strong>\s*(\d+)\s*<\/strong>/i) ||
+                                 html.match(/<strong>\s*(\d+)\s*<\/strong>\s*[\r\n\s]*Country Rank/i) ||
+                                 html.match(/"countryRank":\s*(\d+)/);
+            if (countryMatch) countryRank = parseInt(countryMatch[1]);
+
+            if (rating > 0 || solved > 0 || globalRank > 0) {
+              fetchedSuccessfully = true;
+            }
           }
         } catch (err) {
           console.warn("CodeChef HTML fetch failed:", err);
         }
       }
 
+      if (!fetchedSuccessfully && rating === 0 && solved === 0) {
+        return NextResponse.json({ error: "Could not fetch CodeChef profile" }, { status: 502 });
+      }
+
       return NextResponse.json({
-        solved: solved || 12,
+        solved: solved || 0,
         solvedEasy: 0,
         solvedMedium: 0,
         solvedHard: 0,
-        totalSubmissions: solved || 12,
-        acceptedSubmissions: solved || 12,
+        totalSubmissions: solved || 0,
+        acceptedSubmissions: solved || 0,
         rank: rank || "1★",
-        rating: rating || 1400,
-        highestRating: highestRating || rating || 1400,
-        globalRank: globalRank || rating || 1400,
+        rating: rating || 0,
+        highestRating: highestRating || rating || 0,
+        globalRank: globalRank || 0,
         countryRank: countryRank || 0,
         submissionCalendar: {}
       });

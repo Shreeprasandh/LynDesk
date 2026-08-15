@@ -75,24 +75,18 @@ function generateFallbackSections(
         completed: false,
         videoResource: {
           title: `Video Tutorial: Master ${secTopic.title}`,
-          url: `https://www.youtube.com/results?search_query=${topicQuery}`,
+          url: `https://www.youtube.com/results?search_query=${encodeURIComponent(secTopic.title + " tutorial")}`,
           channelName: "Academic & Tech Educators",
           duration: "14:20"
         },
-        practiceProblems: [
+        practiceProblems: /coding|program|algorithm|data structure|leetcode|python|javascript|typescript|c\+\+|java|sql|react|node|tree|graph|array/i.test(secTopic.title) ? [
           {
-            title: `Practice Problem Set: ${secTopic.title}`,
-            url: `https://leetcode.com/problemset/all/?search=${topicQuery}`,
+            title: `Practice Challenge: ${secTopic.title}`,
+            url: `https://leetcode.com/problemset/all/?search=${encodeURIComponent(secTopic.title + " problem")}`,
             platform: "LeetCode",
             difficulty: l % 2 === 0 ? "Easy" : "Medium"
-          },
-          {
-            title: `Interactive Exercises: ${secTopic.title}`,
-            url: `https://www.khanacademy.org/search?page_search_query=${topicQuery}`,
-            platform: "KhanAcademy",
-            difficulty: "Medium"
           }
-        ],
+        ] : [],
         cards: [
           {
             title: `1. Core Theoretical Foundations of ${lesTopic.title}`,

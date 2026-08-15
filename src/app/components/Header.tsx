@@ -745,6 +745,12 @@ export default function Header() {
           await supabase.from("notifications").delete().eq("user_id", user.id).eq("link_url", actionUrl);
         }
       }
+      // Call server DELETE route handler with admin privileges to ensure permanent deletion
+      fetch("/api/user/notifications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, userId: user?.id, title, actionUrl })
+      }).catch(() => {});
     } catch {}
   };
 
