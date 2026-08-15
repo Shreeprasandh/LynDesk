@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
 import { extractAvatarFromUser } from "../lib/avatar";
+import { syncEventDeskWithCalendar } from "../lib/wallCalendarSync";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -1376,6 +1377,14 @@ export default function Home() {
     };
 
     setEvents([newObj, ...events]);
+
+    // Live sync Event Desk creation with WallCalendar
+    syncEventDeskWithCalendar(
+      "join",
+      { id: newObj.id, title: newObj.title, date: newObj.deadline, category: isContest ? "contest" : "deadline" },
+      user?.id
+    );
+
     setIsModalOpen(false);
     setScraperUrl("");
     setScrapedData(null);

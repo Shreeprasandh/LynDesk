@@ -15,6 +15,7 @@ import ProgressDashboardView from "../components/study-desk/ProgressDashboardVie
 import ErrorBankModal from "../components/study-desk/ErrorBankModal";
 import DSASystemMasteryView, { UserDSAProgressMap } from "../components/study-desk/DSASystemMasteryView";
 import { DSA_TRACKS, DSAProblem } from "./dsaMasteryData";
+import { syncStudyPathWithCalendar } from "../lib/wallCalendarSync";
 
 const STORAGE_PATHS_KEY = "lyndesk_study_paths_cache";
 const STORAGE_MISTAKES_KEY = "lyndesk_study_mistakes_cache";
@@ -305,6 +306,13 @@ export default function StudyDeskPage() {
         });
       } catch {}
     }
+
+    // Live sync track creation with WallCalendar
+    syncStudyPathWithCalendar(
+      "create",
+      { id: fullPath.id, title: fullPath.title },
+      user?.id
+    );
   };
 
   const handleDeletePath = async (pathId: string) => {
@@ -325,6 +333,9 @@ export default function StudyDeskPage() {
         await supabase.from("study_paths").delete().eq("id", pathId);
       } catch {}
     }
+
+    // Live sync track deletion with WallCalendar
+    syncStudyPathWithCalendar("delete", { id: pathId, title: "" }, user?.id);
   };
 
   const handleDuplicatePath = async (pathId: string) => {

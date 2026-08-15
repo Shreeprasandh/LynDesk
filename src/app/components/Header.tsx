@@ -20,8 +20,11 @@ import {
   Clock, 
   Check, 
   Sparkles,
-  Menu
+  Menu,
+  Calendar as CalendarIcon
 } from "lucide-react";
+import WallCalendarModal from "./WallCalendarModal";
+import { fetchWallCalendarEvents } from "../lib/wallCalendarSync";
 
 interface NotificationItem {
   id: string;
@@ -114,6 +117,10 @@ export default function Header() {
   const [oCollegeSuggestion, setOCollegeSuggestion] = useState<string | null>(null);
   const [oDeptSuggestion, setODeptSuggestion] = useState<string | null>(null);
 
+  // WallCalendar Popup State
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [hasTodayEvents, setHasTodayEvents] = useState(false);
+
   // Autocomplete Suggestions
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
@@ -160,7 +167,19 @@ export default function Header() {
     return extractAvatarFromUser(user);
   });
 
-  // Live avatar updates prioritizing database profiles record & localStorage over OAuth initial picture
+  useEffect(() => {
+    const checkCalendarToday = async () => {
+      if (!user?.id) return;
+      try {
+        const events = await fetchWallCalendarEvents(user.id);
+        const todayStr = new Date().toISOString().split("T")[0];
+        setHasTodayEvents(events.some((e) => e.date === todayStr));
+      } catch {}
+    };
+    checkCalendarToday();
+    window.addEventListener("ldk_wall_calendar_update", checkCalendarToday);
+    return () => window.removeEventListener("ldk_wall_calendar_update", checkCalendarToday);
+  }, [user?.id]);
   useEffect(() => {
     let isMounted = true;
     const resolveHeaderAvatar = async () => {
@@ -1005,6 +1024,35 @@ export default function Header() {
           <div className="hidden lg:block w-[1px] h-4 bg-border-main/60" />
 
           <div className="flex items-center gap-2 md:gap-3">
+            {/* Theme Switcher */}
+            <button 
+              onClick={toggleTheme}
+              className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
+              aria-label="Toggle theme"
+              title="Toggle Theme"
+            >
+              {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+
+            {/* WallCalendar Launcher Button (Placed between Theme Selector and Notification Bell!) */}
+            {user && (
+              <button
+                onClick={() => setIsCalendarOpen(true)}
+                className={`p-2 rounded-full transition-all duration-300 focus:outline-none relative cursor-pointer ${
+                  hasTodayEvents
+                    ? "border border-accent-main/60 text-accent-main shadow-[0_0_8px_rgba(234,179,8,0.2)] hover:bg-bg-card"
+                    : "border border-border-main/80 hover:bg-bg-card text-txt-main"
+                }`}
+                aria-label="Open WallCalendar"
+                title={hasTodayEvents ? "WallCalendar — Events Scheduled Today!" : "WallCalendar"}
+              >
+                <CalendarIcon size={14} />
+                {hasTodayEvents && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-main rounded-full animate-ping" />
+                )}
+              </button>
+            )}
+
             {/* Notification Bell (Only visible when user is logged in) */}
             {user && (
               <button 
@@ -1020,15 +1068,6 @@ export default function Header() {
                 <Bell size={14} />
               </button>
             )}
-
-            {/* Theme Switcher */}
-            <button 
-              onClick={toggleTheme}
-              className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
-              aria-label="Toggle theme"
-            >
-              {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
-            </button>
             
             {user && (
               <>
@@ -1139,6 +1178,13 @@ export default function Header() {
       )}
 
       {user && <LynAI />}
+
+      {/* WallCalendar Drawer Popup Modal */}
+      <WallCalendarModal
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        userId={user?.id}
+      />
 
       {/* Slide-over Notification Drawer Overlay */}
       {isOpen && (
