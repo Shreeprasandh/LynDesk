@@ -54,6 +54,27 @@ function toDateString(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+const monthFlipVariants = {
+  enter: (direction: "next" | "prev") => ({
+    rotateX: direction === "next" ? -20 : 20,
+    y: direction === "next" ? 20 : -20,
+    opacity: 0,
+    scale: 0.98,
+  }),
+  center: {
+    rotateX: 0,
+    y: 0,
+    opacity: 1,
+    scale: 1,
+  },
+  exit: (direction: "next" | "prev") => ({
+    rotateX: direction === "next" ? 20 : -20,
+    y: direction === "next" ? -20 : 20,
+    opacity: 0,
+    scale: 0.98,
+  }),
+};
+
 export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalendarModalProps) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [navDirection, setNavDirection] = useState<"next" | "prev">("next");
@@ -228,13 +249,13 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto font-sans bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 md:p-6">
+    <div className="fixed inset-0 z-50 overflow-hidden font-sans bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop click to close */}
       <div className="fixed inset-0" onClick={onClose} />
 
-      {/* Physical Calendar Card Wrapper with 3D Perspective */}
+      {/* Physical Calendar Card Wrapper with Proportional Scaling */}
       <div 
-        className="relative z-10 w-full max-w-[880px] bg-bg-surface border border-border-main/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto"
+        className="relative z-10 w-full max-w-[820px] scale-[0.88] sm:scale-[0.94] md:scale-100 origin-center bg-bg-surface border border-border-main/90 rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto transition-transform"
         style={{ perspective: "1500px" }}
       >
         {/* Top Metallic Binder-Ring Bar */}
@@ -271,24 +292,15 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
         </div>
 
         {/* 3D Page-Flip Month Animator */}
-        <AnimatePresence mode="wait" initial={false} custom={navDirection}>
+        <AnimatePresence mode="popLayout" initial={false} custom={navDirection}>
           <motion.div
             key={`${currentYear}-${currentMonthIndex}`}
             custom={navDirection}
-            initial={{ 
-              opacity: 0, 
-              rotateX: navDirection === "next" ? -25 : 25, 
-              y: navDirection === "next" ? 25 : -25, 
-              scale: 0.97 
-            }}
-            animate={{ opacity: 1, rotateX: 0, y: 0, scale: 1 }}
-            exit={{ 
-              opacity: 0, 
-              rotateX: navDirection === "next" ? 25 : -25, 
-              y: navDirection === "next" ? -25 : 25, 
-              scale: 0.97 
-            }}
-            transition={{ type: "spring", stiffness: 260, damping: 24 }}
+            variants={monthFlipVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: "spring", stiffness: 280, damping: 26 }}
             style={{ 
               transformOrigin: "top center", 
               width: "100%",
@@ -297,10 +309,10 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
               backfaceVisibility: "hidden"
             }}
           >
-            <div className="grid grid-cols-1 md:grid-cols-12 min-h-[460px]">
+            <div className="grid grid-cols-1 md:grid-cols-12 min-h-[440px]">
               
               {/* Left-Side Month Hero Artwork Panel (4 cols) */}
-              <div className="md:col-span-4 relative min-h-[220px] md:min-h-[460px] overflow-hidden border-b md:border-b-0 md:border-r border-border-main/50">
+              <div className="md:col-span-4 relative min-h-[180px] md:min-h-[440px] overflow-hidden border-b md:border-b-0 md:border-r border-border-main/50">
                 <Image
                   src={monthHeroImage.src}
                   alt={monthHeroImage.alt}
@@ -425,13 +437,13 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                         onMouseEnter={() => setHoveredDateStr(cell.dateStr)}
                         onMouseLeave={() => setHoveredDateStr(null)}
                         onClick={() => handleCellClick(cell.dateStr)}
-                        className={`min-h-[58px] p-1.5 border rounded flex flex-col justify-between transition-all cursor-pointer relative ${
+                        className={`min-h-[50px] md:min-h-[56px] p-1.5 border rounded flex flex-col justify-between transition-all cursor-pointer relative ${
                           cell.isToday
                             ? "border-accent-main bg-accent-main/10 font-bold shadow-xs"
                             : cell.isCurrentMonth
                             ? "border-border-main/40 bg-bg-base/60 hover:bg-bg-card hover:border-border-main"
                             : "border-border-main/20 bg-bg-base/20 opacity-30"
-                        } ${isSelected ? "ring-2 ring-accent-main" : ""}`}
+                        }`}
                       >
                         <div className="flex items-center justify-between font-mono text-[11px]">
                           <span className={cell.isToday ? "text-accent-main font-bold" : "text-txt-main"}>
