@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   try {
     const res = await fetch("https://unstop.com/api/public/competition/search-v2?opportunity=competitions&per_page=10", {
       headers: {

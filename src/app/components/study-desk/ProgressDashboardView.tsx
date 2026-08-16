@@ -2,7 +2,6 @@
 
 import React from "react";
 import { StudyPath, StudyMistake, StudyStats } from "../../study-desk/types";
-import { DSA_TRACKS } from "../../study-desk/dsaMasteryData";
 import { 
   Flame, 
   Zap, 
@@ -14,7 +13,6 @@ import {
   TrendingUp,
   Gamepad2,
   ExternalLink,
-  Lock,
   CheckCircle2,
   Sparkles,
   KeyRound,

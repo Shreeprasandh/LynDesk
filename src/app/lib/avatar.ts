@@ -4,28 +4,38 @@
  * and custom stored profile URLs.
  */
 export function extractAvatarFromUser(user: any): string {
-  if (!user) return "";
-
-  const meta = user.user_metadata || {};
-
-  // 0. Check localStorage custom cached avatar URL first (prevents flash of Google OAuth picture)
-  if (typeof window !== "undefined" && user.id) {
+  // 0. Instant global un-sessioned cache check (prevents 1-frame hydration flash before AuthContext resolves)
+  if (typeof window !== "undefined") {
     try {
-      const localCached = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`);
-      if (localCached && typeof localCached === "string" && localCached.trim().length > 0) {
-        return localCached.trim();
+      const globalActive = localStorage.getItem("ldk_active_user_avatar");
+      if (globalActive && (globalActive.startsWith("http") || globalActive.startsWith("data:image/"))) {
+        return globalActive.trim();
       }
-      const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
-      if (rawPublic) {
-        const parsed = JSON.parse(rawPublic);
-        if (parsed?.avatar_url && typeof parsed.avatar_url === "string" && parsed.avatar_url.trim().length > 0) {
-          return parsed.avatar_url.trim();
+
+      if (user?.id) {
+        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (rawPublic) {
+          const parsed = JSON.parse(rawPublic);
+          if (parsed?.avatar_url && typeof parsed.avatar_url === "string" && parsed.avatar_url.trim().length > 0) {
+            return parsed.avatar_url.trim();
+          }
+        }
+
+        const localCached =
+          localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+          localStorage.getItem(`ldk_avatar_url_${user.id}`);
+        if (localCached && typeof localCached === "string" && localCached.trim().length > 0) {
+          return localCached.trim();
         }
       }
     } catch {}
   }
 
-  // 0b. If user explicitly removed their avatar or updated avatar, do NOT fall back to Google OAuth pictures
+  if (!user) return "";
+
+  const meta = user.user_metadata || {};
+
+  // 0b. If user explicitly removed their avatar, return empty string
   if (meta.avatar_removed === true || meta.avatar_url === null || meta.avatar_url === "") {
     return "";
   }
@@ -40,8 +50,12 @@ export function extractAvatarFromUser(user: any): string {
     return user.avatar_url.trim();
   }
 
-  // 3. OAuth Identities fallback ONLY if user has never customized/updated their profile avatar
-  if (!meta.avatar_updated && Array.isArray(user.identities)) {
+  // 3. OAuth Identities fallback ONLY if user has never updated/customized their profile avatar
+  if (meta.avatar_updated === true) {
+    return "";
+  }
+
+  if (Array.isArray(user.identities)) {
     for (const identity of user.identities) {
       const idData = identity?.identity_data || {};
       const idUrl = idData.avatar_url || idData.picture || idData.avatarUrl || idData.avatar || idData.image || "";

@@ -64,9 +64,8 @@ async function seed() {
   }
 
   const seedUsersToDelete = users.filter(u => 
-    u.email.endsWith('@srmeaswari.edu.in') || 
-    u.email.endsWith('@iitd.ac.in') || 
-    u.email.endsWith('@google.com')
+    u.user_metadata?.is_seed_account === true ||
+    (u.email && u.email.startsWith("seed_user_"))
   );
 
   console.log(`Found ${seedUsersToDelete.length} seed users to delete.`);
@@ -98,7 +97,8 @@ async function seed() {
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
-        avatar_url: ""
+        avatar_url: "",
+        is_seed_account: true
       }
     });
 

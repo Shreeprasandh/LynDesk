@@ -146,21 +146,27 @@ export default function Header() {
     }
   };
   const [headerAvatar, setHeaderAvatar] = useState<string>(() => {
-    if (typeof window !== "undefined" && user) {
+    if (typeof window !== "undefined") {
       try {
-        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
-        if (rawPublic) {
-          const parsed = JSON.parse(rawPublic);
-          if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
-            return parsed.avatar_url;
-          }
+        const globalActive = localStorage.getItem("ldk_active_user_avatar");
+        if (globalActive && (globalActive.startsWith("http") || globalActive.startsWith("data:image/"))) {
+          return globalActive;
         }
-        const stored =
-          localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
-          localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
-          "";
-        if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
-          return stored;
+        if (user?.id) {
+          const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+          if (rawPublic) {
+            const parsed = JSON.parse(rawPublic);
+            if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
+              return parsed.avatar_url;
+            }
+          }
+          const stored =
+            localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+            localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+            "";
+          if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
+            return stored;
+          }
         }
       } catch {}
     }
@@ -211,16 +217,16 @@ export default function Header() {
               localUrl = parsed.avatar_url;
             }
           }
-        } catch {}
-        if (!localUrl) {
-          const stored =
-            localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
-            localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
-            "";
-          if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
-            localUrl = stored;
+          if (!localUrl) {
+            const stored =
+              localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+              localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+              "";
+            if (stored && (stored.startsWith("http") || stored.startsWith("data:image/"))) {
+              localUrl = stored;
+            }
           }
-        }
+        } catch {}
       }
 
       if (localUrl && isMounted) {
@@ -247,6 +253,7 @@ export default function Header() {
             } else if (typeof data.avatar_url === "string" && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
               if (isMounted) setHeaderAvatar(data.avatar_url);
               if (typeof window !== "undefined") {
+                localStorage.setItem("ldk_active_user_avatar", data.avatar_url);
                 localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
                 localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
               }
@@ -256,7 +263,7 @@ export default function Header() {
         } catch {}
       }
 
-      // 3. Fallback to extractAvatarFromUser ONLY if localUrl was not found
+      // 3. Fallback ONLY if localUrl and DB profile were both completely empty
       if (!localUrl && isMounted) {
         const oauthUrl = extractAvatarFromUser(user);
         setHeaderAvatar(oauthUrl || "");

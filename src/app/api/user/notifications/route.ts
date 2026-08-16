@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ notifications });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ notifications: [] });
   }
 }

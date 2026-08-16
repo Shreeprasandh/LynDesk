@@ -11,7 +11,6 @@ import {
   X,
   Trophy,
   Award,
-  ChevronRight,
   Clock,
   Zap,
   Target,
@@ -125,6 +124,15 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
     }
   };
 
+  const firstIncompleteLessonId = React.useMemo(() => {
+    for (const sec of path?.sections || []) {
+      for (const les of sec.lessons || []) {
+        if (!les.completed) return les.id;
+      }
+    }
+    return null;
+  }, [path?.sections]);
+
   if (!path || !path.sections || path.sections.length === 0) {
     return (
       <div className="border border-border-main/70 bg-bg-surface p-8 sm:p-12 rounded-md flex flex-col items-center justify-center text-center max-w-lg mx-auto gap-4 my-8">
@@ -148,8 +156,6 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
   const totalLessons = path.totalLessons || 1;
   const completedLessons = path.completedLessons || 0;
   const progressPercent = Math.min(100, Math.round((completedLessons / totalLessons) * 100));
-
-  let foundFirstUnlocked = false;
 
   const scrollToSection = (secId: string) => {
     setActiveSectionId(secId);
@@ -338,15 +344,7 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                 <div className="space-y-3 pl-2 border-l-2 border-border-main/40 ml-4">
                   {secLessons.map((lesson) => {
                     const isCompleted = lesson.completed;
-                    let isUnlocked = false;
-
-                    if (isCompleted) {
-                      isUnlocked = true;
-                    } else if (!foundFirstUnlocked) {
-                      isUnlocked = true;
-                      foundFirstUnlocked = true;
-                    }
-
+                    const isUnlocked = isCompleted || lesson.id === firstIncompleteLessonId;
                     const isCurrentTarget = isUnlocked && !isCompleted;
 
                     return (

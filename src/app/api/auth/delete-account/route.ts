@@ -91,38 +91,55 @@ export async function POST(request: Request) {
 
     // 3. Handle Requesting Verification Code
     if (action === "request") {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // console.log(`[DELETE ACCOUNT OTP CODE for ${user.email}]: ${code}`);
+      if (!user.email) {
+        return NextResponse.json({ error: "No registered email address found for this user account" }, { status: 400 });
+      }
 
-      // Store verification code in user metadata
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+      // Store verification code & expiry in user metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
         user_metadata: { 
           ...user.user_metadata, 
-          delete_account_otp: code 
+          delete_account_otp: code,
+          delete_account_otp_expiry: expiry
         }
       });
 
       if (updateError) throw updateError;
 
       // Dispatch real email via NodeMailer SMTP
-      const emailSent = await sendOtpEmail(user.email || "shreecode.service@gmail.com", code);
+      const emailSent = await sendOtpEmail(user.email, code);
 
       return NextResponse.json({ 
         success: true, 
         message: emailSent 
           ? "Verification code sent to your registered email."
-          : "Verification code generated. (Check local console logs for code bypass)"
+          : "Verification code generated."
       });
     }
 
     // 4. Handle Verifying Code & Permanent Deletion
     if (action === "verify") {
       const storedOtp = user.user_metadata?.delete_account_otp;
+      const storedExpiry = user.user_metadata?.delete_account_otp_expiry;
       
-      if (!otp || otp !== storedOtp) {
-        return NextResponse.json({ error: "Invalid verification code. Please check your email." }, { status: 400 });
+      const isExpired = storedExpiry ? Date.now() > Number(storedExpiry) : false;
+
+      if (!otp || otp !== storedOtp || isExpired) {
+        return NextResponse.json({ 
+          error: isExpired 
+            ? "Verification code has expired. Please request a new code." 
+            : "Invalid verification code. Please check your email." 
+        }, { status: 400 });
       }
+
+      // Clear OTP metadata before deletion
+      const updatedMeta = { ...user.user_metadata };
+      delete updatedMeta.delete_account_otp;
+      delete updatedMeta.delete_account_otp_expiry;
+      await supabaseAdmin.auth.admin.updateUserById(user.id, { user_metadata: updatedMeta });
 
       // Delete public profile database record first
       await supabaseAdmin

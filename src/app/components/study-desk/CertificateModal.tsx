@@ -2,7 +2,7 @@
 
 import React from "react";
 import { StudyPath } from "../../study-desk/types";
-import { Award, Download, Printer, CheckCircle, Sparkles, Zap } from "lucide-react";
+import { Award, Printer, CheckCircle, Sparkles, Zap } from "lucide-react";
 
 interface CertificateModalProps {
   path: StudyPath;

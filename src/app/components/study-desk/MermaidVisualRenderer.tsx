@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowDown, CheckCircle, ArrowRight } from "lucide-react";
+import { ArrowDown, CheckCircle } from "lucide-react";
 
 interface MermaidVisualRendererProps {
   code: string;

@@ -10,7 +10,6 @@ import {
   Calendar as CalendarIcon, 
   Plus, 
   Trash2, 
-  ExternalLink,
   Check,
   PenLine
 } from "lucide-react";
@@ -96,10 +95,10 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
   const currentYear = currentDate.getFullYear();
   const monthHeroImage = MONTH_IMAGES[currentMonthIndex];
 
-  const loadEvents = async () => {
+  const loadEvents = React.useCallback(async () => {
     const loaded = await fetchWallCalendarEvents(userId);
     setEvents(loaded);
-  };
+  }, [userId]);
 
   // Preload all 12 month images into RAM for 0ms fetch latency
   useEffect(() => {
@@ -113,21 +112,25 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
 
   useEffect(() => {
     if (!isOpen) return;
-    loadEvents();
+    queueMicrotask(() => {
+      loadEvents();
+    });
 
     // Load monthly memo from local storage
     if (typeof window !== "undefined") {
       try {
         const key = `ldk_wall_calendar_memo_${currentYear}_${currentMonthIndex}`;
         const storedMemo = localStorage.getItem(key);
-        setMonthlyMemo(storedMemo || "");
+        queueMicrotask(() => {
+          setMonthlyMemo(storedMemo || "");
+        });
       } catch {}
     }
 
     const handleUpdate = () => loadEvents();
     window.addEventListener("ldk_wall_calendar_update", handleUpdate);
     return () => window.removeEventListener("ldk_wall_calendar_update", handleUpdate);
-  }, [isOpen, userId, currentMonthIndex, currentYear]);
+  }, [isOpen, loadEvents, currentMonthIndex, currentYear]);
 
   const handleMonthlyMemoChange = (text: string) => {
     setMonthlyMemo(text);
@@ -201,35 +204,30 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
   };
 
   // Generate 42-day calendar matrix (6 weeks layout, Monday start)
-  const calendarMatrix: CalendarCell[] = useMemo(() => {
-    const firstDayOfMonth = new Date(currentYear, currentMonthIndex, 1);
-    
-    let dayOfWeek = firstDayOfMonth.getDay() - 1;
-    if (dayOfWeek < 0) dayOfWeek = 6;
+  const firstDayOfMonth = new Date(currentYear, currentMonthIndex, 1);
+  let dayOfWeek = firstDayOfMonth.getDay() - 1;
+  if (dayOfWeek < 0) dayOfWeek = 6;
 
-    const startDate = new Date(firstDayOfMonth);
-    startDate.setDate(firstDayOfMonth.getDate() - dayOfWeek);
+  const startDate = new Date(firstDayOfMonth);
+  startDate.setDate(firstDayOfMonth.getDate() - dayOfWeek);
 
-    const todayStr = toDateString(new Date());
-    const days: CalendarCell[] = [];
+  const todayStr = toDateString(new Date());
+  const calendarMatrix: CalendarCell[] = [];
 
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(startDate);
-      d.setDate(startDate.getDate() + i);
-      const dateStr = toDateString(d);
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    const dateStr = toDateString(d);
 
-      days.push({
-        date: d,
-        dateStr,
-        dayNum: d.getDate(),
-        isCurrentMonth: d.getMonth() === currentMonthIndex,
-        isToday: dateStr === todayStr,
-        dayOfWeek: d.getDay(),
-      });
-    }
-
-    return days;
-  }, [currentDate, currentYear, currentMonthIndex]);
+    calendarMatrix.push({
+      date: d,
+      dateStr,
+      dayNum: d.getDate(),
+      isCurrentMonth: d.getMonth() === currentMonthIndex,
+      isToday: dateStr === todayStr,
+      dayOfWeek: d.getDay(),
+    });
+  }
 
   // Group events by date & filter by active category
   const filteredEvents = useMemo(() => {
@@ -429,7 +427,6 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                   {calendarMatrix.map((cell: CalendarCell) => {
                     const dayEvts = eventsByDate[cell.dateStr] || [];
                     const isHovered = hoveredDateStr === cell.dateStr;
-                    const isSelected = selectedDateStr === cell.dateStr;
 
                     return (
                       <div

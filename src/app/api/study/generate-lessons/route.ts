@@ -21,6 +21,11 @@ function sanitizeString(str?: string): string {
     .trim();
 }
 
+function sanitizeTextOutput(str?: string): string {
+  if (!str || typeof str !== "string") return "";
+  return str.trim();
+}
+
 function generateFallbackSections(
   pathTitle: string,
   depthMode: string = "standard",
@@ -62,7 +67,6 @@ function generateFallbackSections(
     for (let l = 0; l < lessonsPerSec && lessonCounter <= targetTotal; l++) {
       const lesTopic = topics[(s + l) % topics.length];
       const lesId = `les_${secNum}_${l + 1}_${Math.random().toString(36).substring(2, 7)}`;
-      const topicQuery = encodeURIComponent(`${title} ${secTopic.title}`);
 
       lessons.push({
         id: lesId,
@@ -209,7 +213,7 @@ export async function POST(req: Request) {
       files = [] 
     } = body;
 
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY;
 
     if (groqApiKey) {
       try {
@@ -226,7 +230,9 @@ export async function POST(req: Request) {
           ? "24 to 36 lessons total distributed across 6-9 distinct sections (each section MUST contain 3 to 5 lessons)" 
           : "15 to 20 lessons total distributed across 4-6 distinct sections (each section MUST contain 3 to 4 lessons)";
 
-        const systemPrompt = `You are a world-class adaptive educator, textbook author, and master curriculum architect. Output ONLY valid JSON matching this schema:
+        const systemPrompt = `You are a world-class adaptive educator, textbook author, and master curriculum architect.
+Learning style: ${learningStyle}. Creation mode: ${creationMode}.
+Output ONLY valid JSON matching this schema:
 {
   "extractedTitle": "Auto-extracted concise topic title from document or user input",
   "extractedDescription": "Auto-extracted concise 1-2 sentence description summarizing the course",
@@ -424,44 +430,44 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
             const processedSections = parsed.sections.map((sec: any, secIdx: number) => ({
               id: `sec_${secIdx + 1}`,
               pathId: "pending",
-              title: sanitizeString(sec.title) || `Section ${secIdx + 1}`,
-              description: sanitizeString(sec.description) || "Key concepts and review.",
+              title: sanitizeTextOutput(sec.title) || `Section ${secIdx + 1}`,
+              description: sanitizeTextOutput(sec.description) || "Key concepts and review.",
               lessons: (sec.lessons || []).map((les: any, lesIdx: number) => ({
                 id: `les_${secIdx + 1}_${lesIdx + 1}_${Math.random().toString(36).substring(2, 6)}`,
                 sectionId: `sec_${secIdx + 1}`,
                 pathId: "pending",
-                title: sanitizeString(les.title) || `Lesson ${lesIdx + 1}`,
-                description: sanitizeString(les.description) || "Practice and review.",
-                xpValue: sec.title.toUpperCase().includes("GRAND PATH EXAM") ? 50 : 10,
+                title: sanitizeTextOutput(les.title) || `Lesson ${lesIdx + 1}`,
+                description: sanitizeTextOutput(les.description) || "Practice and review.",
+                xpValue: sec.title?.toUpperCase().includes("GRAND PATH EXAM") ? 50 : 10,
                 estimatedMinutes: typeof les.estimatedMinutes === "number" ? les.estimatedMinutes : 5,
                 completed: false,
                 cards: (les.cards || []).map((c: any) => ({
-                  title: sanitizeString(c.title) || "Core Concept",
-                  badge: sanitizeString(c.badge) || "Summary",
-                  content: sanitizeString(c.content) || "Key definitions and operational rules.",
-                  keyTakeaway: sanitizeString(c.keyTakeaway) || "Focus on primary mechanisms.",
-                  example: sanitizeString(c.example) || undefined,
+                  title: sanitizeTextOutput(c.title) || "Core Concept",
+                  badge: sanitizeTextOutput(c.badge) || "Summary",
+                  content: sanitizeTextOutput(c.content) || "Key definitions and operational rules.",
+                  keyTakeaway: sanitizeTextOutput(c.keyTakeaway) || "Focus on primary mechanisms.",
+                  example: sanitizeTextOutput(c.example) || undefined,
                 })),
                 questions: (les.questions || []).map((q: any) => {
                   const type = q.type === "short_answer" ? "short_answer" : "mcq";
                   if (type === "mcq") {
-                    const rawOpts = Array.isArray(q.options) ? q.options.map((o: any) => sanitizeString(o)) : [];
-                    const opts = rawOpts.filter((o: string) => o.length > 1);
+                    const rawOpts = Array.isArray(q.options) ? q.options.map((o: any) => sanitizeTextOutput(o)) : [];
+                    const opts = rawOpts.filter((o: string) => o.length > 0);
                     while (opts.length < 4) opts.push(`Option ${opts.length + 1}`);
                     return {
                       type: "mcq",
-                      prompt: sanitizeString(q.prompt) || "What is a primary principle of this topic?",
+                      prompt: sanitizeTextOutput(q.prompt) || "What is a primary principle of this topic?",
                       options: opts.slice(0, 4),
                       correctAnswerIndex: typeof q.correctAnswerIndex === "number" ? q.correctAnswerIndex : 0,
                       correctAnswerText: opts[0],
-                      explanation: sanitizeString(q.explanation) || "Aligns directly with core concepts.",
+                      explanation: sanitizeTextOutput(q.explanation) || "Aligns directly with core concepts.",
                     };
                   } else {
                     return {
                       type: "short_answer",
-                      prompt: sanitizeString(q.prompt) || "Summarize the main focus in your own words.",
-                      modelAnswer: sanitizeString(q.modelAnswer) || "Understanding core mechanisms.",
-                      keywords: Array.isArray(q.keywords) ? q.keywords.map((k: any) => sanitizeString(k)) : ["concept"],
+                      prompt: sanitizeTextOutput(q.prompt) || "Summarize the main focus in your own words.",
+                      modelAnswer: sanitizeTextOutput(q.modelAnswer) || "Understanding core mechanisms.",
+                      keywords: Array.isArray(q.keywords) ? q.keywords.map((k: any) => sanitizeTextOutput(k)) : ["concept"],
                     };
                   }
                 }),

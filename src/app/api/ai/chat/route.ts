@@ -265,6 +265,8 @@ export async function POST(req: NextRequest) {
     const liveDate = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
     const contextPrompt = `You are LynAI, an intelligent and helpful AI assistant co-pilot on LynDesk.
+CURRENT TEMPORAL CONTEXT: ${liveDate} at ${liveTime}.
+${workspaceContext ? `ACTIVE WORKSPACE CONTEXT: ${JSON.stringify(workspaceContext)}` : ""}
 
 CORE DIRECTIVES:
 1. ACCURACY FIRST: For general knowledge, anime, history, science, celebrities, pop culture, or programming queries, provide 100% accurate, direct, and factually correct answers. (e.g. Eiichiro Oda is the creator and author of One Piece).
@@ -272,8 +274,8 @@ CORE DIRECTIVES:
 3. MEDIA REQUESTS: If asked for a picture or image, politely explain that you are a text assistant and suggest web search. Do NOT attach unasked platform navigation links.
 4. ABSOLUTELY NO EMOJIS: Keep all answers clean, clear, professional, and free of emojis.`;
 
-    // 1. Try Groq API (Hyper-fast free LLaMA 3.3 70B model)
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    // 1. Try Groq API (Hyper-fast LLaMA 3.3 70B model)
+    const groqApiKey = process.env.GROQ_API_KEY;
 
     if (groqApiKey) {
       try {
@@ -301,7 +303,7 @@ CORE DIRECTIVES:
           body: JSON.stringify({
             model: "llama-3.3-70b-versatile",
             messages: groqMessages,
-            max_tokens: 300,
+            max_tokens: 1200,
             temperature: 0.5
           })
         });

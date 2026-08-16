@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+function getWorkspaceUuid(rawId: string): string {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
+  if (isUuid) return rawId;
+  let hash = 0;
+  for (let i = 0; i < rawId.length; i++) {
+    hash = (hash << 5) - hash + rawId.charCodeAt(i);
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(8, "0");
+  return `00000000-0000-4000-8000-${hex.padStart(12, "0")}`;
+}
+
 export async function GET(req: NextRequest) {
   const urlParams = req.nextUrl.searchParams;
   const workspaceId = urlParams.get("workspaceId");
@@ -8,6 +20,8 @@ export async function GET(req: NextRequest) {
   if (!workspaceId) {
     return NextResponse.json({ error: "Missing workspaceId" }, { status: 400 });
   }
+
+  const targetUuid = getWorkspaceUuid(workspaceId);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -31,7 +45,7 @@ export async function GET(req: NextRequest) {
         last_seen_at,
         profile:user_id ( id, username, full_name, avatar_url )
       `)
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", targetUuid);
 
     if (!pError && presenceData && presenceData.length > 0) {
       const formatted = presenceData.map((item: any) => {
@@ -66,7 +80,7 @@ export async function GET(req: NextRequest) {
         role,
         profile:profile_id ( id, username, full_name, avatar_url )
       `)
-      .eq("project_space_id", workspaceId);
+      .eq("project_space_id", targetUuid);
 
     if (memberData && memberData.length > 0) {
       const formatted = memberData.map((item: any) => {
@@ -108,13 +122,14 @@ export async function POST(req: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
+    const targetUuid = getWorkspaceUuid(workspaceId);
     const nowIso = new Date().toISOString();
 
     // Upsert row in workspace_presence table
     const { error: upsertError } = await supabaseAdmin
       .from("workspace_presence")
       .upsert({
-        workspace_id: workspaceId,
+        workspace_id: targetUuid,
         user_id: userId,
         status_text: statusText || "Active",
         is_online: isOnline !== undefined ? isOnline : true,

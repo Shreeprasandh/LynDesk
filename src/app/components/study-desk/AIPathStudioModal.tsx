@@ -27,7 +27,7 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
   const [creationMode, setCreationMode] = useState<"prompt" | "materials">("prompt");
 
   const [pathTitle, setPathTitle] = useState("");
-  const [pathDescription, setPathDescription] = useState("");
+  const pathDescription = "";
   const [subtopics, setSubtopics] = useState("");
   const [depthMode, setDepthMode] = useState<DepthMode>("standard");
   const [learningStyle, setLearningStyle] = useState<"balanced" | "coding">("balanced");
@@ -37,7 +37,7 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
   const [parsedSourceFiles, setParsedSourceFiles] = useState<SourceFile[]>([]);
   const [isParsingFiles, setIsParsingFiles] = useState(false);
 
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [, setIsGenerating] = useState(false);
   const [generatedSections, setGeneratedSections] = useState<Section[]>([]);
   const [finalTitle, setFinalTitle] = useState("");
   const [finalDescription, setFinalDescription] = useState("");

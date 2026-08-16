@@ -23,7 +23,6 @@ import {
   ExternalLink,
   UserPlus,
   User,
-  CheckCircle2,
   X,
   Eye,
   EyeOff,
@@ -203,7 +202,7 @@ const INITIAL_EVENTS: EventItem[] = [];
 export default function Home() {
   const { user, loading: authLoading, isUserOnline } = useAuth();
   const { showToast } = useToast();
-  const [likelyHasSession, setLikelyHasSession] = useState(false);
+  const likelyHasSession = !!user;
 
   // Smart Reload-Only Session Loading State
   const [isHardReloading, setIsHardReloading] = useState<boolean>(() => {
@@ -522,9 +521,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       const loadLocalWorkspaces = () => {
         const stored = localStorage.getItem("ldk_events");
-        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
         const parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
-        const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
 
         // Enrich parsed events with local workspace overrides
         const enrichedEvents = parsedEvents.map(e => {
@@ -843,7 +840,9 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
-      fetchCoworkersAndCollege();
+      queueMicrotask(() => {
+        fetchCoworkersAndCollege();
+      });
 
       const profileChannel = supabase
         .channel("public:profiles_home")
@@ -859,7 +858,7 @@ export default function Home() {
         supabase.removeChannel(profileChannel);
       };
     }
-  }, [user]);
+  }, [user, fetchCoworkersAndCollege]);
 
   const handleSaveWorkspaceTitle = async (workspaceId: string) => {
     if (!tempWorkspaceTitle || !tempWorkspaceTitle.trim()) return;
@@ -911,7 +910,7 @@ export default function Home() {
     setEditingWorkspaceId(null);
   };
 
-  const handleUpdateWorkspaceStatus = async (workspaceId: string, newStatus: "ideation" | "development" | "testing" | "submitted") => {
+  const _handleUpdateWorkspaceStatus = async (workspaceId: string, newStatus: "ideation" | "development" | "testing" | "submitted") => {
     setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, status: newStatus } : e));
     if (typeof window !== "undefined") {
       localStorage.setItem(`ldk_workspace_status_${workspaceId}`, newStatus);

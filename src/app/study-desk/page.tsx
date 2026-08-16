@@ -8,7 +8,6 @@ import { supabase } from "../lib/supabase";
 import { StudyPath, StudyMistake, StudyStats, Lesson } from "./types";
 
 import LearningPathsView from "../components/study-desk/LearningPathsView";
-import ActivePathView from "../components/study-desk/ActivePathView";
 import SessionPlayer from "../components/study-desk/SessionPlayer";
 import AIPathStudioModal from "../components/study-desk/AIPathStudioModal";
 import ProgressDashboardView from "../components/study-desk/ProgressDashboardView";

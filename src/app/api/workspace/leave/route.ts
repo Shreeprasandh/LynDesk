@@ -10,12 +10,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dsqkxedafwzkjtcupzwx.supabase.co";
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    // Validate Auth Token
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return NextResponse.json({ error: "Authorization credentials required" }, { status: 401 });
+    }
+    const token = authHeader.replace("Bearer ", "");
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!url || !serviceKey) {
+      return NextResponse.json({ error: "Missing Supabase server configuration" }, { status: 500 });
+    }
 
     const supabaseAdmin = createClient(url, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
+
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+    if (authErr || !user) {
+      return NextResponse.json({ error: "Invalid authentication session" }, { status: 401 });
+    }
+
+    // Ensure users can only remove themselves (or admin/owner validation)
+    if (user.id !== userId) {
+      return NextResponse.json({ error: "Unauthorized operation" }, { status: 403 });
+    }
 
     const targetSpaceIds = [workspaceId, workspaceUuid].filter(Boolean);
 
@@ -32,11 +53,16 @@ export async function POST(req: Request) {
     try {
       const activeSpaceId = workspaceUuid || workspaceId;
       const channel = supabaseAdmin.channel(`project_chat:${activeSpaceId}`);
-      await channel.subscribe();
-      await channel.send({
-        type: "broadcast",
-        event: "member_left",
-        payload: { userId, workspaceId: activeSpaceId }
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          channel.send({
+            type: "broadcast",
+            event: "member_left",
+            payload: { userId, workspaceId: activeSpaceId }
+          }).finally(() => {
+            supabaseAdmin.removeChannel(channel);
+          });
+        }
       });
     } catch {}
 

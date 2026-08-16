@@ -1192,6 +1192,7 @@ export default function ProfilePage() {
   const applyNewAvatar = async (url: string) => {
     setAvatarUrl(url);
     if (typeof window !== "undefined" && user?.id) {
+      localStorage.setItem("ldk_active_user_avatar", url);
       localStorage.setItem(`ldk_user_avatar_${user.id}`, url);
       localStorage.setItem(`ldk_avatar_url_${user.id}`, url);
       try {
@@ -1206,7 +1207,7 @@ export default function ProfilePage() {
     if (user?.id) {
       try {
         await supabase.from("profiles").update({ avatar_url: url, updated_at: new Date().toISOString() }).eq("id", user.id);
-        await supabase.auth.updateUser({ data: { avatar_url: url, picture: url, avatarUrl: url, avatar: url, avatar_removed: false } });
+        await supabase.auth.updateUser({ data: { avatar_url: url, picture: url, avatarUrl: url, avatar: url, avatar_removed: false, avatar_updated: true } });
       } catch (dbErr) {
         console.warn("Avatar database sync note:", dbErr);
       }
@@ -1247,6 +1248,7 @@ export default function ProfilePage() {
     setAvatarUrl("");
     if (typeof window !== "undefined" && user?.id) {
       try {
+        localStorage.removeItem("ldk_active_user_avatar");
         localStorage.removeItem(`ldk_user_avatar_${user.id}`);
         localStorage.removeItem(`ldk_avatar_url_${user.id}`);
         const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);

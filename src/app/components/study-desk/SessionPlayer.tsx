@@ -10,10 +10,8 @@ import {
   Sparkles, 
   CheckCircle2, 
   XCircle,
-  Video,
   ExternalLink,
   Code2,
-  Layers,
   Volume2,
   VolumeX,
   Bot,
@@ -199,13 +197,17 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
   // Reset Learn More drawer state on step change
   useEffect(() => {
-    setShowLearnMore(false);
+    queueMicrotask(() => {
+      setShowLearnMore(false);
+    });
   }, [currentStepIndex]);
 
   // Enforce anti-spam card reading pace delay (5 seconds per card)
   useEffect(() => {
     if (currentStepIndex < totalCards) {
-      setCardPaceTimeLeft(5);
+      queueMicrotask(() => {
+        setCardPaceTimeLeft(5);
+      });
       const interval = setInterval(() => {
         setCardPaceTimeLeft((prev) => {
           if (prev <= 1) {
@@ -217,7 +219,9 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
       }, 1000);
       return () => clearInterval(interval);
     } else {
-      setCardPaceTimeLeft(0);
+      queueMicrotask(() => {
+        setCardPaceTimeLeft(0);
+      });
     }
   }, [currentStepIndex, totalCards]);
 
@@ -250,8 +254,11 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
     }
   };
 
-  const shuffledMcqData = React.useMemo(() => {
-    if (!currentQuestion || currentQuestion.type !== "mcq") return null;
+  const currentQuestionPrompt = currentQuestion?.prompt;
+  const currentQuestionType = currentQuestion?.type;
+
+  const getShuffledMcqData = () => {
+    if (!currentQuestion || currentQuestionType !== "mcq") return null;
 
     const rawOpts = currentQuestion.options || [];
     const filteredOpts = rawOpts.filter((o) => typeof o === "string" && o.trim().length > 0);
@@ -267,7 +274,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
     const origCorrectIdx = currentQuestion.correctAnswerIndex ?? 0;
     const correctText = currentQuestion.correctAnswerText || currentQuestion.correctAnswer || baseOpts[origCorrectIdx] || baseOpts[0];
 
-    const promptKey = (currentQuestion.prompt || "") + currentStepIndex;
+    const promptKey = (currentQuestionPrompt || "") + currentStepIndex;
     let hash = 0;
     for (let i = 0; i < promptKey.length; i++) {
       hash = (hash << 5) - hash + promptKey.charCodeAt(i);
@@ -294,7 +301,9 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
       correctIndex: newCorrectIdx >= 0 ? newCorrectIdx : 0,
       correctText
     };
-  }, [currentQuestion, currentStepIndex]);
+  };
+
+  const shuffledMcqData = getShuffledMcqData();
 
   const handleCheckMcq = () => {
     if (!currentQuestion || selectedMcqOption === null) return;
@@ -332,7 +341,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
       setAnswerFeedback(`Correct Answer: ${targetCorrectText}. ${currentQuestion.explanation || ""}`);
 
       const mistake: StudyMistake = {
-        id: "mistake_" + Math.random().toString(36).substring(2, 9),
+        id: `mistake_${lesson.id}_${currentQuestionIndex}`,
         pathId: lesson.pathId,
         lessonId: lesson.id,
         questionPrompt: currentQuestion.prompt,
@@ -384,7 +393,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
         }
         setHearts((prev) => Math.max(0, prev - 1));
         const mistake: StudyMistake = {
-          id: "mistake_" + Math.random().toString(36).substring(2, 9),
+          id: `mistake_${lesson.id}_${currentQuestionIndex}`,
           pathId: lesson.pathId,
           lessonId: lesson.id,
           questionPrompt: currentQuestion.prompt,
@@ -521,7 +530,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
 
               <div className="space-y-1">
                 <span className="font-mono text-[10px] uppercase tracking-widest text-rose-400 font-bold">Out of Hearts (0/5)</span>
-                <h2 className="font-display text-2xl font-light text-txt-main">Let's Review the Key Concepts</h2>
+                <h2 className="font-display text-2xl font-light text-txt-main">Let&apos;s Review the Key Concepts</h2>
                 <p className="text-xs text-txt-sub font-light max-w-md mx-auto leading-relaxed">
                   You ran out of lives on this lesson. Review the teaching cards carefully to absorb the material, then retry the assessment!
                 </p>

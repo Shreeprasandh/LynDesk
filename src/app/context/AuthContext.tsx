@@ -127,9 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
     return () => {
-      globalPresenceChannel.untrack().then(() => {
-        supabase.removeChannel(globalPresenceChannel);
-      });
+      globalPresenceChannel.untrack().catch(() => {});
+      supabase.removeChannel(globalPresenceChannel);
     };
   }, [user?.id]);
 

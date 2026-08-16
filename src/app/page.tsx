@@ -23,7 +23,6 @@ import {
   Award,
   Globe,
   Mail,
-  SlidersHorizontal,
   BookOpen,
   Zap,
   Target,
@@ -318,30 +317,6 @@ export default function Home() {
 
   // Preference Preset Modal State
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
-  const [hasActivePreset, setHasActivePreset] = useState(false);
-
-  useEffect(() => {
-    const checkPreset = () => {
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("ldk_preference_preset");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed.location || parsed.locationMode !== "all" || parsed.categoryFocus !== "all") {
-              setHasActivePreset(true);
-              return;
-            }
-          } catch {}
-        }
-      }
-      setHasActivePreset(false);
-    };
-    checkPreset();
-    if (typeof window !== "undefined") {
-      window.addEventListener("ldk_preferences_update", checkPreset);
-      return () => window.removeEventListener("ldk_preferences_update", checkPreset);
-    }
-  }, []);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -363,15 +338,17 @@ export default function Home() {
         const avatarUrl = localAvatar || publicProf.avatar_url || draft.avatarUrl || meta.avatar_url || extractAvatarFromUser(user) || "";
 
         if (fullName || username || avatarUrl) {
-          setProfile(prev => ({
-            full_name: fullName || prev?.full_name || "",
-            username: username || prev?.username || "",
-            avatar_url: avatarUrl || prev?.avatar_url || "",
-            college_name: publicProf.college_name || draft.collegeName || meta.college_name || prev?.college_name || "",
-            department: publicProf.department || draft.department || meta.department || prev?.department || "",
-            leetcode_username: publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || prev?.leetcode_username || "",
-            github_url: publicProf.github_url || draft.githubUrl || meta.github_url || prev?.github_url || "",
-          }));
+          queueMicrotask(() => {
+            setProfile(prev => ({
+              full_name: fullName || prev?.full_name || "",
+              username: username || prev?.username || "",
+              avatar_url: avatarUrl || prev?.avatar_url || "",
+              college_name: publicProf.college_name || draft.collegeName || meta.college_name || prev?.college_name || "",
+              department: publicProf.department || draft.department || meta.department || prev?.department || "",
+              leetcode_username: publicProf.leetcode_username || draft.leetcodeUsername || meta.leetcode_username || prev?.leetcode_username || "",
+              github_url: publicProf.github_url || draft.githubUrl || meta.github_url || prev?.github_url || "",
+            }));
+          });
         }
       } catch {}
     }

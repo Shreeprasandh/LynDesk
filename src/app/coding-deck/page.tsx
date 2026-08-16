@@ -249,29 +249,38 @@ export default function CodingDeckPage() {
 
     if (isCompleted === true) {
       if (typeof window !== "undefined" && sessionStorage.getItem(storageKey)) {
-        setShowSuccessBanner(false);
-        setPrevCompleted(true);
+        queueMicrotask(() => {
+          setShowSuccessBanner(false);
+          setPrevCompleted(true);
+        });
         return;
       }
 
       if (prevCompleted === false) {
-        setShowSuccessBanner(true);
-        setPrevCompleted(true);
+        queueMicrotask(() => {
+          setShowSuccessBanner(true);
+          setPrevCompleted(true);
+        });
         if (typeof window !== "undefined") {
           sessionStorage.setItem(storageKey, "true");
         }
       } else if (prevCompleted === null) {
         if (typeof window !== "undefined" && !sessionStorage.getItem(storageKey)) {
-          setShowSuccessBanner(true);
+          queueMicrotask(() => {
+            setShowSuccessBanner(true);
+            setPrevCompleted(true);
+          });
           sessionStorage.setItem(storageKey, "true");
         } else {
-          setShowSuccessBanner(false);
+          queueMicrotask(() => {
+            setPrevCompleted(true);
+          });
         }
-        setPrevCompleted(true);
       }
     } else if (isCompleted === false) {
-      setShowSuccessBanner(false);
-      setPrevCompleted(false);
+      queueMicrotask(() => {
+        setPrevCompleted(false);
+      });
     }
   }, [stats.leetcode?.dailyChallenge?.completed, stats.leetcode?.dailyChallenge?.date, prevCompleted]);
 

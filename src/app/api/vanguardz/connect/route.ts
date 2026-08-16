@@ -7,8 +7,8 @@ function sanitizeString(str: any): string {
 }
 
 function getVanguarDZClient() {
-  const url = process.env.VANGUARDZ_SUPABASE_URL || process.env.NEXT_PUBLIC_VANGUARDZ_SUPABASE_URL || "https://sonmafrtldaiymqirmuv.supabase.co";
-  const key = process.env.VANGUARDZ_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_VANGUARDZ_SUPABASE_ANON_KEY || "sb_publishable_0V2SUUQ-xuuf9yPxAh3bMg_DfaRltt9";
+  const url = process.env.VANGUARDZ_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.VANGUARDZ_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false }
   });
@@ -109,7 +109,7 @@ export async function GET(req: Request) {
       username: profile.username,
       highScore: profile.high_score ?? 0
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
       { success: false, message: "Failed to fetch VanguarDZ stats." },
       { status: 500 }

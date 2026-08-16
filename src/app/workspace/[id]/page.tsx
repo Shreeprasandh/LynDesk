@@ -411,12 +411,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     brief?: string;
   };
 
-  const now = new Date();
-  const dAug = new Date(now.getTime() + 7 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-  const dSep = new Date(now.getTime() + 21 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-  const dOct = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-  const dNov = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-
   const defaultRealStages: RealStageItem[] = [
     { title: "Ideation & Proposal", deadline: "Aug 19", brief: "Problem statement selection, team role assignment, technical architecture deck draft submission." },
     { title: "Prototype Development", deadline: "Sep 02", brief: "Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync." },
@@ -442,11 +436,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     // 1. Resolve workspace-specific URL mapping
     const mapped = WORKSPACE_EVENT_URL_MAP[id];
     if (mapped) {
-      setEventMetadata(prev => ({
-        ...prev,
-        title: mapped.title,
-        url: mapped.portalUrl
-      }));
+      queueMicrotask(() => {
+        setEventMetadata(prev => ({
+          ...prev,
+          title: mapped.title,
+          url: mapped.portalUrl
+        }));
+      });
     }
 
     // 2. Load workspace-specific metadata from local storage / cache
@@ -540,10 +536,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     return "Active";
   });
   const myCustomStatusRef = useRef<string>(myCustomStatus);
-  const [statusInputDraft, setStatusInputDraft] = useState<string>(myCustomStatus);
   useEffect(() => {
     myCustomStatusRef.current = myCustomStatus;
-    setTimeout(() => setStatusInputDraft(myCustomStatus), 0);
   }, [myCustomStatus]);
   const [sentInviteIds, setSentInviteIds] = useState<string[]>([]);
 
@@ -1038,7 +1032,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const userAvatar = getBestAvatarUrl(user);
 
       // Register member in database project_members table
-      const isUuidWorkspace = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !!workspaceUuid;
       if (workspaceUuid) {
         (async () => {
           try {
@@ -2122,47 +2115,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   };
 
-  const handleUpdateMyCustomStatus = async (newStatus: string) => {
-    const cleanStatus = newStatus.trim() || "Active";
-    myCustomStatusRef.current = cleanStatus;
-    setMyCustomStatus(cleanStatus);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`ldk_my_custom_status_${id}`, cleanStatus);
-    }
-
-    setRoomMembers((prev) =>
-      prev.map((m) => (m.id === user?.id ? { ...m, customStatus: cleanStatus } : m))
-    );
-
-    if (activeChannelRef.current && user) {
-      try {
-        const myName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Collaborator";
-        activeChannelRef.current.track({
-          id: user.id,
-          name: myName,
-          avatarUrl: getBestAvatarUrl(user),
-          customStatus: cleanStatus,
-          online_at: new Date().toISOString()
-        });
-      } catch {}
-    }
-
-    if (user && workspaceUuid) {
-      try {
-        await fetch("/api/workspace/presence", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            workspaceId: workspaceUuid,
-            userId: user.id,
-            statusText: cleanStatus,
-            isOnline: true
-          })
-        });
-      } catch {}
-    }
-  };
-
   // Bind local/remote streams to video tags
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -2589,9 +2541,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   };
 
   // Artifact file upload simulation
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
