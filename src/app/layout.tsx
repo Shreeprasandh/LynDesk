@@ -24,9 +24,25 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LynDesk",
-  description: "Link Your Next Desk — Pinned Events, Team Collaboration, and University Portals.",
+  title: "LynDesk — Link Your Next Desk",
+  description: "Link Your Next Desk — Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+  keywords: ["LynDesk", "Event Tracker", "Student Collaboration", "Study Desk", "Hackathons", "University Portal"],
+  authors: [{ name: "LynDesk Engineering" }],
   manifest: "/manifest.json",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://lyndesk.vercel.app"),
+  openGraph: {
+    title: "LynDesk — Link Your Next Desk",
+    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+    url: "https://lyndesk.vercel.app",
+    siteName: "LynDesk",
+    locale: "en_US",
+    type: "website"
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LynDesk — Link Your Next Desk",
+    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk."
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
