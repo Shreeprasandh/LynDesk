@@ -142,6 +142,53 @@ const tableColumns = {
     "handle",
     "status",
     "created_at"
+  ],
+  wall_calendar_events: [
+    "id",
+    "user_id",
+    "title",
+    "event_date",
+    "event_time",
+    "category",
+    "description",
+    "link",
+    "source_type",
+    "source_id",
+    "created_at"
+  ],
+  study_paths: [
+    "id",
+    "user_id",
+    "title",
+    "description",
+    "depth_mode",
+    "upload_mode",
+    "total_lessons",
+    "completed_lessons",
+    "xp_earned",
+    "is_active",
+    "created_at"
+  ],
+  study_mistakes: [
+    "id",
+    "user_id",
+    "path_id",
+    "lesson_id",
+    "question_type",
+    "question_prompt",
+    "correct_answer",
+    "user_answer",
+    "created_at"
+  ],
+  user_dsa_progress: [
+    "id",
+    "user_id",
+    "track_id",
+    "problem_id",
+    "status",
+    "is_starred",
+    "notes",
+    "completed_at"
   ]
 };
 

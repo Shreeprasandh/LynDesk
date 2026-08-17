@@ -6,14 +6,33 @@ import { supabase } from "../lib/supabase";
 
 export type UserRole = "student" | "recruiter" | "coordinator";
 
+export interface UserProfileData {
+  id: string;
+  full_name: string;
+  username: string;
+  avatar_url: string;
+  academic_credits: number;
+  department: string;
+  college_key: string;
+  bio: string;
+  skills: string;
+  github_url?: string;
+  linkedin_url?: string;
+  portfolio_url?: string;
+  leetcode_username?: string;
+}
+
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   userRole: UserRole;
+  profileAvatar: string;
+  userProfile: UserProfileData | null;
   loading: boolean;
   onlineUserIds: Set<string>;
   isUserOnline: (userId: string) => boolean;
   refreshUser: () => Promise<void>;
+  updateUserProfile: (partial: Partial<UserProfileData>) => void;
   signOut: () => Promise<void>;
 };
 
@@ -23,6 +42,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("student");
+  const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
+  const [profileAvatar, setProfileAvatar] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const active = localStorage.getItem("ldk_active_user_avatar");
+        if (active && (active.startsWith("http") || active.startsWith("data:image/"))) {
+          return active;
+        }
+      } catch {}
+    }
+    return "";
+  });
   const [loading, setLoading] = useState(true);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
 
@@ -70,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (event === "SIGNED_OUT") {
         setSession(null);
         setUser(null);
+        setUserProfile(null);
         setUserRole("student");
         setLoading(false);
       } else {
@@ -172,6 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(null);
     setSession(null);
+    setUserProfile(null);
     setUserRole("student");
     setOnlineUserIds(new Set());
     setLoading(false);
@@ -186,6 +219,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
+  const updateUserProfile = (partial: Partial<UserProfileData>) => {
+    setUserProfile(prev => {
+      const updated = prev ? { ...prev, ...partial } : (partial as UserProfileData);
+      if (partial.avatar_url && typeof window !== "undefined") {
+        localStorage.setItem("ldk_active_user_avatar", partial.avatar_url);
+        if (user?.id) {
+          localStorage.setItem(`ldk_user_avatar_${user.id}`, partial.avatar_url);
+        }
+      }
+      return updated;
+    });
+    if (partial.avatar_url) {
+      setProfileAvatar(partial.avatar_url);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProfileAvatar("");
+      setUserProfile(null);
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (rawPublic) {
+          const parsed = JSON.parse(rawPublic);
+          if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
+            setProfileAvatar(parsed.avatar_url);
+          }
+        }
+        const cached =
+          localStorage.getItem(`ldk_user_avatar_${user.id}`) ||
+          localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
+          localStorage.getItem("ldk_active_user_avatar");
+        if (cached && (cached.startsWith("http") || cached.startsWith("data:image/"))) {
+          setProfileAvatar(cached);
+        }
+      } catch {}
+    }
+
+    const syncProfile = async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, full_name, username, avatar_url, academic_credits, department, college_key, bio, skills, github_url, linkedin_url, portfolio_url, leetcode_username")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (data) {
+          const profData: UserProfileData = {
+            id: data.id,
+            full_name: data.full_name || user.user_metadata?.full_name || "Developer",
+            username: data.username || "dev_user",
+            avatar_url: data.avatar_url || user.user_metadata?.avatar_url || "",
+            academic_credits: data.academic_credits || 0,
+            department: data.department || "Computer Science",
+            college_key: data.college_key || "COLLEGE_SRM",
+            bio: data.bio || "",
+            skills: data.skills || "",
+            github_url: data.github_url,
+            linkedin_url: data.linkedin_url,
+            portfolio_url: data.portfolio_url,
+            leetcode_username: data.leetcode_username
+          };
+          setUserProfile(profData);
+
+          if (data.avatar_url && typeof data.avatar_url === "string" && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
+            setProfileAvatar(data.avatar_url);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("ldk_active_user_avatar", data.avatar_url);
+              localStorage.setItem(`ldk_user_avatar_${user.id}`, data.avatar_url);
+              localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
+            }
+          }
+        }
+      } catch {}
+    };
+
+    syncProfile();
+  }, [user?.id]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.addEventListener("ldk_profile_update", refreshUser);
@@ -196,7 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, onlineUserIds, isUserOnline, refreshUser, signOut }}>
+    <AuthContext.Provider value={{ user, session, userRole, profileAvatar, userProfile, loading, onlineUserIds, isUserOnline, refreshUser, updateUserProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,21 +1,22 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
+import { createAdminClient } from "@/app/lib/supabaseServer";
+import { apiSuccess, apiError } from "@/app/lib/apiResponse";
+
+const querySchema = z.object({
+  userId: z.string().uuid({ message: "Invalid user UUID format" })
+});
 
 export async function GET(request: Request) {
   try {
-    const { searchParams: urlParams } = new URL(request.url);
-    const userId = urlParams.get("userId");
+    const { searchParams } = new URL(request.url);
+    const parseResult = querySchema.safeParse({ userId: searchParams.get("userId") });
 
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
+    if (!parseResult.success) {
+      return apiError(parseResult.error.issues[0]?.message || "Invalid or missing userId parameter", 400, "BAD_REQUEST");
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const { userId } = parseResult.data;
+    const supabaseAdmin = createAdminClient();
 
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
@@ -24,11 +25,11 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return apiError(error.message, 500, "DATABASE_ERROR");
     }
 
-    return NextResponse.json({ profile: profile || null });
+    return apiSuccess({ profile: profile || null });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed fetching user profile" }, { status: 500 });
+    return apiError(err.message || "Failed fetching user profile", 500);
   }
 }

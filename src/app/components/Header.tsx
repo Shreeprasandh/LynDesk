@@ -43,7 +43,7 @@ interface NotificationItem {
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { user, userRole, loading, signOut } = useAuth();
+  const { user, userRole, profileAvatar, loading, signOut } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -146,6 +146,7 @@ export default function Header() {
     }
   };
   const [headerAvatar, setHeaderAvatar] = useState<string>(() => {
+    if (profileAvatar) return profileAvatar;
     if (typeof window !== "undefined") {
       try {
         const globalActive = localStorage.getItem("ldk_active_user_avatar");
@@ -172,6 +173,12 @@ export default function Header() {
     }
     return extractAvatarFromUser(user);
   });
+
+  useEffect(() => {
+    if (profileAvatar) {
+      setHeaderAvatar(profileAvatar);
+    }
+  }, [profileAvatar]);
 
   useEffect(() => {
     const checkCalendarToday = async () => {
@@ -207,8 +214,8 @@ export default function Header() {
       }
 
       // 1. Instant 0ms local storage cache check (prevents flash of Google OAuth picture)
-      let localUrl = "";
-      if (typeof window !== "undefined") {
+      let localUrl = profileAvatar || "";
+      if (!localUrl && typeof window !== "undefined") {
         try {
           const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
           if (rawPublic) {
@@ -244,7 +251,7 @@ export default function Header() {
 
           if (data) {
             if (data.avatar_url === null || data.avatar_url === "") {
-              if (isMounted) setHeaderAvatar("");
+              if (isMounted && !meta.avatar_url) setHeaderAvatar("");
               if (typeof window !== "undefined") {
                 localStorage.removeItem(`ldk_user_avatar_${user.id}`);
                 localStorage.removeItem(`ldk_avatar_url_${user.id}`);
@@ -263,8 +270,8 @@ export default function Header() {
         } catch {}
       }
 
-      // 3. Fallback ONLY if localUrl and DB profile were both completely empty
-      if (!localUrl && isMounted) {
+      // 3. Fallback ONLY if localUrl, profileAvatar, and DB profile were all completely empty
+      if (!localUrl && !profileAvatar && isMounted) {
         const oauthUrl = extractAvatarFromUser(user);
         setHeaderAvatar(oauthUrl || "");
       }
