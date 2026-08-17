@@ -1,6 +1,6 @@
 # 🌑 THE SEVEN SHADOWS: Master Audit Report
 
-**Last Scan**: 18/8/2026, 1:32:17 am
+**Last Scan**: 18/8/2026, 1:35:23 am
 **Files Inspected**: 130
 **Active Target**: ALL 7 SHADOWS
 
@@ -23,7 +23,7 @@
 - **Issue**: Un-awaited Next.js 15/16 route params/searchParams
 - **Impact**: In Next.js 15+, route params are Promises. Direct access causes runtime crashes.
 
-### 2. `src/app/page.tsx:256`
+### 2. `src/app/page.tsx:257`
 - **Issue**: Unhandled async database/fetch operation
 - **Impact**: Network failure or DB error will cause unhandled promise rejection.
 

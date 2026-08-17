@@ -36,7 +36,7 @@ type AuthContextType = {
   resolveEmailFromInput: (input: string) => Promise<string>;
   updateUserPassword: (newPassword: string) => Promise<{ error: Error | null }>;
   requestPasswordResetOtp: (email: string) => Promise<{ error: Error | null }>;
-  verifyPasswordResetOtp: (email: string, token: string) => Promise<{ error: Error | null }>;
+  verifyPasswordResetOtp: (email: string, token: string, newPassword?: string, confirmPassword?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -370,22 +370,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const requestPasswordResetOtp = async (email: string): Promise<{ error: Error | null }> => {
-    const targetEmail = await resolveEmailFromInput(email);
-    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/profile` : undefined
-    });
-    return { error };
+  const requestPasswordResetOtp = async (input: string): Promise<{ error: Error | null }> => {
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        return { error: new Error(data.error || "Failed to send 6-digit OTP code.") };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: err };
+    }
   };
 
-  const verifyPasswordResetOtp = async (email: string, token: string): Promise<{ error: Error | null }> => {
-    const targetEmail = await resolveEmailFromInput(email);
-    const { error } = await supabase.auth.verifyOtp({
-      email: targetEmail,
-      token: token.trim(),
-      type: "recovery"
-    });
-    return { error };
+  const verifyPasswordResetOtp = async (input: string, token: string, newPassword?: string, confirmPassword?: string): Promise<{ error: Error | null }> => {
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input, otp: token, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        return { error: new Error(data.error || "Invalid or expired OTP code.") };
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: err };
+    }
   };
 
   return (

@@ -1525,7 +1525,7 @@ const POPULAR_LOCATIONS = [
                     value={oFullName}
                     onChange={(e) => setOFullName(e.target.value)}
                     placeholder="Mira Sen"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-light"
                   />
                 </div>
 
@@ -1537,7 +1537,7 @@ const POPULAR_LOCATIONS = [
                     value={oUsername}
                     onChange={(e) => setOUsername(e.target.value)}
                     placeholder="mirasen"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                   />
                 </div>
               </div>
@@ -1561,7 +1561,7 @@ const POPULAR_LOCATIONS = [
                           value={oPassword}
                           onChange={(e) => setOPassword(e.target.value)}
                           placeholder="Min 8 chars, A-Z, 0-9, special..."
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                         />
                       </div>
 
@@ -1573,7 +1573,7 @@ const POPULAR_LOCATIONS = [
                           value={oConfirmPassword}
                           onChange={(e) => setOConfirmPassword(e.target.value)}
                           placeholder="Re-enter password..."
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                         />
                       </div>
                     </div>

@@ -1732,6 +1732,31 @@ export default function ProfilePage() {
                   className="w-4 h-4 rounded border-border-main text-accent-main focus:ring-accent-main disabled:opacity-50"
                 />
               </div>
+
+              {/* Security & Credentials Sub-Section */}
+              <div className="border-t border-border-main/40 pt-4 flex flex-col gap-2.5">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                  Security & Credentials
+                </span>
+                
+                <div className="flex items-center justify-between p-3 bg-bg-base/40 border border-border-main/60 rounded-sm">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-txt-main font-semibold">Security Password</span>
+                    <span className="text-xs font-mono tracking-widest text-txt-muted">••••••••••••</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSecurityError(null);
+                      setSecuritySuccess(null);
+                      setIsPasswordModalOpen(true);
+                    }}
+                    className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] font-semibold uppercase rounded-sm cursor-pointer transition-opacity shrink-0"
+                  >
+                    Change Password
+                  </button>
+                </div>
+              </div>
             </div>
 
             {!(isStaff || isRec) && (
@@ -2582,45 +2607,6 @@ export default function ProfilePage() {
               </>
             )}
 
-            {/* Security & Credentials Card */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 mt-6">
-              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                <div className="flex items-center gap-2">
-                  <KeyRound size={16} className="text-accent-main" />
-                  <h3 className="font-display text-base font-light text-txt-main">Security & Credentials</h3>
-                </div>
-                <span className="font-mono text-[10px] text-txt-muted uppercase">Authentication Methods</span>
-              </div>
-
-              <div className="flex flex-col gap-3 font-mono text-xs">
-                <div className="flex items-center justify-between p-3 bg-bg-base/40 border border-border-main/60 rounded">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-txt-main font-semibold">Registered Account Email</span>
-                    <span className="text-[10px] text-txt-muted">{user?.email || "Not specified"}</span>
-                  </div>
-                  <span className="text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">Verified</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-bg-base/40 border border-border-main/60 rounded">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-txt-main font-semibold">LynDesk Security Password</span>
-                    <span className="text-[10px] text-txt-muted">Enables logging in via Email Address or Username handle</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSecurityError(null);
-                      setSecuritySuccess(null);
-                      setIsPasswordModalOpen(true);
-                    }}
-                    className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] font-semibold uppercase rounded cursor-pointer transition-opacity shrink-0"
-                  >
-                    Set / Change Password
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* Account Deletion Button */}
             <div className="flex justify-center mt-2 pb-6">
               <button
@@ -2695,7 +2681,7 @@ export default function ProfilePage() {
                       value={securityPasswordInput}
                       onChange={(e) => setSecurityPasswordInput(e.target.value)}
                       placeholder="Min 8 chars, A-Z, 0-9, special..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                     />
                   </div>
 
@@ -2707,7 +2693,7 @@ export default function ProfilePage() {
                       value={securityConfirmPasswordInput}
                       onChange={(e) => setSecurityConfirmPasswordInput(e.target.value)}
                       placeholder="Re-enter new password..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                     />
                   </div>
                 </div>

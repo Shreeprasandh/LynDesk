@@ -330,7 +330,7 @@ export default function Home() {
       const { error } = await requestPasswordResetOtp(email);
       if (error) throw error;
       setResetOtpSent(true);
-      setForgotSuccess("Security OTP code & link dispatched! Check your email inbox.");
+      setForgotSuccess("Security OTP code & link dispatched!\nCheck your email inbox.");
     } catch (err: any) {
       setAuthError(err?.message || "Failed to dispatch password reset email.");
     } finally {
@@ -370,11 +370,8 @@ export default function Home() {
     setForgotSuccess(null);
 
     try {
-      const { error: otpErr } = await verifyPasswordResetOtp(email, resetOtpCode);
+      const { error: otpErr } = await verifyPasswordResetOtp(email, resetOtpCode, resetNewPassword, resetConfirmPassword);
       if (otpErr) throw otpErr;
-
-      const { error: passErr } = await updateUserPassword(resetNewPassword);
-      if (passErr) throw passErr;
 
       setForgotSuccess("Password successfully updated! Redirecting to sign in...");
       setTimeout(() => {
@@ -712,7 +709,7 @@ export default function Home() {
         }
 
         const { data: dbWs } = await supabase
-          .from("event_workspaces")
+          .from("project_spaces")
           .select("*")
           .eq("created_by", user.id);
 
@@ -989,7 +986,7 @@ export default function Home() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="email@university.edu or @username"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-light"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-light"
                         />
                       </div>
                       
@@ -1016,7 +1013,7 @@ export default function Home() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out"
                         />
                       </div>
                     </div>
@@ -1089,7 +1086,7 @@ export default function Home() {
                     )}
 
                     {forgotSuccess && (
-                      <div className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                      <div className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-sm font-mono tracking-tight text-center whitespace-pre-line">
                         {forgotSuccess}
                       </div>
                     )}
@@ -1104,7 +1101,7 @@ export default function Home() {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="email@domain.com or @username"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono disabled:opacity-60"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono disabled:opacity-60"
                         />
                       </div>
 
@@ -1122,7 +1119,7 @@ export default function Home() {
                               value={resetOtpCode}
                               onChange={(e) => setResetOtpCode(e.target.value.trim())}
                               placeholder="e.g. 849201"
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono tracking-widest text-center"
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono tracking-widest text-center"
                             />
                           </div>
 
@@ -1134,7 +1131,7 @@ export default function Home() {
                               value={resetNewPassword}
                               onChange={(e) => setResetNewPassword(e.target.value)}
                               placeholder="Min 8 chars, A-Z, 0-9, special..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                             />
                           </div>
 
@@ -1146,7 +1143,7 @@ export default function Home() {
                               value={resetConfirmPassword}
                               onChange={(e) => setResetConfirmPassword(e.target.value)}
                               placeholder="Re-enter new password..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
                             />
                           </div>
 
