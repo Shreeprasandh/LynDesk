@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import WallCalendarModal from "./WallCalendarModal";
 import { fetchWallCalendarEvents } from "../lib/wallCalendarSync";
+import CustomDatePicker from "./CustomDatePicker";
 
 interface NotificationItem {
   id: string;
@@ -121,10 +122,98 @@ export default function Header() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [hasTodayEvents, setHasTodayEvents] = useState(false);
 
+const POPULAR_LOCATIONS = [
+  "Chennai, Tamil Nadu, India",
+  "Kattankulathur, Tamil Nadu, India",
+  "Coimbatore, Tamil Nadu, India",
+  "Madurai, Tamil Nadu, India",
+  "Tiruchirappalli, Tamil Nadu, India",
+  "Salem, Tamil Nadu, India",
+  "Tirunelveli, Tamil Nadu, India",
+  "Vellore, Tamil Nadu, India",
+  "Erode, Tamil Nadu, India",
+  "Thanjavur, Tamil Nadu, India",
+  "Dindigul, Tamil Nadu, India",
+  "Tiruppur, Tamil Nadu, India",
+  "Nagercoil, Tamil Nadu, India",
+  "Hosur, Tamil Nadu, India",
+  "Kanchipuram, Tamil Nadu, India",
+  "Chengalpattu, Tamil Nadu, India",
+  "Cuddalore, Tamil Nadu, India",
+  "Kanyakumari, Tamil Nadu, India",
+  "Tuticorin, Tamil Nadu, India",
+  "Namakkal, Tamil Nadu, India",
+  "Karur, Tamil Nadu, India",
+  "Ooty, Tamil Nadu, India",
+  "Bengaluru, Karnataka, India",
+  "Mysuru, Karnataka, India",
+  "Mangaluru, Karnataka, India",
+  "Hubballi, Karnataka, India",
+  "Manipal, Karnataka, India",
+  "Hyderabad, Telangana, India",
+  "Warangal, Telangana, India",
+  "Visakhapatnam, Andhra Pradesh, India",
+  "Vijayawada, Andhra Pradesh, India",
+  "Tirupati, Andhra Pradesh, India",
+  "Guntur, Andhra Pradesh, India",
+  "Mumbai, Maharashtra, India",
+  "Pune, Maharashtra, India",
+  "Nagpur, Maharashtra, India",
+  "Nashik, Maharashtra, India",
+  "Navi Mumbai, Maharashtra, India",
+  "Panaji, Goa, India",
+  "Kochi, Kerala, India",
+  "Trivandrum, Kerala, India",
+  "Kozhikode, Kerala, India",
+  "Thrissur, Kerala, India",
+  "Delhi, NCR, India",
+  "Gurgaon, Haryana, India",
+  "Noida, Uttar Pradesh, India",
+  "Chandigarh, India",
+  "Jaipur, Rajasthan, India",
+  "Ahmedabad, Gujarat, India",
+  "Vadodara, Gujarat, India",
+  "Kolkata, West Bengal, India",
+  "Bhubaneswar, Odisha, India",
+  "Patna, Bihar, India",
+  "Lucknow, Uttar Pradesh, India",
+  "Kanpur, Uttar Pradesh, India",
+  "Indore, Madhya Pradesh, India",
+  "Bhopal, Madhya Pradesh, India",
+  "Guwahati, Assam, India",
+  "San Francisco, CA, USA",
+  "San Jose, CA, USA",
+  "Seattle, WA, USA",
+  "New York, NY, USA",
+  "Boston, MA, USA",
+  "Austin, TX, USA",
+  "London, England, UK",
+  "Cambridge, England, UK",
+  "Singapore, Singapore",
+  "Toronto, Ontario, Canada",
+  "Vancouver, BC, Canada",
+  "Sydney, NSW, Australia",
+  "Melbourne, VIC, Australia",
+  "Berlin, Germany",
+  "Munich, Germany",
+  "Zurich, Switzerland",
+  "Tokyo, Japan",
+  "Seoul, South Korea",
+  "Dubai, UAE"
+];
+
   // Autocomplete Suggestions
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
   const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
+  const [oLocationSuggestions, setOLocationSuggestions] = useState<string[]>([]);
+
+  const clearAllSuggestions = () => {
+    setOCollegeSuggestions([]);
+    setODeptSuggestions([]);
+    setOCompanySuggestions([]);
+    setOLocationSuggestions([]);
+  };
 
   // Legal Agreement & Gating States
   const [oPrivacyRead, setOPrivacyRead] = useState(false);
@@ -1363,8 +1452,23 @@ export default function Header() {
 
       {/* Onboarding Wizard Full-Screen Modal */}
       {showOnboarding && (
-        <div className="fixed inset-0 z-[9999] overflow-y-auto bg-bg-base/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-fade-in">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              clearAllSuggestions();
+            }
+          }}
+          className="fixed inset-0 z-[9999] overflow-y-auto bg-bg-base/95 backdrop-blur-md flex items-center justify-center p-4"
+        >
+          <div 
+            onClick={(e) => {
+              // Prevent form card click from closing unless clicking non-input space
+              if ((e.target as HTMLElement).tagName !== "INPUT") {
+                clearAllSuggestions();
+              }
+            }}
+            className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-fade-in"
+          >
             
             <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Profile setup required</span>
@@ -1411,25 +1515,66 @@ export default function Header() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Date of Birth *</label>
-                  <input 
-                    type="date" 
-                    required
+                  <CustomDatePicker
                     value={oDob}
-                    onChange={(e) => setODob(e.target.value)}
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                    onChange={setODob}
+                    placeholder="DD / MM / YYYY"
+                    required
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">City, Country *</label>
+                <div className="flex flex-col gap-1 relative">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">City, State, Country *</label>
                   <input 
                     type="text" 
                     required
                     value={oLocation}
-                    onChange={(e) => setOLocation(e.target.value)}
-                    placeholder="San Francisco, CA"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setOLocation(val);
+                      clearAllSuggestions();
+                      if (!val.trim()) {
+                        setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
+                      } else {
+                        setOLocationSuggestions(
+                          POPULAR_LOCATIONS.filter(loc =>
+                            loc.toLowerCase().includes(val.toLowerCase())
+                          )
+                        );
+                      }
+                    }}
+                    onFocus={() => {
+                      clearAllSuggestions();
+                      if (!oLocation.trim()) {
+                        setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
+                      } else {
+                        setOLocationSuggestions(
+                          POPULAR_LOCATIONS.filter(loc =>
+                            loc.toLowerCase().includes(oLocation.toLowerCase())
+                          )
+                        );
+                      }
+                    }}
+                    placeholder="Chennai, Tamil Nadu, India"
                     className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
                   />
+                  {oLocationSuggestions.length > 0 && (
+                    <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                      {oLocationSuggestions.map((loc) => (
+                        <li 
+                          key={loc} 
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setOLocation(loc);
+                            clearAllSuggestions();
+                          }}
+                          className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                        >
+                          {loc}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
 
@@ -1461,9 +1606,16 @@ export default function Header() {
                       onChange={(e) => {
                         const val = e.target.value;
                         setOCollege(val);
+                        clearAllSuggestions();
                         const match = getSpellingSuggestion(val);
                         setOCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
                         setOCollegeSuggestions(getAutocompleteSuggestions(val, "college"));
+                      }}
+                      onFocus={() => {
+                        clearAllSuggestions();
+                        if (oCollege.trim()) {
+                          setOCollegeSuggestions(getAutocompleteSuggestions(oCollege, "college"));
+                        }
                       }}
                       placeholder="Massachusetts Institute of Technology (MIT)"
                       className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
@@ -1473,9 +1625,10 @@ export default function Header() {
                         {oCollegeSuggestions.map((s) => (
                           <li 
                             key={s} 
-                            onClick={() => {
+                            onMouseDown={(e) => {
+                              e.preventDefault();
                               setOCollege(s);
-                              setOCollegeSuggestions([]);
+                              clearAllSuggestions();
                               setOCollegeSuggestion(null);
                             }}
                             className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
@@ -1502,9 +1655,16 @@ export default function Header() {
                         onChange={(e) => {
                           const val = e.target.value;
                           setODepartment(val);
+                          clearAllSuggestions();
                           const match = getSpellingSuggestion(val);
                           setODeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
                           setODeptSuggestions(getAutocompleteSuggestions(val, "department"));
+                        }}
+                        onFocus={() => {
+                          clearAllSuggestions();
+                          if (oDepartment.trim()) {
+                            setODeptSuggestions(getAutocompleteSuggestions(oDepartment, "department"));
+                          }
                         }}
                         placeholder="Computer Science"
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
@@ -1514,9 +1674,10 @@ export default function Header() {
                           {oDeptSuggestions.map((s) => (
                             <li 
                               key={s} 
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setODepartment(s);
-                                setODeptSuggestions([]);
+                                clearAllSuggestions();
                                 setODeptSuggestion(null);
                               }}
                               className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
@@ -1561,7 +1722,14 @@ export default function Header() {
                         onChange={(e) => {
                           const val = e.target.value;
                           setOCompany(val);
+                          clearAllSuggestions();
                           setOCompanySuggestions(getAutocompleteSuggestions(val, "company"));
+                        }}
+                        onFocus={() => {
+                          clearAllSuggestions();
+                          if (oCompany.trim()) {
+                            setOCompanySuggestions(getAutocompleteSuggestions(oCompany, "company"));
+                          }
                         }}
                         placeholder="Google Inc."
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
@@ -1571,9 +1739,10 @@ export default function Header() {
                           {oCompanySuggestions.map((s) => (
                             <li 
                               key={s} 
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault();
                                 setOCompany(s);
-                                setOCompanySuggestions([]);
+                                clearAllSuggestions();
                               }}
                               className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
                             >
@@ -1711,7 +1880,7 @@ export default function Header() {
                   {!oPrivacyRead ? (
                     <span className="text-[9px] font-mono text-txt-muted/70 ml-auto shrink-0">(Click text to scroll)</span>
                   ) : (
-                    <span className="text-[9px] font-mono text-emerald-400 ml-auto shrink-0 font-semibold">&check; Read</span>
+                    <span className="text-[9px] font-mono text-txt-main bg-bg-card border border-border-main/60 px-1.5 py-0.5 rounded ml-auto shrink-0 font-semibold">&check; Read</span>
                   )}
                 </div>
 
@@ -1741,7 +1910,7 @@ export default function Header() {
                   {!oTermsRead ? (
                     <span className="text-[9px] font-mono text-txt-muted/70 ml-auto shrink-0">(Click text to scroll)</span>
                   ) : (
-                    <span className="text-[9px] font-mono text-emerald-400 ml-auto shrink-0 font-semibold">&check; Read</span>
+                    <span className="text-[9px] font-mono text-txt-main bg-bg-card border border-border-main/60 px-1.5 py-0.5 rounded ml-auto shrink-0 font-semibold">&check; Read</span>
                   )}
                 </div>
               </div>
@@ -1875,12 +2044,12 @@ export default function Header() {
             <div className="p-4 border-t border-border-main/50 bg-bg-card flex items-center justify-between shrink-0 gap-4">
               <div className="flex items-center gap-2 text-xs font-mono">
                 {!legalModalScrolledBottom ? (
-                  <span className="text-amber-400 flex items-center gap-1.5 animate-pulse">
+                  <span className="text-txt-muted flex items-center gap-1.5 animate-pulse">
                     <span>&darr;</span> Scroll to the end of the document to unlock checkbox
                   </span>
                 ) : (
-                  <span className="text-emerald-400 flex items-center gap-1.5 font-bold">
-                    <span>&check;</span> Document End Reached — Checkbox Unlocked
+                  <span className="text-txt-main flex items-center gap-1.5 font-bold">
+                    <span className="text-txt-main font-bold">&check;</span> Document End Reached — Checkbox Unlocked
                   </span>
                 )}
               </div>

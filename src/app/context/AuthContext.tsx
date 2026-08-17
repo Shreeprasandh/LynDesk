@@ -102,8 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
         setUser(null);
         setUserProfile(null);
+        setProfileAvatar("");
         setUserRole("student");
         setLoading(false);
+        if (typeof window !== "undefined") {
+          try {
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && (key.startsWith("ldk_") || key.startsWith("lyndesk_") || key.includes("member") || key.includes("cache"))) {
+                keysToRemove.push(key);
+              }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+          } catch {
+            localStorage.clear();
+          }
+        }
       } else {
         setLoading(false);
       }
@@ -192,10 +207,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (typeof window !== "undefined") {
-      localStorage.removeItem("faculty_staff_member");
-      localStorage.removeItem("company_recruiter_member");
-      localStorage.removeItem("ldk_recruiter_session");
-      localStorage.removeItem("ldk_avatar_url");
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith("ldk_") || key.startsWith("lyndesk_") || key.includes("member") || key.includes("cache"))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {
+        localStorage.clear();
+      }
     }
     try {
       await supabase.auth.signOut();
@@ -205,6 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSession(null);
     setUserProfile(null);
+    setProfileAvatar("");
     setUserRole("student");
     setOnlineUserIds(new Set());
     setLoading(false);
