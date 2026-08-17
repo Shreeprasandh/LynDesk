@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Server-Side Authentication & Security Middleware for LynDesk.
- * Intercepts requests on the edge server to enforce security policies and protect private routes.
+ * Next.js 16 Edge Server Proxy & Security Middleware.
+ * Intercepts requests on the edge server to enforce security headers and route isolation.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: {
       headers: request.headers
