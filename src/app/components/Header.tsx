@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
+import { validatePassword } from "../lib/passwordValidation";
 import Link from "next/link";
 import LynAI from "./LynAI";
 import { usePathname, useRouter } from "next/navigation";
@@ -91,6 +92,7 @@ export default function Header() {
   const [oFullName, setOFullName] = useState("");
   const [oUsername, setOUsername] = useState("");
   const [oPassword, setOPassword] = useState("");
+  const [oConfirmPassword, setOConfirmPassword] = useState("");
   const [oRole, setORole] = useState<"student" | "employee" | "solo">("student");
   const [oDob, setODob] = useState("");
   const [oLocation, setOLocation] = useState("");
@@ -418,6 +420,26 @@ const POPULAR_LOCATIONS = [
 
     if (!cleanFullName || !cleanUsername || !oDob || !cleanLocation) {
       setOnboardingError("Full Name, Username, Date of Birth, and Location are required.");
+      return;
+    }
+
+    const passValidation = validatePassword(oPassword, oConfirmPassword);
+    if (!passValidation.isValid) {
+      if (!passValidation.passwordsMatch) {
+        setOnboardingError("Passwords do not match. Please enter the same password twice.");
+      } else if (!passValidation.hasMinLength) {
+        setOnboardingError("Password must be at least 8 characters long.");
+      } else if (!passValidation.hasUppercase) {
+        setOnboardingError("Password must contain at least 1 uppercase letter (A-Z).");
+      } else if (!passValidation.hasLowercase) {
+        setOnboardingError("Password must contain at least 1 lowercase letter (a-z).");
+      } else if (!passValidation.hasNumber) {
+        setOnboardingError("Password must contain at least 1 number (0-9).");
+      } else if (!passValidation.hasSpecialChar) {
+        setOnboardingError("Password must contain at least 1 special character (!@#$%^&*).");
+      } else {
+        setOnboardingError("Please create a strong password matching all security rules.");
+      }
       return;
     }
     
@@ -1520,20 +1542,66 @@ const POPULAR_LOCATIONS = [
                 </div>
               </div>
 
-              {/* LynDesk Security Password (Optional for OAuth Users) */}
-              <div className="flex flex-col gap-1 border border-border-main/60 bg-bg-base/40 p-3 rounded-sm">
-                <div className="flex justify-between items-center">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Create Security Password (Optional)</label>
-                  <span className="text-[9px] font-mono text-txt-muted">Enable login via Email/Username + Password</span>
-                </div>
-                <input 
-                  type="password" 
-                  value={oPassword}
-                  onChange={(e) => setOPassword(e.target.value)}
-                  placeholder="Set account password (min 6 chars)..."
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
-                />
-              </div>
+              {/* Compulsory Dual Password Fields with Security Rules */}
+              {(() => {
+                const rules = validatePassword(oPassword, oConfirmPassword);
+                return (
+                  <div className="flex flex-col gap-3 border border-border-main/70 bg-bg-base/50 p-3.5 rounded-sm">
+                    <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
+                      <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Set LynDesk Security Password *</label>
+                      <span className="text-[9px] font-mono text-txt-muted">Enables login via Email Address or Username</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] text-txt-sub font-mono uppercase">Create Password *</label>
+                        <input 
+                          type="password" 
+                          required
+                          value={oPassword}
+                          onChange={(e) => setOPassword(e.target.value)}
+                          placeholder="Min 8 chars, A-Z, 0-9, special..."
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[9px] text-txt-sub font-mono uppercase">Confirm Password *</label>
+                        <input 
+                          type="password" 
+                          required
+                          value={oConfirmPassword}
+                          onChange={(e) => setOConfirmPassword(e.target.value)}
+                          placeholder="Re-enter password..."
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live Password Rules Checklist */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1 text-[9.5px] font-mono">
+                      <span className={rules.hasMinLength ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.hasMinLength ? "✓" : "○"} 8+ Characters
+                      </span>
+                      <span className={rules.hasUppercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.hasUppercase ? "✓" : "○"} Uppercase (A-Z)
+                      </span>
+                      <span className={rules.hasLowercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.hasLowercase ? "✓" : "○"} Lowercase (a-z)
+                      </span>
+                      <span className={rules.hasNumber ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.hasNumber ? "✓" : "○"} Number (0-9)
+                      </span>
+                      <span className={rules.hasSpecialChar ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.hasSpecialChar ? "✓" : "○"} Special Char (!@#$)
+                      </span>
+                      <span className={rules.passwordsMatch && oConfirmPassword ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {rules.passwordsMatch && oConfirmPassword ? "✓ Passwords Match" : "○ Match Passwords"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* General Context Section */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

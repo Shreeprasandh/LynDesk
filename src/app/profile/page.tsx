@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
+import { validatePassword } from "../lib/passwordValidation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AvatarCropModal from "../components/AvatarCropModal";
@@ -264,6 +265,7 @@ export default function ProfilePage() {
   // Security & Password Management States
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [securityPasswordInput, setSecurityPasswordInput] = useState("");
+  const [securityConfirmPasswordInput, setSecurityConfirmPasswordInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [securityActionLoading, setSecurityActionLoading] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
@@ -288,10 +290,26 @@ export default function ProfilePage() {
 
   const handleUpdateSecurityPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!securityPasswordInput || securityPasswordInput.length < 6) {
-      setSecurityError("Password must be at least 6 characters.");
+    const rules = validatePassword(securityPasswordInput, securityConfirmPasswordInput);
+    if (!rules.isValid) {
+      if (!rules.passwordsMatch) {
+        setSecurityError("Passwords do not match. Re-enter password twice.");
+      } else if (!rules.hasMinLength) {
+        setSecurityError("Password must be at least 8 characters long.");
+      } else if (!rules.hasUppercase) {
+        setSecurityError("Password must contain at least 1 uppercase letter (A-Z).");
+      } else if (!rules.hasLowercase) {
+        setSecurityError("Password must contain at least 1 lowercase letter (a-z).");
+      } else if (!rules.hasNumber) {
+        setSecurityError("Password must contain at least 1 number (0-9).");
+      } else if (!rules.hasSpecialChar) {
+        setSecurityError("Password must contain at least 1 special character (!@#$%^&*).");
+      } else {
+        setSecurityError("Please enter a strong password matching all security rules.");
+      }
       return;
     }
+
     setSecurityActionLoading(true);
     setSecurityError(null);
     setSecuritySuccess(null);
@@ -301,6 +319,7 @@ export default function ProfilePage() {
       showToast("LynDesk Password successfully updated!");
       setSecuritySuccess("Password updated! You can now log in via Email/Username + Password.");
       setSecurityPasswordInput("");
+      setSecurityConfirmPasswordInput("");
       setTimeout(() => setIsPasswordModalOpen(false), 2000);
     } catch (err: any) {
       setSecurityError(err?.message || "Failed to update password.");
@@ -2666,23 +2685,64 @@ export default function ProfilePage() {
 
               <form onSubmit={handleUpdateSecurityPassword} className="flex flex-col gap-3 font-mono text-xs">
                 <span className="text-[10px] uppercase text-txt-sub font-semibold">2. Set New LynDesk Password</span>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub">New Password (min 6 chars)</label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={securityPasswordInput}
-                    onChange={(e) => setSecurityPasswordInput(e.target.value)}
-                    placeholder="Enter new secure password..."
-                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
-                  />
+                
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub">New Password *</label>
+                    <input
+                      type="password"
+                      required
+                      value={securityPasswordInput}
+                      onChange={(e) => setSecurityPasswordInput(e.target.value)}
+                      placeholder="Min 8 chars, A-Z, 0-9, special..."
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub">Confirm New Password *</label>
+                    <input
+                      type="password"
+                      required
+                      value={securityConfirmPasswordInput}
+                      onChange={(e) => setSecurityConfirmPasswordInput(e.target.value)}
+                      placeholder="Re-enter new password..."
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                    />
+                  </div>
                 </div>
+
+                {/* Live Rules Indicator */}
+                {(() => {
+                  const secRules = validatePassword(securityPasswordInput, securityConfirmPasswordInput);
+                  return (
+                    <div className="grid grid-cols-2 gap-1 pt-1 text-[9px] font-mono border-t border-border-main/40 mt-1">
+                      <span className={secRules.hasMinLength ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.hasMinLength ? "✓" : "○"} 8+ Characters
+                      </span>
+                      <span className={secRules.hasUppercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.hasUppercase ? "✓" : "○"} Uppercase (A-Z)
+                      </span>
+                      <span className={secRules.hasLowercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.hasLowercase ? "✓" : "○"} Lowercase (a-z)
+                      </span>
+                      <span className={secRules.hasNumber ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.hasNumber ? "✓" : "○"} Number (0-9)
+                      </span>
+                      <span className={secRules.hasSpecialChar ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.hasSpecialChar ? "✓" : "○"} Special Char (!@#$)
+                      </span>
+                      <span className={secRules.passwordsMatch && securityConfirmPasswordInput ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                        {secRules.passwordsMatch && securityConfirmPasswordInput ? "✓ Passwords Match" : "○ Match Passwords"}
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="submit"
-                  disabled={securityActionLoading || !securityPasswordInput}
-                  className="h-9 w-full bg-accent-main hover:opacity-90 text-bg-base text-xs font-semibold uppercase tracking-wider rounded transition-opacity disabled:opacity-50 mt-1 cursor-pointer"
+                  disabled={securityActionLoading || !validatePassword(securityPasswordInput, securityConfirmPasswordInput).isValid}
+                  className="h-9 w-full bg-accent-main hover:opacity-90 text-bg-base text-xs font-semibold uppercase tracking-wider rounded transition-opacity disabled:opacity-50 mt-2 cursor-pointer"
                 >
                   {securityActionLoading ? "Updating Password..." : "Update LynDesk Password"}
                 </button>
