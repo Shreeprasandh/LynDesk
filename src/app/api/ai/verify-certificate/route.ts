@@ -59,8 +59,14 @@ export async function POST(req: NextRequest) {
 
     if (groqRes.ok) {
       const groqData = await groqRes.json();
-      const replyText = groqData?.choices?.[0]?.message?.content;
-      const data = JSON.parse(replyText || "{}");
+      const replyText = groqData?.choices?.[0]?.message?.content || "{}";
+      const cleanJson = replyText.replace(/```json/gi, "").replace(/```/g, "").trim();
+      let data: any = {};
+      try {
+        data = JSON.parse(cleanJson);
+      } catch {
+        data = {};
+      }
 
       return NextResponse.json({
         isMock: false,

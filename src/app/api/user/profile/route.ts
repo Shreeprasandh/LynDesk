@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
     const { data: profile, error } = await supabaseAdmin
       .from("profiles")
-      .select("id, full_name, username, avatar_url, college_name, department, leetcode_username, github_url, updated_at")
+      .select("id, full_name, username, avatar_url, college_key, department, bio, skills, leetcode_username, github_url, updated_at")
       .eq("id", userId)
       .maybeSingle();
 

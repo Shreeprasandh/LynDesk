@@ -146,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            workspaceId: "global_online",
+            workspaceId: "00000000-0000-4000-8000-000000000000",
             userId: user.id,
             statusText: "Offline",
             isOnline: false

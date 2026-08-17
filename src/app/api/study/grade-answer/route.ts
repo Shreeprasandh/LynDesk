@@ -54,8 +54,14 @@ Student's Answer: "${cleanUserAns}"`;
 
         if (groqRes.ok) {
           const groqData = await groqRes.json();
-          const replyText = groqData?.choices?.[0]?.message?.content;
-          const parsed = JSON.parse(replyText || "{}");
+          const replyText = groqData?.choices?.[0]?.message?.content || "{}";
+          const cleanJson = replyText.replace(/```json/gi, "").replace(/```/g, "").trim();
+          let parsed: any = {};
+          try {
+            parsed = JSON.parse(cleanJson);
+          } catch {
+            parsed = {};
+          }
 
           if (typeof parsed.isCorrect === "boolean") {
             return NextResponse.json({
