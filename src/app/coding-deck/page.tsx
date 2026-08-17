@@ -217,19 +217,27 @@ export default function CodingDeckPage() {
     }
   };
 
-  // Mock platforms stats based on username presence
+  // Platforms stats with 0ms SWR Cache Initialization
   const [stats, setStats] = useState<{
     leetcode: PlatformStats | null;
     codeforces: PlatformStats | null;
     codechef: PlatformStats | null;
     unstop: { registered: number; completed: number; rank: number } | null;
     hack2skill: { registered: number; completed: number; rank: number } | null;
-  }>({
-    leetcode: null,
-    codeforces: null,
-    codechef: null,
-    unstop: null,
-    hack2skill: null,
+  }>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("ldk_coding_desk_stats_cache");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return {
+      leetcode: null,
+      codeforces: null,
+      codechef: null,
+      unstop: null,
+      hack2skill: null,
+    };
   });
 
   // Auto-scroll the heatmap to the far right (current month/latest submissions)
@@ -364,6 +372,14 @@ export default function CodingDeckPage() {
         };
 
         setStats(updatedStats);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("ldk_coding_desk_stats_cache", JSON.stringify(updatedStats));
+            if (user?.id && leetcodeStats) {
+              localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(leetcodeStats));
+            }
+          } catch {}
+        }
 
         // Auto-manage streak warning notification in global header drawer for daily challenge
         if (leetcodeStats?.dailyChallenge) {

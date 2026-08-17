@@ -234,8 +234,19 @@ export default function Home() {
   const [showPassword, setShowPassword] = useState(false);
   const [showFacultyPassword, setShowFacultyPassword] = useState(false);
 
-  // Dashboard & Scraper States
-  const [events, setEvents] = useState<EventItem[]>(INITIAL_EVENTS);
+  // Dashboard & Scraper States with 0ms SWR Cache Initialization
+  const [events, setEvents] = useState<EventItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("ldk_event_workspaces_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return INITIAL_EVENTS;
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [scraperUrl, setScraperUrl] = useState("");
   const [scraping, setScraping] = useState(false);

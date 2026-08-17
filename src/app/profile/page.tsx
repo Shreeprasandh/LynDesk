@@ -262,10 +262,33 @@ export default function ProfilePage() {
 
 
   
-  // Basic profiles table fields
-  const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  // Basic profiles table fields with 0ms SWR Cache Initialization
+  const [fullName, setFullName] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        const cached = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (cached) return JSON.parse(cached).full_name || "";
+      } catch {}
+    }
+    return "";
+  });
+  const [username, setUsername] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        const cached = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (cached) return JSON.parse(cached).username || "";
+      } catch {}
+    }
+    return "";
+  });
+  const [avatarUrl, setAvatarUrl] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        return localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
+      } catch {}
+    }
+    return "";
+  });
   const [isPublic, setIsPublic] = useState(true);
   
   // Detailed metadata fields
@@ -280,8 +303,24 @@ export default function ProfilePage() {
   const [resumeFileName, setResumeFileName] = useState("");
   
   // Academic details
-  const [collegeName, setCollegeName] = useState("");
-  const [department, setDepartment] = useState("");
+  const [collegeName, setCollegeName] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        const cached = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (cached) return JSON.parse(cached).college_name || "";
+      } catch {}
+    }
+    return "";
+  });
+  const [department, setDepartment] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        const cached = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        if (cached) return JSON.parse(cached).department || "";
+      } catch {}
+    }
+    return "";
+  });
   const [gradYear, setGradYear] = useState("");
   const [collegeKey, setCollegeKey] = useState("");
   const [batchCode, setBatchCode] = useState("");
@@ -289,9 +328,30 @@ export default function ProfilePage() {
   const [academicCredits, setAcademicCredits] = useState(0);
   
   // Coding platforms handles
-  const [leetcodeUsername, setLeetcodeUsername] = useState("");
-  const [codeforcesUsername, setCodeforcesUsername] = useState("");
-  const [codechefUsername, setCodechefUsername] = useState("");
+  const [leetcodeUsername, setLeetcodeUsername] = useState(() => {
+    if (typeof window !== "undefined" && user) {
+      try {
+        return localStorage.getItem(`ldk_leetcode_handle_${user.id}`) || localStorage.getItem("ldk_leetcode_handle") || "";
+      } catch {}
+    }
+    return "";
+  });
+  const [codeforcesUsername, setCodeforcesUsername] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("ldk_codeforces_handle") || "";
+      } catch {}
+    }
+    return "";
+  });
+  const [codechefUsername, setCodechefUsername] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("ldk_codechef_handle") || "";
+      } catch {}
+    }
+    return "";
+  });
   const [unstopUsername, setUnstopUsername] = useState("");
   const [hack2skillUsername, setHack2skillUsername] = useState("");
 
