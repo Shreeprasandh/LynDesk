@@ -5,6 +5,7 @@ import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import { extractAvatarFromUser } from "./lib/avatar";
 import { validateEmail } from "./lib/emailValidation";
+import { validatePassword } from "./lib/passwordValidation";
 import Header from "./components/Header";
 import LynDeskLogo from "./components/LynDeskLogo";
 import Footer from "./components/Footer";
@@ -69,7 +70,7 @@ interface DashboardProfile {
 }
 
 export default function Home() {
-  const { user, loading, resolveEmailFromInput, requestPasswordResetOtp } = useAuth();
+  const { user, loading, resolveEmailFromInput, requestPasswordResetOtp, verifyPasswordResetOtp, updateUserPassword } = useAuth();
   
   // Instant 0ms Sync Profile Initialization from localStorage or user_metadata
   const [profile, setProfile] = useState<DashboardProfile | null>(() => {
@@ -291,8 +292,18 @@ export default function Home() {
   };
 
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+  const [resetOtpSent, setResetOtpSent] = useState(false);
+  const [resetOtpCode, setResetOtpCode] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  useEffect(() => {
+    setAuthActionLoading(false);
+    setAuthError(null);
+    setForgotSuccess(null);
+  }, [authStep]);
+
+  const handleRequestResetOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setAuthError("Please enter your registered email address or username.");
@@ -318,9 +329,63 @@ export default function Home() {
     try {
       const { error } = await requestPasswordResetOtp(email);
       if (error) throw error;
-      setForgotSuccess("Password reset link dispatched! Check your inbox to reset your password.");
+      setResetOtpSent(true);
+      setForgotSuccess("Security OTP code & link dispatched! Check your email inbox.");
     } catch (err: any) {
-      setAuthError(err?.message || "Failed to dispatch password reset link.");
+      setAuthError(err?.message || "Failed to dispatch password reset email.");
+    } finally {
+      setAuthActionLoading(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetOtpCode || resetOtpCode.trim().length < 6) {
+      setAuthError("Please enter the 6-digit OTP code received in your email.");
+      return;
+    }
+
+    const rules = validatePassword(resetNewPassword, resetConfirmPassword);
+    if (!rules.isValid) {
+      if (!rules.passwordsMatch) {
+        setAuthError("Passwords do not match. Re-enter password twice.");
+      } else if (!rules.hasMinLength) {
+        setAuthError("Password must be at least 8 characters long.");
+      } else if (!rules.hasUppercase) {
+        setAuthError("Password must contain at least 1 uppercase letter (A-Z).");
+      } else if (!rules.hasLowercase) {
+        setAuthError("Password must contain at least 1 lowercase letter (a-z).");
+      } else if (!rules.hasNumber) {
+        setAuthError("Password must contain at least 1 number (0-9).");
+      } else if (!rules.hasSpecialChar) {
+        setAuthError("Password must contain at least 1 special character (!@#$%^&*).");
+      } else {
+        setAuthError("Please enter a strong password matching all security rules.");
+      }
+      return;
+    }
+
+    setAuthActionLoading(true);
+    setAuthError(null);
+    setForgotSuccess(null);
+
+    try {
+      const { error: otpErr } = await verifyPasswordResetOtp(email, resetOtpCode);
+      if (otpErr) throw otpErr;
+
+      const { error: passErr } = await updateUserPassword(resetNewPassword);
+      if (passErr) throw passErr;
+
+      setForgotSuccess("Password successfully updated! Redirecting to sign in...");
+      setTimeout(() => {
+        setAuthStep("login");
+        setResetOtpSent(false);
+        setResetOtpCode("");
+        setResetNewPassword("");
+        setResetConfirmPassword("");
+      }, 2000);
+    } catch (err: any) {
+      setAuthError(err?.message || "Failed to verify OTP code or update password.");
     } finally {
       setAuthActionLoading(false);
     }
@@ -989,7 +1054,7 @@ export default function Home() {
                 {authStep === "forgot" && (
                   <motion.form 
                     key="forgot"
-                    onSubmit={handleForgotPassword}
+                    onSubmit={resetOtpSent ? handleVerifyResetOtp : handleRequestResetOtp}
                     initial={{ opacity: 0, y: 3 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -3 }}
@@ -1002,6 +1067,7 @@ export default function Home() {
                         onClick={() => {
                           setAuthError(null);
                           setForgotSuccess(null);
+                          setResetOtpSent(false);
                           setAuthStep("login");
                         }}
                         className="text-[9px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase cursor-pointer"
@@ -1012,7 +1078,7 @@ export default function Home() {
                         Reset LynDesk Password
                       </h2>
                       <p className="text-[11px] text-txt-muted font-light">
-                        Enter your account email or username to receive a 1-click password reset link.
+                        {resetOtpSent ? "Type the 6-digit OTP received in your email along with your new password." : "Enter your account email or username to receive a 6-digit security OTP code."}
                       </p>
                     </div>
 
@@ -1028,25 +1094,113 @@ export default function Home() {
                       </div>
                     )}
 
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-txt-sub font-medium">Registered Email or Username</label>
-                      <input 
-                        type="text" 
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="email@domain.com or @username"
-                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono"
-                      />
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] text-txt-sub font-medium">Registered Email or Username</label>
+                        <input 
+                          type="text" 
+                          required
+                          disabled={resetOtpSent}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="email@domain.com or @username"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono disabled:opacity-60"
+                        />
+                      </div>
+
+                      {resetOtpSent && (
+                        <>
+                          <div className="flex flex-col gap-1 border-t border-border-main/40 pt-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[11px] text-txt-sub font-medium">6-Digit Security OTP Code *</label>
+                              <span className="text-[9px] font-mono text-txt-muted">Check Gmail / Inbox</span>
+                            </div>
+                            <input 
+                              type="text" 
+                              required
+                              maxLength={6}
+                              value={resetOtpCode}
+                              onChange={(e) => setResetOtpCode(e.target.value.trim())}
+                              placeholder="e.g. 849201"
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-sm focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono tracking-widest text-center"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-txt-sub font-medium">New LynDesk Password *</label>
+                            <input 
+                              type="password" 
+                              required
+                              value={resetNewPassword}
+                              onChange={(e) => setResetNewPassword(e.target.value)}
+                              placeholder="Min 8 chars, A-Z, 0-9, special..."
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-txt-sub font-medium">Confirm New Password *</label>
+                            <input 
+                              type="password" 
+                              required
+                              value={resetConfirmPassword}
+                              onChange={(e) => setResetConfirmPassword(e.target.value)}
+                              placeholder="Re-enter new password..."
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                            />
+                          </div>
+
+                          {/* Live Password Rules Checklist */}
+                          {(() => {
+                            const rules = validatePassword(resetNewPassword, resetConfirmPassword);
+                            return (
+                              <div className="grid grid-cols-2 gap-1 pt-1 text-[9px] font-mono border-t border-border-main/40">
+                                <span className={rules.hasMinLength ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.hasMinLength ? "✓" : "○"} 8+ Chars
+                                </span>
+                                <span className={rules.hasUppercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.hasUppercase ? "✓" : "○"} Uppercase
+                                </span>
+                                <span className={rules.hasLowercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.hasLowercase ? "✓" : "○"} Lowercase
+                                </span>
+                                <span className={rules.hasNumber ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.hasNumber ? "✓" : "○"} Number
+                                </span>
+                                <span className={rules.hasSpecialChar ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.hasSpecialChar ? "✓" : "○"} Special Char
+                                </span>
+                                <span className={rules.passwordsMatch && resetConfirmPassword ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                                  {rules.passwordsMatch && resetConfirmPassword ? "✓ Passwords Match" : "○ Match Passwords"}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </>
+                      )}
                     </div>
 
                     <button 
                       type="submit"
-                      disabled={authActionLoading}
+                      disabled={authActionLoading || (resetOtpSent && (!resetOtpCode || !validatePassword(resetNewPassword, resetConfirmPassword).isValid))}
                       className="w-full h-9 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-medium text-[11px] tracking-wider uppercase transition-opacity duration-150 cursor-pointer disabled:opacity-50 mt-1"
                     >
-                      {authActionLoading ? "Dispatching Reset Link..." : "Send Password Reset Email"}
+                      {authActionLoading 
+                        ? (resetOtpSent ? "Verifying OTP Code..." : "Dispatching OTP...") 
+                        : (resetOtpSent ? "Verify OTP & Reset Password" : "Send 6-Digit Security OTP")}
                     </button>
+
+                    {resetOtpSent && (
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setResetOtpSent(false)}
+                          className="text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono underline cursor-pointer"
+                        >
+                          Change Email / Resend OTP
+                        </button>
+                      </div>
+                    )}
                   </motion.form>
                 )}
 

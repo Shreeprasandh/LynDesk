@@ -36,6 +36,7 @@ type AuthContextType = {
   resolveEmailFromInput: (input: string) => Promise<string>;
   updateUserPassword: (newPassword: string) => Promise<{ error: Error | null }>;
   requestPasswordResetOtp: (email: string) => Promise<{ error: Error | null }>;
+  verifyPasswordResetOtp: (email: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -377,6 +378,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  const verifyPasswordResetOtp = async (email: string, token: string): Promise<{ error: Error | null }> => {
+    const targetEmail = await resolveEmailFromInput(email);
+    const { error } = await supabase.auth.verifyOtp({
+      email: targetEmail,
+      token: token.trim(),
+      type: "recovery"
+    });
+    return { error };
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -392,6 +403,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resolveEmailFromInput, 
       updateUserPassword, 
       requestPasswordResetOtp, 
+      verifyPasswordResetOtp,
       signOut 
     }}>
       {children}
