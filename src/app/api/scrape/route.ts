@@ -175,12 +175,30 @@ export async function POST(request: Request) {
                   };
                 });
 
-                // Deduplicate stage rounds by normalized title
+                // Deduplicate stage rounds & filter out administrative/email broadcast tasks
                 const seenTitles = new Set<string>();
                 stageBriefs = rawStages.filter((stg: { stage: string; deadline: string; brief: string }) => {
-                  const norm = stg.stage.toLowerCase().replace(/\s+/g, " ");
-                  if (seenTitles.has(norm)) return false;
-                  seenTitles.add(norm);
+                  const cleanTitle = stg.stage
+                    .replace(/\s*-\s*Duplicate/gi, "")
+                    .replace(/\s*\(Duplicate\)/gi, "")
+                    .replace(/\s*\|\s*\d{4}-\d{2}-\d{2}.*/gi, "")
+                    .trim();
+
+                  const lower = cleanTitle.toLowerCase();
+                  if (
+                    lower.includes("send email") || 
+                    lower.includes("email (campus") || 
+                    lower.includes("campus ambassador") || 
+                    lower.includes("admin broadcast") ||
+                    lower.includes("round to send") ||
+                    lower.includes("duplicate")
+                  ) {
+                    return false;
+                  }
+
+                  if (seenTitles.has(lower)) return false;
+                  seenTitles.add(lower);
+                  stg.stage = cleanTitle;
                   return true;
                 });
 

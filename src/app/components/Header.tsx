@@ -90,6 +90,7 @@ export default function Header() {
   // Compulsory Fields
   const [oFullName, setOFullName] = useState("");
   const [oUsername, setOUsername] = useState("");
+  const [oPassword, setOPassword] = useState("");
   const [oRole, setORole] = useState<"student" | "employee" | "solo">("student");
   const [oDob, setODob] = useState("");
   const [oLocation, setOLocation] = useState("");
@@ -496,6 +497,14 @@ const POPULAR_LOCATIONS = [
           portfolio_url: oPortfolio.trim()
         }
       });
+
+      if (oPassword.trim() && oPassword.trim().length >= 6) {
+        try {
+          await supabase.auth.updateUser({ password: oPassword.trim() });
+        } catch (passErr) {
+          console.warn("Optional onboarding password setting notice:", passErr);
+        }
+      }
 
       if (authErr) throw authErr;
 
@@ -1509,6 +1518,21 @@ const POPULAR_LOCATIONS = [
                     className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
                   />
                 </div>
+              </div>
+
+              {/* LynDesk Security Password (Optional for OAuth Users) */}
+              <div className="flex flex-col gap-1 border border-border-main/60 bg-bg-base/40 p-3 rounded-sm">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Create Security Password (Optional)</label>
+                  <span className="text-[9px] font-mono text-txt-muted">Enable login via Email/Username + Password</span>
+                </div>
+                <input 
+                  type="password" 
+                  value={oPassword}
+                  onChange={(e) => setOPassword(e.target.value)}
+                  placeholder="Set account password (min 6 chars)..."
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-mono"
+                />
               </div>
 
               {/* General Context Section */}

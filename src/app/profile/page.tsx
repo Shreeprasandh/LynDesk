@@ -25,7 +25,8 @@ import {
   X,
   Code2,
   Sparkles,
-  MapPin
+  MapPin,
+  KeyRound
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -257,8 +258,56 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, requestPasswordResetOtp, updateUserPassword } = useAuth();
   const { showToast } = useToast();
+
+  // Security & Password Management States
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [securityPasswordInput, setSecurityPasswordInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [securityActionLoading, setSecurityActionLoading] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [securitySuccess, setSecuritySuccess] = useState<string | null>(null);
+
+  const handleRequestPasswordOtp = async () => {
+    if (!user?.email) return;
+    setSecurityActionLoading(true);
+    setSecurityError(null);
+    setSecuritySuccess(null);
+    try {
+      const { error } = await requestPasswordResetOtp(user.email);
+      if (error) throw error;
+      setOtpSent(true);
+      setSecuritySuccess("Verification email dispatched! Check your inbox for the reset link/code.");
+    } catch (err: any) {
+      setSecurityError(err?.message || "Failed to dispatch verification email.");
+    } finally {
+      setSecurityActionLoading(false);
+    }
+  };
+
+  const handleUpdateSecurityPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!securityPasswordInput || securityPasswordInput.length < 6) {
+      setSecurityError("Password must be at least 6 characters.");
+      return;
+    }
+    setSecurityActionLoading(true);
+    setSecurityError(null);
+    setSecuritySuccess(null);
+    try {
+      const { error } = await updateUserPassword(securityPasswordInput);
+      if (error) throw error;
+      showToast("LynDesk Password successfully updated!");
+      setSecuritySuccess("Password updated! You can now log in via Email/Username + Password.");
+      setSecurityPasswordInput("");
+      setTimeout(() => setIsPasswordModalOpen(false), 2000);
+    } catch (err: any) {
+      setSecurityError(err?.message || "Failed to update password.");
+    } finally {
+      setSecurityActionLoading(false);
+    }
+  };
 
 
   
@@ -2514,6 +2563,45 @@ export default function ProfilePage() {
               </>
             )}
 
+            {/* Security & Credentials Card */}
+            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4 mt-6">
+              <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <KeyRound size={16} className="text-accent-main" />
+                  <h3 className="font-display text-base font-light text-txt-main">Security & Credentials</h3>
+                </div>
+                <span className="font-mono text-[10px] text-txt-muted uppercase">Authentication Methods</span>
+              </div>
+
+              <div className="flex flex-col gap-3 font-mono text-xs">
+                <div className="flex items-center justify-between p-3 bg-bg-base/40 border border-border-main/60 rounded">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-txt-main font-semibold">Registered Account Email</span>
+                    <span className="text-[10px] text-txt-muted">{user?.email || "Not specified"}</span>
+                  </div>
+                  <span className="text-[9px] font-mono uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded">Verified</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-bg-base/40 border border-border-main/60 rounded">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-txt-main font-semibold">LynDesk Security Password</span>
+                    <span className="text-[10px] text-txt-muted">Enables logging in via Email Address or Username handle</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSecurityError(null);
+                      setSecuritySuccess(null);
+                      setIsPasswordModalOpen(true);
+                    }}
+                    className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] font-semibold uppercase rounded cursor-pointer transition-opacity shrink-0"
+                  >
+                    Set / Change Password
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Account Deletion Button */}
             <div className="flex justify-center mt-2 pb-6">
               <button
@@ -2530,6 +2618,79 @@ export default function ProfilePage() {
         </div>
 
       </main>
+
+      {/* Password Security Center Modal */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main/80 max-w-md w-full p-6 rounded-md flex flex-col gap-5 shadow-2xl animate-fade-in relative">
+            <button
+              onClick={() => setIsPasswordModalOpen(false)}
+              className="absolute top-4 right-4 text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="flex flex-col gap-1 border-b border-border-main/40 pb-3">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Credential Security</span>
+              <h3 className="font-display text-xl font-light text-txt-main">Password Security Center</h3>
+              <p className="text-xs text-txt-sub">Set or update your LynDesk password to enable Email/Username logins.</p>
+            </div>
+
+            {securityError && (
+              <div className="text-xs p-3 border border-red-500/50 bg-red-500/10 text-txt-muted font-mono rounded text-center">
+                {securityError}
+              </div>
+            )}
+
+            {securitySuccess && (
+              <div className="text-xs p-3 border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 font-mono rounded text-center">
+                {securitySuccess}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2 p-3 bg-bg-base/40 border border-border-main/50 rounded font-mono text-xs">
+                <span className="text-[10px] uppercase text-txt-sub font-semibold">1. Verification Link Step</span>
+                <p className="text-[11px] text-txt-muted leading-relaxed font-light">
+                  Dispatch a secure 1-click verification link to <strong>{user?.email}</strong>.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRequestPasswordOtp}
+                  disabled={securityActionLoading}
+                  className="h-8 w-full border border-border-main/80 bg-bg-card hover:bg-bg-base text-txt-main text-[10px] uppercase tracking-wider rounded transition-colors font-semibold mt-1 cursor-pointer"
+                >
+                  {securityActionLoading ? "Dispatching Email..." : otpSent ? "Resend Verification Email" : "Request 1-Click Verification Email"}
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateSecurityPassword} className="flex flex-col gap-3 font-mono text-xs">
+                <span className="text-[10px] uppercase text-txt-sub font-semibold">2. Set New LynDesk Password</span>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] text-txt-sub">New Password (min 6 chars)</label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={securityPasswordInput}
+                    onChange={(e) => setSecurityPasswordInput(e.target.value)}
+                    placeholder="Enter new secure password..."
+                    className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={securityActionLoading || !securityPasswordInput}
+                  className="h-9 w-full bg-accent-main hover:opacity-90 text-bg-base text-xs font-semibold uppercase tracking-wider rounded transition-opacity disabled:opacity-50 mt-1 cursor-pointer"
+                >
+                  {securityActionLoading ? "Updating Password..." : "Update LynDesk Password"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Request Handle Verification Modal */}
       {verifyPlatform && (() => {

@@ -68,7 +68,7 @@ interface DashboardProfile {
 }
 
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user, loading, resolveEmailFromInput } = useAuth();
   
   // Instant 0ms Sync Profile Initialization from localStorage or user_metadata
   const [profile, setProfile] = useState<DashboardProfile | null>(() => {
@@ -235,8 +235,9 @@ export default function Home() {
     e.preventDefault();
     setAuthActionLoading(true);
     setAuthError(null);
+    const targetEmail = await resolveEmailFromInput(email);
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: targetEmail,
       password,
     });
     if (error) {
@@ -250,8 +251,9 @@ export default function Home() {
     setAuthActionLoading(true);
     setAuthError(null);
 
+    const targetEmail = await resolveEmailFromInput(email);
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: targetEmail,
       password,
     });
 
@@ -860,13 +862,13 @@ export default function Home() {
 
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1">
-                        <label className="text-[11px] text-txt-sub font-medium">Domain Email Address</label>
+                        <label className="text-[11px] text-txt-sub font-medium">Email Address or Username</label>
                         <input 
-                          type="email" 
+                          type="text" 
                           required
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          placeholder="username@university.edu"
+                          placeholder="email@university.edu or @username"
                           className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150 font-light"
                         />
                       </div>

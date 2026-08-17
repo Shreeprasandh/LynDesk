@@ -33,6 +33,9 @@ type AuthContextType = {
   isUserOnline: (userId: string) => boolean;
   refreshUser: () => Promise<void>;
   updateUserProfile: (partial: Partial<UserProfileData>) => void;
+  resolveEmailFromInput: (input: string) => Promise<string>;
+  updateUserPassword: (newPassword: string) => Promise<{ error: Error | null }>;
+  requestPasswordResetOtp: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -335,8 +338,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const resolveEmailFromInput = async (input: string): Promise<string> => {
+    const trimmed = input.trim();
+    if (trimmed.includes("@")) {
+      return trimmed.toLowerCase();
+    }
+    const cleanUsername = trimmed.replace(/^@/, "").toLowerCase();
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", cleanUsername)
+        .maybeSingle();
+
+      if (data?.id) {
+        // Find email from profiles or metadata
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", data.id)
+          .maybeSingle();
+        if (prof?.email) return prof.email;
+      }
+    } catch {}
+    return trimmed;
+  };
+
+  const updateUserPassword = async (newPassword: string): Promise<{ error: Error | null }> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error };
+  };
+
+  const requestPasswordResetOtp = async (email: string): Promise<{ error: Error | null }> => {
+    const targetEmail = await resolveEmailFromInput(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+      redirectTo: typeof window !== "undefined" ? `${window.location.origin}/profile` : undefined
+    });
+    return { error };
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, userRole, profileAvatar, userProfile, loading, onlineUserIds, isUserOnline, refreshUser, updateUserProfile, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      userRole, 
+      profileAvatar, 
+      userProfile, 
+      loading, 
+      onlineUserIds, 
+      isUserOnline, 
+      refreshUser, 
+      updateUserProfile, 
+      resolveEmailFromInput, 
+      updateUserPassword, 
+      requestPasswordResetOtp, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
