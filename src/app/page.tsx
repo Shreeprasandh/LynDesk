@@ -1107,7 +1107,7 @@ export default function Home() {
           {/* ───────────────────────────────────────────────────────────────── */}
           {/* COLUMN 2: CENTER DESK CARDS (Event Desk top, Code Desk bottom)  */}
           {/* ───────────────────────────────────────────────────────────────── */}
-          <div className="lg:col-span-6 flex flex-col gap-6">
+          <div className="lg:col-span-6 flex flex-col justify-between gap-6 h-full">
 
             {/* CARD 1: EVENT DESK (TOP) */}
             <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5">
@@ -1162,7 +1162,7 @@ export default function Home() {
             </div>
 
             {/* CARD 2: CODE DESK (BOTTOM) */}
-            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5">
+            <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 flex-1 justify-between">
               <div className="flex items-center justify-between border-b border-border-main/30 pb-4">
                 <div className="flex items-center gap-2.5">
                   <div className="p-2 bg-bg-card border border-border-main/60 text-txt-main rounded-sm">
@@ -1186,7 +1186,7 @@ export default function Home() {
               </div>
 
               {leetcodeHandle ? (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 my-auto">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-txt-sub font-light">Connected Handle:</span>
                     <span className="text-txt-main font-semibold">@{leetcodeHandle}</span>
@@ -1211,7 +1211,7 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 border border-dashed border-border-main/60 rounded-sm flex flex-col items-center gap-2 text-center text-xs font-mono">
+                <div className="p-4 border border-dashed border-border-main/60 rounded-sm flex flex-col items-center gap-2 text-center text-xs font-mono my-auto">
                   <span className="text-txt-muted font-light">Link your LeetCode handle to view live problem statistics.</span>
                   <Link
                     href="/profile"
@@ -1228,7 +1228,7 @@ export default function Home() {
           {/* ───────────────────────────────────────────────────────────────── */}
           {/* COLUMN 3: RIGHT SIDEBAR (Quick Actions & Difficulty Progress)      */}
           {/* ───────────────────────────────────────────────────────────────── */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
+          <div className="lg:col-span-3 flex flex-col justify-between gap-6 h-full">
 
             {/* Quick Actions */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3">
