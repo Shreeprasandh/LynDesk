@@ -26,9 +26,13 @@ import {
   BookOpen,
   Zap,
   Target,
-  ChevronRight
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Clock
 } from "lucide-react";
 import PreferencePresetModal from "./components/PreferencePresetModal";
+import WallCalendarModal from "./components/WallCalendarModal";
+import { fetchWallCalendarEvents, WallEvent } from "./lib/wallCalendarSync";
 
 // Brand Icon Helpers
 const DiscordIcon = ({ size = 14 }: { size?: number }) => (
@@ -317,6 +321,49 @@ export default function Home() {
 
   // Preference Preset Modal State
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+
+  // Weekly Schedule Horizon State
+  const [weekEvents, setWeekEvents] = useState<WallEvent[]>([]);
+  const [hoveredWeekDate, setHoveredWeekDate] = useState<string | null>(null);
+  const [isWallModalOpen, setIsWallModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadWeekEvents = async () => {
+      try {
+        const events = await fetchWallCalendarEvents(user.id);
+        setWeekEvents(events);
+      } catch {}
+    };
+    loadWeekEvents();
+    window.addEventListener("ldk_wall_calendar_update", loadWeekEvents);
+    return () => window.removeEventListener("ldk_wall_calendar_update", loadWeekEvents);
+  }, [user?.id]);
+
+  const getCurrentWeekDates = () => {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const distanceToMon = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMon);
+
+    const daysMap = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const todayStr = today.toISOString().split("T")[0];
+
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split("T")[0];
+      week.push({
+        dayName: daysMap[i],
+        dayNum: d.getDate(),
+        dateStr,
+        isToday: dateStr === todayStr
+      });
+    }
+    return week;
+  };
 
   // Fetch dashboard data
   useEffect(() => {
@@ -1261,6 +1308,130 @@ export default function Home() {
               </div>
             </div>
 
+            {/* 📅 Weekly Schedule Horizon Agenda Card */}
+            <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3.5 relative">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon size={12} className="text-txt-main" />
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                    Weekly Horizon Agenda
+                  </span>
+                </div>
+                <button
+                  onClick={() => setIsWallModalOpen(true)}
+                  className="text-[10px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1"
+                >
+                  <Plus size={10} />
+                  <span>Add Event</span>
+                </button>
+              </div>
+
+              {/* 7-Day Grid */}
+              <div className="grid grid-cols-7 gap-1.5 pt-1">
+                {getCurrentWeekDates().map((day) => {
+                  const dayEvents = weekEvents.filter(e => e.date === day.dateStr);
+                  const hasEvents = dayEvents.length > 0;
+                  const isHovered = hoveredWeekDate === day.dateStr;
+
+                  return (
+                    <div
+                      key={day.dateStr}
+                      onMouseEnter={() => setHoveredWeekDate(day.dateStr)}
+                      onMouseLeave={() => setHoveredWeekDate(null)}
+                      onClick={() => setHoveredWeekDate(isHovered ? null : day.dateStr)}
+                      className={`relative p-2 rounded-md border transition-all cursor-pointer flex flex-col items-center justify-center text-center ${
+                        day.isToday
+                          ? "bg-bg-card border-txt-main/60 shadow-md ring-1 ring-txt-main/20"
+                          : isHovered
+                          ? "bg-bg-card/80 border-border-main"
+                          : "bg-bg-surface border-border-main/50 hover:border-border-main"
+                      }`}
+                    >
+                      {day.isToday && (
+                        <span className="absolute -top-2 px-1.5 py-[1px] bg-txt-main text-bg-surface font-mono text-[7px] font-bold uppercase rounded-full tracking-wider shadow-sm">
+                          TODAY
+                        </span>
+                      )}
+                      <span className="font-mono text-[9px] text-txt-muted font-medium mt-1">{day.dayName}</span>
+                      <span className={`font-mono text-sm font-bold my-0.5 ${day.isToday ? "text-txt-main" : "text-txt-sub"}`}>
+                        {day.dayNum}
+                      </span>
+
+                      {/* Event Indicator Badge */}
+                      {hasEvents ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                          <span className="font-mono text-[8px] text-txt-main font-semibold">{dayEvents.length}</span>
+                        </div>
+                      ) : (
+                        <span className="font-mono text-[8px] text-txt-muted/40 mt-0.5">•</span>
+                      )}
+
+                      {/* Hover Popover Tooltip */}
+                      <AnimatePresence>
+                        {isHovered && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.94 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 6, scale: 0.94 }}
+                            transition={{ type: "spring", stiffness: 450, damping: 26, mass: 0.75 }}
+                            className="absolute z-50 bottom-full mb-2.5 left-1/2 -translate-x-1/2 w-64 p-3 bg-bg-card border border-border-main/90 rounded-lg shadow-2xl text-left pointer-events-auto backdrop-blur-xl ring-1 ring-border-main/50"
+                          >
+                            <div className="flex items-center justify-between pb-2 border-b border-border-main/60 mb-2">
+                              <span className="font-mono text-[10px] text-txt-main font-bold flex items-center gap-1.5">
+                                <CalendarIcon size={10} className="text-txt-muted" />
+                                {day.dayName}, {day.dateStr}
+                              </span>
+                              <span className="text-[9px] font-mono px-2 py-0.5 bg-bg-surface text-txt-main border border-border-main/80 rounded-md font-bold shadow-xs">
+                                {dayEvents.length} {dayEvents.length === 1 ? "Event" : "Events"}
+                              </span>
+                            </div>
+
+                            {dayEvents.length === 0 ? (
+                              <div className="py-3 text-center text-txt-muted font-mono text-[10px]">
+                                No events scheduled for this day
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-0.5">
+                                {dayEvents.map((evt) => (
+                                  <div key={evt.id} className="p-2 rounded bg-bg-surface border border-border-main/60 flex flex-col gap-1 hover:border-border-main transition-colors">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="font-mono text-[10px] font-bold text-txt-main truncate max-w-[135px]">
+                                        {evt.title}
+                                      </span>
+                                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.5 rounded-md font-bold tracking-wider ${
+                                        evt.category === "contest" ? "bg-red-500/10 text-red-500 border border-red-500/20" :
+                                        evt.category === "study" ? "bg-blue-500/10 text-blue-500 border border-blue-500/20" :
+                                        evt.category === "deadline" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                                        "bg-purple-500/10 text-purple-500 border border-purple-500/20"
+                                      }`}>
+                                        {evt.category}
+                                      </span>
+                                    </div>
+                                    {evt.time && (
+                                      <div className="flex items-center gap-1 font-mono text-[8px] text-txt-muted font-medium">
+                                        <Clock size={9} />
+                                        <span>{evt.time}</span>
+                                      </div>
+                                    )}
+                                    {evt.description && (
+                                      <p className="font-sans text-[9px] text-txt-sub line-clamp-2 leading-relaxed">
+                                        {evt.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
 
         </div>
@@ -1272,6 +1443,12 @@ export default function Home() {
       <PreferencePresetModal 
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
+      />
+
+      <WallCalendarModal
+        isOpen={isWallModalOpen}
+        onClose={() => setIsWallModalOpen(false)}
+        userId={user?.id}
       />
     </div>
   );
