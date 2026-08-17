@@ -117,9 +117,9 @@ export default function CodeIDEEditor({
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
-    <div className="w-full border border-border-main/80 rounded-md bg-[#0d1117] overflow-hidden shadow-md font-mono">
+    <div className="w-full border border-border-main/80 rounded-md bg-bg-surface overflow-hidden shadow-md font-mono">
       {/* IDE Header Bar */}
-      <div className="px-4 py-2 bg-[#161b22] border-b border-border-main/60 flex items-center justify-between text-xs">
+      <div className="px-4 py-2 bg-bg-card border-b border-border-main/60 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2 text-txt-sub">
           <Code2 size={14} className="text-accent-main" />
           <span className="font-semibold uppercase text-[10px] text-txt-main">
@@ -153,7 +153,7 @@ export default function CodeIDEEditor({
       {/* Code Editor Body */}
       <div className="flex relative min-h-[160px] text-xs">
         {/* Line Numbers Sidebar */}
-        <div className="w-10 py-3 bg-[#0d1117] text-[#484f58] select-none text-right pr-3 border-r border-border-main/30 font-mono text-[11px] leading-relaxed shrink-0">
+        <div className="w-10 py-3 bg-bg-card/50 text-txt-muted select-none text-right pr-3 border-r border-border-main/30 font-mono text-[11px] leading-relaxed shrink-0">
           {lineNumbers.map((num) => (
             <div key={num}>{num}</div>
           ))}
