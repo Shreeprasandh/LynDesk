@@ -854,10 +854,11 @@ export default function Home() {
                 {authStep === "idle" && (
                   <motion.div 
                     key="idle"
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -3 }}
-                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    layout
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
@@ -948,11 +949,12 @@ export default function Home() {
                 {(authStep === "login" || authStep === "signup") && (
                   <motion.form 
                     key={authStep}
+                    layout
                     onSubmit={authStep === "login" ? handleLogin : handleSignUp}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -3 }}
-                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
@@ -1051,11 +1053,12 @@ export default function Home() {
                 {authStep === "forgot" && (
                   <motion.form 
                     key="forgot"
+                    layout
                     onSubmit={resetOtpSent ? handleVerifyResetOtp : handleRequestResetOtp}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -3 }}
-                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">
@@ -1204,11 +1207,12 @@ export default function Home() {
                 {authStep === "faculty_login" && (
                   <motion.form 
                     key="faculty_login"
+                    layout
                     onSubmit={handleFacultyLogin}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -3 }}
-                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                     className="relative z-10 overflow-hidden flex flex-col gap-4"
                   >
                     <div className="flex flex-col gap-1">

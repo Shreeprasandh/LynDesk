@@ -1489,7 +1489,7 @@ const POPULAR_LOCATIONS = [
               clearAllSuggestions();
             }
           }}
-          className="fixed inset-0 z-[9999] overflow-y-auto bg-bg-base/95 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] overflow-y-auto bg-bg-base/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 ease-out"
         >
           <div 
             onClick={(e) => {
@@ -1498,7 +1498,7 @@ const POPULAR_LOCATIONS = [
                 clearAllSuggestions();
               }
             }}
-            className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-fade-in"
+            className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-in fade-in zoom-in-95 duration-250 ease-out"
           >
             
             <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">

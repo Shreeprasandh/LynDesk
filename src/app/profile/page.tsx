@@ -2626,8 +2626,8 @@ export default function ProfilePage() {
 
       {/* Password Security Center Modal */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-bg-surface border border-border-main/80 max-w-md w-full p-6 rounded-md flex flex-col gap-5 shadow-2xl animate-fade-in relative">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 ease-out">
+          <div className="bg-bg-surface border border-border-main/80 max-w-md w-full p-6 rounded-md flex flex-col gap-5 shadow-2xl animate-in fade-in zoom-in-95 duration-250 ease-out relative">
             <button
               onClick={() => setIsPasswordModalOpen(false)}
               className="absolute top-4 right-4 text-txt-muted hover:text-txt-main transition-colors cursor-pointer"
