@@ -411,6 +411,40 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     brief?: string;
   };
 
+  function sanitizeStageItems(items: RealStageItem[]): RealStageItem[] {
+    if (!Array.isArray(items)) return [];
+    const seen = new Set<string>();
+    const result: RealStageItem[] = [];
+
+    for (const item of items) {
+      if (!item || !item.title) continue;
+      const cleanTitle = item.title
+        .replace(/\s*-\s*Duplicate/gi, "")
+        .replace(/\s*\(Duplicate\)/gi, "")
+        .trim();
+
+      const lower = cleanTitle.toLowerCase();
+      // Exclude administrative email tasks & internal notification steps
+      if (
+        lower.includes("send email") || 
+        lower.includes("email (campus") || 
+        lower.includes("campus ambassador") || 
+        lower.includes("admin broadcast")
+      ) {
+        continue;
+      }
+
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push({
+          ...item,
+          title: cleanTitle
+        });
+      }
+    }
+    return result;
+  }
+
   const defaultRealStages: RealStageItem[] = [
     { title: "Ideation & Proposal", deadline: "Aug 19", brief: "Problem statement selection, team role assignment, technical architecture deck draft submission." },
     { title: "Prototype Development", deadline: "Sep 02", brief: "Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync." },
@@ -468,7 +502,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         try {
           const parsedStages = JSON.parse(savedStages);
           if (Array.isArray(parsedStages) && parsedStages.length > 0) {
-            setTimeout(() => setRealStageItems(parsedStages), 0);
+            const clean = sanitizeStageItems(parsedStages);
+            setTimeout(() => setRealStageItems(clean), 0);
           }
         } catch {}
       }
@@ -509,9 +544,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 deadline: s.deadline || "TBD",
                 brief: s.brief || ""
               }));
-              setRealStageItems(extracted);
+              const cleanExtracted = sanitizeStageItems(extracted);
+              setRealStageItems(cleanExtracted);
               if (typeof window !== "undefined") {
-                localStorage.setItem(`ldk_workspace_real_stages_${id}`, JSON.stringify(extracted));
+                localStorage.setItem(`ldk_workspace_real_stages_${id}`, JSON.stringify(cleanExtracted));
               }
             }
           }
