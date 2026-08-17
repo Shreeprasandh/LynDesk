@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import { supabase } from "./lib/supabase";
 import { extractAvatarFromUser } from "./lib/avatar";
+import { validateEmail } from "./lib/emailValidation";
 import Header from "./components/Header";
 import LynDeskLogo from "./components/LynDeskLogo";
 import Footer from "./components/Footer";
@@ -68,7 +69,7 @@ interface DashboardProfile {
 }
 
 export default function Home() {
-  const { user, loading, resolveEmailFromInput } = useAuth();
+  const { user, loading, resolveEmailFromInput, requestPasswordResetOtp } = useAuth();
   
   // Instant 0ms Sync Profile Initialization from localStorage or user_metadata
   const [profile, setProfile] = useState<DashboardProfile | null>(() => {
@@ -127,7 +128,7 @@ export default function Home() {
   });
 
   // Authentication States
-  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "faculty_login">("idle");
+  const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "faculty_login" | "forgot">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [staffKey, setStaffKey] = useState("");
@@ -289,10 +290,64 @@ export default function Home() {
     }
   };
 
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      setAuthError("Please enter your registered email address or username.");
+      return;
+    }
+    setAuthActionLoading(true);
+    setAuthError(null);
+    setForgotSuccess(null);
+
+    const emailVal = validateEmail(email);
+    if (!emailVal.isValidSyntax && !email.includes("@")) {
+      // Username input allowed
+    } else if (emailVal.isDisposable) {
+      setAuthError("Disposable or temporary email addresses are not allowed.");
+      setAuthActionLoading(false);
+      return;
+    } else if (emailVal.suggestedCorrection) {
+      setAuthError(`Did you mean ${emailVal.suggestedCorrection}?`);
+      setAuthActionLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await requestPasswordResetOtp(email);
+      if (error) throw error;
+      setForgotSuccess("Password reset link dispatched! Check your inbox to reset your password.");
+    } catch (err: any) {
+      setAuthError(err?.message || "Failed to dispatch password reset link.");
+    } finally {
+      setAuthActionLoading(false);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthActionLoading(true);
     setAuthError(null);
+
+    const emailVal = validateEmail(email);
+    if (!emailVal.isValidSyntax) {
+      setAuthError("Please enter a valid email address. (e.g. user@domain.com)");
+      setAuthActionLoading(false);
+      return;
+    }
+    if (emailVal.isDisposable) {
+      setAuthError("Disposable / temporary email addresses are not allowed. Please use a real email.");
+      setAuthActionLoading(false);
+      return;
+    }
+    if (emailVal.suggestedCorrection) {
+      setAuthError(`Did you mean ${emailVal.suggestedCorrection}? Check for typos.`);
+      setAuthActionLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
         email,
@@ -301,7 +356,7 @@ export default function Home() {
       if (error) {
         setAuthError(error.message);
       } else {
-        setAuthError("Registration successful. Check your email for verification.");
+        setAuthError("Registration successful. Verification email dispatched to your inbox.");
       }
     } catch (err: any) {
       setAuthError(err.message || "Registration failed. Please try again.");
@@ -877,7 +932,17 @@ export default function Home() {
                         <div className="flex justify-between items-center">
                           <label className="text-[11px] text-txt-sub font-medium">Password</label>
                           {authStep === "login" && (
-                            <a href="#" className="text-[9px] text-txt-muted hover:text-txt-main transition-colors font-light">Forgot?</a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAuthError(null);
+                                setForgotSuccess(null);
+                                setAuthStep("forgot");
+                              }}
+                              className="text-[9px] text-txt-muted hover:text-txt-main transition-colors font-light cursor-pointer underline"
+                            >
+                              Forgot?
+                            </button>
                           )}
                         </div>
                         <input 
@@ -918,6 +983,70 @@ export default function Home() {
                         {authStep === "login" ? "Need a new desk? Create an account" : "Already registered? Sign in"}
                       </button>
                     </div>
+                  </motion.form>
+                )}
+
+                {authStep === "forgot" && (
+                  <motion.form 
+                    key="forgot"
+                    onSubmit={handleForgotPassword}
+                    initial={{ opacity: 0, y: 3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -3 }}
+                    transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative z-10 overflow-hidden flex flex-col gap-4"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setAuthError(null);
+                          setForgotSuccess(null);
+                          setAuthStep("login");
+                        }}
+                        className="text-[9px] text-txt-muted hover:text-txt-main self-start transition-colors duration-150 font-mono tracking-widest uppercase cursor-pointer"
+                      >
+                        ← Back to Sign In
+                      </button>
+                      <h2 className="font-display text-base font-semibold tracking-tight text-txt-main mt-1">
+                        Reset LynDesk Password
+                      </h2>
+                      <p className="text-[11px] text-txt-muted font-light">
+                        Enter your account email or username to receive a 1-click password reset link.
+                      </p>
+                    </div>
+
+                    {authError && (
+                      <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded-sm font-mono tracking-tight text-center">
+                        {authError}
+                      </div>
+                    )}
+
+                    {forgotSuccess && (
+                      <div className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-sm font-mono tracking-tight text-center">
+                        {forgotSuccess}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] text-txt-sub font-medium">Registered Email or Username</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="email@domain.com or @username"
+                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main font-mono"
+                      />
+                    </div>
+
+                    <button 
+                      type="submit"
+                      disabled={authActionLoading}
+                      className="w-full h-9 rounded-sm bg-accent-main hover:opacity-90 text-bg-base font-medium text-[11px] tracking-wider uppercase transition-opacity duration-150 cursor-pointer disabled:opacity-50 mt-1"
+                    >
+                      {authActionLoading ? "Dispatching Reset Link..." : "Send Password Reset Email"}
+                    </button>
                   </motion.form>
                 )}
 
