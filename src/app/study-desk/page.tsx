@@ -123,6 +123,7 @@ export default function StudyDeskPage() {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(STORAGE_STATS_KEY, JSON.stringify(stats));
+        window.dispatchEvent(new Event("ldk_study_stats_update"));
       } catch {}
     }
   }, [stats]);
@@ -131,6 +132,7 @@ export default function StudyDeskPage() {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem(STORAGE_DSA_PROGRESS_KEY, JSON.stringify(dsaProgressMap));
+        window.dispatchEvent(new Event("ldk_study_stats_update"));
       } catch {}
     }
   }, [dsaProgressMap]);

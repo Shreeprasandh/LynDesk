@@ -183,36 +183,45 @@ export default function Home() {
     };
   });
 
-  // Deadlines & workspace counts - 0ms Cache Readers
+  // Deadlines & workspace counts - 0ms Multi-Cache & Supabase Readers
   const [upcomingDeadline, setUpcomingDeadline] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       try {
-        const storedEvents = localStorage.getItem("ldk_opportunities");
-        if (storedEvents) {
-          const eventsList = JSON.parse(storedEvents);
-          if (Array.isArray(eventsList) && eventsList.length > 0) {
-            const sorted = [...eventsList]
-              .filter((e: { deadline?: string }) => e.deadline)
-              .sort(
-                (a: { deadline: string }, b: { deadline: string }) =>
-                  new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-              );
-            if (sorted.length > 0) return sorted[0].deadline;
-          }
+        const e1 = localStorage.getItem("ldk_events");
+        const e2 = localStorage.getItem("ldk_event_workspaces_cache");
+        const e3 = localStorage.getItem("ldk_joined_workspaces");
+        const p1 = e1 ? JSON.parse(e1) : [];
+        const p2 = e2 ? JSON.parse(e2) : [];
+        const p3 = e3 ? JSON.parse(e3) : [];
+        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+        if (list.length > 0) {
+          const deadlines = list.map((w: any) => w.deadline || w.target_date).filter(Boolean);
+          if (deadlines.length > 0) return deadlines[0];
         }
       } catch {}
     }
-    return null;
+    return "No Deadlines";
   });
 
   const [activeWorkspacesCount, setActiveWorkspacesCount] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const storedWs = localStorage.getItem("ldk_joined_workspaces");
-        if (storedWs) {
-          const list = JSON.parse(storedWs);
-          return Array.isArray(list) ? list.length : 0;
-        }
+        const e1 = localStorage.getItem("ldk_events");
+        const e2 = localStorage.getItem("ldk_event_workspaces_cache");
+        const e3 = localStorage.getItem("ldk_joined_workspaces");
+        const p1 = e1 ? JSON.parse(e1) : [];
+        const p2 = e2 ? JSON.parse(e2) : [];
+        const p3 = e3 ? JSON.parse(e3) : [];
+        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+        const seen = new Set();
+        const unique = list.filter((w: any) => {
+          if (!w) return false;
+          const id = w.id || w.title;
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+        return unique.length;
       } catch {}
     }
     return 0;
@@ -565,11 +574,68 @@ export default function Home() {
       } catch {}
     };
 
+    // 5. Fetch Live Event Workspaces from Supabase DB & Caches
+    const fetchUserWorkspaces = async () => {
+      if (!user?.id) return;
+      try {
+        let wsList: any[] = [];
+        if (typeof window !== "undefined") {
+          const e1 = localStorage.getItem("ldk_events");
+          const e2 = localStorage.getItem("ldk_event_workspaces_cache");
+          const e3 = localStorage.getItem("ldk_joined_workspaces");
+          const p1 = e1 ? JSON.parse(e1) : [];
+          const p2 = e2 ? JSON.parse(e2) : [];
+          const p3 = e3 ? JSON.parse(e3) : [];
+          wsList = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+        }
+
+        const { data: dbWs } = await supabase
+          .from("event_workspaces")
+          .select("*")
+          .eq("created_by", user.id);
+
+        if (dbWs && Array.isArray(dbWs) && dbWs.length > 0) {
+          wsList = [...wsList, ...dbWs];
+        }
+
+        const seen = new Set();
+        const unique = wsList.filter((w: any) => {
+          if (!w) return false;
+          const idKey = w.id || w.title;
+          if (!idKey || seen.has(idKey)) return false;
+          seen.add(idKey);
+          return true;
+        });
+
+        setActiveWorkspacesCount(unique.length);
+
+        if (unique.length > 0) {
+          const deadlines = unique
+            .map((w: any) => w.deadline || w.target_date)
+            .filter(Boolean)
+            .sort((a: any, b: any) => new Date(a).getTime() - new Date(b).getTime());
+          setUpcomingDeadline(deadlines[0] || "No Deadlines");
+        } else {
+          setUpcomingDeadline("No Deadlines");
+        }
+      } catch {
+        setUpcomingDeadline("No Deadlines");
+      }
+    };
+
     fetchStudyDeskStats();
+    fetchUserWorkspaces();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("ldk_study_stats_update", fetchStudyDeskStats);
+      window.addEventListener("ldk_workspace_update", fetchUserWorkspaces);
+    }
 
     return () => {
       if (typeof window !== "undefined") {
         window.removeEventListener("ldk_profile_update", fetchProfile);
+        window.removeEventListener("ldk_study_stats_update", fetchStudyDeskStats);
+        window.removeEventListener("ldk_workspace_update", fetchUserWorkspaces);
       }
     };
   }, [user]);

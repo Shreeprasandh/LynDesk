@@ -421,15 +421,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       const cleanTitle = item.title
         .replace(/\s*-\s*Duplicate/gi, "")
         .replace(/\s*\(Duplicate\)/gi, "")
+        .replace(/\s*\|\s*\d{4}-\d{2}-\d{2}.*/gi, "")
         .trim();
 
       const lower = cleanTitle.toLowerCase();
-      // Exclude administrative email tasks & internal notification steps
+      // Exclude administrative email tasks, ambassador reminders, and duplicate markers
       if (
         lower.includes("send email") || 
         lower.includes("email (campus") || 
         lower.includes("campus ambassador") || 
-        lower.includes("admin broadcast")
+        lower.includes("admin broadcast") ||
+        lower.includes("round to send") ||
+        lower.includes("duplicate")
       ) {
         continue;
       }
@@ -3458,10 +3461,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div className="absolute top-4 bottom-2 left-[18px] -translate-x-1/2 w-[1px] bg-gradient-to-b from-border-main/70 via-border-main/35 to-transparent z-0" />
             
             {(() => {
-              const firstUnpassed = realStageItems.findIndex((s) => !isDatePassed(s.deadline));
-              const activeIdx = firstUnpassed >= 0 ? firstUnpassed : realStageItems.length - 1;
+              const cleanList = sanitizeStageItems(realStageItems);
+              const firstUnpassed = cleanList.findIndex((s) => !isDatePassed(s.deadline));
+              const activeIdx = firstUnpassed >= 0 ? firstUnpassed : cleanList.length - 1;
 
-              return realStageItems.map((item, idx) => {
+              return cleanList.map((item, idx) => {
                 const liveDate = item.deadline || "Target Active";
                 const isPassed = isDatePassed(liveDate);
                 const isCompleted = isPassed || idx < activeIdx;
@@ -5037,49 +5041,46 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
               {/* Stage-by-Stage Detailed Briefs */}
               <div className="flex flex-col gap-3">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-txt-muted font-bold">Stage-by-Stage Timeline & Briefs</span>
-                
                 <div className="flex flex-col gap-3">
-                  {realStageItems.map((stg, idx) => {
-                    const isPast = isDatePassed(stg.deadline);
-                    const isCurrentActive = !isPast && (idx === 0 || isDatePassed(realStageItems[idx - 1]?.deadline));
+                  {(() => {
+                    const cleanBriefs = sanitizeStageItems(realStageItems);
+                    return cleanBriefs.map((stg, idx) => {
+                      const isPast = isDatePassed(stg.deadline);
+                      const isCurrentActive = !isPast && (idx === 0 || isDatePassed(cleanBriefs[idx - 1]?.deadline));
 
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`p-3.5 bg-bg-base/50 rounded flex flex-col gap-1 ${
-                          isCurrentActive 
-                            ? "border border-accent-main/40 ring-1 ring-accent-main/20" 
-                            : "border border-border-main/60"
-                        }`}
-                      >
-                        <div className="flex justify-between items-center gap-2">
-                          <span className={`text-xs font-semibold font-display ${isCurrentActive ? "text-accent-main" : "text-txt-main"}`}>
-                            {idx + 1}. {stg.title}
-                          </span>
-                          <span className={`text-[9px] font-mono font-bold uppercase shrink-0 ${
-                            isPast 
-                              ? "text-emerald-400" 
-                              : isCurrentActive 
-                                ? "text-accent-main" 
-                                : "text-txt-muted"
-                          }`}>
-                            {stg.deadline === "Date not specified" || stg.deadline === "TBD"
-                              ? "Date not specified"
-                              : isPast
-                                ? `Completed (${stg.deadline})`
-                                : isCurrentActive
-                                  ? `Active (${stg.deadline})`
-                                  : `Target (${stg.deadline})`}
-                          </span>
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`p-3.5 bg-bg-base/50 rounded flex flex-col gap-1 ${
+                            isCurrentActive 
+                              ? "border border-accent-main/40 ring-1 ring-accent-main/20" 
+                              : "border border-border-main/60"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center gap-2">
+                            <span className={`text-xs font-semibold font-display ${isCurrentActive ? "text-accent-main" : "text-txt-main"}`}>
+                              {idx + 1}. {stg.title}
+                            </span>
+                            <span className={`text-[9px] font-mono font-bold uppercase shrink-0 ${
+                              isPast ? "text-emerald-400" : isCurrentActive ? "text-accent-main" : "text-txt-muted"
+                            }`}>
+                              {isPast ? "Passed" : isCurrentActive ? "Active Round" : "Upcoming"}
+                            </span>
+                          </div>
+                          {stg.deadline && (
+                            <span className="text-[10px] font-mono text-txt-sub">
+                              Target Date: {stg.deadline}
+                            </span>
+                          )}
+                          {stg.brief && (
+                            <p className="text-xs text-txt-muted font-light leading-relaxed mt-1">
+                              {stg.brief}
+                            </p>
+                          )}
                         </div>
-                        {stg.brief && (
-                          <p className="text-[11px] text-txt-sub font-light leading-relaxed">
-                            {stg.brief}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
