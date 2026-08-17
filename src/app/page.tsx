@@ -166,20 +166,20 @@ export default function Home() {
         const activePath = paths.find((p: any) => p.isActive) || paths[0];
 
         return {
-          streakCount: stats?.streakCount || 1,
-          totalXp: stats?.totalXp || 120,
-          solvedProblemsCount: solvedCount || 8,
+          streakCount: stats?.streakCount || 0,
+          totalXp: stats?.totalXp || 0,
+          solvedProblemsCount: solvedCount || 0,
           activePathTitle: activePath?.title || "DSA Systems & Algorithms",
-          activePathProgress: activePath?.progress || 42
+          activePathProgress: activePath?.progress || 0
         };
       } catch {}
     }
     return {
-      streakCount: 1,
-      totalXp: 120,
-      solvedProblemsCount: 8,
+      streakCount: 0,
+      totalXp: 0,
+      solvedProblemsCount: 0,
       activePathTitle: "DSA Systems & Algorithms",
-      activePathProgress: 42
+      activePathProgress: 0
     };
   });
 
@@ -555,11 +555,11 @@ export default function Home() {
           const activePath = paths.find((p: any) => p.isActive) || paths[0];
 
           setStudyCardStats({
-            streakCount: stats?.streakCount || 1,
-            totalXp: stats?.totalXp || 120,
-            solvedProblemsCount: solvedCount || 8,
+            streakCount: stats?.streakCount || 0,
+            totalXp: stats?.totalXp || 0,
+            solvedProblemsCount: solvedCount || 0,
             activePathTitle: activePath?.title || "DSA Systems & Algorithms",
-            activePathProgress: activePath?.progress || 42
+            activePathProgress: activePath?.progress || 0
           });
         }
       } catch {}
@@ -1144,7 +1144,7 @@ export default function Home() {
                 <div className="border border-border-main/60 bg-bg-card p-3.5 rounded flex flex-col gap-1">
                   <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Next Deadline</span>
                   <span className="text-xl font-semibold text-txt-main font-display truncate">
-                    {upcomingDeadline || "Nov 20, 2026"}
+                    {upcomingDeadline || "No Deadlines"}
                   </span>
                   <span className="text-[9px] text-txt-sub font-mono tracking-tight">Upcoming submission</span>
                 </div>

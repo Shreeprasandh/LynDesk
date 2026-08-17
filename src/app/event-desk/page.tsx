@@ -9,6 +9,7 @@ import { syncEventDeskWithCalendar } from "../lib/wallCalendarSync";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import LynDeskLoadingCard from "../components/LynDeskLoadingCard";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -80,63 +81,21 @@ const getWorkspaceUuid = (rawId: string): string => {
 
 function DashboardSkeleton() {
   return (
-    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-pulse">
-      {/* Left Sidebar Skeleton (3 columns) */}
-      <div className="lg:col-span-3 flex flex-col gap-6">
-        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
-          <div className="h-2 w-16 bg-border-main/60 rounded" />
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-border-main/60" />
-            <div className="flex flex-col gap-2 flex-grow">
-              <div className="h-3 w-24 bg-border-main/60 rounded" />
-              <div className="h-2 w-32 bg-border-main/60 rounded" />
-            </div>
-          </div>
-        </div>
-        <div className="border border-border-main/40 bg-bg-surface/50 p-5 rounded-md flex flex-col gap-3">
-          <div className="h-2 w-20 bg-border-main/60 rounded" />
-          <div className="h-8 w-24 bg-border-main/60 rounded mt-1" />
-          <div className="h-1 w-full bg-border-main/60 rounded" />
-          <div className="h-2 w-full bg-border-main/40 rounded" />
-        </div>
-      </div>
-
-      {/* Main Column Skeleton (9 columns) */}
-      <div className="lg:col-span-9 flex flex-col gap-6">
-        <div className="flex gap-4 border-b border-border-main/40 pb-2">
-          <div className="h-4 w-20 bg-border-main/60 rounded" />
-          <div className="h-4 w-20 bg-border-main/40 rounded" />
-          <div className="h-4 w-20 bg-border-main/40 rounded" />
-        </div>
-        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
-          <div className="h-4 w-40 bg-border-main/60 rounded" />
-          <div className="h-3 w-full bg-border-main/40 rounded" />
-          <div className="h-3 w-5/6 bg-border-main/40 rounded" />
-        </div>
-        <div className="border border-border-main/40 bg-bg-surface/50 p-6 rounded-md flex flex-col gap-4">
-          <div className="h-4 w-32 bg-border-main/60 rounded" />
-          <div className="h-3 w-full bg-border-main/40 rounded" />
-        </div>
-      </div>
-    </div>
+    <LynDeskLoadingCard 
+      message="Loading Event Desk Workspaces..."
+      subtext="Verifying campus team permissions & project vaults"
+      minHeight="min-h-[450px]"
+    />
   );
 }
 
 function LandingSkeleton() {
   return (
-    <div className="flex-grow max-w-7xl w-full mx-auto px-6 md:px-12 py-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center animate-pulse">
-      <div className="lg:col-span-7 flex flex-col gap-6">
-        <div className="h-3 w-32 bg-border-main/60 rounded" />
-        <div className="h-12 w-4/5 bg-border-main/60 rounded" />
-        <div className="h-4 w-full bg-border-main/40 rounded" />
-        <div className="h-4 w-2/3 bg-border-main/40 rounded" />
-      </div>
-      <div className="lg:col-span-5 border border-border-main/40 bg-bg-surface/50 p-8 rounded-md flex flex-col gap-4">
-        <div className="h-6 w-32 bg-border-main/60 rounded" />
-        <div className="h-10 w-full bg-border-main/40 rounded" />
-        <div className="h-10 w-full bg-border-main/40 rounded" />
-      </div>
-    </div>
+    <LynDeskLoadingCard 
+      message="Initializing Event Desk..."
+      subtext="Loading team workspace directory"
+      minHeight="min-h-[450px]"
+    />
   );
 }
 
@@ -200,7 +159,7 @@ interface EventItem {
 const INITIAL_EVENTS: EventItem[] = [];
 
 export default function Home() {
-  const { user, loading: authLoading, isUserOnline } = useAuth();
+  const { user, userProfile, loading: authLoading, isUserOnline } = useAuth();
   const { showToast } = useToast();
   const likelyHasSession = !!user;
 
@@ -1974,14 +1933,19 @@ export default function Home() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-display font-light tracking-tight text-txt-main">32</span>
+                  <span className="text-3xl font-display font-light tracking-tight text-txt-main">
+                    {userProfile?.academic_credits || 0}
+                  </span>
                   <span className="text-[10px] text-txt-muted uppercase tracking-wider font-mono">/ 100 Pts</span>
                 </div>
                 <div className="w-full h-1 bg-border-main/50 rounded-full overflow-hidden">
-                  <div className="bg-accent-main h-full rounded-full" style={{ width: "32%" }} />
+                  <div 
+                    className="bg-accent-main h-full rounded-full transition-all duration-500" 
+                    style={{ width: `${Math.min(100, userProfile?.academic_credits || 0)}%` }} 
+                  />
                 </div>
                 <p className="text-[10px] text-txt-muted font-light leading-relaxed">
-                  3 completed projects verified by academic coordinators. 8 points pending.
+                  {userProfile?.academic_credits ? `${userProfile.academic_credits} points verified by academic coordinators.` : "0 completed projects verified. Complete team projects to earn campus credits."}
                 </p>
               </div>
             </div>

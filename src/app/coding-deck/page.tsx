@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import AppliedHackathonsModal from "../components/coding-desk/AppliedHackathonsModal";
+import LynDeskLoadingCard from "../components/LynDeskLoadingCard";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Link from "next/link";
@@ -961,9 +962,10 @@ export default function CodingDeckPage() {
         )}
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center font-mono text-[10px] text-txt-muted py-24">
-            FETCHING LINKED HANDLES...
-          </div>
+          <LynDeskLoadingCard 
+            message="Fetching Linked Handles..." 
+            subtext="Syncing competitive platform statistics & problem tallies" 
+          />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             

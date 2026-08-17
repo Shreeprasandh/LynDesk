@@ -360,30 +360,96 @@ export default function ProgressDashboardView({
               <div>
                 <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
                   <span>Arrays & Memory Layout</span>
-                  <span className="text-accent-main font-bold">100% Mastered</span>
+                  <span className="text-txt-main font-bold">
+                    {(() => {
+                      if (typeof window === "undefined") return "0% Uninitiated";
+                      try {
+                        const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                        const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("array") || k.includes("two-sum") || k.includes("matrix"))).length;
+                        const pct = Math.min(100, Math.round((solved / 5) * 100));
+                        return pct > 0 ? `${pct}% ${pct >= 80 ? "Mastered" : "Intermediate"}` : "0% Uninitiated";
+                      } catch { return "0% Uninitiated"; }
+                    })()}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent-main rounded-full" style={{ width: "100%" }} />
+                  <div 
+                    className="h-full bg-accent-main rounded-full transition-all duration-500" 
+                    style={{ 
+                      width: `${(() => {
+                        if (typeof window === "undefined") return 0;
+                        try {
+                          const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                          const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("array") || k.includes("two-sum") || k.includes("matrix"))).length;
+                          return Math.min(100, Math.round((solved / 5) * 100));
+                        } catch { return 0; }
+                      })()}%` 
+                    }} 
+                  />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
                   <span>Two Pointers & Sliding Window</span>
-                  <span className="text-emerald-400 font-bold">85% Advanced</span>
+                  <span className="text-txt-main font-bold">
+                    {(() => {
+                      if (typeof window === "undefined") return "0% Uninitiated";
+                      try {
+                        const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                        const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("pointer") || k.includes("window") || k.includes("sliding"))).length;
+                        const pct = Math.min(100, Math.round((solved / 5) * 100));
+                        return pct > 0 ? `${pct}% ${pct >= 80 ? "Mastered" : "Intermediate"}` : "0% Uninitiated";
+                      } catch { return "0% Uninitiated"; }
+                    })()}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: "85%" }} />
+                  <div 
+                    className="h-full bg-txt-main rounded-full transition-all duration-500" 
+                    style={{ 
+                      width: `${(() => {
+                        if (typeof window === "undefined") return 0;
+                        try {
+                          const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                          const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("pointer") || k.includes("window") || k.includes("sliding"))).length;
+                          return Math.min(100, Math.round((solved / 5) * 100));
+                        } catch { return 0; }
+                      })()}%` 
+                    }} 
+                  />
                 </div>
               </div>
 
               <div>
                 <div className="flex justify-between text-[10px] uppercase text-txt-sub mb-1">
                   <span>Algorithmic Optimization</span>
-                  <span className="text-amber-400 font-bold">60% Intermediate</span>
+                  <span className="text-txt-main font-bold">
+                    {(() => {
+                      if (typeof window === "undefined") return "0% Uninitiated";
+                      try {
+                        const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                        const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("opt") || k.includes("dynamic") || k.includes("binary"))).length;
+                        const pct = Math.min(100, Math.round((solved / 5) * 100));
+                        return pct > 0 ? `${pct}% ${pct >= 80 ? "Mastered" : "Intermediate"}` : "0% Uninitiated";
+                      } catch { return "0% Uninitiated"; }
+                    })()}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 bg-bg-card border border-border-main/40 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 rounded-full" style={{ width: "60%" }} />
+                  <div 
+                    className="h-full bg-txt-muted rounded-full transition-all duration-500" 
+                    style={{ 
+                      width: `${(() => {
+                        if (typeof window === "undefined") return 0;
+                        try {
+                          const dsaMap = JSON.parse(localStorage.getItem("lyndesk_dsa_progress_cache") || "{}");
+                          const solved = Object.keys(dsaMap).filter(k => dsaMap[k]?.status === "completed" && (k.includes("opt") || k.includes("dynamic") || k.includes("binary"))).length;
+                          return Math.min(100, Math.round((solved / 5) * 100));
+                        } catch { return 0; }
+                      })()}%` 
+                    }} 
+                  />
                 </div>
               </div>
             </div>
