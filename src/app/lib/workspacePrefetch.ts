@@ -47,23 +47,17 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
   if (existing) return existing;
 
   try {
-    const [spaceRes, tasksRes, chatRes, membersRes] = await Promise.allSettled([
+    const [spaceRes, chatRes, membersRes] = await Promise.allSettled([
       supabase
         .from("project_spaces")
         .select("id, project_name, status, github_repo")
         .eq("id", workspaceId)
         .maybeSingle(),
       supabase
-        .from("project_tasks")
-        .select("id, title, status, priority, assigned_to, position, created_at")
-        .eq("project_space_id", workspaceId)
-        .order("position", { ascending: true })
-        .limit(100),
-      supabase
         .from("chat_messages")
-        .select("id, content, sender_name, sender_id, created_at, role, is_system")
+        .select("id, content, created_at, profile_id, profiles(id, full_name, username, avatar_url, college_key, company_key)")
         .eq("project_space_id", workspaceId)
-        .order("created_at", { ascending: false })
+        .order("created_at", { ascending: true })
         .limit(50),
       supabase
         .from("project_members")
@@ -72,16 +66,71 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
     ]);
 
     const spaceData = spaceRes.status === "fulfilled" ? spaceRes.value.data : null;
-    const tasksData = tasksRes.status === "fulfilled" ? (tasksRes.value.data || []) : [];
-    const chatData = chatRes.status === "fulfilled" ? (chatRes.value.data || []) : [];
+    const rawChat = chatRes.status === "fulfilled" ? (chatRes.value.data || []) : [];
     const membersData = membersRes.status === "fulfilled" ? (membersRes.value.data || []) : [];
+
+    // Parse chat messages according to schema
+    const formattedChat = rawChat.map((c: any) => {
+      const profile = c.profiles as any;
+      let role = "Developer";
+      if (profile?.college_key) role = "Faculty";
+      else if (profile?.company_key) role = "Recruiter";
+
+      let textContent = c.content || "";
+      let fileUrl = undefined;
+      let fileName = undefined;
+      let fileSizeStr = undefined;
+      let isImage = false;
+
+      if (textContent.startsWith("IMAGE_ATTACHMENT::")) {
+        const parts = textContent.replace("IMAGE_ATTACHMENT::", "").split("::");
+        fileUrl = parts[0];
+        fileName = parts[1] || "Uploaded Image";
+        fileSizeStr = parts[2] || "0 KB";
+        isImage = true;
+        textContent = "Shared an image attachment";
+      } else if (textContent.startsWith("FILE_ATTACHMENT::")) {
+        const parts = textContent.replace("FILE_ATTACHMENT::", "").split("::");
+        fileUrl = parts[0];
+        fileName = parts[1] || "Uploaded File";
+        fileSizeStr = parts[2] || "0 KB";
+        isImage = false;
+        textContent = "Shared a file attachment";
+      }
+
+      return {
+        id: c.id,
+        sender_name: profile?.full_name || profile?.username || "Collaborator",
+        sender_role: role,
+        sender_id: c.profile_id,
+        content: textContent,
+        file_url: fileUrl,
+        file_name: fileName,
+        file_size_str: fileSizeStr,
+        is_image: isImage,
+        created_at: c.created_at,
+        isSystem: false
+      };
+    });
+
+    // Recover cached tasks from persistent storage
+    let tasksData: any[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const rawTasks = localStorage.getItem(`ldk_workspace_tasks_${workspaceId}`);
+        if (rawTasks) {
+          const parsed = JSON.parse(rawTasks);
+          if (Array.isArray(parsed)) tasksData = parsed;
+        }
+      } catch {}
+    }
 
     const snapshot: WorkspaceSnapshot = {
       workspaceId,
       projectName: spaceData?.project_name || "Workspace",
       status: spaceData?.status || "development",
       tasks: tasksData,
-      chatMessages: chatData,
+      chatMessages: formattedChat,
       members: membersData,
       fetchedAt: Date.now()
     };
