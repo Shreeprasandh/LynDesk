@@ -630,6 +630,43 @@ const POPULAR_LOCATIONS = [
             console.error("Error parsing user notifications", e);
           }
         }
+
+        // Urgent Workspace & Round Deadline Warnings (Today or Tomorrow)
+        try {
+          const events = await fetchWallCalendarEvents(user.id);
+          const tomorrow = new Date(Date.now() + 86400000);
+          const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+          events.forEach((evt) => {
+            if (!evt || !evt.date) return;
+            const isToday = evt.date === todayStr;
+            const isTomorrow = evt.date === tomorrowStr;
+
+            if (isToday || isTomorrow) {
+              const alertKey = `ldk_deadline_alert_${user.id}_${todayStr}_${evt.id}`;
+              const alreadyFired = localStorage.getItem(alertKey);
+
+              if (!alreadyFired) {
+                localStorage.setItem(alertKey, "true");
+                const newDeadlineNotif: NotificationItem = {
+                  id: `notif_deadline_${evt.id}_${todayStr}`,
+                  type: "deadline",
+                  category: "alerts",
+                  title: isToday ? `⚠️ Deadline Today: ${evt.title}` : `⏳ Deadline Tomorrow: ${evt.title}`,
+                  message: isToday
+                    ? `The scheduled milestone for "${evt.title}" is due today (${evt.date}). Ensure your project updates are in.`
+                    : `The scheduled milestone for "${evt.title}" is due tomorrow (${evt.date}). Finalize your deliverables.`,
+                  time: "Just now",
+                  read: false,
+                  actionUrl: evt.link || "/event-desk",
+                  actionLabel: "View Desk",
+                };
+                userLocalNotifs.unshift(newDeadlineNotif);
+                localStorage.setItem(`ldk_user_notifications_${user.id}`, JSON.stringify(userLocalNotifs));
+              }
+            }
+          });
+        } catch {}
       }
 
       // Fetch server notifications via same-origin route handler
@@ -1170,22 +1207,15 @@ const POPULAR_LOCATIONS = [
               {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
             </button>
 
-            {/* WallCalendar Launcher Button (Placed between Theme Selector and Notification Bell!) */}
+            {/* WallCalendar Launcher Button */}
             {user && (
               <button
                 onClick={() => setIsCalendarOpen(true)}
-                className={`p-2 rounded-full transition-all duration-300 focus:outline-none relative cursor-pointer ${
-                  hasTodayEvents
-                    ? "border border-accent-main/60 text-accent-main shadow-[0_0_8px_rgba(234,179,8,0.2)] hover:bg-bg-card"
-                    : "border border-border-main/80 hover:bg-bg-card text-txt-main"
-                }`}
+                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
                 aria-label="Open WallCalendar"
-                title={hasTodayEvents ? "WallCalendar — Events Scheduled Today!" : "WallCalendar"}
+                title="WallCalendar"
               >
                 <CalendarIcon size={14} />
-                {hasTodayEvents && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-accent-main rounded-full animate-ping" />
-                )}
               </button>
             )}
 
@@ -1500,7 +1530,7 @@ const POPULAR_LOCATIONS = [
                 clearAllSuggestions();
               }
             }}
-            className="bg-bg-surface border border-border-main max-w-lg w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-in fade-in zoom-in-95 duration-250 ease-out"
+            className="bg-bg-surface border border-border-main max-w-4xl w-full p-6 md:p-8 rounded-md flex flex-col gap-6 shadow-2xl animate-in fade-in zoom-in-95 duration-250 ease-out"
           >
             
             <div className="flex flex-col gap-1 border-b border-border-main/40 pb-4">
@@ -1515,264 +1545,202 @@ const POPULAR_LOCATIONS = [
               </div>
             )}
 
-            <form onSubmit={handleSubmitOnboarding} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmitOnboarding} className="flex flex-col gap-5">
               
-              {/* Primary Identity Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Full Legal Name *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={oFullName}
-                    onChange={(e) => setOFullName(e.target.value)}
-                    placeholder="Mira Sen"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-light"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Username handle *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={oUsername}
-                    onChange={(e) => setOUsername(e.target.value)}
-                    placeholder="mirasen"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Compulsory Dual Password Fields with Security Rules */}
-              {(() => {
-                const rules = validatePassword(oPassword, oConfirmPassword);
-                return (
-                  <div className="flex flex-col gap-3 border border-border-main/70 bg-bg-base/50 p-3.5 rounded-sm">
-                    <div className="flex justify-between items-center border-b border-border-main/40 pb-2">
-                      <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Set LynDesk Security Password *</label>
-                      <span className="text-[9px] font-mono text-txt-muted">Enables login via Email Address or Username</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-txt-sub font-mono uppercase">Create Password *</label>
-                        <input 
-                          type="password" 
-                          required
-                          value={oPassword}
-                          onChange={(e) => setOPassword(e.target.value)}
-                          placeholder="Min 8 chars, A-Z, 0-9, special..."
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[9px] text-txt-sub font-mono uppercase">Confirm Password *</label>
-                        <input 
-                          type="password" 
-                          required
-                          value={oConfirmPassword}
-                          onChange={(e) => setOConfirmPassword(e.target.value)}
-                          placeholder="Re-enter password..."
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Live Password Rules Checklist */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1 text-[9.5px] font-mono">
-                      <span className={rules.hasMinLength ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.hasMinLength ? "✓" : "○"} 8+ Characters
-                      </span>
-                      <span className={rules.hasUppercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.hasUppercase ? "✓" : "○"} Uppercase (A-Z)
-                      </span>
-                      <span className={rules.hasLowercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.hasLowercase ? "✓" : "○"} Lowercase (a-z)
-                      </span>
-                      <span className={rules.hasNumber ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.hasNumber ? "✓" : "○"} Number (0-9)
-                      </span>
-                      <span className={rules.hasSpecialChar ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.hasSpecialChar ? "✓" : "○"} Special Char (!@#$)
-                      </span>
-                      <span className={rules.passwordsMatch && oConfirmPassword ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
-                        {rules.passwordsMatch && oConfirmPassword ? "✓ Passwords Match" : "○ Match Passwords"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* General Context Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Date of Birth *</label>
-                  <CustomDatePicker
-                    value={oDob}
-                    onChange={setODob}
-                    placeholder="DD / MM / YYYY"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1 relative">
-                  <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">City, State, Country *</label>
-                  <input 
-                    type="text" 
-                    required
-                    value={oLocation}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setOLocation(val);
-                      clearAllSuggestions();
-                      if (!val.trim()) {
-                        setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
-                      } else {
-                        setOLocationSuggestions(
-                          POPULAR_LOCATIONS.filter(loc =>
-                            loc.toLowerCase().includes(val.toLowerCase())
-                          )
-                        );
-                      }
-                    }}
-                    onFocus={() => {
-                      clearAllSuggestions();
-                      if (!oLocation.trim()) {
-                        setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
-                      } else {
-                        setOLocationSuggestions(
-                          POPULAR_LOCATIONS.filter(loc =>
-                            loc.toLowerCase().includes(oLocation.toLowerCase())
-                          )
-                        );
-                      }
-                    }}
-                    placeholder="Chennai, Tamil Nadu, India"
-                    className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
-                  />
-                  {oLocationSuggestions.length > 0 && (
-                    <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
-                      {oLocationSuggestions.map((loc) => (
-                        <li 
-                          key={loc} 
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setOLocation(loc);
-                            clearAllSuggestions();
-                          }}
-                          className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
-                        >
-                          {loc}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Role Selection */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Your Professional Role *</label>
-                <select
-                  value={oRole}
-                  onChange={(e) => setORole(e.target.value as "student" | "employee" | "solo")}
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main cursor-pointer"
-                >
-                  <option value="student">Student / Academic</option>
-                  <option value="employee">Industry Professional / Employee</option>
-                  <option value="solo">Solo Independent Builder</option>
-                </select>
-              </div>
-
-              {/* Dynamic Context based on Role */}
-              {oRole === "student" && (
-                <div className="border border-border-main/60 p-4 rounded bg-bg-base/30 flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials</span>
-                  
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-[10px] text-txt-sub">University Name *</label>
+              {/* Balanced 2-Column Responsive Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                
+                {/* LEFT COLUMN: PRIMARY IDENTITY & PASSWORD */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Full Legal Name *</label>
                     <input 
-                      type="text"
+                      type="text" 
                       required
-                      value={oCollege}
+                      value={oFullName}
+                      onChange={(e) => setOFullName(e.target.value)}
+                      placeholder="mithun Surya06"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-light"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Username handle *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={oUsername}
+                      onChange={(e) => setOUsername(e.target.value)}
+                      placeholder="mithunsurya61"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                    />
+                  </div>
+
+                  {/* Compulsory Dual Password Fields with Security Rules */}
+                  {(() => {
+                    const rules = validatePassword(oPassword, oConfirmPassword);
+                    return (
+                      <div className="flex flex-col gap-3 border border-border-main/70 bg-bg-base/50 p-3.5 rounded-sm">
+                        <div className="flex justify-between items-center border-b border-border-main/40 pb-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Set LynDesk Security Password *</label>
+                          <span className="text-[8.5px] font-mono text-txt-muted">Enables login via Email or Username</span>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] text-txt-sub font-mono uppercase">Create Password *</label>
+                            <input 
+                              type="password" 
+                              required
+                              value={oPassword}
+                              onChange={(e) => setOPassword(e.target.value)}
+                              placeholder="Min 8 chars, A-Z, 0-9, special..."
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[9px] text-txt-sub font-mono uppercase">Confirm Password *</label>
+                            <input 
+                              type="password" 
+                              required
+                              value={oConfirmPassword}
+                              onChange={(e) => setOConfirmPassword(e.target.value)}
+                              placeholder="Re-enter password..."
+                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Live Password Rules Checklist */}
+                        <div className="grid grid-cols-2 gap-1 pt-1 text-[9px] font-mono">
+                          <span className={rules.hasMinLength ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.hasMinLength ? "✓" : "○"} 8+ Characters
+                          </span>
+                          <span className={rules.hasUppercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.hasUppercase ? "✓" : "○"} Uppercase (A-Z)
+                          </span>
+                          <span className={rules.hasLowercase ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.hasLowercase ? "✓" : "○"} Lowercase (a-z)
+                          </span>
+                          <span className={rules.hasNumber ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.hasNumber ? "✓" : "○"} Number (0-9)
+                          </span>
+                          <span className={rules.hasSpecialChar ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.hasSpecialChar ? "✓" : "○"} Special Char (!@#$)
+                          </span>
+                          <span className={rules.passwordsMatch && oConfirmPassword ? "text-emerald-400 font-semibold" : "text-txt-muted"}>
+                            {rules.passwordsMatch && oConfirmPassword ? "✓ Passwords Match" : "○ Match Passwords"}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* RIGHT COLUMN: LOCATION & ACADEMIC CREDENTIALS */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">Date of Birth *</label>
+                    <CustomDatePicker
+                      value={oDob}
+                      onChange={setODob}
+                      placeholder="DD / MM / YYYY"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1 relative">
+                    <label className="text-[10px] text-txt-sub font-semibold uppercase tracking-wider">City, State, Country *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={oLocation}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setOCollege(val);
+                        setOLocation(val);
                         clearAllSuggestions();
-                        const match = getSpellingSuggestion(val);
-                        setOCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
-                        setOCollegeSuggestions(getAutocompleteSuggestions(val, "college"));
+                        if (!val.trim()) {
+                          setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
+                        } else {
+                          setOLocationSuggestions(
+                            POPULAR_LOCATIONS.filter(loc =>
+                              loc.toLowerCase().includes(val.toLowerCase())
+                            )
+                          );
+                        }
                       }}
                       onFocus={() => {
                         clearAllSuggestions();
-                        if (oCollege.trim()) {
-                          setOCollegeSuggestions(getAutocompleteSuggestions(oCollege, "college"));
+                        if (!oLocation.trim()) {
+                          setOLocationSuggestions(POPULAR_LOCATIONS.slice(0, 10));
+                        } else {
+                          setOLocationSuggestions(
+                            POPULAR_LOCATIONS.filter(loc =>
+                              loc.toLowerCase().includes(oLocation.toLowerCase())
+                            )
+                          );
                         }
                       }}
-                      placeholder="Massachusetts Institute of Technology (MIT)"
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                      placeholder="Chennai, Tamil Nadu, India"
+                      className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main font-light"
                     />
-                    {oCollegeSuggestions.length > 0 && (
+                    {oLocationSuggestions.length > 0 && (
                       <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
-                        {oCollegeSuggestions.map((s) => (
+                        {oLocationSuggestions.map((loc) => (
                           <li 
-                            key={s} 
+                            key={loc} 
                             onMouseDown={(e) => {
                               e.preventDefault();
-                              setOCollege(s);
+                              setOLocation(loc);
                               clearAllSuggestions();
-                              setOCollegeSuggestion(null);
                             }}
                             className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
                           >
-                            {s}
+                            {loc}
                           </li>
                         ))}
                       </ul>
                     )}
-                    {oCollegeSuggestion && oCollegeSuggestions.length === 0 && (
-                      <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
-                        Did you mean: <strong className="underline cursor-pointer" onClick={() => { setOCollege(oCollegeSuggestion); setOCollegeSuggestion(null); }}>{oCollegeSuggestion}</strong>?
-                      </span>
-                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Academic Credentials Box */}
+                  <div className="border border-border-main/70 p-3.5 rounded-sm bg-bg-base/50 flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credentials</span>
+                    
                     <div className="flex flex-col gap-1 relative">
-                      <label className="text-[10px] text-txt-sub">Department *</label>
+                      <label className="text-[10px] text-txt-sub">University Name *</label>
                       <input 
                         type="text"
                         required
-                        value={oDepartment}
+                        value={oCollege}
                         onChange={(e) => {
                           const val = e.target.value;
-                          setODepartment(val);
+                          setOCollege(val);
                           clearAllSuggestions();
                           const match = getSpellingSuggestion(val);
-                          setODeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
-                          setODeptSuggestions(getAutocompleteSuggestions(val, "department"));
+                          setOCollegeSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                          setOCollegeSuggestions(getAutocompleteSuggestions(val, "college"));
                         }}
                         onFocus={() => {
                           clearAllSuggestions();
-                          if (oDepartment.trim()) {
-                            setODeptSuggestions(getAutocompleteSuggestions(oDepartment, "department"));
+                          if (oCollege.trim()) {
+                            setOCollegeSuggestions(getAutocompleteSuggestions(oCollege, "college"));
                           }
                         }}
-                        placeholder="Computer Science"
+                        placeholder="Massachusetts Institute of Technology (MIT)"
                         className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
                       />
-                      {oDeptSuggestions.length > 0 && (
+                      {oCollegeSuggestions.length > 0 && (
                         <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
-                          {oDeptSuggestions.map((s) => (
+                          {oCollegeSuggestions.map((s) => (
                             <li 
                               key={s} 
                               onMouseDown={(e) => {
                                 e.preventDefault();
-                                setODepartment(s);
+                                setOCollege(s);
                                 clearAllSuggestions();
-                                setODeptSuggestion(null);
+                                setOCollegeSuggestion(null);
                               }}
                               className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
                             >
@@ -1781,85 +1749,71 @@ const POPULAR_LOCATIONS = [
                           ))}
                         </ul>
                       )}
-                      {oDeptSuggestion && oDeptSuggestions.length === 0 && (
+                      {oCollegeSuggestion && oCollegeSuggestions.length === 0 && (
                         <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
-                          Did you mean: <strong className="underline cursor-pointer" onClick={() => { setODepartment(oDeptSuggestion); setODeptSuggestion(null); }}>{oDeptSuggestion}</strong>?
+                          Did you mean: <strong className="underline cursor-pointer" onClick={() => { setOCollege(oCollegeSuggestion); setOCollegeSuggestion(null); }}>{oCollegeSuggestion}</strong>?
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub">Grad Year *</label>
-                      <input 
-                        type="text"
-                        required
-                        value={oGradYear}
-                        onChange={(e) => setOGradYear(e.target.value)}
-                        placeholder="2027"
-                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {oRole === "employee" && (
-                <div className="border border-border-main/60 p-4 rounded bg-bg-base/30 flex flex-col gap-3">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Employment Credentials</span>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1 relative">
-                      <label className="text-[10px] text-txt-sub">Company *</label>
-                      <input 
-                        type="text"
-                        required
-                        value={oCompany}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setOCompany(val);
-                          clearAllSuggestions();
-                          setOCompanySuggestions(getAutocompleteSuggestions(val, "company"));
-                        }}
-                        onFocus={() => {
-                          clearAllSuggestions();
-                          if (oCompany.trim()) {
-                            setOCompanySuggestions(getAutocompleteSuggestions(oCompany, "company"));
-                          }
-                        }}
-                        placeholder="Google Inc."
-                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
-                      />
-                      {oCompanySuggestions.length > 0 && (
-                        <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
-                          {oCompanySuggestions.map((s) => (
-                            <li 
-                              key={s} 
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setOCompany(s);
-                                clearAllSuggestions();
-                              }}
-                              className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
-                            >
-                              {s}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] text-txt-sub">Job Title / Designation *</label>
-                      <input 
-                        type="text"
-                        required
-                        value={oDesignation}
-                        onChange={(e) => setODesignation(e.target.value)}
-                        placeholder="Senior Software Engineer"
-                        className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
-                      />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="flex flex-col gap-1 relative">
+                        <label className="text-[10px] text-txt-sub">Department *</label>
+                        <input 
+                          type="text"
+                          required
+                          value={oDepartment}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setODepartment(val);
+                            clearAllSuggestions();
+                            const match = getSpellingSuggestion(val);
+                            setODeptSuggestion(match && match.toLowerCase() !== val.toLowerCase() ? match : null);
+                            setODeptSuggestions(getAutocompleteSuggestions(val, "department"));
+                          }}
+                          onFocus={() => {
+                            clearAllSuggestions();
+                            if (oDepartment.trim()) {
+                              setODeptSuggestions(getAutocompleteSuggestions(oDepartment, "department"));
+                            }
+                          }}
+                          placeholder="Computer Science"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                        />
+                        {oDeptSuggestions.length > 0 && (
+                          <ul className="absolute z-50 w-full bg-bg-surface border border-border-main/80 rounded-sm shadow-xl top-full left-0 mt-1 py-1 max-h-40 overflow-y-auto text-xs font-light">
+                            {oDeptSuggestions.map((s) => (
+                              <li 
+                                key={s} 
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setODepartment(s);
+                                  clearAllSuggestions();
+                                  setODeptSuggestion(null);
+                                }}
+                                className="px-3 py-1.5 hover:bg-bg-card hover:text-txt-main cursor-pointer text-txt-sub transition-colors"
+                              >
+                                {s}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-txt-sub">Grad Year *</label>
+                        <input 
+                          type="text"
+                          required
+                          value={oGradYear}
+                          onChange={(e) => setOGradYear(e.target.value)}
+                          placeholder="2027"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Expandable Optional Details */}
               <div className="flex flex-col gap-2">

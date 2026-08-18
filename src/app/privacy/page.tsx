@@ -67,48 +67,73 @@ export default function PrivacyPolicy() {
 
           <div className="flex flex-col gap-6 text-sm text-txt-sub font-light leading-relaxed">
             <p>
-              At LynDesk, we believe technical accomplishment should be documented transparently and protected securely. 
-              This Policy details how we collect, store, and utilize your information across the LynDesk Campus network.
+              At LynDesk (&quot;Link Your Next Desk&quot;), we believe technical accomplishment should be documented transparently and protected securely. 
+              This Policy details how we collect, store, safeguard, and utilize your information across the LynDesk Campus network and workspace ecosystem.
             </p>
 
             <div className="flex flex-col gap-2">
               <h2 className="font-display text-lg font-semibold text-txt-main">1. Scope of Data Collection</h2>
               <p>
-                We collect personal information required to establish your technical dashboard and university connection:
+                We collect personal information strictly necessary to establish your student dashboard, verified portfolio, and university connection:
               </p>
               <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
-                <li><strong>Authentication Data</strong>: Full name, email address, and OAuth authentication tokens (from Google, GitHub, and Discord).</li>
-                <li><strong>Academic Portfolios</strong>: Project names, registration deadlines, co-worker associations, slide decks, and project reports.</li>
-                <li><strong>Integration Metadata</strong>: Public GitHub repository URLs, commit metrics, and chat communications inside project spaces.</li>
+                <li><strong>Identity & Authentication Data</strong>: Full legal name, unique username handle, date of birth, geographic location, primary email address, and OAuth authentication tokens from linked third-party providers (Google, GitHub, Discord).</li>
+                <li><strong>Academic Credentials</strong>: University or college affiliation, academic department, intended graduation year, and extracurricular verification points.</li>
+                <li><strong>Workspace Deliverables</strong>: Project tasks, Kanban milestone states, meeting agendas, slide decks, markdown documentation, whiteboard notes, and team chat transcripts within authorized project spaces.</li>
+                <li><strong>Developer Metrics</strong>: Public GitHub repository URLs, commit histories, LeetCode performance statistics, and problem-solving metrics aggregated via your integrated profiles.</li>
               </ul>
             </div>
 
             <div className="flex flex-col gap-2">
-              <h2 className="font-display text-lg font-semibold text-txt-main">2. Academic Record Protection (FERPA)</h2>
+              <h2 className="font-display text-lg font-semibold text-txt-main">2. Academic Record Protection (FERPA & Global Compliance)</h2>
               <p>
-                For university-mandated credit claims, LynDesk operates in compliance with the Family Educational Rights and Privacy Act (FERPA) regulations protecting student education records:
+                For university-mandated credit claims and departmental oversight, LynDesk operates in strict compliance with the Family Educational Rights and Privacy Act (FERPA) regulations protecting student education records:
               </p>
               <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
-                <li>Project accomplishment logs and credit requests are shared strictly with verified department deans and faculty advisors.</li>
+                <li>Project accomplishment logs and credit requests are shared strictly with authorized, verified department deans and faculty advisors.</li>
                 <li>Students retain full ownership of their extracurricular histories and can opt to make their profiles public or private at any time.</li>
+                <li>No educational records or student performance metrics are indexed by commercial search engines without explicit user consent.</li>
               </ul>
             </div>
 
             <div className="flex flex-col gap-2">
-              <h2 className="font-display text-lg font-semibold text-txt-main">3. Data Sharing and Third-Party API Integrations</h2>
+              <h2 className="font-display text-lg font-semibold text-txt-main">3. Multi-Account OAuth & Credential Linking</h2>
               <p>
-                We do not sell student profile metadata to third-party advertisers or recruitment brokers. Information is shared strictly in these cases:
+                LynDesk provides unified authentication allowing students to link multiple identity providers (Google, GitHub, Discord) to a single profile:
               </p>
               <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
-                <li><strong>Within Project Teams</strong>: Shared chat logs, slide decks, and codebases are visible to co-workers you invite.</li>
-                <li><strong>To Institutional Admins</strong>: Submitting credit requests routes verified files to your university&apos;s grading console.</li>
+                <li>OAuth tokens are used solely for identity verification and authorized metadata retrieval (e.g. GitHub repos, LeetCode stats). We never request or store your private repository passwords or third-party credentials.</li>
+                <li>You can link or unlink OAuth accounts at any time from your Profile settings, subject to the safety rule that at least one authentication method must remain active to prevent account lockout.</li>
               </ul>
             </div>
 
             <div className="flex flex-col gap-2">
-              <h2 className="font-display text-lg font-semibold text-txt-main">4. Security Standards</h2>
+              <h2 className="font-display text-lg font-semibold text-txt-main">4. WebRTC Real-Time Communications & Voice/Video Privacy</h2>
               <p>
-                All data transfers are encrypted in transit via SSL/TLS, and authentication sessions are guarded by Supabase Row Level Security (RLS) policies. Databases are hosted in secure, isolated ap-northeast cloud centers.
+                Our collaborative workspace voice and video lounges operate via WebRTC peer-to-peer protocols:
+              </p>
+              <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
+                <li>Audio and video streams are transmitted directly between workspace members using End-to-End Encryption (E2EE) and are never recorded, tapped, or stored on LynDesk servers.</li>
+                <li>Signaling metadata is ephemeral and deleted immediately upon channel disconnection.</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h2 className="font-display text-lg font-semibold text-txt-main">5. AI Curriculum Processing & Data Privacy</h2>
+              <p>
+                When utilizing the Study Desk AI path generator or syllabus synthesizer:
+              </p>
+              <ul className="list-disc list-inside pl-2 flex flex-col gap-1 text-xs">
+                <li>Uploaded PDF course syllabi and topic prompts are processed in transient memory to generate pedagogical flashcards and quizzes.</li>
+                <li>User data is never used to train generalized foundation models without your explicit opt-in.</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h2 className="font-display text-lg font-semibold text-txt-main">6. Security Infrastructure & Zero-Sale Guarantee</h2>
+              <p>
+                All data transfers are encrypted in transit via TLS 1.3, and database records are isolated using strict PostgreSQL Row Level Security (RLS) policies. 
+                <strong>We enforce a zero-sale policy:</strong> LynDesk never sells student profile information, contact data, or project codebases to third-party advertisers or commercial data brokers.
               </p>
             </div>
           </div>

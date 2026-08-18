@@ -38,6 +38,7 @@ function saveLocalEvents(events: WallEvent[], userId?: string) {
 
 /**
  * Fetch all WallCalendar events for a user (combining DB, auto-sync, and localStorage)
+ * Automatically filters out past/expired events (< today)
  */
 export async function fetchWallCalendarEvents(userId?: string): Promise<WallEvent[]> {
   const localEvents = getLocalEvents(userId);
@@ -72,13 +73,30 @@ export async function fetchWallCalendarEvents(userId?: string): Promise<WallEven
   localEvents.forEach((e) => map.set(e.id, e));
   dbEvents.forEach((e) => map.set(e.id, e));
 
-  return Array.from(map.values());
+  const all = Array.from(map.values());
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Auto-prune and return only active and upcoming events (>= today)
+  const activeEvents = all.filter((e) => e.date && e.date >= todayStr);
+
+  // Sync back cleaned active events to local storage if stale past items were pruned
+  if (activeEvents.length !== localEvents.length && typeof window !== "undefined") {
+    saveLocalEvents(activeEvents, userId);
+  }
+
+  return activeEvents;
 }
 
 /**
  * Add a new event to WallCalendar (Supabase DB + Local Storage)
  */
-export async function addWallCalendarEvent(evt: Omit<WallEvent, "id"> & { id?: string }, userId?: string): Promise<WallEvent> {
+export async function addWallCalendarEvent(evt: Omit<WallEvent, "id"> & { id?: string }, userId?: string): Promise<WallEvent | null> {
+  const todayStr = new Date().toISOString().split("T")[0];
+  if (evt.date && evt.date < todayStr) {
+    // Do not create past schedules
+    return null;
+  }
+
   const eventId = evt.id || `evt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
   const fullEvt: WallEvent = { ...evt, id: eventId, user_id: userId };
 
@@ -153,25 +171,100 @@ export async function syncStudyPathWithCalendar(action: "create" | "delete", pat
 }
 
 /**
- * Automatically sync Event Desk registration / unregistration with WallCalendar
+ * Automatically sync Event Desk registration / unregistration & multi-round milestones with WallCalendar
  */
-export async function syncEventDeskWithCalendar(action: "join" | "leave", event: { id: string; title: string; date?: string; category?: string }, userId?: string) {
+export async function syncEventDeskWithCalendar(
+  action: "join" | "leave", 
+  event: { 
+    id: string; 
+    title: string; 
+    date?: string; 
+    category?: string;
+    stages?: Array<{ name: string; date?: string; target_date?: string; time?: string }>;
+  }, 
+  userId?: string
+) {
   if (action === "leave") {
     await deleteWallCalendarEvent(event.id, userId);
   } else if (action === "join") {
-    const dateStr = event.date || new Date().toISOString().split("T")[0];
-    await addWallCalendarEvent(
-      {
-        title: `[Event Desk] ${event.title}`,
-        date: dateStr,
-        time: "10:00",
-        category: event.category === "contest" ? "contest" : "deadline",
-        description: "Registered contest/hackathon in Event Desk.",
-        link: "/event-desk",
-        source_type: "event_desk",
-        source_id: event.id,
-      },
-      userId
-    );
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // If event has multiple individual rounds/stages, sync each one as a distinct schedule item
+    if (event.stages && Array.isArray(event.stages) && event.stages.length > 0) {
+      for (const [idx, stage] of event.stages.entries()) {
+        const stageDate = stage.date || stage.target_date;
+        if (stageDate && stageDate >= todayStr) {
+          await addWallCalendarEvent(
+            {
+              id: `${event.id}_stage_${idx + 1}`,
+              title: `[Event Desk] ${event.title} - ${stage.name}`,
+              date: stageDate,
+              time: stage.time || "10:00",
+              category: "deadline",
+              description: `Round milestone for ${event.title}: ${stage.name}`,
+              link: "/event-desk",
+              source_type: "event_desk",
+              source_id: event.id,
+            },
+            userId
+          );
+        }
+      }
+    } else {
+      const dateStr = event.date || todayStr;
+      if (dateStr >= todayStr) {
+        await addWallCalendarEvent(
+          {
+            title: `[Event Desk] ${event.title}`,
+            date: dateStr,
+            time: "10:00",
+            category: event.category === "contest" ? "contest" : "deadline",
+            description: "Registered contest/hackathon in Event Desk.",
+            link: "/event-desk",
+            source_type: "event_desk",
+            source_id: event.id,
+          },
+          userId
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Sync workspace stages/rounds deeply to WallCalendar
+ */
+export async function syncWorkspaceRoundsWithCalendar(
+  action: "sync" | "remove",
+  workspace: {
+    id: string;
+    title: string;
+    stages: Array<{ name: string; date?: string; target_date?: string }>;
+  },
+  userId?: string
+) {
+  if (action === "remove") {
+    await deleteWallCalendarEvent(workspace.id, userId);
+  } else if (action === "sync") {
+    const todayStr = new Date().toISOString().split("T")[0];
+    for (const [idx, stage] of workspace.stages.entries()) {
+      const stageDate = stage.date || stage.target_date;
+      if (stageDate && stageDate >= todayStr) {
+        await addWallCalendarEvent(
+          {
+            id: `ws_${workspace.id}_round_${idx + 1}`,
+            title: `[Workspace] ${workspace.title} - ${stage.name}`,
+            date: stageDate,
+            time: "10:00",
+            category: "deadline",
+            description: `Workspace milestone: ${stage.name}`,
+            link: `/workspace/${workspace.id}`,
+            source_type: "event_desk",
+            source_id: workspace.id,
+          },
+          userId
+        );
+      }
+    }
   }
 }

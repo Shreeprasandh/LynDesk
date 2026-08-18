@@ -2478,20 +2478,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Academic stats card */}
-                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credit Balance</span>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-accent-main text-bg-base flex items-center justify-center">
-                      <Award size={18} className="stroke-[1.5]" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-2xl font-display font-light tracking-tight text-txt-main">{academicCredits} Points</span>
-                      <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Verified Extracurriculars</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Coding & Platform Desk Integrations Panel */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
@@ -2507,6 +2493,20 @@ export default function ProfilePage() {
                   >
                     <Code2 size={12} /> Manage Code Desk
                   </Link>
+                </div>
+
+                {/* Academic stats card */}
+                <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Academic Credit Balance</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-accent-main text-bg-base flex items-center justify-center">
+                      <Award size={18} className="stroke-[1.5]" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-2xl font-display font-light tracking-tight text-txt-main">{academicCredits} Points</span>
+                      <span className="text-[10px] text-txt-muted font-mono uppercase tracking-wider">Verified Extracurriculars</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Institutional Link / Key Enrollment Panel */}

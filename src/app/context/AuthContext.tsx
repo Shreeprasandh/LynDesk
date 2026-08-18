@@ -98,7 +98,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserRole(resolveRole(session.user));
         setLoading(false);
         if (typeof window !== "undefined") {
-          if (window.location.search.includes("code=") || window.location.hash.includes("access_token=")) {
+          const isFirstTime = localStorage.getItem("ldk_first_time_signup");
+          if (isFirstTime === "true") {
+            localStorage.removeItem("ldk_first_time_signup");
+            if (window.location.pathname !== "/profile") {
+              window.location.href = "/profile";
+            }
+          } else if (window.location.search.includes("code=") || window.location.hash.includes("access_token=")) {
             window.history.replaceState(null, "", window.location.pathname);
           }
         }
@@ -323,6 +329,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localStorage.setItem(`ldk_avatar_url_${user.id}`, data.avatar_url);
             }
           }
+        } else {
+          // Auto-initialize profile row in database for newly registered user
+          const defaultFullName = user.user_metadata?.full_name || (user.email ? user.email.split("@")[0] : "Student");
+          const defaultUsername = user.user_metadata?.username || (user.email ? user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_") : `user_${user.id.slice(0, 6)}`);
+          const defaultAvatar = user.user_metadata?.avatar_url || "";
+
+          const newProfileData: UserProfileData = {
+            id: user.id,
+            full_name: defaultFullName,
+            username: defaultUsername,
+            avatar_url: defaultAvatar,
+            academic_credits: 0,
+            department: "Computer Science",
+            college_key: "COLLEGE_SRM",
+            bio: "",
+            skills: "",
+          };
+
+          setUserProfile(newProfileData);
+
+          // Save to database
+          await supabase.from("profiles").upsert({
+            id: user.id,
+            full_name: defaultFullName,
+            username: defaultUsername,
+            avatar_url: defaultAvatar,
+            department: "Computer Science",
+            college_key: "COLLEGE_SRM",
+            academic_credits: 0,
+          });
         }
       } catch {}
     };

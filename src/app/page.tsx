@@ -415,14 +415,28 @@ export default function Home() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
+      if (typeof window !== "undefined") {
+        localStorage.setItem("ldk_first_time_signup", "true");
+      }
+      const rawUser = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: email.split("@")[0],
+            username: rawUser,
+          }
+        }
       });
       if (error) {
         setAuthError(error.message);
       } else {
-        setAuthError("Registration successful. Verification email dispatched to your inbox.");
+        if (data?.session) {
+          window.location.href = "/profile";
+        } else {
+          setAuthError("Registration successful. Verification email dispatched to your inbox.");
+        }
       }
     } catch (err: any) {
       setAuthError(err.message || "Registration failed. Please try again.");
