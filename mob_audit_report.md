@@ -1,13 +1,13 @@
 # 🌑 THE SEVEN SHADOWS: Master Audit Report
 
-**Last Scan**: 18/8/2026, 7:50:37 pm
+**Last Scan**: 19/8/2026, 1:00:09 am
 **Files Inspected**: 139
 **Active Target**: ALL 7 SHADOWS
 
 ### 📊 Master Executive Summary
 | Shadow | Codename | Domain | Findings Count | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **4** | ⚠️ Action Required |
+| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **5** | ⚠️ Action Required |
 | 🛡️ **Beta** | Secret Sentinel | Security & Secret Leaks | **3** | 🚨 Critical Risk |
 | 🎯 **Gamma** | Schema Validator | DB & API Contract Alignment | **0** | ✅ Clean |
 | ♿ **Delta** | A11y Inspector | Accessibility & ARIA Compliance | **0** | ✅ Accessible |
@@ -17,7 +17,7 @@
 
 ---
 
-## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (4)
+## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (5)
 
 ### 1. `src/app/api/user/profile/route.ts:12`
 - **Issue**: Un-awaited Next.js 15/16 route params/searchParams
@@ -32,6 +32,10 @@
 - **Impact**: In Next.js 15+, route params are Promises. Direct access causes runtime crashes.
 
 ### 4. `src/app/auth/callback/route.ts:14`
+- **Issue**: Unhandled async database/fetch operation
+- **Impact**: Network failure or DB error will cause unhandled promise rejection.
+
+### 5. `src/app/context/AuthContext.tsx:353`
 - **Issue**: Unhandled async database/fetch operation
 - **Impact**: Network failure or DB error will cause unhandled promise rejection.
 
