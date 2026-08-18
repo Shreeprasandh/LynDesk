@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 interface SourceFileInput {
   id?: string;
@@ -213,9 +214,10 @@ export async function POST(req: Request) {
       files = [] 
     } = body;
 
+    const geminiApiKey = process.env.GEMINI_API_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
 
-    if (groqApiKey) {
+    if (geminiApiKey || groqApiKey) {
       try {
         let sourceSummary = "";
         files.forEach((f: SourceFileInput, idx: number) => {
@@ -390,27 +392,59 @@ Depth Mode: ${depthMode} (${lessonTargetCount})
 Source text preview from uploaded files:
 ${sourceSummary || "None (Prompt-driven mode)"}`;
 
-        let groqRes: Response;
-        try {
-          groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${groqApiKey.trim()}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              response_format: { type: "json_object" },
-              temperature: 0.4,
-              max_tokens: 8000,
-            }),
-          });
-        } catch (fetchErr) {
-          console.error("Groq study fetch error:", fetchErr);
+        const geminiApiKey = process.env.GEMINI_API_KEY;
+        let jsonText = "";
+
+        if (geminiApiKey) {
+          try {
+            const genAI = new GoogleGenerativeAI(geminiApiKey.trim());
+            const model = genAI.getGenerativeModel({
+              model: "gemini-2.0-flash",
+              generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.35,
+                maxOutputTokens: 8192
+              },
+              systemInstruction: systemPrompt
+            });
+
+            const result = await model.generateContent(userPrompt);
+            jsonText = result.response.text();
+          } catch (geminiErr) {
+            console.warn("Gemini study generation error, falling back to Groq:", geminiErr);
+          }
+        }
+
+        if (!jsonText && groqApiKey) {
+          try {
+            const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${groqApiKey.trim()}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: userPrompt },
+                ],
+                response_format: { type: "json_object" },
+                temperature: 0.4,
+                max_tokens: 8000,
+              }),
+            });
+
+            if (groqRes.ok) {
+              const groqData = await groqRes.json();
+              jsonText = groqData?.choices?.[0]?.message?.content || "";
+            }
+          } catch (fetchErr) {
+            console.error("Groq study fetch error:", fetchErr);
+          }
+        }
+
+        if (!jsonText) {
           return NextResponse.json({
             isMock: true,
             title: pathTitle || "Structured Study Path",
@@ -418,10 +452,7 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
           });
         }
 
-        if (groqRes.ok) {
-          const groqData = await groqRes.json();
-          const jsonText = groqData?.choices?.[0]?.message?.content;
-          const parsed = JSON.parse(jsonText || "{}");
+        const parsed = JSON.parse(jsonText || "{}");
 
           if (parsed.sections && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
             const finalTitle = parsed.extractedTitle || pathTitle || "Structured Study Path";
@@ -481,9 +512,8 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
               sections: processedSections 
             });
           }
-        }
-      } catch (groqErr) {
-        console.warn("Groq AI generation error, using fallback:", groqErr);
+      } catch (aiErr) {
+        console.warn("AI generation error, using fallback:", aiErr);
       }
     }
 

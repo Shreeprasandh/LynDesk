@@ -47,7 +47,7 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
   if (existing) return existing;
 
   try {
-    const [spaceRes, chatRes, membersRes] = await Promise.allSettled([
+    const [spaceRes, chatRes, membersRes, tasksRes] = await Promise.allSettled([
       supabase
         .from("project_spaces")
         .select("id, project_name, status, github_repo")
@@ -62,12 +62,19 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
       supabase
         .from("project_members")
         .select("profile_id, profiles(id, full_name, username, avatar_url, department)")
+        .eq("project_space_id", workspaceId),
+      supabase
+        .from("project_tasks")
+        .select("id, title, status, priority, scope, assigned_to, position, created_at")
         .eq("project_space_id", workspaceId)
+        .order("position", { ascending: true })
+        .limit(100)
     ]);
 
     const spaceData = spaceRes.status === "fulfilled" ? spaceRes.value.data : null;
     const rawChat = chatRes.status === "fulfilled" ? (chatRes.value.data || []) : [];
     const membersData = membersRes.status === "fulfilled" ? (membersRes.value.data || []) : [];
+    const dbTasks = tasksRes.status === "fulfilled" ? (tasksRes.value.data || []) : [];
 
     // Parse chat messages according to schema
     const formattedChat = rawChat.map((c: any) => {
@@ -113,9 +120,20 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
       };
     });
 
-    // Recover cached tasks from persistent storage
+    // Recover cached tasks from DB or persistent storage fallback
     let tasksData: any[] = [];
-    if (typeof window !== "undefined") {
+    if (dbTasks && dbTasks.length > 0) {
+      tasksData = dbTasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        status: t.status || "todo",
+        priority: t.priority || "medium",
+        scope: t.scope || "team",
+        assignedTo: t.assigned_to,
+        position: t.position || 0,
+        createdAt: t.created_at
+      }));
+    } else if (typeof window !== "undefined") {
       try {
         const rawTasks = localStorage.getItem(`ldk_workspace_tasks_${workspaceId}`);
         if (rawTasks) {

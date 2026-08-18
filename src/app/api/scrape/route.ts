@@ -18,17 +18,27 @@ export async function GET(_request: Request) {
           ? json.data
           : [];
       
-      const liveEvents = rawList.map((item: any) => ({
-        id: `unstop_${item.id || item.seo_url}`,
-        title: item.title || item.name,
-        organization: item.organisation?.name || "Unstop Track",
-        portal: "Unstop",
-        deadline: item.end_regn_dt ? new Date(item.end_regn_dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Registration Open",
-        portalUrl: item.seo_url ? `https://unstop.com/${item.seo_url}` : "https://unstop.com/competitions",
-        prizes: item.prizes?.[0]?.cash ? `${item.prizes[0].cash} Prize Pool` : "Certificate & Cash Prizes",
-        status: "Registration Open",
-        category: "Hackathon"
-      }));
+      const nowMs = Date.now();
+      const liveEvents = rawList
+        .filter((item: any) => {
+          if (!item || (!item.title && !item.name)) return false;
+          if (item.end_regn_dt) {
+            const endMs = new Date(item.end_regn_dt).getTime();
+            if (!isNaN(endMs) && endMs < nowMs) return false; // Filter out expired events
+          }
+          return true;
+        })
+        .map((item: any) => ({
+          id: `unstop_${item.id || item.seo_url}`,
+          title: (item.title || item.name || "").trim(),
+          organization: item.organisation?.name || "Global Hackathon Track",
+          portal: "Unstop",
+          deadline: item.end_regn_dt ? new Date(item.end_regn_dt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Registration Open",
+          portalUrl: item.seo_url ? `https://unstop.com/${item.seo_url}` : "https://unstop.com/competitions",
+          prizes: item.prizes?.[0]?.cash ? `${item.prizes[0].cash} Prize Pool` : "Certificate & Cash Prizes",
+          status: "Registration Open",
+          category: "Hackathon"
+        }));
 
       if (liveEvents.length > 0) {
         return NextResponse.json({ events: liveEvents });

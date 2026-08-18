@@ -1426,10 +1426,38 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             setWorkspaceNotes(data.notes);
             if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_notes_${id}`, data.notes);
           }
-          if (Array.isArray(data.tasks) && data.tasks.length > 0) {
-            setTasks(data.tasks);
-            if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
+          
+          // Fetch dedicated project_tasks table
+          try {
+            const { data: dbTaskList } = await supabase
+              .from("project_tasks")
+              .select("id, title, status, priority, scope, assigned_to, position, created_at")
+              .eq("project_space_id", workspaceUuid)
+              .order("position", { ascending: true });
+
+            if (dbTaskList && dbTaskList.length > 0) {
+              const formatted: WorkspaceTask[] = dbTaskList.map(t => ({
+                id: t.id,
+                title: t.title,
+                status: (t.status as any) || "todo",
+                priority: (t.priority as any) || "medium",
+                scope: (t.scope as any) || "team",
+                assignee: t.assigned_to === user?.id ? (user?.user_metadata?.full_name || "You") : "Teammate",
+                created_by: t.assigned_to
+              }));
+              setTasks(formatted);
+              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(formatted));
+            } else if (Array.isArray(data.tasks) && data.tasks.length > 0) {
+              setTasks(data.tasks);
+              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
+            }
+          } catch {
+            if (Array.isArray(data.tasks) && data.tasks.length > 0) {
+              setTasks(data.tasks);
+              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
+            }
           }
+
           if (Array.isArray(data.slot_names) && data.slot_names.length === 4) {
             setSlotNames(data.slot_names);
             if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_slot_names_${id}`, JSON.stringify(data.slot_names));
@@ -3247,6 +3275,22 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         (async () => {
           try {
             await supabase.from("project_spaces").update({ tasks: updated }).eq("id", workspaceUuid);
+            const { data: inserted } = await supabase.from("project_tasks").insert({
+              project_space_id: workspaceUuid,
+              title: newTask.title,
+              status: newTask.status,
+              priority: newTask.priority,
+              scope: newTask.scope,
+              assigned_to: user?.id || null
+            }).select("id").maybeSingle();
+
+            if (inserted?.id) {
+              setTasks(curr => {
+                const refreshed = curr.map(t => t.id === newTask.id ? { ...t, id: inserted.id } : t);
+                localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(refreshed));
+                return refreshed;
+              });
+            }
           } catch {}
         })();
       }
@@ -3297,6 +3341,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         (async () => {
           try {
             await supabase.from("project_spaces").update({ tasks: updatedTasks }).eq("id", workspaceUuid);
+            if (!taskId.startsWith("task_") && !taskId.startsWith("local_")) {
+              await supabase.from("project_tasks").update({ status: newStatus, updated_at: new Date().toISOString() }).eq("id", taskId);
+            }
           } catch {}
         })();
       }
@@ -3329,6 +3376,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         (async () => {
           try {
             await supabase.from("project_spaces").update({ tasks: updatedTasks }).eq("id", workspaceUuid);
+            if (!taskId.startsWith("task_") && !taskId.startsWith("local_")) {
+              await supabase.from("project_tasks").delete().eq("id", taskId);
+            }
           } catch {}
         })();
       }
