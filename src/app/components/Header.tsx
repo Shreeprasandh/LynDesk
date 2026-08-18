@@ -971,12 +971,12 @@ const POPULAR_LOCATIONS = [
     const targetSenderId = targetNotif?.senderId;
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
 
-    if (actionUrl) {
+    if (actionUrl && targetNotif?.type === "invite") {
       try {
         const urlParts = actionUrl.split("?");
         const workspacePath = urlParts[0];
         const workspaceId = workspacePath.split("/").pop();
-        if (workspaceId && workspaceId.length > 0) {
+        if (workspaceId && workspaceId.length > 0 && workspaceId !== "workspace" && workspaceId !== "event-desk") {
           // Register workspace in user-scoped ldk_joined_workspaces
           const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
           const joinedStr = localStorage.getItem(userJoinedKey) || localStorage.getItem("ldk_joined_workspaces");
@@ -996,23 +996,6 @@ const POPULAR_LOCATIONS = [
               localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(cleanedDeleted));
             } catch {}
           }
-
-          // Save workspace card to ldk_events so dashboard renders it immediately
-          const eventsStr = localStorage.getItem("ldk_events");
-          const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
-          if (!eventsList.some(e => e.id === workspaceId)) {
-            eventsList.unshift({
-              id: workspaceId,
-              title: `Shared Workspace (${workspaceId.substring(0, 8)})`,
-              deadline: "Ongoing",
-              location: "online",
-              level: "global",
-              url: `/workspace/${workspaceId}`,
-              status: "development",
-              stages: ["Ideation", "Development", "Final Submission"]
-            });
-            localStorage.setItem("ldk_events", JSON.stringify(eventsList));
-          }
         }
       } catch (e) {
         console.error("Error registering joined workspace on accept: ", e);
@@ -1020,7 +1003,7 @@ const POPULAR_LOCATIONS = [
     }
 
     // Send outcome notification back to the inviter
-    if (targetSenderId) {
+    if (targetSenderId && targetNotif?.type === "invite") {
       fetch("/api/notifications/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1053,8 +1036,14 @@ const POPULAR_LOCATIONS = [
     window.dispatchEvent(new Event("ldk_notifications_update"));
 
     if (actionUrl) {
-      router.push(actionUrl);
       setIsOpen(false);
+      if (typeof window !== "undefined") {
+        if (window.location.pathname === actionUrl) {
+          window.location.reload();
+        } else {
+          router.push(actionUrl);
+        }
+      }
     }
   };
 
@@ -1484,14 +1473,20 @@ const POPULAR_LOCATIONS = [
                         <div className="flex gap-2 justify-end pt-1">
                           {item.type === "invite" && (
                             <button
-                              onClick={() => handleNotificationReject(item.id, item.actionUrl)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleNotificationReject(item.id, item.actionUrl);
+                              }}
                               className="h-6 px-3 border border-border-main hover:bg-bg-card text-txt-main font-mono text-[8px] tracking-wider uppercase rounded-sm transition-colors cursor-pointer flex items-center gap-1 font-bold"
                             >
                               <X size={8} /> Reject
                             </button>
                           )}
                           <button
-                            onClick={() => handleNotificationAction(item.id, item.actionUrl)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleNotificationAction(item.id, item.actionUrl);
+                            }}
                             className="h-6 px-3 bg-accent-main text-bg-base font-mono text-[8px] tracking-wider uppercase rounded-sm hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1 font-bold"
                           >
                             <Check size={8} /> {item.actionLabel}
