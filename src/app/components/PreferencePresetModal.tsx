@@ -151,10 +151,24 @@ export default function PreferencePresetModal({ isOpen, onClose }: PreferencePre
     onClose();
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[200] overflow-hidden font-sans text-left">
+        <div 
+          className="fixed inset-0 z-[200] overflow-hidden font-sans text-left"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Preference Presets"
+        >
           {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}

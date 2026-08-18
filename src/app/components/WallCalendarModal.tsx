@@ -244,10 +244,24 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
     return map;
   }, [filteredEvents]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden font-sans bg-black/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/70 backdrop-blur-md animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Wall Calendar"
+    >
       {/* Backdrop click to close */}
       <div className="fixed inset-0" onClick={onClose} />
 
