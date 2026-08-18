@@ -1,122 +1,145 @@
-# 🌌 LynDesk — Link Your Next Desk
+<div align="center">
 
-> **Link Your Next Desk**: The unified academic engine, collaborative workspace platform, and AI-powered engineering portfolio hub for student developers, faculty coordinators, and tech recruiters.
+# 🌌 LynDesk
+### *Link Your Next Desk*
 
-LynDesk (**L**ink **Y**our **N**ext **Desk**) bridges student accomplishments in hackathons, daily competitive coding, and coursework directly into verified, recruiter-ready engineering portfolios and academic records.
+**The unified collaborative workspace, competitive coding tracker, and academic engineering engine.**
+
+[![Next.js](https://img.shields.io/badge/Next.js-16.2_(App_Router)-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=flat-square&logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0_Strict-3178C6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL_%7C_Realtime-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com/)
+[![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.0_%7C_1.5_Pro-4285F4?style=flat-square&logo=google)](https://ai.google.dev/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 ---
 
-## 🏛️ The Three Core Desks
+</div>
 
-LynDesk is structured around three dedicated productivity desks tailored for engineering excellence:
+## 📌 Overview
+
+**LynDesk** is an all-in-one engineering workstation designed for student developers, faculty coordinators, and technical recruiters. It bridges hackathon collaboration, daily competitive programming streaks, and coursework into verified, recruiter-ready engineering portfolios and academic records.
+
+---
+
+## 🏛️ Platform Architecture & Desks
 
 ```
-                          ┌───────────────────────────┐
-                          │   🌌 LynDesk Architecture │
-                          └─────────────┬─────────────┘
-                                        │
-         ┌──────────────────────────────┼──────────────────────────────┐
-         ▼                              ▼                              ▼
- 🚀 Event Desk                  💻 Coding Desk                 📚 Study Desk
- (Workspaces & Hackathons)       (Competitive Ratings)          (Adaptive AI Paths)
+                               ┌───────────────────────────┐
+                               │       🌌 LynDesk Hub      │
+                               └─────────────┬─────────────┘
+                                             │
+      ┌──────────────────────────────┬───────┴──────────────────────┬──────────────────────────────┐
+      ▼                              ▼                              ▼                              ▼
+🚀 Event Desk                  💻 Coding Desk                 📚 Study Desk                 🎓 Coordinator Desk
+(Workspaces & WebRTC)          (Ratings & Leetie Sync)        (Adaptive AI Lessons)         (Analytics & Batch CSV)
 ```
 
 ### 1. 🚀 Event Desk (`/event-desk`)
-* **Collaborative Project Workspaces**: Dedicated team spaces for hackathon deliverables, stage management (*Ideation → MVP → Polished Demo*), and active task tracking.
-* **P2P WebRTC Video & Voice Rooms**: Embedded low-latency peer-to-peer audio and video rooms powered by Supabase Realtime signaling.
-* **Live GitHub Commit Ticker**: Synchronized commit feeds polling local Git logs or the GitHub API in real time.
-* **Deliverable Artifact Registry**: Version-controlled pitch decks (PDF/PPTX), hosted demo URLs, and code repository links.
+* **Live Project Workspaces**: Dedicated team rooms for tracking milestones (*Ideation → Prototype Development → QA → Final Submission*).
+* **0ms Predictive Hydration**: Instant workspace loading powered by background pre-fetching and client-side SWR caching.
+* **P2P Audio/Video Rooms**: Ultra-low latency WebRTC voice and video calls with real-time peer status indicators.
+* **Artifact Vault & GitHub Ticker**: Version-controlled deliverable management for pitch decks, live demo URLs, and GitHub commit tracking.
 
-### 2. 💻 Coding Desk (`/coding-desk`)
-* **Multi-Platform Handle Sync**: Automated aggregation across **LeetCode**, **Codeforces**, and **CodeChef**.
-* **Streak & Activity Verification**: Live daily challenge streak tracking with verified problem solve counters.
-* **Competitive Index**: Standardized scoring algorithm evaluating difficulty distribution (Easy, Medium, Hard) and rating brackets.
+### 2. 💻 Coding Desk (`/coding-deck`)
+* **Multi-Platform Metric Aggregation**: Synchronized analytics across **LeetCode**, **Codeforces**, **CodeChef**, and **Unstop**.
+* **Daily Streak & Rating Engine**: Activity heatmaps, solve distribution (*Easy, Medium, Hard*), and standardized global percentile calculations.
+* **Leetie Extension (`/public/leetie-v1.0.0.zip`)**: Bundled Chrome extension that automatically archives accepted LeetCode solutions directly to your personal GitHub repository.
 
 ### 3. 📚 Study Desk (`/study-desk`)
-* **AI Path Studio**: Drag-and-drop file uploader for lecture notes, PDFs, DOCX, and spreadsheets that automatically generates structured Duolingo-style study paths.
-* **Interactive Session Player**: Full-screen lesson overlay featuring concept teaching cards, multiple-choice questions, short-answer items, 5-heart life system, and celebration confetti.
-* **Depth & Pace Controls**: Generate targeted paths tuned for **Sprint (5 lessons)**, **Standard (15–20 lessons)**, or **Deep Dive (25–50 lessons)**.
-* **Error Bank & Adaptive Review**: Automated mistake queue for targeted re-testing and knowledge retention.
-* **30-Day Activity Grid & Leagues**: Visual heatmap tracking daily study habits and rank progression (*Bronze, Silver, Gold, Diamond*).
+* **AI Path Studio**: Upload lecture slides, DOCX files, or PDFs to automatically synthesize structured, interactive study paths.
+* **Gamified Session Player**: Step-by-step concept flashcards, interactive multi-choice quizzes, 5-heart life system, and active recall mistake queues.
+* **Adaptive Depth Controls**: Select study intensity from **Sprint** (5 lessons), **Standard** (15–20 lessons), or **Deep Dive** (25–50 lessons).
+
+### 4. 🎓 Coordinator & Recruiter Hubs (`/coordinator`, `/recruiter`)
+* **Faculty Department Analytics**: Real-time student coding activity monitoring, academic credit verification, and one-click student roster CSV exports.
+* **Recruiter Search & Verified Portfolios**: Filter candidates by verified competitive ratings, hackathon accomplishments, and AI-synthesized skill tags.
 
 ---
 
-## 🧠 AI Engine & Co-Pilot (Groq Llama 3.3)
+## 🧠 Google Gemini AI Integration
 
-LynDesk is powered by the **Groq AI Engine** (`llama-3.3-70b-versatile`), driving zero-latency intelligent workflows across the platform:
+LynDesk leverages the **Google Generative AI SDK** (`@google/generative-ai`) to orchestrate zero-latency developer assistance:
 
-* **LynAI Co-Pilot (`/api/ai/chat`)**: Context-aware assistant providing CS algorithm guidance, workspace navigation, and daily challenge tips.
-* **Curriculum Generator (`/api/study/generate-lessons`)**: High-speed JSON schema generation for bite-sized teaching cards and assessment quizzes.
-* **Short-Answer Evaluator (`/api/study/grade-answer`)**: Intelligent grading of written responses against model answers and key concepts.
-* **Faculty Coordinator Assistant (`/api/ai/coordinator-query`)**: Natural language query engine translating faculty prompts (e.g., *"Export LeetCode stats for CS roll 1001 to 2000"*) into instant CSV downloads.
-* **Recruiter Portfolio Summary (`/api/ai/portfolio-summary`)**: Synthesizes verified platform stats into executive recruiter overviews and skill tags.
-
----
-
-## 🎨 Visual Identity & Aesthetic Directives
-
-LynDesk is built with a Swiss-grid minimalist aesthetic, dark mode precision, CSS hardware acceleration (120Hz smooth layouts), and curated Google Fonts typography:
-
-* **Headings**: `Outfit` (Clean, geometric elegance)
-* **Body & UI**: `Inter` (Humanist legibility)
-* **Code & Monospace**: `JetBrains Mono` / `Font Mono`
-* **Animations**: Micro-interactions and spring transitions powered by `framer-motion`
+* **LynAI Co-Pilot (`/api/ai/chat`)**: Contextual assistant for algorithm debugging, workspace navigation, and daily practice advice.
+* **Curriculum Synthesis (`/api/study/generate-lessons`)**: High-speed schema generation for bite-sized lesson paths from raw document uploads.
+* **Assessment Evaluator (`/api/study/grade-answer`)**: Contextual semantic grading of open-ended student answers.
+* **Natural Language Data Queries (`/api/ai/coordinator-query`)**: Translates plain-English queries from faculty into instant database reports and downloadable CSVs.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Technology Stack
 
-* **Frontend Framework**: Next.js 16 (App Router with Turbopack) & React 19
-* **Database & Auth**: Supabase (PostgreSQL, Row Level Security, Realtime Broadcast Channels)
-* **AI Orchestration**: Groq AI SDK (`llama-3.3-70b-versatile`)
-* **Styling**: Tailwind CSS v4 & Custom CSS Design Tokens
-* **Document Processing**: `pdf-parse`, `mammoth`, `xlsx`
-* **Icons**: Lucide React
-* **Realtime Media**: WebRTC (MediaStream API + RTCPeerConnection)
+| Layer | Technology |
+| :--- | :--- |
+| **Framework** | [Next.js 16](https://nextjs.org/) (App Router & Turbopack) |
+| **UI Library** | [React 19](https://react.dev/) & [Framer Motion](https://www.framer.com/motion/) |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) & Custom Design Tokens |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL, Row Level Security, WebSockets) |
+| **AI SDK** | [Google Generative AI](https://ai.google.dev/) (`gemini-2.0-flash`, `gemini-1.5-pro`) |
+| **Realtime Media** | WebRTC (MediaStream & RTCPeerConnection) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
+| **Type Safety** | Strict [TypeScript](https://www.typescriptlang.org/) |
+
+---
+
+## 🛡️ The Seven Shadows Auditing Pipeline
+
+LynDesk features an automated pre-commit audit squad known as **The Seven Shadows**:
+
+1. 🕵️‍♂️ **Alpha (Logic Auditor)**: Next.js 16 async params, unhandled promises, and route logic.
+2. 🛡️ **Beta (Secret Sentinel)**: API token isolation and zero hardcoded credentials.
+3. 🎯 **Gamma (Schema Validator)**: Supabase SQL contract & UI type alignment.
+4. ♿ **Delta (A11y Inspector)**: ARIA accessibility, keyboard navigation, and semantic DOM elements.
+5. 🧪 **Epsilon (Test Sentinel)**: Automated test suite coverage across API route handlers.
+6. ⚡ **Zeta (Performance Accelerator)**: Bundle optimization and leftover console statement audits.
+7. 🔒 **Eta (RLS Guardian)**: Supabase Row Level Security policy validation.
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+* **Node.js**: `v18.x` or later (Node 20+ recommended)
+* **npm**: `v9.x` or later
 
-* Node.js 18.x or later
-* npm or yarn
+### 1. Clone & Install
+```bash
+git clone https://github.com/Shreeprasandh/LynDesk.git
+cd LynDesk
+npm install
+```
 
-### Installation & Local Setup
+### 2. Configure Environment Variables
+Create a `.env.local` file in the project root:
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-1. **Clone the repository and install dependencies**:
-   ```bash
-   npm install
-   ```
+# Google Gemini AI API Key
+GEMINI_API_KEY=your_gemini_api_key
 
-2. **Configure Environment Variables**:
-   Create a `.env.local` file in the project root:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-   GROQ_API_KEY=gsk_your_groq_api_key
-   ```
+# SMTP Credentials (Optional - for Email OTP resets)
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_gmail_app_password
+```
 
-3. **Apply Database Migrations**:
-   Run the SQL migration scripts in your Supabase SQL Editor:
-   - `supabase_migration.sql` — Core database tables (`profiles`, `events`, `project_spaces`, `workspace_tasks`)
-   - `supabase_study_desk.sql` — Study Desk tables (`study_paths`, `study_mistakes`, profile gamification columns)
+### 3. Launch Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-4. **Launch Development Server**:
-   ```bash
-   npm run dev
-   ```
-   Navigate to [http://localhost:3000](http://localhost:3000).
-
-5. **Verify Production Build**:
-   ```bash
-   npm run build
-   ```
+### 4. Build for Production
+```bash
+npm run build
+```
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
