@@ -116,11 +116,12 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
       loadEvents();
     });
 
-    // Load monthly memo from local storage
+    // Load monthly memo from local storage (scoped per user)
     if (typeof window !== "undefined") {
       try {
-        const key = `ldk_wall_calendar_memo_${currentYear}_${currentMonthIndex}`;
-        const storedMemo = localStorage.getItem(key);
+        const userPrefix = userId || "guest";
+        const key = `ldk_wall_calendar_memo_${userPrefix}_${currentYear}_${currentMonthIndex}`;
+        const storedMemo = localStorage.getItem(key) || localStorage.getItem(`ldk_wall_calendar_memo_${currentYear}_${currentMonthIndex}`);
         queueMicrotask(() => {
           setMonthlyMemo(storedMemo || "");
         });
@@ -130,13 +131,14 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
     const handleUpdate = () => loadEvents();
     window.addEventListener("ldk_wall_calendar_update", handleUpdate);
     return () => window.removeEventListener("ldk_wall_calendar_update", handleUpdate);
-  }, [isOpen, loadEvents, currentMonthIndex, currentYear]);
+  }, [isOpen, loadEvents, currentMonthIndex, currentYear, userId]);
 
   const handleMonthlyMemoChange = (text: string) => {
     setMonthlyMemo(text);
     if (typeof window !== "undefined") {
       try {
-        const key = `ldk_wall_calendar_memo_${currentYear}_${currentMonthIndex}`;
+        const userPrefix = userId || "guest";
+        const key = `ldk_wall_calendar_memo_${userPrefix}_${currentYear}_${currentMonthIndex}`;
         localStorage.setItem(key, text);
       } catch {}
     }

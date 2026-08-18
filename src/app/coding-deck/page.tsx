@@ -318,11 +318,17 @@ export default function CodingDeckPage() {
         }
         const meta = user?.user_metadata || {};
         
-        const localLc = typeof window !== "undefined" ? localStorage.getItem("ldk_leetcode_handle") || "" : "";
-        const localCf = typeof window !== "undefined" ? localStorage.getItem("ldk_codeforces_handle") || "" : "";
-        const localCc = typeof window !== "undefined" ? localStorage.getItem("ldk_codechef_handle") || "" : "";
-        const localUn = typeof window !== "undefined" ? localStorage.getItem("ldk_unstop_handle") || "" : "";
-        const localH2s = typeof window !== "undefined" ? localStorage.getItem("ldk_hack2skill_handle") || "" : "";
+        const userLcKey = user?.id ? `ldk_leetcode_handle_${user.id}` : "ldk_leetcode_handle";
+        const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
+        const userCcKey = user?.id ? `ldk_codechef_handle_${user.id}` : "ldk_codechef_handle";
+        const userUnKey = user?.id ? `ldk_unstop_handle_${user.id}` : "ldk_unstop_handle";
+        const userH2sKey = user?.id ? `ldk_hack2skill_handle_${user.id}` : "ldk_hack2skill_handle";
+
+        const localLc = typeof window !== "undefined" ? (localStorage.getItem(userLcKey) || localStorage.getItem("ldk_leetcode_handle") || "") : "";
+        const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
+        const localCc = typeof window !== "undefined" ? (localStorage.getItem(userCcKey) || localStorage.getItem("ldk_codechef_handle") || "") : "";
+        const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
+        const localH2s = typeof window !== "undefined" ? (localStorage.getItem(userH2sKey) || localStorage.getItem("ldk_hack2skill_handle") || "") : "";
 
         const lc = meta.leetcode_username || localLc;
         const cf = meta.codeforces_username || localCf;

@@ -438,7 +438,7 @@ export default function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider === "linkedin" ? "linkedin_oidc" : provider,
         options: {
-          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
         },
       });
       if (error) {

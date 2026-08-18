@@ -940,11 +940,13 @@ const POPULAR_LOCATIONS = [
         const workspacePath = urlParts[0];
         const workspaceId = workspacePath.split("/").pop();
         if (workspaceId && workspaceId.length > 0) {
-          // Register workspace in ldk_joined_workspaces
-          const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+          // Register workspace in user-scoped ldk_joined_workspaces
+          const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+          const joinedStr = localStorage.getItem(userJoinedKey) || localStorage.getItem("ldk_joined_workspaces");
           const joinedList: string[] = joinedStr ? JSON.parse(joinedStr) : [];
           if (!joinedList.includes(workspaceId)) {
             joinedList.push(workspaceId);
+            localStorage.setItem(userJoinedKey, JSON.stringify(joinedList));
             localStorage.setItem("ldk_joined_workspaces", JSON.stringify(joinedList));
           }
 

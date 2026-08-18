@@ -733,13 +733,27 @@ export default function Home() {
       }
 
       setEvents(() => {
-        const joinedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_joined_workspaces") : null;
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+        const userDeletedKey = user?.id ? `ldk_deleted_workspaces_${user.id}` : "ldk_deleted_workspaces";
+
+        const joinedStr = typeof window !== "undefined"
+          ? (localStorage.getItem(userJoinedKey) || localStorage.getItem("ldk_joined_workspaces"))
+          : null;
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
         
         const map = new Map<string, EventItem>();
+        const seenTitles = new Set<string>();
 
         // 1. Add DB events
-        dbEvents.forEach(item => { if (item && item.id) map.set(item.id, item); });
+        dbEvents.forEach(item => {
+          if (item && item.id && !map.has(item.id)) {
+            const cleanTitle = (item.title || "").trim();
+            if (cleanTitle && !seenTitles.has(cleanTitle.toLowerCase())) {
+              seenTitles.add(cleanTitle.toLowerCase());
+              map.set(item.id, item);
+            }
+          }
+        });
 
         // 2. Add joined workspace IDs from localStorage ONLY if a real custom name exists (newest first)
         joinedIds.slice().reverse().forEach(id => {
@@ -759,7 +773,9 @@ export default function Home() {
               ? metaTitle
               : "";
 
-            if (resolvedTitle) {
+            const cleanTitle = resolvedTitle.trim();
+            if (cleanTitle && !seenTitles.has(cleanTitle.toLowerCase())) {
+              seenTitles.add(cleanTitle.toLowerCase());
               map.set(id, {
                 id,
                 title: resolvedTitle,
@@ -774,7 +790,9 @@ export default function Home() {
           }
         });
 
-        const deletedStr = typeof window !== "undefined" ? localStorage.getItem("ldk_deleted_workspaces") : null;
+        const deletedStr = typeof window !== "undefined"
+          ? (localStorage.getItem(userDeletedKey) || localStorage.getItem("ldk_deleted_workspaces"))
+          : null;
         const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
 
         let mergedList = Array.from(map.values()).filter(e => !deletedIds.includes(e.id));
@@ -1181,7 +1199,7 @@ export default function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider === "linkedin" ? "linkedin_oidc" : provider,
         options: {
-          redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          redirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined,
         },
       });
       if (error) {
