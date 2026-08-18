@@ -253,40 +253,44 @@ export default function Home() {
     setAuthActionLoading(true);
     setAuthError(null);
 
-    const targetEmail = await resolveEmailFromInput(email);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: targetEmail,
-      password,
-    });
+    try {
+      const targetEmail = await resolveEmailFromInput(email);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: targetEmail,
+        password,
+      });
 
-    if (error) {
-      setAuthError(error.message);
-      setAuthActionLoading(false);
-      return;
-    }
-
-    if (!data.user) {
-      setAuthError("Authentication failed.");
-      setAuthActionLoading(false);
-      return;
-    }
-
-    const staffList = data.user.user_metadata?.registered_staff || [];
-    if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
-      staffList.push({ name: "Main Administrator", key: "ADMIN" });
-    }
-
-    const matched = staffList.find((s: any) => s.key === staffKey.trim());
-    if (matched) {
-      localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
-      window.location.href = "/coordinator";
-    } else {
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.error("SignOut error:", err);
+      if (error) {
+        setAuthError(error.message);
+        return;
       }
-      setAuthError("Invalid Staff Key. Access denied.");
+
+      if (!data.user) {
+        setAuthError("Authentication failed.");
+        return;
+      }
+
+      const staffList = data.user.user_metadata?.registered_staff || [];
+      if (staffList.length === 0 || !staffList.find((s: any) => s.key === "ADMIN")) {
+        staffList.push({ name: "Main Administrator", key: "ADMIN" });
+      }
+
+      const matched = staffList.find((s: any) => s.key === staffKey.trim());
+      if (matched) {
+        localStorage.setItem("faculty_staff_member", JSON.stringify(matched));
+        window.location.href = "/coordinator";
+      } else {
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          console.error("SignOut error:", err);
+        }
+        setAuthError("Invalid Staff Key. Access denied.");
+      }
+    } catch (err: any) {
+      console.error("[Faculty Login Exception]:", err);
+      setAuthError(err?.message || "An unexpected error occurred during login. Please try again.");
+    } finally {
       setAuthActionLoading(false);
     }
   };
