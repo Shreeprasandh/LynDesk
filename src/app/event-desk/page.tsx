@@ -38,6 +38,7 @@ import {
   SlidersHorizontal
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
+import { prefetchWorkspace, scheduleIdlePrefetch } from "../lib/workspacePrefetch";
 
 // Brand Icon Helpers
 const DiscordIcon = ({ size = 14 }: { size?: number }) => (
@@ -847,6 +848,14 @@ export default function Home() {
       };
     }
   }, [user, fetchCoworkersAndCollege]);
+
+  // Schedule background idle pre-fetch for user's active workspaces
+  useEffect(() => {
+    if (events && events.length > 0) {
+      const cancel = scheduleIdlePrefetch(events.map(e => e.id), 1200);
+      return () => cancel();
+    }
+  }, [events]);
 
   const handleSaveWorkspaceTitle = async (workspaceId: string) => {
     if (!tempWorkspaceTitle || !tempWorkspaceTitle.trim()) return;
@@ -2160,6 +2169,7 @@ export default function Home() {
                               overflow: "hidden" 
                             }}
                             transition={{ duration: 0.35, ease: "easeInOut" }}
+                            onMouseEnter={() => prefetchWorkspace(ev.id)}
                             className="relative z-10 border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5 hover:shadow-[0_4px_16px_rgba(0,0,0,0.01)] transition-shadow duration-300"
                           >
                             <div className="flex justify-between items-start">

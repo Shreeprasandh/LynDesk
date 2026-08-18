@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { supabase } from "../../lib/supabase";
+import { getCachedWorkspaceSnapshot } from "../../lib/workspacePrefetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -351,8 +352,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
   };
 
-  // Workspace Tasks & Milestones State (Team vs Self)
-  const [tasks, setTasks] = useState<WorkspaceTask[]>([]);
+  // Workspace Tasks & Milestones State (Team vs Self) - 0ms Pre-fetch Cache Hydration
+  const [tasks, setTasks] = useState<WorkspaceTask[]>(() => {
+    const snap = getCachedWorkspaceSnapshot(workspaceUuid || id);
+    return snap?.tasks && Array.isArray(snap.tasks) && snap.tasks.length > 0 ? (snap.tasks as WorkspaceTask[]) : [];
+  });
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState<"high" | "medium" | "low">("medium");
   const [newTaskScope, setNewTaskScope] = useState<"team" | "self">("team");
@@ -363,10 +367,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     "## Team Architecture Notes\n- Next.js 16 App Router with React 19 Server Components\n- WebRTC peer connection for real-time voice call\n- Supabase real-time channel for live chat feed"
   );
 
-  // Project Details
-  const [projectName, setProjectName] = useState("Loading Project...");
+  // Project Details with 0ms Snapshot Hydration
+  const [projectName, setProjectName] = useState(() => {
+    const snap = getCachedWorkspaceSnapshot(workspaceUuid || id);
+    return snap?.projectName && snap.projectName !== "Workspace" ? snap.projectName : "Loading Project...";
+  });
   const [eventTitle, setEventTitle] = useState("Hackathon Event");
-  const [status, setStatus] = useState<"ideation" | "development" | "testing" | "submitted">("development");
+  const [status, setStatus] = useState<"ideation" | "development" | "testing" | "submitted">(() => {
+    const snap = getCachedWorkspaceSnapshot(workspaceUuid || id);
+    return (snap?.status as any) || "development";
+  });
   const [githubRepo, setGithubRepo] = useState("");
   const [liveDemo, setLiveDemo] = useState("");
   const [gitLanguages, setGitLanguages] = useState<GitLanguage[]>([]);
@@ -632,8 +642,11 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isCallActiveInRoom, setIsCallActiveInRoom] = useState(false);
   const [callCallerName, setCallCallerName] = useState("Teammate");
 
-  // Chat Feed State
-  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  // Chat Feed State - 0ms Pre-fetch Cache Hydration
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>(() => {
+    const snap = getCachedWorkspaceSnapshot(workspaceUuid || id);
+    return snap?.chatMessages && Array.isArray(snap.chatMessages) && snap.chatMessages.length > 0 ? (snap.chatMessages as ChatMsg[]) : [];
+  });
   const [newMsg, setNewMsg] = useState("");
   // Collaborative Chat State & File Attachments
   const chatEndRef = useRef<HTMLDivElement>(null);
