@@ -378,10 +378,12 @@ export default function CodingDeckPage() {
           hack2skill: h2s ? { registered: 2, completed: 1, rank: 12 } : null,
         };
 
-        setStats(updatedStats);
         if (typeof window !== "undefined") {
           try {
             localStorage.setItem("ldk_coding_desk_stats_cache", JSON.stringify(updatedStats));
+            if (leetcodeStats) {
+              localStorage.setItem("ldk_last_active_coding_stats", JSON.stringify(leetcodeStats));
+            }
             if (user?.id && leetcodeStats) {
               localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(leetcodeStats));
             }
@@ -441,9 +443,14 @@ export default function CodingDeckPage() {
         }
 
         setStats(updatedStats);
-        if (typeof window !== "undefined" && user?.id) {
-          localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(updatedStats));
-          window.dispatchEvent(new Event("ldk_coding_stats_update"));
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("ldk_last_active_coding_stats", JSON.stringify(updatedStats));
+            if (user?.id) {
+              localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(updatedStats));
+            }
+            window.dispatchEvent(new Event("ldk_coding_stats_update"));
+          } catch {}
         }
 
       } catch (err) {

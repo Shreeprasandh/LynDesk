@@ -70,22 +70,45 @@ interface DashboardProfile {
   github_url?: string;
 }
 
+const getNextUpcomingDeadline = (list: any[]): string => {
+  if (!Array.isArray(list) || list.length === 0) return "No Deadlines";
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const futureDeadlines = list
+    .map((w: any) => {
+      const dStr = w.deadline || w.target_date;
+      if (!dStr || dStr === "Ongoing" || dStr === "TBD") return null;
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return null;
+      return { raw: dStr, time: d.getTime() };
+    })
+    .filter((d): d is { raw: string; time: number } => d !== null && d.time >= now.getTime())
+    .sort((a, b) => a.time - b.time);
+
+  if (futureDeadlines.length > 0) {
+    return futureDeadlines[0].raw;
+  }
+  return "No Deadlines";
+};
+
 export default function Home() {
   const { user, loading, resolveEmailFromInput, requestPasswordResetOtp, verifyPasswordResetOtp, updateUserPassword } = useAuth();
   
   // Instant 0ms Sync Profile Initialization from localStorage or user_metadata
   const [profile, setProfile] = useState<DashboardProfile | null>(() => {
-    if (typeof window !== "undefined" && user) {
+    if (typeof window !== "undefined") {
       try {
-        const meta = user.user_metadata || {};
-        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        const uId = user?.id;
+        const rawPublic = uId ? localStorage.getItem(`ldk_public_profile_${uId}`) : null;
         const publicProf = rawPublic ? JSON.parse(rawPublic) : {};
-        const rawDraft = localStorage.getItem(`ldk_profile_draft_${user.id}`);
+        const rawDraft = uId ? localStorage.getItem(`ldk_profile_draft_${uId}`) : null;
         const draft = rawDraft ? JSON.parse(rawDraft) : {};
+        const meta = user?.user_metadata || {};
 
-        const localAvatar = localStorage.getItem(`ldk_user_avatar_${user.id}`) || localStorage.getItem(`ldk_avatar_url_${user.id}`) || "";
+        const localAvatar = (uId ? localStorage.getItem(`ldk_user_avatar_${uId}`) || localStorage.getItem(`ldk_avatar_url_${uId}`) : null) || "";
         const fullName = publicProf.full_name || draft.fullName || meta.full_name || meta.name || "";
-        const username = publicProf.username || draft.username || meta.username || user.email?.split("@")[0] || "";
+        const username = publicProf.username || draft.username || meta.username || user?.email?.split("@")[0] || "";
         if (fullName || username) {
           return {
             full_name: fullName,
@@ -97,6 +120,8 @@ export default function Home() {
             github_url: publicProf.github_url || draft.githubUrl || meta.github_url || "",
           };
         }
+        const cachedActive = localStorage.getItem("ldk_last_active_profile");
+        if (cachedActive) return JSON.parse(cachedActive);
       } catch {}
     }
     return null;
@@ -104,13 +129,17 @@ export default function Home() {
 
   // 0ms Synchronous Completion Calculation
   const [completion, setCompletion] = useState<number>(() => {
-    if (typeof window !== "undefined" && user) {
+    if (typeof window !== "undefined") {
       try {
-        const rawPublic = localStorage.getItem(`ldk_public_profile_${user.id}`);
+        const cachedVal = localStorage.getItem("ldk_last_active_completion");
+        if (cachedVal) return Number(cachedVal);
+
+        const uId = user?.id;
+        const rawPublic = uId ? localStorage.getItem(`ldk_public_profile_${uId}`) : null;
         const publicProf = rawPublic ? JSON.parse(rawPublic) : {};
-        const rawDraft = localStorage.getItem(`ldk_profile_draft_${user.id}`);
+        const rawDraft = uId ? localStorage.getItem(`ldk_profile_draft_${uId}`) : null;
         const draft = rawDraft ? JSON.parse(rawDraft) : {};
-        const meta = user.user_metadata || {};
+        const meta = user?.user_metadata || {};
 
         const fullName = publicProf.full_name || draft.fullName || meta.full_name || "";
         const username = publicProf.username || draft.username || meta.username || "";
@@ -139,10 +168,13 @@ export default function Home() {
 
   // Coding stats state - 0ms Cache Reader
   const [stats, setStats] = useState<LocalStats | null>(() => {
-    if (typeof window !== "undefined" && user) {
+    if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(`ldk_coding_stats_${user.id}`);
+        const uId = user?.id;
+        const cached = uId ? localStorage.getItem(`ldk_coding_stats_${uId}`) : null;
         if (cached) return JSON.parse(cached);
+        const lastActive = localStorage.getItem("ldk_last_active_coding_stats");
+        if (lastActive) return JSON.parse(lastActive);
       } catch {}
     }
     return null;
@@ -190,16 +222,18 @@ export default function Home() {
   const [upcomingDeadline, setUpcomingDeadline] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       try {
-        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
-        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
-        const e1 = localStorage.getItem(userEventsKey);
-        const e2 = localStorage.getItem(userJoinedKey);
+        const cachedDeadline = localStorage.getItem("ldk_last_active_deadline");
+        if (cachedDeadline) return cachedDeadline;
+
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : null;
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : null;
+        const e1 = userEventsKey ? localStorage.getItem(userEventsKey) : null;
+        const e2 = userJoinedKey ? localStorage.getItem(userJoinedKey) : null;
         const p1 = e1 ? JSON.parse(e1) : [];
         const p2 = e2 ? JSON.parse(e2) : [];
         const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
         if (list.length > 0) {
-          const deadlines = list.map((w: any) => w.deadline || w.target_date).filter(Boolean);
-          if (deadlines.length > 0) return deadlines[0];
+          return getNextUpcomingDeadline(list);
         }
       } catch {}
     }
@@ -209,10 +243,13 @@ export default function Home() {
   const [activeWorkspacesCount, setActiveWorkspacesCount] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
-        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
-        const e1 = localStorage.getItem(userEventsKey);
-        const e2 = localStorage.getItem(userJoinedKey);
+        const cachedCount = localStorage.getItem("ldk_last_active_workspace_count");
+        if (cachedCount !== null) return Number(cachedCount);
+
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : null;
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : null;
+        const e1 = userEventsKey ? localStorage.getItem(userEventsKey) : null;
+        const e2 = userJoinedKey ? localStorage.getItem(userJoinedKey) : null;
         const p1 = e1 ? JSON.parse(e1) : [];
         const p2 = e2 ? JSON.parse(e2) : [];
         const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
@@ -579,6 +616,7 @@ export default function Home() {
             setStats(formatted);
             if (typeof window !== "undefined") {
               localStorage.setItem(`ldk_coding_stats_${user.id}`, JSON.stringify(formatted));
+              localStorage.setItem("ldk_last_active_coding_stats", JSON.stringify(formatted));
             }
           }
         } catch {}
@@ -587,44 +625,7 @@ export default function Home() {
       fetchLiveStats();
     }
 
-    // 2. Load active workspace count & upcoming deadlines
-    if (typeof window !== "undefined") {
-      queueMicrotask(() => {
-        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
-        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
-        const storedWs = localStorage.getItem(userEventsKey) || localStorage.getItem(userJoinedKey) || (user?.id ? null : localStorage.getItem("ldk_joined_workspaces"));
-        if (storedWs) {
-          try {
-            const list = JSON.parse(storedWs);
-            setActiveWorkspacesCount(Array.isArray(list) ? list.length : 0);
-          } catch {
-            setActiveWorkspacesCount(0);
-          }
-        } else {
-          setActiveWorkspacesCount(0);
-        }
-
-        const storedEvents = localStorage.getItem("ldk_opportunities");
-        if (storedEvents) {
-          try {
-            const eventsList = JSON.parse(storedEvents);
-            if (Array.isArray(eventsList) && eventsList.length > 0) {
-              const sorted = [...eventsList]
-                .filter((e: { deadline?: string }) => e.deadline)
-                .sort(
-                  (a: { deadline: string }, b: { deadline: string }) =>
-                    new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-                );
-              if (sorted.length > 0) {
-                setUpcomingDeadline(sorted[0].deadline);
-              }
-            }
-          } catch {}
-        }
-      });
-    }
-
-    // 3. Load profile from Supabase with valid column names
+    // 2. Load profile from Supabase with valid column names
     const fetchProfile = async () => {
       let dbProfile: any = null;
       try {
@@ -671,7 +672,7 @@ export default function Home() {
       const liUrl = publicProf.linkedin_url || draft.linkedinUrl || meta.linkedin_url || "";
       const pfUrl = publicProf.portfolio_url || draft.portfolioUrl || meta.portfolio_url || "";
 
-      setProfile({
+      const profilePayload = {
         full_name: fullName,
         username: username,
         avatar_url: avatarUrl,
@@ -679,21 +680,25 @@ export default function Home() {
         department: department,
         leetcode_username: lcHandle,
         github_url: ghUrl,
-      });
+      };
+
+      setProfile(profilePayload);
 
       // Compute exact profile completion %
       const fields = [fullName, username, collegeName, department, lcHandle, ghUrl, liUrl, pfUrl];
       const filled = fields.filter((f) => f && String(f).trim() !== "").length;
-      setCompletion(Math.round((filled / fields.length) * 100));
+      const computedCompletion = Math.round((filled / fields.length) * 100);
+      setCompletion(computedCompletion);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("ldk_last_active_completion", String(computedCompletion));
+        localStorage.setItem("ldk_last_active_profile", JSON.stringify(profilePayload));
+      }
     };
 
     fetchProfile();
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("ldk_profile_update", fetchProfile);
-    }
-
-    // 4. Fetch Live Study Desk Focus Stats & DSA Track Progress
+    // 3. Fetch Live Study Desk Focus Stats & DSA Track Progress
     const fetchStudyDeskStats = async () => {
       try {
         if (typeof window !== "undefined") {
@@ -717,7 +722,7 @@ export default function Home() {
       } catch {}
     };
 
-    // 5. Fetch Live Event Workspaces from Supabase DB & Caches
+    // 4. Fetch Live Event Workspaces from Supabase DB & Caches
     const fetchUserWorkspaces = async () => {
       if (!user?.id) return;
       try {
@@ -751,16 +756,13 @@ export default function Home() {
           return true;
         });
 
+        const nextDeadline = getNextUpcomingDeadline(unique);
         setActiveWorkspacesCount(unique.length);
+        setUpcomingDeadline(nextDeadline);
 
-        if (unique.length > 0) {
-          const deadlines = unique
-            .map((w: any) => w.deadline || w.target_date)
-            .filter(Boolean)
-            .sort((a: any, b: any) => new Date(a).getTime() - new Date(b).getTime());
-          setUpcomingDeadline(deadlines[0] || "No Deadlines");
-        } else {
-          setUpcomingDeadline("No Deadlines");
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ldk_last_active_workspace_count", String(unique.length));
+          localStorage.setItem("ldk_last_active_deadline", nextDeadline);
         }
       } catch {
         setUpcomingDeadline("No Deadlines");
@@ -770,10 +772,22 @@ export default function Home() {
     fetchStudyDeskStats();
     fetchUserWorkspaces();
 
+    const handleCodingStatsUpdate = () => {
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("ldk_last_active_coding_stats") || (user?.id ? localStorage.getItem(`ldk_coding_stats_${user.id}`) : null);
+        if (raw) {
+          try {
+            setStats(JSON.parse(raw));
+          } catch {}
+        }
+      }
+    };
+
     if (typeof window !== "undefined") {
       window.addEventListener("ldk_profile_update", fetchProfile);
       window.addEventListener("ldk_study_stats_update", fetchStudyDeskStats);
       window.addEventListener("ldk_workspace_update", fetchUserWorkspaces);
+      window.addEventListener("ldk_coding_stats_update", handleCodingStatsUpdate);
     }
 
     return () => {
@@ -781,6 +795,7 @@ export default function Home() {
         window.removeEventListener("ldk_profile_update", fetchProfile);
         window.removeEventListener("ldk_study_stats_update", fetchStudyDeskStats);
         window.removeEventListener("ldk_workspace_update", fetchUserWorkspaces);
+        window.removeEventListener("ldk_coding_stats_update", handleCodingStatsUpdate);
       }
     };
   }, [user]);
