@@ -75,19 +75,64 @@ const getNextUpcomingDeadline = (list: any[]): string => {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  const futureDeadlines = list
-    .map((w: any) => {
-      const dStr = w.deadline || w.target_date;
-      if (!dStr || dStr === "Ongoing" || dStr === "TBD") return null;
-      const d = new Date(dStr);
-      if (isNaN(d.getTime())) return null;
-      return { raw: dStr, time: d.getTime() };
-    })
-    .filter((d): d is { raw: string; time: number } => d !== null && d.time >= now.getTime())
-    .sort((a, b) => a.time - b.time);
+  const candidateDates: { raw: string; time: number }[] = [];
 
-  if (futureDeadlines.length > 0) {
-    return futureDeadlines[0].raw;
+  list.forEach((w: any) => {
+    if (!w) return;
+
+    // 1. Direct workspace deadline
+    const dStr = w.deadline || w.target_date;
+    if (dStr && dStr !== "Ongoing" && dStr !== "TBD" && dStr !== "Target Active") {
+      const d = new Date(dStr);
+      if (!isNaN(d.getTime()) && d.getTime() >= now.getTime()) {
+        candidateDates.push({ raw: dStr, time: d.getTime() });
+      }
+    }
+
+    // 2. Real stages from localStorage cache
+    if (typeof window !== "undefined" && w.id) {
+      const realStr = localStorage.getItem(`ldk_workspace_real_stages_${w.id}`) || localStorage.getItem(`ldk_workspace_stages_${w.id}`);
+      if (realStr) {
+        try {
+          const parsed = JSON.parse(realStr);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((s: any) => {
+              const stageDeadline = s.deadline || s.date;
+              if (stageDeadline && stageDeadline !== "Ongoing" && stageDeadline !== "TBD" && stageDeadline !== "Target Active") {
+                const sd = new Date(stageDeadline);
+                if (!isNaN(sd.getTime()) && sd.getTime() >= now.getTime()) {
+                  candidateDates.push({ raw: stageDeadline, time: sd.getTime() });
+                }
+              }
+            });
+          }
+        } catch {}
+      }
+
+      const metaStr = localStorage.getItem(`ldk_workspace_meta_${w.id}`);
+      if (metaStr) {
+        try {
+          const meta = JSON.parse(metaStr);
+          if (meta && meta.stages && Array.isArray(meta.stages)) {
+            meta.stages.forEach((s: any) => {
+              const stageDeadline = s.deadline || s.date;
+              if (stageDeadline && stageDeadline !== "Ongoing" && stageDeadline !== "TBD" && stageDeadline !== "Target Active") {
+                const sd = new Date(stageDeadline);
+                if (!isNaN(sd.getTime()) && sd.getTime() >= now.getTime()) {
+                  candidateDates.push({ raw: stageDeadline, time: sd.getTime() });
+                }
+              }
+            });
+          }
+        } catch {}
+      }
+    }
+  });
+
+  candidateDates.sort((a, b) => a.time - b.time);
+
+  if (candidateDates.length > 0) {
+    return candidateDates[0].raw;
   }
   return "No Deadlines";
 };
@@ -727,31 +772,46 @@ export default function Home() {
       if (!user?.id) return;
       try {
         let wsList: any[] = [];
+        const userEventsKey = `ldk_events_${user.id}`;
+        const userDeletedKey = `ldk_deleted_workspaces_${user.id}`;
+
+        let deletedIds: string[] = [];
         if (typeof window !== "undefined") {
-          const userEventsKey = `ldk_events_${user.id}`;
-          const userJoinedKey = `ldk_joined_workspaces_${user.id}`;
+          const delStr = localStorage.getItem(userDeletedKey) || localStorage.getItem("ldk_deleted_workspaces");
+          if (delStr) {
+            try {
+              deletedIds = JSON.parse(delStr);
+            } catch {}
+          }
+
+          // Primary authoritative cache that Event Desk maintains
           const e1 = localStorage.getItem(userEventsKey);
-          const e2 = localStorage.getItem(userJoinedKey);
-          const p1 = e1 ? JSON.parse(e1) : [];
-          const p2 = e2 ? JSON.parse(e2) : [];
-          wsList = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
+          if (e1) {
+            try {
+              const p1 = JSON.parse(e1);
+              if (Array.isArray(p1)) wsList = [...p1];
+            } catch {}
+          }
         }
 
-        const { data: memberData } = await supabase
-          .from("project_members")
-          .select("project_space_id, project_spaces(*)")
-          .eq("profile_id", user.id);
+        if (wsList.length === 0) {
+          const { data: memberData } = await supabase
+            .from("project_members")
+            .select("project_space_id, project_spaces(*)")
+            .eq("profile_id", user.id);
 
-        if (memberData && Array.isArray(memberData) && memberData.length > 0) {
-          const dbSpaces = memberData.map((m: any) => m.project_spaces).filter(Boolean);
-          wsList = [...wsList, ...dbSpaces];
+          if (memberData && Array.isArray(memberData) && memberData.length > 0) {
+            const dbSpaces = memberData.map((m: any) => m.project_spaces).filter(Boolean);
+            wsList = [...wsList, ...dbSpaces];
+          }
         }
 
         const seen = new Set();
         const unique = wsList.filter((w: any) => {
-          if (!w) return false;
-          const idKey = w.id || w.title;
-          if (!idKey || seen.has(idKey)) return false;
+          if (!w || !w.id) return false;
+          if (deletedIds.includes(w.id)) return false;
+          const idKey = w.id;
+          if (seen.has(idKey)) return false;
           seen.add(idKey);
           return true;
         });

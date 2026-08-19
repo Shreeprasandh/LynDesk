@@ -822,6 +822,7 @@ export default function Home() {
           }
           const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
           localStorage.setItem(userEventsKey, JSON.stringify(mergedList));
+          window.dispatchEvent(new Event("ldk_workspace_update"));
         }
         return mergedList;
       });
@@ -1018,23 +1019,23 @@ export default function Home() {
         localStorage.removeItem(`ldk_workspace_members_${idToRemove}`);
 
         window.dispatchEvent(new CustomEvent("ldk_events_update"));
+        window.dispatchEvent(new Event("ldk_workspace_update"));
       } catch (err) {
         console.error("Failed leaving workspace:", err);
       }
     }
 
-    if (idToRemove !== "mock") {
+    if (idToRemove !== "mock" && user) {
       try {
         const targetUuid = getWorkspaceUuid(idToRemove);
-        if (user) {
-          await supabase
-            .from("project_members")
-            .delete()
-            .eq("project_space_id", targetUuid)
-            .eq("profile_id", user.id);
-        }
+        await Promise.allSettled([
+          supabase.from("project_members").delete().eq("project_space_id", idToRemove).eq("profile_id", user.id),
+          supabase.from("project_members").delete().eq("project_space_id", targetUuid).eq("profile_id", user.id),
+          supabase.from("project_spaces").delete().eq("id", idToRemove),
+          supabase.from("project_spaces").delete().eq("id", targetUuid)
+        ]);
       } catch (e) {
-        console.error("Failed removing membership in DB:", e);
+        console.error("Failed removing workspace in DB:", e);
       }
     }
     fetchCoworkersAndCollege();
