@@ -8,6 +8,7 @@ import { validateEmail } from "./lib/emailValidation";
 import { validatePassword } from "./lib/passwordValidation";
 import Header from "./components/Header";
 import LynDeskLogo from "./components/LynDeskLogo";
+import LynDeskLoadingCard from "./components/LynDeskLoadingCard";
 import Footer from "./components/Footer";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -189,13 +190,13 @@ export default function Home() {
   const [upcomingDeadline, setUpcomingDeadline] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       try {
-        const e1 = localStorage.getItem("ldk_events");
-        const e2 = localStorage.getItem("ldk_event_workspaces_cache");
-        const e3 = localStorage.getItem("ldk_joined_workspaces");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+        const e1 = localStorage.getItem(userEventsKey);
+        const e2 = localStorage.getItem(userJoinedKey);
         const p1 = e1 ? JSON.parse(e1) : [];
         const p2 = e2 ? JSON.parse(e2) : [];
-        const p3 = e3 ? JSON.parse(e3) : [];
-        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
         if (list.length > 0) {
           const deadlines = list.map((w: any) => w.deadline || w.target_date).filter(Boolean);
           if (deadlines.length > 0) return deadlines[0];
@@ -208,13 +209,13 @@ export default function Home() {
   const [activeWorkspacesCount, setActiveWorkspacesCount] = useState<number>(() => {
     if (typeof window !== "undefined") {
       try {
-        const e1 = localStorage.getItem("ldk_events");
-        const e2 = localStorage.getItem("ldk_event_workspaces_cache");
-        const e3 = localStorage.getItem("ldk_joined_workspaces");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+        const e1 = localStorage.getItem(userEventsKey);
+        const e2 = localStorage.getItem(userJoinedKey);
         const p1 = e1 ? JSON.parse(e1) : [];
         const p2 = e2 ? JSON.parse(e2) : [];
-        const p3 = e3 ? JSON.parse(e3) : [];
-        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+        const list = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
         const seen = new Set();
         const unique = list.filter((w: any) => {
           if (!w) return false;
@@ -562,7 +563,8 @@ export default function Home() {
       
       const fetchLiveStats = async () => {
         try {
-          const res = await fetch(`/api/coding-stats?platform=leetcode&username=${handle}&t=${Date.now()}`);
+          const safeHandle = encodeURIComponent(handle.trim());
+          const res = await fetch(`/api/coding-stats?platform=leetcode&username=${safeHandle}&t=${Date.now()}`);
           if (res.ok) {
             const data = await res.json();
             const formatted: LocalStats = {
@@ -721,22 +723,23 @@ export default function Home() {
       try {
         let wsList: any[] = [];
         if (typeof window !== "undefined") {
-          const e1 = localStorage.getItem("ldk_events");
-          const e2 = localStorage.getItem("ldk_event_workspaces_cache");
-          const e3 = localStorage.getItem("ldk_joined_workspaces");
+          const userEventsKey = `ldk_events_${user.id}`;
+          const userJoinedKey = `ldk_joined_workspaces_${user.id}`;
+          const e1 = localStorage.getItem(userEventsKey);
+          const e2 = localStorage.getItem(userJoinedKey);
           const p1 = e1 ? JSON.parse(e1) : [];
           const p2 = e2 ? JSON.parse(e2) : [];
-          const p3 = e3 ? JSON.parse(e3) : [];
-          wsList = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : []), ...(Array.isArray(p3) ? p3 : [])];
+          wsList = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
         }
 
-        const { data: dbWs } = await supabase
-          .from("project_spaces")
-          .select("*")
-          .eq("created_by", user.id);
+        const { data: memberData } = await supabase
+          .from("project_members")
+          .select("project_space_id, project_spaces(*)")
+          .eq("profile_id", user.id);
 
-        if (dbWs && Array.isArray(dbWs) && dbWs.length > 0) {
-          wsList = [...wsList, ...dbWs];
+        if (memberData && Array.isArray(memberData) && memberData.length > 0) {
+          const dbSpaces = memberData.map((m: any) => m.project_spaces).filter(Boolean);
+          wsList = [...wsList, ...dbSpaces];
         }
 
         const seen = new Set();
@@ -768,6 +771,7 @@ export default function Home() {
     fetchUserWorkspaces();
 
     if (typeof window !== "undefined") {
+      window.addEventListener("ldk_profile_update", fetchProfile);
       window.addEventListener("ldk_study_stats_update", fetchStudyDeskStats);
       window.addEventListener("ldk_workspace_update", fetchUserWorkspaces);
     }
@@ -785,26 +789,14 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans">
         <Header />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 pt-8 pb-12 flex flex-col gap-8">
-          <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col md:flex-row md:items-center justify-between gap-6 animate-pulse">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-bg-card border border-border-main/60 shrink-0" />
-              <div className="flex flex-col gap-2">
-                <div className="h-5 w-48 bg-bg-card rounded-sm" />
-                <div className="h-3 w-32 bg-bg-card rounded-sm" />
-              </div>
-            </div>
-            <div className="flex items-center gap-3 font-mono text-xs">
-              <div className="h-9 w-28 bg-bg-card rounded-sm" />
-              <div className="h-9 w-24 bg-bg-card rounded-sm" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="h-36 border border-border-main/60 bg-bg-surface rounded-md p-5 animate-pulse" />
-            <div className="h-36 border border-border-main/60 bg-bg-surface rounded-md p-5 animate-pulse" />
-            <div className="h-36 border border-border-main/60 bg-bg-surface rounded-md p-5 animate-pulse" />
-          </div>
+        <main className="flex-1 flex items-center justify-center p-6">
+          <LynDeskLoadingCard
+            message="Initializing LynDesk Command Center..."
+            subtext="Verifying network session, workspace indexes & live telemetry"
+            minHeight="min-h-[420px]"
+          />
         </main>
+        <Footer />
       </div>
     );
   }
