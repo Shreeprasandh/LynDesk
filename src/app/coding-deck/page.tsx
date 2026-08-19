@@ -50,7 +50,21 @@ interface PlatformStats {
 
 export default function CodingDeckPage() {
   const { user, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(true);
+  // Smart cache-aware initial loading state: 0ms instant render if cached data exists
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("ldk_coding_desk_stats_cache");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.leetcode || parsed.codeforces || parsed.codechef)) {
+            return false;
+          }
+        } catch {}
+      }
+    }
+    return true;
+  });
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Auto-clear message notification after 4 seconds
@@ -876,16 +890,21 @@ export default function CodingDeckPage() {
     ];
   }, []);
 
-  if (authLoading) {
+  if (authLoading && !user) {
     return (
-      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
-        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
-        <span>Syncing session...</span>
+      <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans">
+        <Header />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <LynDeskLoadingCard
+            message="Syncing Coding Desk Session..."
+            subtext="Authenticating developer credentials & platform integrations"
+            minHeight="min-h-[420px]"
+          />
+        </main>
+        <Footer />
       </div>
     );
   }
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
