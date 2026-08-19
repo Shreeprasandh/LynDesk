@@ -890,7 +890,9 @@ export default function CodingDeckPage() {
     ];
   }, []);
 
-  if (authLoading && !user) {
+  const hasCachedStats = typeof window !== "undefined" && !!localStorage.getItem("ldk_coding_desk_stats_cache");
+
+  if ((authLoading || loading) && !hasCachedStats) {
     return (
       <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans">
         <Header />
@@ -993,13 +995,7 @@ export default function CodingDeckPage() {
           </div>
         )}
 
-        {loading ? (
-          <LynDeskLoadingCard 
-            message="Fetching Linked Handles..." 
-            subtext="Syncing competitive platform statistics & problem tallies" 
-          />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* ================= LEFT COLUMN: CODING CARD STACKS (8 Columns) ================= */}
             <div className="lg:col-span-8 flex flex-col gap-6 min-w-0">
@@ -1606,9 +1602,7 @@ export default function CodingDeckPage() {
               </div>
 
             </div>
-
           </div>
-        )}
 
       </main>
 
