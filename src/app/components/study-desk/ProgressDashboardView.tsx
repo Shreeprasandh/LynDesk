@@ -20,6 +20,9 @@ import {
   RefreshCw
 } from "lucide-react";
 
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
+
 interface ProgressDashboardViewProps {
   stats: StudyStats;
   paths: StudyPath[];
@@ -35,12 +38,22 @@ export default function ProgressDashboardView({
   onOpenErrorBank,
   onResumePath,
 }: ProgressDashboardViewProps) {
-  // VanguarDZ Account Connection State
+  const { user } = useAuth();
+
+  // VanguarDZ Account Connection State with 0ms Cache & Supabase Sync
   const [vanguardzAccount, setVanguardzAccount] = React.useState<{ username: string; highScore: number } | null>(() => {
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("ldk_vanguardz_account");
+        const uId = user?.id;
+        const userStored = uId ? localStorage.getItem(`ldk_vanguardz_account_${uId}`) : null;
+        const stored = userStored || localStorage.getItem("ldk_vanguardz_account");
         if (stored) return JSON.parse(stored);
+
+        const metaUsername = user?.user_metadata?.vanguardz_username;
+        const metaScore = user?.user_metadata?.vanguardz_high_score;
+        if (metaUsername) {
+          return { username: metaUsername, highScore: Number(metaScore) || 0 };
+        }
       } catch {}
     }
     return null;
@@ -51,6 +64,15 @@ export default function ProgressDashboardView({
   const [vgPassword, setVgPassword] = React.useState("");
   const [vgLoading, setVgLoading] = React.useState(false);
   const [vgError, setVgError] = React.useState<string | null>(null);
+
+  // Sync with Supabase on mount if metadata exists
+  React.useEffect(() => {
+    if (user?.user_metadata?.vanguardz_username && !vanguardzAccount) {
+      const uname = user.user_metadata.vanguardz_username;
+      const score = Number(user.user_metadata.vanguardz_high_score) || 0;
+      setVanguardzAccount({ username: uname, highScore: score });
+    }
+  }, [user, vanguardzAccount]);
 
   const handleConnectVanguarDZ = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +95,26 @@ export default function ProgressDashboardView({
         setVanguardzAccount(accountData);
         if (typeof window !== "undefined") {
           localStorage.setItem("ldk_vanguardz_account", JSON.stringify(accountData));
+          if (user?.id) {
+            localStorage.setItem(`ldk_vanguardz_account_${user.id}`, JSON.stringify(accountData));
+          }
         }
+
+        // Persist permanently in Supabase User Metadata
+        if (user) {
+          try {
+            await supabase.auth.updateUser({
+              data: {
+                ...user.user_metadata,
+                vanguardz_username: data.username,
+                vanguardz_high_score: data.highScore
+              }
+            });
+          } catch (dbErr) {
+            console.warn("Failed saving VanguarDZ handle to Supabase metadata:", dbErr);
+          }
+        }
+
         setIsConnectModalOpen(false);
         setVgPassword("");
       } else {
@@ -96,9 +137,48 @@ export default function ProgressDashboardView({
         setVanguardzAccount(updated);
         if (typeof window !== "undefined") {
           localStorage.setItem("ldk_vanguardz_account", JSON.stringify(updated));
+          if (user?.id) {
+            localStorage.setItem(`ldk_vanguardz_account_${user.id}`, JSON.stringify(updated));
+          }
+        }
+
+        if (user) {
+          try {
+            await supabase.auth.updateUser({
+              data: {
+                ...user.user_metadata,
+                vanguardz_username: vanguardzAccount.username,
+                vanguardz_high_score: data.highScore
+              }
+            });
+          } catch {}
         }
       }
     } catch {}
+  };
+
+  const handleUnlinkVanguarDZ = async () => {
+    setVanguardzAccount(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("ldk_vanguardz_account");
+      if (user?.id) {
+        localStorage.removeItem(`ldk_vanguardz_account_${user.id}`);
+      }
+    }
+
+    if (user) {
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            ...user.user_metadata,
+            vanguardz_username: null,
+            vanguardz_high_score: null
+          }
+        });
+      } catch (e) {
+        console.warn("Failed unlinking VanguarDZ from Supabase:", e);
+      }
+    }
   };
   // Generate 30-day activity grid
   const daysGrid: { dateStr: string; isActive: boolean; dayNum: number }[] = [];
@@ -479,13 +559,22 @@ export default function ProgressDashboardView({
                     <CheckCircle2 size={14} className="text-accent-main" />
                     <span>@{vanguardzAccount.username}</span>
                   </div>
-                  <button
-                    onClick={handleRefreshVgStats}
-                    title="Refresh high score"
-                    className="text-txt-muted hover:text-txt-main p-1 transition-colors cursor-pointer"
-                  >
-                    <RefreshCw size={12} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleRefreshVgStats}
+                      title="Refresh high score"
+                      className="text-txt-muted hover:text-txt-main p-1 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
+                    <button
+                      onClick={handleUnlinkVanguarDZ}
+                      title="Unlink VanguarDZ account"
+                      className="text-txt-muted hover:text-rose-400 p-1 transition-colors cursor-pointer text-[10px] font-mono"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-1 border-t border-border-main/40 text-[11px]">
