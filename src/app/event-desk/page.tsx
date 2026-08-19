@@ -1545,9 +1545,15 @@ export default function Home() {
       <Header />
 
       {/* Conditional Layout: Landing VS. Dashboard */}
-      {authLoading ? (
+      {authLoading || (isHardReloading && likelyHasSession) ? (
         likelyHasSession ? (
-          <DashboardSkeleton />
+          <div className="flex-1 flex items-center justify-center p-6 min-h-[70vh]">
+            <LynDeskLoadingCard 
+              message="Syncing Event Desks & Live Milestones..." 
+              subtext="Resolving multi-round schedules, peer presence & verified registries"
+              minHeight="min-h-[420px]"
+            />
+          </div>
         ) : (
           <LandingSkeleton />
         )
@@ -2123,56 +2129,69 @@ export default function Home() {
                         })();
 
                         const stageObjects = (() => {
+                          let list: { stage: string; deadline: string }[] = [];
                           const realStr = typeof window !== "undefined" ? (localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) || localStorage.getItem(`ldk_workspace_stages_${ev.id}`)) : null;
                           if (realStr) {
                             try {
                               const parsed = JSON.parse(realStr);
                               if (Array.isArray(parsed) && parsed.length > 0) {
-                                return parsed.map((s: any) => ({
+                                list = parsed.map((s: any) => ({
                                   stage: s.title || s.stage || "Stage",
                                   deadline: s.deadline || "Target Active"
                                 }));
                               }
                             } catch {}
                           }
-                          const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
-                          if (metaStr) {
-                            try {
-                              const meta = JSON.parse(metaStr);
-                              if (meta && meta.stages && meta.stages.length > 0) {
-                                return meta.stages.map((s: any) => ({
-                                  stage: s.title || s.stage || "Stage",
-                                  deadline: s.deadline || "Target Active"
-                                }));
-                              }
-                            } catch {}
+                          if (list.length === 0) {
+                            const metaStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_meta_${ev.id}`) : null;
+                            if (metaStr) {
+                              try {
+                                const meta = JSON.parse(metaStr);
+                                if (meta && meta.stages && meta.stages.length > 0) {
+                                  list = meta.stages.map((s: any) => ({
+                                    stage: s.title || s.stage || "Stage",
+                                    deadline: s.deadline || "Target Active"
+                                  }));
+                                }
+                              } catch {}
+                            }
                           }
                           
-                          // Dynamic Date Synthesis based on actual event deadline (Zero static fake dates)
-                          const rawNames = (ev.stages && ev.stages.length > 0)
-                            ? ev.stages
-                            : ["Ideation & Proposal", "Prototype Development", "QA & User Testing", "Final Submission"];
+                          if (list.length === 0) {
+                            // Dynamic Date Synthesis based on actual event deadline (Zero static fake dates)
+                            const rawNames = (ev.stages && ev.stages.length > 0)
+                              ? ev.stages
+                              : ["Ideation & Proposal", "Prototype Development", "QA & User Testing", "Final Submission"];
 
-                          const now = new Date();
-                          let targetDate = new Date(ev.deadline);
-                          if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime()) {
-                            targetDate = new Date(now.getTime() + 30 * 86400000);
+                            const now = new Date();
+                            let targetDate = new Date(ev.deadline);
+                            if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime()) {
+                              targetDate = new Date(now.getTime() + 30 * 86400000);
+                            }
+
+                            const startTime = now.getTime();
+                            const endTime = targetDate.getTime();
+                            const totalDuration = Math.max(86400000 * 7, endTime - startTime);
+                            const count = rawNames.length;
+
+                            list = rawNames.map((name, idx) => {
+                              const fraction = (idx + 1) / count;
+                              const stageTimestamp = startTime + (totalDuration * fraction);
+                              const stageDate = new Date(stageTimestamp);
+                              const formattedDeadline = stageDate.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+                              return {
+                                stage: name,
+                                deadline: idx === count - 1 ? (ev.deadline && ev.deadline !== "Ongoing" && ev.deadline !== "TBD" ? ev.deadline : formattedDeadline) : formattedDeadline
+                              };
+                            });
                           }
 
-                          const startTime = now.getTime();
-                          const endTime = targetDate.getTime();
-                          const totalDuration = Math.max(86400000 * 7, endTime - startTime);
-                          const count = rawNames.length;
-
-                          return rawNames.map((name, idx) => {
-                            const fraction = (idx + 1) / count;
-                            const stageTimestamp = startTime + (totalDuration * fraction);
-                            const stageDate = new Date(stageTimestamp);
-                            const formattedDeadline = stageDate.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-                            return {
-                              stage: name,
-                              deadline: idx === count - 1 ? (ev.deadline && ev.deadline !== "Ongoing" && ev.deadline !== "TBD" ? ev.deadline : formattedDeadline) : formattedDeadline
-                            };
+                          // Sort strictly chronologically by calendar date
+                          return list.slice().sort((a, b) => {
+                            const timeA = new Date(a.deadline).getTime();
+                            const timeB = new Date(b.deadline).getTime();
+                            if (isNaN(timeA) || isNaN(timeB)) return 0;
+                            return timeA - timeB;
                           });
                         })();
 
