@@ -588,7 +588,9 @@ export default function Home() {
     // 2. Load active workspace count & upcoming deadlines
     if (typeof window !== "undefined") {
       queueMicrotask(() => {
-        const storedWs = localStorage.getItem("ldk_joined_workspaces");
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const storedWs = localStorage.getItem(userEventsKey) || localStorage.getItem(userJoinedKey) || (user?.id ? null : localStorage.getItem("ldk_joined_workspaces"));
         if (storedWs) {
           try {
             const list = JSON.parse(storedWs);
@@ -596,6 +598,8 @@ export default function Home() {
           } catch {
             setActiveWorkspacesCount(0);
           }
+        } else {
+          setActiveWorkspacesCount(0);
         }
 
         const storedEvents = localStorage.getItem("ldk_opportunities");

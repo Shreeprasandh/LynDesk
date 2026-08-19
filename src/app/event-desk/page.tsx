@@ -491,7 +491,8 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const loadLocalWorkspaces = () => {
-        const stored = localStorage.getItem("ldk_events");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const stored = localStorage.getItem(userEventsKey) || (user?.id ? null : localStorage.getItem("ldk_events"));
         const parsedEvents: EventItem[] = stored ? JSON.parse(stored) : [];
 
         // Enrich parsed events with local workspace overrides
@@ -541,14 +542,15 @@ export default function Home() {
         window.removeEventListener("storage", loadLocalWorkspaces);
       };
     }
-  }, []);
+  }, [user?.id]);
 
-  // Sync events to localStorage on modification
+  // Sync events to user-scoped localStorage on modification
   useEffect(() => {
-    if (events && events.length > 0) {
-      localStorage.setItem("ldk_events", JSON.stringify(events));
+    if (events && events.length > 0 && typeof window !== "undefined") {
+      const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+      localStorage.setItem(userEventsKey, JSON.stringify(events));
     }
-  }, [events]);
+  }, [events, user?.id]);
 
   const fetchCoworkersAndCollege = useCallback(async () => {
     if (!user) return;
@@ -818,7 +820,8 @@ export default function Home() {
             // Default: newest created workspaces stay at the top
             mergedList = mergedList.slice().reverse();
           }
-          localStorage.setItem("ldk_events", JSON.stringify(mergedList));
+          const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+          localStorage.setItem(userEventsKey, JSON.stringify(mergedList));
         }
         return mergedList;
       });
@@ -866,12 +869,13 @@ export default function Home() {
     
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("ldk_events");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const stored = localStorage.getItem(userEventsKey);
         const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
         const idx = parsed.findIndex(e => e.id === workspaceId);
         if (idx >= 0) {
           parsed[idx].title = cleanTitle;
-          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+          localStorage.setItem(userEventsKey, JSON.stringify(parsed));
         }
       } catch {}
     }
@@ -912,12 +916,13 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem(`ldk_workspace_status_${workspaceId}`, newStatus);
       try {
-        const stored = localStorage.getItem("ldk_events");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const stored = localStorage.getItem(userEventsKey);
         const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
         const idx = parsed.findIndex(e => e.id === workspaceId);
         if (idx >= 0) {
           parsed[idx].status = newStatus;
-          localStorage.setItem("ldk_events", JSON.stringify(parsed));
+          localStorage.setItem(userEventsKey, JSON.stringify(parsed));
         }
       } catch {}
       window.dispatchEvent(new CustomEvent("ldk_events_update"));
@@ -963,7 +968,8 @@ export default function Home() {
 
     setEvents(newEvents);
     if (typeof window !== "undefined") {
-      localStorage.setItem("ldk_events", JSON.stringify(newEvents));
+      const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+      localStorage.setItem(userEventsKey, JSON.stringify(newEvents));
       const userOrderKey = user?.id ? `ldk_custom_workspace_order_${user.id}` : "ldk_custom_workspace_order";
       const customOrderIds = newEvents.map(e => e.id);
       localStorage.setItem(userOrderKey, JSON.stringify(customOrderIds));
@@ -981,21 +987,25 @@ export default function Home() {
 
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("ldk_events");
+        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
+        const userDeletedKey = user?.id ? `ldk_deleted_workspaces_${user.id}` : "ldk_deleted_workspaces";
+
+        const stored = localStorage.getItem(userEventsKey) || localStorage.getItem("ldk_events");
         const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
         const filteredEvents = parsed.filter(e => e.id !== idToRemove);
-        localStorage.setItem("ldk_events", JSON.stringify(filteredEvents));
+        localStorage.setItem(userEventsKey, JSON.stringify(filteredEvents));
 
-        const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+        const joinedStr = localStorage.getItem(userJoinedKey) || localStorage.getItem("ldk_joined_workspaces");
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
         const filteredJoined = joinedIds.filter(id => id !== idToRemove);
-        localStorage.setItem("ldk_joined_workspaces", JSON.stringify(filteredJoined));
+        localStorage.setItem(userJoinedKey, JSON.stringify(filteredJoined));
 
-        const deletedStr = localStorage.getItem("ldk_deleted_workspaces");
+        const deletedStr = localStorage.getItem(userDeletedKey) || localStorage.getItem("ldk_deleted_workspaces");
         const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
         if (!deletedIds.includes(idToRemove)) {
           deletedIds.push(idToRemove);
-          localStorage.setItem("ldk_deleted_workspaces", JSON.stringify(deletedIds));
+          localStorage.setItem(userDeletedKey, JSON.stringify(deletedIds));
         }
 
         localStorage.removeItem(`ldk_workspace_name_${idToRemove}`);
