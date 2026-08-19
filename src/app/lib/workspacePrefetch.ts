@@ -50,7 +50,7 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
     const [spaceRes, chatRes, membersRes, tasksRes] = await Promise.allSettled([
       supabase
         .from("project_spaces")
-        .select("id, project_name, status, github_repo")
+        .select("id, project_name, status, github_repo, events(id, title, source_url, registration_deadline, location, level)")
         .eq("id", workspaceId)
         .maybeSingle(),
       supabase
@@ -72,6 +72,32 @@ export async function prefetchWorkspace(workspaceId: string): Promise<WorkspaceS
     ]);
 
     const spaceData = spaceRes.status === "fulfilled" ? spaceRes.value.data : null;
+    if (spaceData && typeof window !== "undefined") {
+      const existingMeta = localStorage.getItem(`ldk_workspace_meta_${workspaceId}`);
+      if (!existingMeta) {
+        const ev = (spaceData as any).events;
+        const projectTitle = spaceData.project_name || ev?.title || "Workspace";
+        const deadline = ev?.registration_deadline ? new Date(ev.registration_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Ongoing";
+        
+        const dynamicStages = [
+          { stage: "Ideation & Proposal", deadline: "Target Active", brief: "Problem statement selection and architecture deck." },
+          { stage: "Prototype Development", deadline: "In Progress", brief: "Core prototype implementation and API scaffolding." },
+          { stage: "QA & User Testing", deadline: "Review Phase", brief: "End-to-end verification and integration testing." },
+          { stage: "Final Submission", deadline: deadline, brief: "Final deliverable submission and demonstration deck." }
+        ];
+
+        localStorage.setItem(`ldk_workspace_meta_${workspaceId}`, JSON.stringify({
+          title: projectTitle,
+          deadline: deadline,
+          location: ev?.location || "online",
+          level: ev?.level || "global",
+          stages: dynamicStages
+        }));
+
+        localStorage.setItem(`ldk_workspace_real_stages_${workspaceId}`, JSON.stringify(dynamicStages));
+        window.dispatchEvent(new CustomEvent("ldk_events_update"));
+      }
+    }
     const rawChat = chatRes.status === "fulfilled" ? (chatRes.value.data || []) : [];
     const membersData = membersRes.status === "fulfilled" ? (membersRes.value.data || []) : [];
     const dbTasks = tasksRes.status === "fulfilled" ? (tasksRes.value.data || []) : [];

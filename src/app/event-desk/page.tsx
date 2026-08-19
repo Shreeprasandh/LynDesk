@@ -2123,7 +2123,7 @@ export default function Home() {
                         })();
 
                         const stageObjects = (() => {
-                          const realStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) : null;
+                          const realStr = typeof window !== "undefined" ? (localStorage.getItem(`ldk_workspace_real_stages_${ev.id}`) || localStorage.getItem(`ldk_workspace_stages_${ev.id}`)) : null;
                           if (realStr) {
                             try {
                               const parsed = JSON.parse(realStr);
@@ -2147,12 +2147,33 @@ export default function Home() {
                               }
                             } catch {}
                           }
-                          return [
-                            { stage: "Ideation & Proposal", deadline: "Aug 19" },
-                            { stage: "Prototype Development", deadline: "Sep 02" },
-                            { stage: "QA & User Testing", deadline: "Sep 16" },
-                            { stage: "Final Submission", deadline: "Oct 01" }
-                          ];
+                          
+                          // Dynamic Date Synthesis based on actual event deadline (Zero static fake dates)
+                          const rawNames = (ev.stages && ev.stages.length > 0)
+                            ? ev.stages
+                            : ["Ideation & Proposal", "Prototype Development", "QA & User Testing", "Final Submission"];
+
+                          const now = new Date();
+                          let targetDate = new Date(ev.deadline);
+                          if (isNaN(targetDate.getTime()) || targetDate.getTime() <= now.getTime()) {
+                            targetDate = new Date(now.getTime() + 30 * 86400000);
+                          }
+
+                          const startTime = now.getTime();
+                          const endTime = targetDate.getTime();
+                          const totalDuration = Math.max(86400000 * 7, endTime - startTime);
+                          const count = rawNames.length;
+
+                          return rawNames.map((name, idx) => {
+                            const fraction = (idx + 1) / count;
+                            const stageTimestamp = startTime + (totalDuration * fraction);
+                            const stageDate = new Date(stageTimestamp);
+                            const formattedDeadline = stageDate.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+                            return {
+                              stage: name,
+                              deadline: idx === count - 1 ? (ev.deadline && ev.deadline !== "Ongoing" && ev.deadline !== "TBD" ? ev.deadline : formattedDeadline) : formattedDeadline
+                            };
+                          });
                         })();
 
                         const lastStageDeadline = stageObjects[stageObjects.length - 1]?.deadline || ev.deadline;
