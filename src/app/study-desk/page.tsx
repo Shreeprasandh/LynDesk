@@ -267,8 +267,12 @@ export default function StudyDeskPage() {
 
     // Sync active state to Supabase if logged in
     if (user) {
-      supabase.from("study_paths").update({ is_active: false }).eq("user_id", user.id);
-      supabase.from("study_paths").update({ is_active: true }).eq("id", pathId);
+      void (async () => {
+        try {
+          await supabase.from("study_paths").update({ is_active: false }).eq("user_id", user.id);
+          await supabase.from("study_paths").update({ is_active: true }).eq("id", pathId);
+        } catch {}
+      })();
     }
   };
 

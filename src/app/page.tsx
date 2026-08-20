@@ -138,7 +138,7 @@ const getNextUpcomingDeadline = (list: any[]): string => {
 };
 
 export default function Home() {
-  const { user, loading, resolveEmailFromInput, requestPasswordResetOtp, verifyPasswordResetOtp, updateUserPassword } = useAuth();
+  const { user, loading, resolveEmailFromInput, requestPasswordResetOtp, verifyPasswordResetOtp } = useAuth();
   
   // Instant 0ms Sync Profile Initialization from localStorage or user_metadata
   const [profile, setProfile] = useState<DashboardProfile | null>(() => {
@@ -385,9 +385,11 @@ export default function Home() {
   const [resetConfirmPassword, setResetConfirmPassword] = useState("");
 
   useEffect(() => {
-    setAuthActionLoading(false);
-    setAuthError(null);
-    setForgotSuccess(null);
+    queueMicrotask(() => {
+      setAuthActionLoading(false);
+      setAuthError(null);
+      setForgotSuccess(null);
+    });
   }, [authStep]);
 
   const handleRequestResetOtp = async (e: React.FormEvent) => {

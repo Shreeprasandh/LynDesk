@@ -79,17 +79,6 @@ const getWorkspaceUuid = (rawId: string): string => {
 };
 
 
-
-function DashboardSkeleton() {
-  return (
-    <LynDeskLoadingCard 
-      message="Loading Event Desk Workspaces..."
-      subtext="Verifying campus team permissions & project vaults"
-      minHeight="min-h-[450px]"
-    />
-  );
-}
-
 function LandingSkeleton() {
   return (
     <LynDeskLoadingCard 
@@ -912,51 +901,7 @@ export default function Home() {
     setEditingWorkspaceId(null);
   };
 
-  const _handleUpdateWorkspaceStatus = async (workspaceId: string, newStatus: "ideation" | "development" | "testing" | "submitted") => {
-    setEvents(prev => prev.map(e => e.id === workspaceId ? { ...e, status: newStatus } : e));
-    if (typeof window !== "undefined") {
-      localStorage.setItem(`ldk_workspace_status_${workspaceId}`, newStatus);
-      try {
-        const userEventsKey = user?.id ? `ldk_events_${user.id}` : "ldk_events";
-        const stored = localStorage.getItem(userEventsKey);
-        const parsed: EventItem[] = stored ? JSON.parse(stored) : [];
-        const idx = parsed.findIndex(e => e.id === workspaceId);
-        if (idx >= 0) {
-          parsed[idx].status = newStatus;
-          localStorage.setItem(userEventsKey, JSON.stringify(parsed));
-        }
-      } catch {}
-      window.dispatchEvent(new CustomEvent("ldk_events_update"));
-    }
 
-    const targetUuid = getWorkspaceUuid(workspaceId);
-    if (user && workspaceId !== "mock" && targetUuid) {
-      try {
-        const { data: existing } = await supabase
-          .from("project_spaces")
-          .select("id")
-          .eq("id", targetUuid)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase
-            .from("project_spaces")
-            .update({ status: newStatus })
-            .eq("id", targetUuid);
-        } else {
-          await supabase
-            .from("project_spaces")
-            .insert({
-              id: targetUuid,
-              status: newStatus,
-              project_name: "Shared Workspace"
-            });
-        }
-      } catch (e) {
-        console.error("Failed updating workspace status in db", e);
-      }
-    }
-  };
 
   const handleMoveWorkspace = (index: number, direction: "up" | "down") => {
     const newEvents = [...events];

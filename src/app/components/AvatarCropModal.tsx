@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { ZoomIn, ZoomOut, Move, Check, X, RotateCcw } from "lucide-react";
+import { ZoomOut, Move, Check, X, RotateCcw } from "lucide-react";
 
 interface AvatarCropModalProps {
   imageSrc: string;

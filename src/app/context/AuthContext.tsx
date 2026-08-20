@@ -271,8 +271,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user?.id) {
-      setProfileAvatar("");
-      setUserProfile(null);
+      queueMicrotask(() => {
+        setProfileAvatar("");
+        setUserProfile(null);
+      });
       return;
     }
 
@@ -282,7 +284,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (rawPublic) {
           const parsed = JSON.parse(rawPublic);
           if (parsed?.avatar_url && (parsed.avatar_url.startsWith("http") || parsed.avatar_url.startsWith("data:image/"))) {
-            setProfileAvatar(parsed.avatar_url);
+            queueMicrotask(() => {
+              setProfileAvatar(parsed.avatar_url);
+            });
           }
         }
         const cached =
@@ -290,7 +294,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.getItem(`ldk_avatar_url_${user.id}`) ||
           localStorage.getItem("ldk_active_user_avatar");
         if (cached && (cached.startsWith("http") || cached.startsWith("data:image/"))) {
-          setProfileAvatar(cached);
+          queueMicrotask(() => {
+            setProfileAvatar(cached);
+          });
         }
       } catch {}
     }
@@ -380,24 +386,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (trimmed.includes("@")) {
       return trimmed.toLowerCase();
     }
-    const cleanUsername = trimmed.replace(/^@/, "").toLowerCase();
-    try {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", cleanUsername)
-        .maybeSingle();
-
-      if (data?.id) {
-        // Find email from profiles or metadata
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("id", data.id)
-          .maybeSingle();
-        if (prof?.email) return prof.email;
-      }
-    } catch {}
     return trimmed;
   };
 

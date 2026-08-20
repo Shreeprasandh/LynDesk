@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { studentName, eventTitle, artifactName, points } = body;
 
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY;
 
     if (!groqApiKey) {
       const isSuspicious = (studentName || "").toLowerCase().includes("test") || (artifactName || "").toLowerCase().includes("fake");

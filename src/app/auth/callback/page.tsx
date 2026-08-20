@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,6 +10,8 @@ function CallbackHandler() {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
     const handleAuth = async () => {
       try {
@@ -31,18 +33,14 @@ function CallbackHandler() {
             router.replace(target);
           }
         });
+        authSubscription = subscription;
 
         // 3. Fallback timeout to prevent hanging
-        const timeout = setTimeout(() => {
+        timeoutId = setTimeout(() => {
           if (isMounted) {
             router.replace(target);
           }
         }, 1200);
-
-        return () => {
-          clearTimeout(timeout);
-          subscription.unsubscribe();
-        };
       } catch (err) {
         console.error("OAuth callback error:", err);
         if (isMounted) router.replace("/event-desk");
@@ -53,6 +51,8 @@ function CallbackHandler() {
 
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (authSubscription) authSubscription.unsubscribe();
     };
   }, [router, searchParams]);
 

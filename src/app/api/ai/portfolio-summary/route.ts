@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { leetcode, codeforces, codechef } = body;
 
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY;
 
     if (!groqApiKey) {
       const lcSolved = leetcode?.solved || 0;

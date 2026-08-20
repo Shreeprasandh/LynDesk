@@ -70,7 +70,9 @@ export default function ProgressDashboardView({
     if (user?.user_metadata?.vanguardz_username && !vanguardzAccount) {
       const uname = user.user_metadata.vanguardz_username;
       const score = Number(user.user_metadata.vanguardz_high_score) || 0;
-      setVanguardzAccount({ username: uname, highScore: score });
+      queueMicrotask(() => {
+        setVanguardzAccount({ username: uname, highScore: score });
+      });
     }
   }, [user, vanguardzAccount]);
 

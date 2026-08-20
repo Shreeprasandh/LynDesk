@@ -10,7 +10,7 @@ export async function GET() {
   const startTime = Date.now();
   try {
     const supabaseAdmin = createAdminClient();
-    const { data, error } = await supabaseAdmin.from("profiles").select("id").limit(1);
+    const { error } = await supabaseAdmin.from("profiles").select("id").limit(1);
 
     const latencyMs = Date.now() - startTime;
 

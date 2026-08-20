@@ -93,7 +93,7 @@ export default function Header() {
   const [oUsername, setOUsername] = useState("");
   const [oPassword, setOPassword] = useState("");
   const [oConfirmPassword, setOConfirmPassword] = useState("");
-  const [oRole, setORole] = useState<"student" | "employee" | "solo">("student");
+  const [oRole] = useState<"student" | "employee" | "solo">("student");
   const [oDob, setODob] = useState("");
   const [oLocation, setOLocation] = useState("");
   
@@ -103,8 +103,8 @@ export default function Header() {
   const [oGradYear, setOGradYear] = useState("");
   
   // Employee dynamic fields
-  const [oCompany, setOCompany] = useState("");
-  const [oDesignation, setODesignation] = useState("");
+  const [oCompany] = useState("");
+  const [oDesignation] = useState("");
   
   // Optional expandable fields
   const [oShowOptional, setOShowOptional] = useState(false);
@@ -208,13 +208,11 @@ const POPULAR_LOCATIONS = [
   // Autocomplete Suggestions
   const [oCollegeSuggestions, setOCollegeSuggestions] = useState<string[]>([]);
   const [oDeptSuggestions, setODeptSuggestions] = useState<string[]>([]);
-  const [oCompanySuggestions, setOCompanySuggestions] = useState<string[]>([]);
   const [oLocationSuggestions, setOLocationSuggestions] = useState<string[]>([]);
 
   const clearAllSuggestions = () => {
     setOCollegeSuggestions([]);
     setODeptSuggestions([]);
-    setOCompanySuggestions([]);
     setOLocationSuggestions([]);
   };
 
@@ -268,7 +266,9 @@ const POPULAR_LOCATIONS = [
 
   useEffect(() => {
     if (profileAvatar) {
-      setHeaderAvatar(profileAvatar);
+      queueMicrotask(() => {
+        setHeaderAvatar(profileAvatar);
+      });
     }
   }, [profileAvatar]);
 
@@ -377,7 +377,7 @@ const POPULAR_LOCATIONS = [
       window.removeEventListener("ldk_profile_update", resolveHeaderAvatar);
       window.removeEventListener("storage", resolveHeaderAvatar);
     };
-  }, [user]);
+  }, [user, profileAvatar]);
 
   // Check onboarding status on mount / user change
   useEffect(() => {
@@ -1200,11 +1200,14 @@ const POPULAR_LOCATIONS = [
             {user && (
               <button
                 onClick={() => setIsCalendarOpen(true)}
-                className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
+                className="relative p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
                 aria-label="Open WallCalendar"
                 title="WallCalendar"
               >
                 <CalendarIcon size={14} />
+                {hasTodayEvents && (
+                  <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-main ring-1 ring-bg-surface" />
+                )}
               </button>
             )}
 

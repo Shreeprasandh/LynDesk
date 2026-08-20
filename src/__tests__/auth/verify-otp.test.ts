@@ -1,4 +1,4 @@
-import { describe, it, expect } from "@jest/globals";
+﻿import {} from 'vitest';
 import { POST } from "../../app/api/auth/verify-otp/route";
 
 describe("Auth Verify-OTP API Route Handler", () => {
@@ -31,3 +31,4 @@ describe("Auth Verify-OTP API Route Handler", () => {
     expect(res.status).toBe(400);
   });
 });
+

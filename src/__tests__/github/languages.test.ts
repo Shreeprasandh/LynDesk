@@ -1,7 +1,8 @@
-import { describe, it, expect } from '@jest/globals';
+﻿import {} from 'vitest';
 
 describe('GitHub Languages Route Handler', () => {
   it('should be defined', () => {
     expect(true).toBe(true);
   });
 });
+

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -9,7 +9,6 @@ import {
   ExternalLink, 
   Plus, 
   CheckCircle2, 
-  FolderKanban, 
   Sparkles, 
   Calendar,
   UserCheck
@@ -53,7 +52,7 @@ export default function AppliedHackathonsModal({
   const [creatingId, setCreatingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const initialEvents: AppliedEventItem[] = [
+  const initialEvents: AppliedEventItem[] = useMemo(() => [
     {
       id: "unstop_uber_2026",
       title: "Uber HackTag 2026 Hackathon",
@@ -114,7 +113,7 @@ export default function AppliedHackathonsModal({
       deadline: "August 25, 2026",
       portalUrl: "https://hack2skill.com/hackathons/google-cloud-ai"
     }
-  ];
+  ], [unstopUser, hack2skillUser]);
 
   const [appliedEvents, setAppliedEvents] = useState<AppliedEventItem[]>(initialEvents);
 
@@ -145,7 +144,7 @@ export default function AppliedHackathonsModal({
           .catch(err => console.warn("Live event scrape notice:", err));
       }
     });
-  }, []);
+  }, [initialEvents]);
 
   const unstopCount = appliedEvents.filter((item) => item.portal === "Unstop").length;
   const h2sCount = appliedEvents.filter((item) => item.portal === "Hack2Skill").length;

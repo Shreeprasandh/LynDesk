@@ -22,7 +22,9 @@ export default function CustomDatePicker({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setInputValue(value || "");
+    queueMicrotask(() => {
+      setInputValue(value || "");
+    });
   }, [value]);
 
   const initialDate = value ? new Date(value) : new Date(2002, 0, 15);
@@ -37,8 +39,10 @@ export default function CustomDatePicker({
     if (value) {
       const d = new Date(value);
       if (!isNaN(d.getTime())) {
-        setViewYear(d.getFullYear());
-        setViewMonth(d.getMonth());
+        queueMicrotask(() => {
+          setViewYear(d.getFullYear());
+          setViewMonth(d.getMonth());
+        });
       }
     }
   }, [value]);

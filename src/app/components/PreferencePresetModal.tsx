@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, X, RotateCcw, Check, MapPin, Sparkles, ShieldCheck } from "lucide-react";
+import { SlidersHorizontal, X, RotateCcw, Check, MapPin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";

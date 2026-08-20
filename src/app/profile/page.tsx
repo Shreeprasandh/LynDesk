@@ -26,8 +26,7 @@ import {
   X,
   Code2,
   Sparkles,
-  MapPin,
-  KeyRound
+  MapPin
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones

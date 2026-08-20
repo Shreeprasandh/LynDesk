@@ -1,3 +1,4 @@
+﻿import { describe, it, expect } from 'vitest';
 import { GET } from "../../app/api/user/notifications/route";
 
 describe("GET /api/user/notifications", () => {
@@ -23,3 +24,4 @@ describe("GET /api/user/notifications", () => {
     expect(Array.isArray(data.notifications)).toBe(true);
   });
 });
+

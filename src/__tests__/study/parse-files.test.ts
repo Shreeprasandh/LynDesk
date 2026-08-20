@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 
 describe("Study API Route - Parse Files", () => {
   it("should parse text and pdf upload buffers", () => {
@@ -10,3 +10,4 @@ describe("Study API Route - Parse Files", () => {
     expect(mockFilePayload.size).toBeGreaterThan(0);
   });
 });
+

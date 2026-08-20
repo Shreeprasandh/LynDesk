@@ -1,13 +1,13 @@
 # 🌑 THE SEVEN SHADOWS: Master Audit Report
 
-**Last Scan**: 19/8/2026, 1:03:04 am
-**Files Inspected**: 139
+**Last Scan**: 21/8/2026, 12:40:52 am
+**Files Inspected**: 140
 **Active Target**: ALL 7 SHADOWS
 
 ### 📊 Master Executive Summary
 | Shadow | Codename | Domain | Findings Count | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **5** | ⚠️ Action Required |
+| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **4** | ⚠️ Action Required |
 | 🛡️ **Beta** | Secret Sentinel | Security & Secret Leaks | **3** | 🚨 Critical Risk |
 | 🎯 **Gamma** | Schema Validator | DB & API Contract Alignment | **0** | ✅ Clean |
 | ♿ **Delta** | A11y Inspector | Accessibility & ARIA Compliance | **0** | ✅ Accessible |
@@ -17,25 +17,21 @@
 
 ---
 
-## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (5)
+## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (4)
 
 ### 1. `src/app/api/user/profile/route.ts:12`
 - **Issue**: Un-awaited Next.js 15/16 route params/searchParams
 - **Impact**: In Next.js 15+, route params are Promises. Direct access causes runtime crashes.
 
-### 2. `src/app/auth/callback/route.ts:6`
+### 2. `src/app/auth/callback/page.tsx:18`
 - **Issue**: Un-awaited Next.js 15/16 route params/searchParams
 - **Impact**: In Next.js 15+, route params are Promises. Direct access causes runtime crashes.
 
-### 3. `src/app/auth/callback/route.ts:7`
-- **Issue**: Un-awaited Next.js 15/16 route params/searchParams
-- **Impact**: In Next.js 15+, route params are Promises. Direct access causes runtime crashes.
-
-### 4. `src/app/auth/callback/route.ts:14`
+### 3. `src/app/context/AuthContext.tsx:359`
 - **Issue**: Unhandled async database/fetch operation
 - **Impact**: Network failure or DB error will cause unhandled promise rejection.
 
-### 5. `src/app/context/AuthContext.tsx:353`
+### 4. `src/app/context/AuthContext.tsx:393`
 - **Issue**: Unhandled async database/fetch operation
 - **Impact**: Network failure or DB error will cause unhandled promise rejection.
 

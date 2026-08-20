@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export async function GET(_request: Request) {
+export async function GET() {
   try {
     const res = await fetch("https://unstop.com/api/public/competition/search-v2?opportunity=competitions&per_page=10", {
       headers: {
@@ -96,8 +96,35 @@ export async function GET(_request: Request) {
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
-    if (!url) {
+    if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
+    }
+
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return NextResponse.json({ error: "Only HTTP and HTTPS protocols are allowed" }, { status: 400 });
+    }
+
+    const host = parsedUrl.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".local") ||
+      host.endsWith(".internal") ||
+      /^127\./.test(host) ||
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+      host === "169.254.169.254" ||
+      host === "0.0.0.0" ||
+      host === "[::1]"
+    ) {
+      return NextResponse.json({ error: "Access to private or local network addresses is prohibited" }, { status: 403 });
     }
 
     const isAdobeHackathonUrl = /adobe-university-hackathon-2026/i.test(url) || /1715333/.test(url);

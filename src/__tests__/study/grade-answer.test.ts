@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 
 describe("Study API Route - Grade Answer", () => {
   it("should evaluate answer score structure", () => {
@@ -11,3 +11,4 @@ describe("Study API Route - Grade Answer", () => {
     expect(mockGrading.passed).toBe(true);
   });
 });
+

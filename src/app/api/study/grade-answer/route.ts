@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const groqApiKey = process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqApiKey = process.env.GROQ_API_KEY;
     const cleanUserAns = sanitizeString(userAnswer);
 
     if (groqApiKey) {

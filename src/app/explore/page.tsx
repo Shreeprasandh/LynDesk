@@ -69,6 +69,53 @@ interface Friendship {
   friend: FriendProfile;
 }
 
+const DEFAULT_EVENTS: OpportunityItem[] = [
+  {
+    id: "opp_1",
+    title: "MIT HackHarvard 2026",
+    category: "hackathon",
+    deadline: "Oct 12, 2026",
+    location: "hybrid",
+    level: "global",
+    url: "https://hackharvard.org",
+    description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+    facultyRecommended: true,
+  },
+  {
+    id: "opp_2",
+    title: "Google Code Jam / Summer of Code 2026",
+    category: "contest",
+    deadline: "Nov 01, 2026",
+    location: "online",
+    level: "global",
+    url: "https://summerofcode.withgoogle.com",
+    description: "Global algorithmic contest and open-source mentorship program sponsored by Google Open Source.",
+    facultyRecommended: true,
+  },
+  {
+    id: "opp_3",
+    title: "SIH (Smart India Hackathon) 2026 - Senior Edition",
+    category: "hackathon",
+    deadline: "Nov 20, 2026",
+    location: "in_person",
+    level: "national",
+    url: "https://sih.gov.in",
+    description: "Nationwide initiative to provide students a platform to solve pressing real-world problems.",
+    facultyRecommended: true,
+  },
+  {
+    id: "opp_4",
+    title: "LeetCode Biweekly Contest 142",
+    category: "contest",
+    deadline: "This Saturday",
+    location: "online",
+    level: "global",
+    url: "https://leetcode.com/contest",
+    description: "90-minute competitive programming contest with 4 algorithmic problems.",
+    facultyRecommended: false,
+  },
+];
+
 export default function ExplorePage() {
   const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -121,53 +168,6 @@ export default function ExplorePage() {
   const [eventSearchQuery, setEventSearchQuery] = useState("");
   const [eventCategoryFilter, setEventCategoryFilter] = useState("");
 
-  const defaultEvents: OpportunityItem[] = [
-    {
-      id: "opp_1",
-      title: "MIT HackHarvard 2026",
-      category: "hackathon",
-      deadline: "Oct 12, 2026",
-      location: "hybrid",
-      level: "global",
-      url: "https://hackharvard.org",
-      description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
-      facultyRecommended: true,
-    },
-    {
-      id: "opp_2",
-      title: "Google Code Jam / Summer of Code 2026",
-      category: "contest",
-      deadline: "Nov 01, 2026",
-      location: "online",
-      level: "global",
-      url: "https://summerofcode.withgoogle.com",
-      description: "Global algorithmic contest and open-source mentorship program sponsored by Google Open Source.",
-      facultyRecommended: true,
-    },
-    {
-      id: "opp_3",
-      title: "SIH (Smart India Hackathon) 2026 - Senior Edition",
-      category: "hackathon",
-      deadline: "Nov 20, 2026",
-      location: "in_person",
-      level: "national",
-      url: "https://sih.gov.in",
-      description: "Nationwide initiative to provide students a platform to solve pressing real-world problems.",
-      facultyRecommended: true,
-    },
-    {
-      id: "opp_4",
-      title: "LeetCode Biweekly Contest 142",
-      category: "contest",
-      deadline: "This Saturday",
-      location: "online",
-      level: "global",
-      url: "https://leetcode.com/contest",
-      description: "90-minute competitive programming contest with 4 algorithmic problems.",
-      facultyRecommended: false,
-    },
-  ];
-
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("ldk_opportunities");
@@ -176,10 +176,10 @@ export default function ExplorePage() {
           try {
             setOpportunities(JSON.parse(stored));
           } catch {
-            setOpportunities(defaultEvents);
+            setOpportunities(DEFAULT_EVENTS);
           }
         } else {
-          setOpportunities(defaultEvents);
+          setOpportunities(DEFAULT_EVENTS);
         }
       });
     }

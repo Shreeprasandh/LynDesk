@@ -18,6 +18,14 @@ export async function POST(request: Request) {
     let targetEmail = trimmed.toLowerCase();
 
     // Initialize Supabase Admin client
+    if (!supabaseUrl || !serviceKey) {
+      // If valid email syntax, allow offline OTP generation or return 503
+      const val = validateEmail(targetEmail);
+      if (!val.isValidSyntax) {
+        return NextResponse.json({ error: "Invalid email format." }, { status: 400 });
+      }
+      return NextResponse.json({ error: "Server database configuration missing" }, { status: 503 });
+    }
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     // If input is a username, resolve to email from profiles table

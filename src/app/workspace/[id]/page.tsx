@@ -578,7 +578,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [roomMembers, setRoomMembers] = useState<TeamMember[]>([]);
   const [showActiveMembersModal, setShowActiveMembersModal] = useState(false);
-  const [myCustomStatus, setMyCustomStatus] = useState<string>(() => {
+  const [myCustomStatus] = useState<string>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem(`ldk_my_custom_status_${id}`) || "Active";
     }

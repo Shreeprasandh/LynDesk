@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 
 describe("Study API Route - Generate Lessons", () => {
   it("should validate input payload parameters", () => {
@@ -8,3 +8,4 @@ describe("Study API Route - Generate Lessons", () => {
     expect(pathTitle).toBe("Data Structures & Algorithms");
   });
 });
+
