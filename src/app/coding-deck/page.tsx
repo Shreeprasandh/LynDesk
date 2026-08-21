@@ -16,6 +16,7 @@ import {
   AlertCircle, 
   TrendingUp,
   Sparkles,
+  Flame,
   RotateCw,
   FolderKanban,
   Lock,
@@ -43,7 +44,11 @@ interface PlatformStats {
     difficulty: string;
     date: string;
     completed: boolean;
+    hasSolvedToday?: boolean;
+    isStreakMaintained?: boolean;
   } | null;
+  hasSolvedToday?: boolean;
+  isStreakMaintained?: boolean;
   leetcodeStreak?: number;
   activeYears?: number[];
 }
@@ -411,14 +416,16 @@ export default function CodingDeckPage() {
           const title = leetcodeStats.dailyChallenge.title || "Daily Challenge";
           const diff = leetcodeStats.dailyChallenge.difficulty || "Easy";
           const streak = leetcodeStats.leetcodeStreak || 0;
+          const isDCCDone = Boolean(leetcodeStats.dailyChallenge.completed);
+          const isStreakSafe = Boolean(leetcodeStats.hasSolvedToday || leetcodeStats.dailyChallenge.hasSolvedToday || leetcodeStats.dailyChallenge.isStreakMaintained);
 
           if (typeof window !== "undefined") {
             const userKey = user ? `ldk_user_notifications_${user.id}` : "ldk_global_notifications";
             const stored = localStorage.getItem(userKey);
             let list = stored ? JSON.parse(stored) : [];
 
-            if (leetcodeStats.dailyChallenge.completed) {
-              // If today's challenge is completed, purge streak warnings!
+            if (isDCCDone || isStreakSafe) {
+              // If streak is already maintained today, purge streak warning alarms!
               list = list.filter((n: any) => 
                 !n.id?.startsWith("notif_streak_warning_") && 
                 !n.title?.includes("Streak at Risk") && 
@@ -427,8 +434,9 @@ export default function CodingDeckPage() {
               localStorage.setItem(userKey, JSON.stringify(list));
               window.dispatchEvent(new Event("ldk_notifications_update"));
             } else {
+              // Only trigger urgency if 0 submissions have been made today
               const message = streak > 0 
-                ? `Today's daily challenge “${title}” (${diff}) is pending. Solve now to maintain your ${streak}-day streak!`
+                ? `You haven't solved any problems today. Solve a challenge now to maintain your ${streak}-day streak!`
                 : `Today's daily challenge “${title}” (${diff}) is pending. Solve now to start your daily challenge streak!`;
               
               // Filter out old warning variants
@@ -945,27 +953,57 @@ export default function CodingDeckPage() {
 
         {/* Banner Alert for outstanding daily problem */}
         {leetcodeUser && stats.leetcode?.dailyChallenge && !stats.leetcode.dailyChallenge.completed && (
-          <div className="border border-yellow-500/40 bg-yellow-500/10 p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
-            <div className="flex items-center gap-3 min-w-0">
-              <AlertCircle className="text-yellow-500 flex-shrink-0" size={18} />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-semibold text-txt-main">LeetCode Daily Challenge Pending</span>
-                <span className="text-[10px] text-txt-sub">
-                  Today&apos;s daily challenge <strong className="text-yellow-500 font-mono font-bold">“{stats.leetcode.dailyChallenge.title}”</strong> ({stats.leetcode.dailyChallenge.difficulty}) is pending. {stats.leetcode?.leetcodeStreak && stats.leetcode.leetcodeStreak > 0 ? `Solve now to maintain your ${stats.leetcode.leetcodeStreak}-day streak!` : "Solve now to start your daily challenge streak!"}
-                </span>
+          (stats.leetcode.hasSolvedToday || stats.leetcode.dailyChallenge.hasSolvedToday || stats.leetcode.dailyChallenge.isStreakMaintained) ? (
+            <div className="border border-emerald-500/30 bg-emerald-500/5 p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <Sparkles className="text-emerald-400 flex-shrink-0" size={18} />
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-txt-main flex items-center gap-1.5">
+                      <Flame size={13} className="text-amber-500 shrink-0" />
+                      Daily Streak Maintained ({stats.leetcode.leetcodeStreak || 1} Days)
+                    </span>
+                    <span className="text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded">Active Today</span>
+                  </div>
+                  <span className="text-[10px] text-txt-sub mt-0.5">
+                    You solved problems today! Today&apos;s featured challenge <strong className="text-emerald-300 font-mono font-medium">“{stats.leetcode.dailyChallenge.title}”</strong> ({stats.leetcode.dailyChallenge.difficulty}) is available to earn your DCC badge.
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <a 
+                  href={stats.leetcode.dailyChallenge.link} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="h-8 px-4 border border-emerald-500/40 hover:bg-emerald-500/15 text-emerald-400 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit whitespace-nowrap"
+                >
+                  Solve Featured Challenge <ExternalLink size={10} />
+                </a>
               </div>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <a 
-                href={stats.leetcode.dailyChallenge.link} 
-                target="_blank" 
-                rel="noreferrer"
-                className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit whitespace-nowrap"
-              >
-                Solve on LeetCode <ExternalLink size={10} />
-              </a>
+          ) : (
+            <div className="border border-yellow-500/40 bg-yellow-500/10 p-4 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
+              <div className="flex items-center gap-3 min-w-0">
+                <AlertCircle className="text-yellow-500 flex-shrink-0" size={18} />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-txt-main">LeetCode Daily Streak at Risk</span>
+                  <span className="text-[10px] text-txt-sub">
+                    No submissions recorded today. Solve today&apos;s challenge <strong className="text-yellow-500 font-mono font-bold">“{stats.leetcode.dailyChallenge.title}”</strong> ({stats.leetcode.dailyChallenge.difficulty}) to maintain your {stats.leetcode?.leetcodeStreak || 0}-day streak!
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <a 
+                  href={stats.leetcode.dailyChallenge.link} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="h-8 px-4 border border-yellow-500/50 hover:bg-yellow-500/20 text-yellow-500 text-[10px] font-mono uppercase tracking-wider rounded-sm flex items-center justify-center gap-1.5 transition-all w-fit whitespace-nowrap"
+                >
+                  Solve on LeetCode <ExternalLink size={10} />
+                </a>
+              </div>
             </div>
-          </div>
+          )
         )}
 
         {leetcodeUser && showSuccessBanner && stats.leetcode?.dailyChallenge?.completed && (

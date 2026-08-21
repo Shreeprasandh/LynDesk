@@ -268,13 +268,27 @@ export async function GET(request: Request) {
           return subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate || subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
         });
 
+        // Check if ANY problem was solved today across rolling 32h window or today's date
+        const hasSolvedAnyToday = recentSubmissions.some((sub: any) => {
+          const subTimeMs = parseInt(sub.timestamp) * 1000;
+          if (isNaN(subTimeMs)) return false;
+          const diffHours = (nowMs - subTimeMs) / (1000 * 60 * 60);
+          if (diffHours >= 0 && diffHours <= 32) return true;
+          const subDate = new Date(subTimeMs);
+          const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
+          const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
+          return subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
+        });
+
         dailyChallengeCompleted = hasSolvedExactDaily;
         dailyChallengeInfo = {
           title: dailyChallengeData.question?.title,
           link: `https://leetcode.com${dailyChallengeData.link}`,
           difficulty: dailyChallengeData.question?.difficulty,
           date: dailyChallengeData.date,
-          completed: dailyChallengeCompleted
+          completed: dailyChallengeCompleted,
+          hasSolvedToday: hasSolvedAnyToday || hasSolvedExactDaily,
+          isStreakMaintained: hasSolvedAnyToday || hasSolvedExactDaily
         };
       }
 
@@ -494,6 +508,8 @@ export async function GET(request: Request) {
         activeYears,
         submissionCalendar,
         submissionCalendarPrivate,
+        hasSolvedToday: Boolean(dailyChallengeInfo?.hasSolvedToday),
+        isStreakMaintained: Boolean(dailyChallengeInfo?.isStreakMaintained),
         dailyChallenge: dailyChallengeInfo
       });
     }
