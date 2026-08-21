@@ -205,7 +205,7 @@ export default function StudyDeskPage() {
           .select("*")
           .eq("user_id", user.id);
 
-        let loadedDsaMap: UserDSAProgressMap = dsaProgressMap;
+        let loadedDsaMap: UserDSAProgressMap = {};
         if (cloudDsa && cloudDsa.length > 0) {
           const map: UserDSAProgressMap = {};
           cloudDsa.forEach((row: any) => {

@@ -214,6 +214,8 @@ const POPULAR_LOCATIONS = [
     setOCollegeSuggestions([]);
     setODeptSuggestions([]);
     setOLocationSuggestions([]);
+    setOCollegeSuggestion(null);
+    setODeptSuggestion(null);
   };
 
   // Legal Agreement & Gating States
@@ -1795,6 +1797,11 @@ const POPULAR_LOCATIONS = [
                               </li>
                             ))}
                           </ul>
+                        )}
+                        {oDeptSuggestion && oDeptSuggestions.length === 0 && (
+                          <span className="text-[9px] text-accent-main font-mono mt-0.5 animate-fade-in">
+                            Did you mean: <strong className="underline cursor-pointer" onClick={() => { setODepartment(oDeptSuggestion); setODeptSuggestion(null); }}>{oDeptSuggestion}</strong>?
+                          </span>
                         )}
                       </div>
                       <div className="flex flex-col gap-1">

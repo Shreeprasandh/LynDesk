@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function getWorkspaceUuid(rawId: string): string {
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId);
-  if (isUuid) return rawId;
-  let hash = 0;
-  for (let i = 0; i < rawId.length; i++) {
-    hash = (hash << 5) - hash + rawId.charCodeAt(i);
-    hash |= 0;
-  }
-  const hex = Math.abs(hash).toString(16).padStart(8, "0");
-  return `00000000-0000-4000-8000-${hex.padStart(12, "0")}`;
-}
+import { createAdminClient } from "@/app/lib/supabaseServer";
+import { getWorkspaceUuid } from "@/app/lib/workspaceUtils";
 
 export async function GET(req: NextRequest) {
   const urlParams = req.nextUrl.searchParams;
@@ -22,17 +11,7 @@ export async function GET(req: NextRequest) {
   }
 
   const targetUuid = getWorkspaceUuid(workspaceId);
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    return NextResponse.json({ presence: [] });
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
+  const supabaseAdmin = createAdminClient();
 
   try {
     // 1. Try querying workspace_presence table
@@ -111,17 +90,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ error: "Missing configuration" }, { status: 500 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
+    const supabaseAdmin = createAdminClient();
     const targetUuid = getWorkspaceUuid(workspaceId);
     const nowIso = new Date().toISOString();
 

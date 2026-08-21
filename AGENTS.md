@@ -55,7 +55,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 9. Major Code Change & Permission Rule
 - **Mandatory Approval for Large Changes**: Whenever fixing issues from Shadow reports or performing code refactors, if a change touches >3 files, modifies database schemas/models, restructures core architectural flows, or rewrites significant component logic, **ALWAYS present a proposed change plan and ask Sir for explicit permission first** before making code edits.
 
-## 10. The Seven Shadows Protocol
+## 10. The Seven Shadows & Full Database Audit Protocol
 - **Squad Identity**: The automated auditing squad is known as **The Seven Shadows**:
   1. **Alpha** (`alpha` / Logic Auditor): Next.js 15/16 async params, unhandled promises, logic bugs.
   2. **Beta** (`beta` / Secret Sentinel): Exposed API keys, secrets, unauthenticated leaks.
@@ -64,10 +64,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
   5. **Epsilon** (`epsilon` / Test Sentinel): API route test suite coverage.
   6. **Zeta** (`zeta` / Performance Accelerator): Leftover debug console.logs, bundle overhead.
   7. **Eta** (`eta` / RLS Guardian): Supabase RLS policies and DB table security.
+- **Full Database Audit Mandate**: Whenever **The Seven Shadows** arise (or upon audit triggers: `arise shadows`, `audit db`, `pre-commit audit`, `git commit`), Luna must ALWAYS run the live full database schema, table, and column parity audit (`node scripts/audit_all_db_columns.js`) alongside the Shadows audit to verify 100% database health, column parity, and RLS policy enforcement.
 - **Global Reference**: Luna must always refer to the squad as **The Seven Shadows** and address members by their respective names (**Alpha**, **Beta**, **Gamma**, **Delta**, **Epsilon**, **Zeta**, **Eta**).
 - **Execution & Trigger Phrases**:
   - **Wake Up / Unpause (Full Squad)**: `wake up shadows`, `shadows wake up`.
   - **Wake Up / Unpause (Individual)**: `wake up [name]`, `[name] wake up` (e.g. `wake up alpha`, `beta wake up`).
-  - **Audit Execution / Run (Full Squad)**: `arise shadows`, `shadows arise` (or `git commit`, `run shadows`, `shadows run`).
+  - **Audit Execution / Run (Full Squad + DB Audit)**: `arise shadows`, `shadows arise` (or `git commit`, `run shadows`, `shadows run`, `audit db`).
   - **Audit Execution / Run (Individual)**: `arise [name]`, `[name] arise` (or `run [name]`, `[name] run`) (e.g. `arise alpha`, `beta arise`).
   - **Halt / Sleep**: `disable shadows`, `halt shadows`, `sleep shadows`, `shadows sleep`.

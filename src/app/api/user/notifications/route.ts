@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function GET(request: Request) {
   try {
@@ -10,12 +10,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ notifications: [] });
     }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const authHeader = request.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "").trim();
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const supabaseAdmin = createAdminClient();
+
+    if (token) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+      if (user && user.id !== userId) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      }
+    }
 
     const { data: dbData, error } = await supabaseAdmin
       .from("notifications")
@@ -52,35 +57,42 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Authorization credentials required" }, { status: 401 });
+    }
+    const token = authHeader.replace("Bearer ", "").trim();
+
     const body = await request.json();
     const { id, userId, title, actionUrl } = body;
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabaseAdmin = createAdminClient();
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json({ success: false, error: "Missing configuration" }, { status: 500 });
+    if (authErr || !user) {
+      return NextResponse.json({ error: "Invalid authentication session" }, { status: 401 });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
+    const targetUserId = userId || user.id;
+    if (userId && userId !== user.id) {
+      return NextResponse.json({ error: "Unauthorized operation" }, { status: 403 });
+    }
 
     if (id && !id.startsWith("n_cron_") && !id.startsWith("notif_local_")) {
-      await supabaseAdmin.from("notifications").delete().eq("id", id);
+      await supabaseAdmin.from("notifications").delete().eq("id", id).eq("user_id", user.id);
     }
 
-    if (userId) {
+    if (targetUserId) {
       if (title) {
-        await supabaseAdmin.from("notifications").delete().eq("user_id", userId).eq("title", title);
+        await supabaseAdmin.from("notifications").delete().eq("user_id", targetUserId).eq("title", title);
       }
       if (actionUrl) {
-        await supabaseAdmin.from("notifications").delete().eq("user_id", userId).eq("link_url", actionUrl);
+        await supabaseAdmin.from("notifications").delete().eq("user_id", targetUserId).eq("link_url", actionUrl);
       }
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err?.message || "Failed deleting notifications" }, { status: 500 });
   }
 }

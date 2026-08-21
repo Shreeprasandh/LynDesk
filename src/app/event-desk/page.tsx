@@ -725,11 +725,11 @@ export default function Home() {
       }
 
       setEvents(() => {
-        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : "ldk_joined_workspaces";
-        const userDeletedKey = user?.id ? `ldk_deleted_workspaces_${user.id}` : "ldk_deleted_workspaces";
+        const userJoinedKey = user?.id ? `ldk_joined_workspaces_${user.id}` : null;
+        const userDeletedKey = user?.id ? `ldk_deleted_workspaces_${user.id}` : null;
 
-        const joinedStr = typeof window !== "undefined"
-          ? (localStorage.getItem(userJoinedKey) || localStorage.getItem("ldk_joined_workspaces"))
+        const joinedStr = typeof window !== "undefined" && userJoinedKey
+          ? localStorage.getItem(userJoinedKey)
           : null;
         const joinedIds: string[] = joinedStr ? JSON.parse(joinedStr) : [];
         
@@ -782,8 +782,8 @@ export default function Home() {
           }
         });
 
-        const deletedStr = typeof window !== "undefined"
-          ? (localStorage.getItem(userDeletedKey) || localStorage.getItem("ldk_deleted_workspaces"))
+        const deletedStr = typeof window !== "undefined" && userDeletedKey
+          ? localStorage.getItem(userDeletedKey)
           : null;
         const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
 

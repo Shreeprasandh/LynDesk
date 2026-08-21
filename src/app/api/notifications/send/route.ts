@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function POST(req: Request) {
   try {
@@ -11,40 +11,37 @@ export async function POST(req: Request) {
     }
 
     const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "") || "";
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Authorization credentials required" }, { status: 401 });
+    }
+    const token = authHeader.replace("Bearer ", "").trim();
 
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    const supabaseAdmin = createAdminClient();
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
 
-    if (!url || !serviceKey) {
-      return NextResponse.json({ error: "Missing Supabase configuration" }, { status: 500 });
+    if (authErr || !user) {
+      return NextResponse.json({ error: "Invalid authentication session" }, { status: 401 });
     }
 
-    const supabaseAdmin = createClient(url, serviceKey, {
-      auth: { persistSession: false }
+    const effectiveSenderId = senderId || user.id;
+    if (senderId && senderId !== user.id) {
+      return NextResponse.json({ error: "Sender identity mismatch" }, { status: 403 });
+    }
+
+    // 1. Insert notification into database notifications table
+    const { error: dbError } = await supabaseAdmin.from("notifications").insert({
+      user_id: recipientId,
+      sender_id: effectiveSenderId,
+      title: title,
+      content: message,
+      link_url: actionUrl || "/explore",
+      type: type || "invite",
+      is_read: false,
+      created_at: new Date().toISOString()
     });
 
-    if (token) {
-      const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized session" }, { status: 401 });
-      }
-    }
-
-    // 1. Try inserting notification into database notifications table
-    try {
-      await supabaseAdmin.from("notifications").insert({
-        user_id: recipientId,
-        sender_id: senderId || null,
-        title: title,
-        content: message,
-        link_url: actionUrl || "/explore",
-        type: type || "invite",
-        is_read: false,
-        created_at: new Date().toISOString()
-      });
-    } catch {
-      // Table not migrated yet, safe fallback to websocket broadcast
+    if (dbError) {
+      console.warn("Notification DB insert warning:", dbError.message);
     }
 
     // 2. Broadcast via Supabase Realtime WebSocket to recipient channel & global bus
@@ -55,17 +52,19 @@ export async function POST(req: Request) {
           channel.send({
             type: "broadcast",
             event: "ldk_invite_sent",
-            payload: { recipientId, senderId, title, message, actionUrl, type: type || "invite" }
-          }).catch(() => {});
+            payload: { recipientId, senderId: effectiveSenderId, title, message, actionUrl, type: type || "invite" }
+          }).finally(() => {
+            supabaseAdmin.removeChannel(channel);
+          });
         }
       });
     } catch (rtErr) {
-      console.warn("Realtime broadcast exception:", rtErr);
+      console.warn("Realtime broadcast notice:", rtErr);
     }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error sending notification via API route:", error);
-    return NextResponse.json({ success: true, warning: "Fallback executed" });
+    return NextResponse.json({ error: error?.message || "Failed sending notification" }, { status: 500 });
   }
 }

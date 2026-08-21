@@ -472,11 +472,23 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
                 xpValue: sec.title?.toUpperCase().includes("GRAND PATH EXAM") ? 50 : 10,
                 estimatedMinutes: typeof les.estimatedMinutes === "number" ? les.estimatedMinutes : 5,
                 completed: false,
+                videoResource: les.videoResource ? {
+                  title: sanitizeTextOutput(les.videoResource.title) || `Understanding ${les.title}`,
+                  youtubeSearchQuery: sanitizeTextOutput(les.videoResource.youtubeSearchQuery) || `${les.title} tutorial`,
+                  duration: les.videoResource.duration || "10 mins"
+                } : undefined,
+                practiceProblems: Array.isArray(les.practiceProblems) ? les.practiceProblems.map((p: any) => ({
+                  title: sanitizeTextOutput(p.title) || "Core Practice Problem",
+                  platform: p.platform || "LeetCode",
+                  difficulty: p.difficulty || "Easy",
+                  url: p.url || `https://leetcode.com/problemset/all/?search=${encodeURIComponent(les.title || "")}`
+                })) : [],
                 cards: (les.cards || []).map((c: any) => ({
                   title: sanitizeTextOutput(c.title) || "Core Concept",
                   badge: sanitizeTextOutput(c.badge) || "Summary",
                   content: sanitizeTextOutput(c.content) || "Key definitions and operational rules.",
                   keyTakeaway: sanitizeTextOutput(c.keyTakeaway) || "Focus on primary mechanisms.",
+                  diagramMermaid: c.diagramMermaid ? sanitizeTextOutput(c.diagramMermaid) : undefined,
                   example: sanitizeTextOutput(c.example) || undefined,
                 })),
                 questions: (les.questions || []).map((q: any) => {

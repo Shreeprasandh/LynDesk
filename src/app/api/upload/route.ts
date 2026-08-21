@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,36 +9,34 @@ export async function POST(req: NextRequest) {
     const ALLOWED_BUCKETS = ["project-vaults", "avatars"];
     const bucket = ALLOWED_BUCKETS.includes(rawBucket) ? rawBucket : "project-vaults";
 
-    const rawPath = (formData.get("path") as string) || "";
-    const safeFileName = (file?.name || "file").replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const sanitizedPath = rawPath 
-      ? rawPath.replace(/\.\./g, "").replace(/^\/+/, "")
-      : `uploads/${Date.now()}_${safeFileName}`;
-
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json({ error: "Authorization credentials required" }, { status: 401 });
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace("Bearer ", "").trim();
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return NextResponse.json({ error: "Missing Supabase server configuration" }, { status: 500 });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
-    });
-
+    const supabaseAdmin = createAdminClient();
     const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
     if (authErr || !user) {
       return NextResponse.json({ error: "Invalid authentication session" }, { status: 401 });
+    }
+
+    const safeFileName = (file.name || "file").replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const rawPath = (formData.get("path") as string) || "";
+    
+    // Namespace paths by user.id to enforce tenant isolation
+    let sanitizedPath: string;
+    if (bucket === "avatars") {
+      sanitizedPath = `${user.id}/avatar_${Date.now()}_${safeFileName}`;
+    } else {
+      const cleanSubPath = rawPath ? rawPath.replace(/\.\./g, "").replace(/^\/+/, "") : "";
+      sanitizedPath = cleanSubPath 
+        ? `${user.id}/${cleanSubPath}`
+        : `uploads/${user.id}/${Date.now()}_${safeFileName}`;
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -65,6 +63,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("Server upload route error:", err);
-    return NextResponse.json({ error: err.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
   }
 }

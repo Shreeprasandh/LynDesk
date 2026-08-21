@@ -12,8 +12,8 @@ function sanitizeString(str?: string): string {
     .replace(/<<[\s\S]*?>>/g, " ")
     .replace(/stream[\s\S]*?endstream/gi, " ")
     .replace(/\/(Filter|FlateDecode|Length|MediaBox|Font|Type|Page)/gi, " ")
-    .replace(/[^\x20-\x7E\n\r\t]/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/[ \t]+/g, " ")
     .trim();
 }
 

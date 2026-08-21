@@ -107,8 +107,8 @@ export async function addWallCalendarEvent(evt: Omit<WallEvent, "id"> & { id?: s
   // 2. Save to Supabase DB if user is authenticated
   if (userId) {
     try {
-      await supabase.from("wall_calendar_events").upsert({
-        id: eventId.startsWith("evt_") ? undefined : eventId,
+      const isUuid = evt.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(evt.id);
+      const payload: any = {
         user_id: userId,
         title: evt.title,
         event_date: evt.date,
@@ -118,7 +118,11 @@ export async function addWallCalendarEvent(evt: Omit<WallEvent, "id"> & { id?: s
         link: evt.link || "",
         source_type: evt.source_type || "custom",
         source_id: evt.source_id || "",
-      });
+      };
+      if (isUuid) {
+        payload.id = evt.id;
+      }
+      await supabase.from("wall_calendar_events").upsert(payload);
     } catch {}
   }
 
@@ -137,11 +141,20 @@ export async function deleteWallCalendarEvent(idOrSourceId: string, userId?: str
   // 2. Delete from Supabase DB
   if (userId) {
     try {
-      await supabase
-        .from("wall_calendar_events")
-        .delete()
-        .or(`id.eq.${idOrSourceId},source_id.eq.${idOrSourceId}`)
-        .eq("user_id", userId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSourceId);
+      if (isUuid) {
+        await supabase
+          .from("wall_calendar_events")
+          .delete()
+          .or(`id.eq.${idOrSourceId},source_id.eq.${idOrSourceId}`)
+          .eq("user_id", userId);
+      } else {
+        await supabase
+          .from("wall_calendar_events")
+          .delete()
+          .eq("source_id", idOrSourceId)
+          .eq("user_id", userId);
+      }
     } catch {}
   }
 }

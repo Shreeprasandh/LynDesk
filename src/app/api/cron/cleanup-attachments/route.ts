@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -9,42 +9,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    return NextResponse.json({ error: "Missing Supabase configuration" }, { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
+  const supabaseAdmin = createAdminClient();
 
   try {
     const tenDaysAgo = new Date();
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
 
-    // List chat files in project-vaults bucket
-    const { data: files, error: listError } = await supabaseAdmin.storage
+    const filesToDelete: string[] = [];
+
+    // 1. List root folder in project-vaults
+    const { data: rootFiles } = await supabaseAdmin.storage
       .from("project-vaults")
       .list("", { limit: 1000 });
 
-    if (listError) {
-      return NextResponse.json({ error: listError.message }, { status: 500 });
-    }
+    (rootFiles || []).forEach((file) => {
+      if (file.id && file.created_at && new Date(file.created_at) < tenDaysAgo) {
+        filesToDelete.push(file.name);
+      }
+    });
 
-    if (!files || files.length === 0) {
-      return NextResponse.json({ message: "No files found to clean up", deletedCount: 0 });
-    }
+    // 2. List uploads/ folder in project-vaults
+    const { data: uploadFiles } = await supabaseAdmin.storage
+      .from("project-vaults")
+      .list("uploads", { limit: 1000 });
 
-    // Filter files created > 10 days ago
-    const filesToDelete = files
-      .filter((file) => {
-        if (!file.created_at) return false;
-        const createdAt = new Date(file.created_at);
-        return createdAt < tenDaysAgo;
-      })
-      .map((file) => file.name);
+    (uploadFiles || []).forEach((file) => {
+      if (file.id && file.created_at && new Date(file.created_at) < tenDaysAgo) {
+        filesToDelete.push(`uploads/${file.name}`);
+      }
+    });
 
     if (filesToDelete.length === 0) {
       return NextResponse.json({ message: "No expired files older than 10 days", deletedCount: 0 });
@@ -66,6 +59,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("Cleanup error:", err);
-    return NextResponse.json({ error: err.message || "Internal Error" }, { status: 500 });
+    return NextResponse.json({ error: err?.message || "Internal Error" }, { status: 500 });
   }
 }

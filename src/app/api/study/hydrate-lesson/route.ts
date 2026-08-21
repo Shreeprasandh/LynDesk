@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 function sanitizeString(str: any): string {
   if (typeof str !== "string") return "";
   return str
-    .replace(/[\uE000-\uF8FF]/g, "")
-    .replace(/[\uD83C-\uD83E][\uDC00-\uDFFF]/g, "")
-    .replace(/[^\x00-\x7F]/g, "")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .trim();
 }
 
@@ -22,12 +21,13 @@ export async function POST(req: Request) {
       materialContext = ""
     } = body;
 
+    const geminiApiKey = process.env.GEMINI_API_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;
 
-    if (!groqApiKey) {
+    if (!geminiApiKey && !groqApiKey) {
       return NextResponse.json({
         success: false,
-        message: "Missing GROQ_API_KEY"
+        message: "Missing AI configuration (GEMINI_API_KEY or GROQ_API_KEY)"
       }, { status: 500 });
     }
 
@@ -164,27 +164,60 @@ Description: "${lessonDescription}"
 Depth Mode: "${depthMode}"
 Student Remediations: ${mistakesSummary}${materialPromptSection}`;
 
-    let groqRes: Response;
-    try {
-      groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${groqApiKey.trim()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.35,
-          max_tokens: 4000,
-        }),
-      });
-    } catch (fetchErr) {
-      console.error("Groq single lesson hydration fetch error:", fetchErr);
+    let jsonText = "";
+
+    // 1. Try Google Generative AI (Gemini)
+    if (geminiApiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiApiKey.trim());
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.0-flash",
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.35,
+            maxOutputTokens: 4000
+          },
+          systemInstruction: systemPrompt
+        });
+
+        const result = await model.generateContent(userPrompt);
+        jsonText = result.response.text();
+      } catch (geminiErr) {
+        console.warn("Gemini lesson hydration error, falling back to Groq:", geminiErr);
+      }
+    }
+
+    // 2. Fallback to Groq API
+    if (!jsonText && groqApiKey) {
+      try {
+        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqApiKey.trim()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.35,
+            max_tokens: 4000,
+          }),
+        });
+        if (groqRes.ok) {
+          const groqData = await groqRes.json();
+          jsonText = groqData?.choices?.[0]?.message?.content || "";
+        }
+      } catch (fetchErr) {
+        console.error("Groq single lesson hydration fetch error:", fetchErr);
+      }
+    }
+
+    // 3. If AI unavailable, return high-yield offline template
+    if (!jsonText) {
       return NextResponse.json({
         success: true,
         cards: [
@@ -235,12 +268,6 @@ Student Remediations: ${mistakesSummary}${materialPromptSection}`;
       });
     }
 
-    if (!groqRes.ok) {
-      return NextResponse.json({ success: false, message: "Groq API request failed" }, { status: 500 });
-    }
-
-    const groqData = await groqRes.json();
-    const jsonText = groqData?.choices?.[0]?.message?.content;
     const parsed = JSON.parse(jsonText || "{}");
 
     if (parsed.cards && Array.isArray(parsed.cards) && parsed.cards.length > 0) {

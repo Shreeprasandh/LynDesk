@@ -69,6 +69,26 @@ export async function POST(request: Request) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     storeOtp(targetEmail, otp);
 
+    // Persist OTP in Supabase user metadata for serverless cross-instance verification
+    try {
+      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const matched = authUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === targetEmail
+      );
+      if (matched?.id) {
+        await supabaseAdmin.auth.admin.updateUserById(matched.id, {
+          user_metadata: {
+            ...(matched.user_metadata || {}),
+            reset_otp: otp,
+            reset_otp_expiry: Date.now() + 10 * 60 * 1000,
+            reset_attempts: 0,
+          },
+        });
+      }
+    } catch (metaErr) {
+      console.warn("Failed persisting OTP to auth metadata, relying on memory fallback:", metaErr);
+    }
+
     // Configure Nodemailer transporter
     const transporter = nodemailer.createTransport({
       service: "gmail",

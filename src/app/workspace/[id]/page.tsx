@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use, useState, useEffect, useRef, useCallback, useMemo, useTransition } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { supabase } from "../../lib/supabase";
@@ -9,6 +9,7 @@ import { getCachedWorkspaceSnapshot } from "../../lib/workspacePrefetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
+import LynDeskLoadingCard from "../../components/LynDeskLoadingCard";
 import { 
   ArrowLeft, 
   Paperclip, 
@@ -242,6 +243,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   }, [user?.id]);
 
   const [activeTab, setActiveTab] = useState<"workspace" | "tasks" | "artifacts" | "notes" | "credits">("workspace");
+  const [isWorkspaceHydrating, setIsWorkspaceHydrating] = useState(true);
   const [, startTabTransition] = useTransition();
 
   const handleTabChange = useCallback((nextTab: "workspace" | "tasks" | "artifacts" | "notes" | "credits") => {
@@ -1675,9 +1677,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           console.error("Failed to load claim status: ", e);
         }
       }
+
+      setIsWorkspaceHydrating(false);
     };
 
+    const safetyTimer = setTimeout(() => {
+      setIsWorkspaceHydrating(false);
+    }, 1200);
+
     fetchWorkspaceDetails();
+    return () => clearTimeout(safetyTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user, workspaceTrigger, workspaceUuid]);
 
@@ -3392,8 +3401,31 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
 
-      {/* Main split workspace grid */}
-      <main ref={containerRef} className={`flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-0 ${isResizing ? "select-none" : ""}`}>
+      <AnimatePresence mode="wait">
+        {isWorkspaceHydrating ? (
+          <motion.div
+            key="workspace-hydration-loader"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 flex items-center justify-center p-6 bg-bg-base"
+          >
+            <LynDeskLoadingCard
+              message={projectName && projectName !== "Loading Project..." ? `Initializing ${projectName}...` : "Initializing Workspace..."}
+              subtext="Syncing project vault, realtime channel & team presence..."
+              minHeight="min-h-[500px]"
+            />
+          </motion.div>
+        ) : (
+          <motion.main
+            key="workspace-hydrated-content"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            ref={containerRef}
+            className={`flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row gap-0 ${isResizing ? "select-none" : ""}`}
+          >
         
         {/* ================= COLUMN 1: STAGE TRACKER (Left Specs Panel) ================= */}
         <section 
@@ -4794,7 +4826,9 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
         </section>
 
-      </main>
+          </motion.main>
+        )}
+      </AnimatePresence>
 
       {/* Invite Friends Modal */}
       {isInviteModalOpen && (

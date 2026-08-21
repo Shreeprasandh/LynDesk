@@ -55,15 +55,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User account not found." }, { status: 404 });
     }
 
-    // 2. Verify OTP code
-    const isOtpValid = verifyOtpCode(targetEmail, otp);
+    // 2. Verify OTP code against Supabase user metadata or memory store
+    let isOtpValid = false;
+    const { data: targetUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const meta = targetUser?.user?.user_metadata || {};
+    const metaOtp = meta.reset_otp;
+    const metaExpiry = meta.reset_otp_expiry ? Number(meta.reset_otp_expiry) : 0;
+    const attempts = meta.reset_attempts ? Number(meta.reset_attempts) : 0;
+
+    if (attempts >= 5) {
+      // Lockout exceeded
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: { ...meta, reset_otp: null, reset_otp_expiry: null, reset_attempts: 0 }
+      });
+      return NextResponse.json({ error: "Too many failed attempts. Please request a new OTP code." }, { status: 429 });
+    }
+
+    if (metaOtp && metaExpiry > Date.now()) {
+      if (metaOtp.trim() === otp.trim()) {
+        isOtpValid = true;
+      } else {
+        // Increment attempts
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { ...meta, reset_attempts: attempts + 1 }
+        });
+      }
+    } else {
+      // Check memory fallback
+      isOtpValid = verifyOtpCode(targetEmail, otp);
+    }
+
     if (!isOtpValid) {
       return NextResponse.json({ error: "Invalid or expired 6-digit OTP code." }, { status: 400 });
     }
 
-    // 3. Update password via Supabase Admin API
+    // 3. Update password via Supabase Admin API and wipe OTP metadata
+    const cleanMeta = { ...meta };
+    delete cleanMeta.reset_otp;
+    delete cleanMeta.reset_otp_expiry;
+    delete cleanMeta.reset_attempts;
+
     const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword,
+      user_metadata: cleanMeta,
     });
 
     if (updateErr) {

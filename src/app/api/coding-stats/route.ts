@@ -235,27 +235,39 @@ export async function GET(request: Request) {
       let dailyChallengeInfo = null;
       
       if (dailyChallengeData) {
-        const dailyDate = dailyChallengeData.date; // e.g. "2026-07-21"
-        const dailySlug = dailyChallengeData.question?.titleSlug;
-        const dailyTitle = dailyChallengeData.question?.title;
+        const dailyDate = dailyChallengeData.date; // e.g. "2026-08-21"
+        const rawDailySlug = dailyChallengeData.question?.titleSlug || "";
+        const rawDailyTitle = dailyChallengeData.question?.title || "";
+        const normDailySlug = rawDailySlug.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const normDailyTitle = rawDailyTitle.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+        const nowMs = Date.now();
         const todayUTC = new Date().toISOString().split("T")[0];
         const todayLocal = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
         
-        // Check if exact daily challenge problem was solved today
+        // Check if exact daily challenge problem was solved (within rolling 32-hour window or matching date)
         const hasSolvedExactDaily = recentSubmissions.some((sub: any) => {
-          const matchSlug = sub.titleSlug && dailySlug && sub.titleSlug.toLowerCase() === dailySlug.toLowerCase();
-          const matchTitle = sub.title && dailyTitle && sub.title.toLowerCase() === dailyTitle.toLowerCase();
+          const subSlug = (sub.titleSlug || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          const subTitle = (sub.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          
+          const matchSlug = subSlug && normDailySlug && (subSlug === normDailySlug || subSlug.includes(normDailySlug) || normDailySlug.includes(subSlug));
+          const matchTitle = subTitle && normDailyTitle && (subTitle === normDailyTitle || subTitle.includes(normDailyTitle) || normDailyTitle.includes(subTitle));
           if (!matchSlug && !matchTitle) return false;
           
-          const subDate = new Date(parseInt(sub.timestamp) * 1000);
+          const subTimeMs = parseInt(sub.timestamp) * 1000;
+          if (isNaN(subTimeMs)) return false;
+
+          const diffHours = (nowMs - subTimeMs) / (1000 * 60 * 60);
+          // If solved within the last 32 hours, it counts as today's active window across all timezones
+          if (diffHours >= 0 && diffHours <= 32) return true;
+
+          const subDate = new Date(subTimeMs);
           const subDateKeyUTC = `${subDate.getUTCFullYear()}-${String(subDate.getUTCMonth() + 1).padStart(2, "0")}-${String(subDate.getUTCDate()).padStart(2, "0")}`;
           const subDateKeyLocal = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, "0")}-${String(subDate.getDate()).padStart(2, "0")}`;
           
           return subDateKeyUTC === dailyDate || subDateKeyLocal === dailyDate || subDateKeyUTC === todayUTC || subDateKeyLocal === todayLocal;
         });
 
-        // Daily Challenge completion requires solving the EXACT unique daily question assigned by LeetCode today
         dailyChallengeCompleted = hasSolvedExactDaily;
         dailyChallengeInfo = {
           title: dailyChallengeData.question?.title,
