@@ -1,5 +1,4 @@
 import React from "react";
-import LynDeskLoadingCard from "./components/LynDeskLoadingCard";
 
 export default function GlobalLoadingSkeleton() {
   return (
