@@ -51,17 +51,17 @@ export default function LynDeskLoadingCard({
         </div>
 
         {/* Subtle Animated Progress Shimmer */}
-        <div className="w-48 h-1 bg-bg-card border border-border-main/50 rounded-full overflow-hidden relative mt-1">
+        <div className="w-52 h-1 bg-bg-card border border-border-main/50 rounded-full overflow-hidden relative mt-1">
           <motion.div
             animate={{
-              x: ["-100%", "100%"]
+              x: ["-100%", "200%"]
             }}
             transition={{
-              duration: 1.5,
+              duration: 1.4,
               repeat: Infinity,
               ease: "easeInOut"
             }}
-            className="w-1/2 h-full bg-txt-main rounded-full"
+            className="w-1/2 h-full bg-gradient-to-r from-transparent via-accent-main to-transparent rounded-full"
           />
         </div>
       </motion.div>

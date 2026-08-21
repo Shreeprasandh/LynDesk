@@ -647,7 +647,19 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Chat Feed State - 0ms Pre-fetch Cache Hydration
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>(() => {
     const snap = getCachedWorkspaceSnapshot(workspaceUuid || id);
-    return snap?.chatMessages && Array.isArray(snap.chatMessages) && snap.chatMessages.length > 0 ? (snap.chatMessages as ChatMsg[]) : [];
+    if (snap?.chatMessages && Array.isArray(snap.chatMessages) && snap.chatMessages.length > 0) {
+      return snap.chatMessages as ChatMsg[];
+    }
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`ldk_chat_messages_${id}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch {}
+    }
+    return [];
   });
   const [newMsg, setNewMsg] = useState("");
   // Collaborative Chat State & File Attachments
@@ -1341,18 +1353,85 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         } catch {}
       }
 
-      // Fetch workspace details from Supabase project_spaces
+      // 1. Parallelize all core workspace queries
       try {
-        const { data, error } = await supabase
-          .from("project_spaces")
-          .select(`
-            *,
-            events ( title, registration_deadline, source_url )
-          `)
-          .eq("id", workspaceUuid)
-          .maybeSingle();
+        const [
+          projectSpaceSettled,
+          chatSettled,
+          artifactsSettled,
+          creditSettled,
+          tasksSettled,
+          membersSettled
+        ] = await Promise.allSettled([
+          // Query 1: project_spaces + events
+          supabase
+            .from("project_spaces")
+            .select(`
+              *,
+              events ( title, registration_deadline, source_url )
+            `)
+            .eq("id", workspaceUuid)
+            .maybeSingle(),
 
-        if (!error && data) {
+          // Query 2: chat_messages + profiles
+          supabase
+            .from("chat_messages")
+            .select(`
+              id,
+              content,
+              created_at,
+              profiles ( username, college_key, company_key )
+            `)
+            .eq("project_space_id", workspaceUuid)
+            .order("created_at", { ascending: true }),
+
+          // Query 3: project_artifacts + profiles
+          supabase
+            .from("project_artifacts")
+            .select(`
+              id,
+              slot_index,
+              slot_name,
+              file_name,
+              file_url,
+              version,
+              is_active,
+              created_at,
+              profiles:uploaded_by ( username )
+            `)
+            .eq("project_space_id", workspaceUuid)
+            .order("created_at", { ascending: false }),
+
+          // Query 4: credit_applications
+          user ? supabase
+            .from("credit_applications")
+            .select("status")
+            .eq("project_space_id", workspaceUuid)
+            .eq("student_id", user.id)
+            .maybeSingle() : Promise.resolve({ data: null, error: null }),
+
+          // Query 5: project_tasks
+          supabase
+            .from("project_tasks")
+            .select("id, title, status, priority, scope, assigned_to, position, created_at")
+            .eq("project_space_id", workspaceUuid)
+            .order("position", { ascending: true }),
+
+          // Query 6: project_members
+          supabase
+            .from("project_members")
+            .select(`
+              id,
+              role,
+              joined_at,
+              profiles ( id, username, full_name, avatar_url, college_key, company_key )
+            `)
+            .eq("project_space_id", workspaceUuid)
+        ]);
+
+        // Process 1: Project Spaces & Event Details
+        if (projectSpaceSettled.status === "fulfilled" && !projectSpaceSettled.value.error && projectSpaceSettled.value.data) {
+          const data = projectSpaceSettled.value.data;
           const savedLocalName = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_name_${id}`) : null;
           const resolvedName = data.project_name || savedLocalName || "Shared Workspace";
           setProjectName(resolvedName);
@@ -1364,24 +1443,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             if (typeof window !== "undefined") {
               localStorage.setItem(`ldk_workspace_status_${id}`, data.status);
             }
-          } else {
-            const savedLocalStatus = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_status_${id}`) : null;
-            if (savedLocalStatus && workspaceUuid) {
-              setStatus(savedLocalStatus as any);
-              (async () => {
-                try {
-                  await supabase
-                    .from("project_spaces")
-                    .update({ status: savedLocalStatus })
-                    .eq("id", workspaceUuid);
-                } catch {}
-              })();
-            }
           }
 
           const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
           const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
-
           const finalGit = data.github_repo?.trim() || localGit;
           const finalDemo = data.live_demo_url?.trim() || localDemo;
 
@@ -1397,159 +1462,70 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
 
           const dbEventUrl = data.events?.source_url || data.source_url;
           if (dbEventUrl && typeof dbEventUrl === "string" && dbEventUrl.startsWith("http")) {
-            setEventMetadata(prev => ({
-              ...prev,
-              url: dbEventUrl
-            }));
+            setEventMetadata(prev => ({ ...prev, url: dbEventUrl }));
           }
+          if (data.events?.title) setEventTitle(data.events.title);
 
-          // If DB was missing git/demo URL but local storage had it, sync DB (only for authenticated users)
-          if (user && ((!data.github_repo && finalGit) || (!data.live_demo_url && finalDemo))) {
-            (async () => {
-              try {
-                await supabase
-                  .from("project_spaces")
-                  .update({
-                    project_name: data.project_name || projectName || "Shared Workspace",
-                    github_repo: finalGit,
-                    live_demo_url: finalDemo,
-                    status: data.status || status || "development"
-                  })
-                  .eq("id", workspaceUuid);
-              } catch {}
-            })();
-          }
-          if (data.events) {
-            if (data.events.title) setEventTitle(data.events.title);
-          }
-
-          // Restore notes, tasks, and slot_names from DB if present
           if (data.notes !== undefined && data.notes !== null) {
             setWorkspaceNotes(data.notes);
             if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_notes_${id}`, data.notes);
           }
-          
-          // Fetch dedicated project_tasks table
-          try {
-            const { data: dbTaskList } = await supabase
-              .from("project_tasks")
-              .select("id, title, status, priority, scope, assigned_to, position, created_at")
-              .eq("project_space_id", workspaceUuid)
-              .order("position", { ascending: true });
-
-            if (dbTaskList && dbTaskList.length > 0) {
-              const formatted: WorkspaceTask[] = dbTaskList.map(t => ({
-                id: t.id,
-                title: t.title,
-                status: (t.status as any) || "todo",
-                priority: (t.priority as any) || "medium",
-                scope: (t.scope as any) || "team",
-                assignee: t.assigned_to === user?.id ? (user?.user_metadata?.full_name || "You") : "Teammate",
-                created_by: t.assigned_to
-              }));
-              setTasks(formatted);
-              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(formatted));
-            } else if (Array.isArray(data.tasks) && data.tasks.length > 0) {
-              setTasks(data.tasks);
-              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
-            }
-          } catch {
-            if (Array.isArray(data.tasks) && data.tasks.length > 0) {
-              setTasks(data.tasks);
-              if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(data.tasks));
-            }
-          }
-
           if (Array.isArray(data.slot_names) && data.slot_names.length === 4) {
             setSlotNames(data.slot_names);
             if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_slot_names_${id}`, JSON.stringify(data.slot_names));
           }
 
-          // Sync workspace to ldk_joined_workspaces and ldk_events so home dashboard renders it
-          if (typeof window !== "undefined") {
+          // User-scoped dashboard sync
+          if (typeof window !== "undefined" && user?.id) {
             try {
-              const joinedStr = localStorage.getItem("ldk_joined_workspaces");
+              const userJoinedKey = `ldk_joined_workspaces_${user.id}`;
+              const joinedStr = localStorage.getItem(userJoinedKey);
               const joinedList: string[] = joinedStr ? JSON.parse(joinedStr) : [];
               if (!joinedList.includes(id)) {
                 joinedList.push(id);
-                localStorage.setItem("ldk_joined_workspaces", JSON.stringify(joinedList));
+                localStorage.setItem(userJoinedKey, JSON.stringify(joinedList));
               }
-
-              const eventsStr = localStorage.getItem("ldk_events");
-              const eventsList: any[] = eventsStr ? JSON.parse(eventsStr) : [];
-              const itemTitle = data.project_name || "Shared Workspace";
-              const existingIdx = eventsList.findIndex(e => e.id === id);
-              const updatedItem = {
-                id,
-                title: itemTitle,
-                deadline: "Ongoing",
-                location: "online",
-                level: "global",
-                url: `/workspace/${id}`,
-                status: data.status || "development",
-                stages: ["Ideation", "Development", "Final Submission"]
-              };
-              if (existingIdx >= 0) {
-                eventsList[existingIdx] = { ...eventsList[existingIdx], ...updatedItem };
-              } else {
-                eventsList.unshift(updatedItem);
-              }
-              localStorage.setItem("ldk_events", JSON.stringify(eventsList));
-            } catch (e) {
-              console.error("Error saving workspace to local dashboard storage: ", e);
-            }
+            } catch {}
           }
-        } else if (error && user) {
-          // If project space row doesn't exist in Supabase DB yet, auto-create it under workspaceUuid
+        } else if (projectSpaceSettled.status === "fulfilled" && projectSpaceSettled.value.error && user) {
+          // Auto-create space if not yet initialized
           const localGit = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_git_${id}`) || "" : "";
           const localDemo = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_demo_${id}`) || "" : "";
           (async () => {
             try {
-              const { error: updateErr } = await supabase
-                .from("project_spaces")
-                .update({
-                  project_name: projectName || "Shared Workspace",
-                  github_repo: localGit || githubRepo || null,
-                  live_demo_url: localDemo || liveDemo || null,
-                  status: status || "development"
-                })
-                .eq("id", workspaceUuid);
-
-              if (updateErr) {
-                await supabase.from("project_spaces").insert({
-                  id: workspaceUuid,
-                  project_name: projectName || "Shared Workspace",
-                  github_repo: localGit || githubRepo || null,
-                  live_demo_url: localDemo || liveDemo || null,
-                  status: status || "development"
-                });
-              }
+              await supabase.from("project_spaces").upsert({
+                id: workspaceUuid,
+                project_name: projectName || "Shared Workspace",
+                github_repo: localGit || githubRepo || null,
+                live_demo_url: localDemo || liveDemo || null,
+                status: status || "development"
+              });
             } catch {}
           })();
         }
-      } catch (e) {
-        console.error("Workspace fetch error: ", e);
-      }
 
-      // Fetch real chat messages and merge with persistent local storage
-      const savedChatStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_chat_messages_${id}`) : null;
-      const savedChatList: ChatMsg[] = savedChatStr ? JSON.parse(savedChatStr) : [];
+        // Process 2: Tasks
+        if (tasksSettled.status === "fulfilled" && !tasksSettled.value.error && tasksSettled.value.data && tasksSettled.value.data.length > 0) {
+          const formatted: WorkspaceTask[] = tasksSettled.value.data.map(t => ({
+            id: t.id,
+            title: t.title,
+            status: (t.status as any) || "todo",
+            priority: (t.priority as any) || "medium",
+            scope: (t.scope as any) || "team",
+            assignee: t.assigned_to === user?.id ? (user?.user_metadata?.full_name || "You") : "Teammate",
+            created_by: t.assigned_to
+          }));
+          setTasks(formatted);
+          if (typeof window !== "undefined") localStorage.setItem(`ldk_workspace_tasks_${id}`, JSON.stringify(formatted));
+        }
 
-      try {
-        const { data: dbChat, error: chatError } = await supabase
-          .from("chat_messages")
-          .select(`
-            id,
-            content,
-            created_at,
-            profiles ( username, college_key, company_key )
-          `)
-          .eq("project_space_id", workspaceUuid)
-          .order("created_at", { ascending: true });
-
+        // Process 3: Chat Messages
+        const savedChatStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_chat_messages_${id}`) : null;
+        const savedChatList: ChatMsg[] = savedChatStr ? JSON.parse(savedChatStr) : [];
         let loadedChat: ChatMsg[] = [];
-        if (!chatError && dbChat && dbChat.length > 0) {
-          loadedChat = dbChat.map(c => {
+
+        if (chatSettled.status === "fulfilled" && !chatSettled.value.error && chatSettled.value.data && chatSettled.value.data.length > 0) {
+          loadedChat = chatSettled.value.data.map(c => {
             const profile = c.profiles as any;
             let role = "Developer";
             if (profile?.college_key) role = "Faculty";
@@ -1588,7 +1564,6 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         }
 
-        // Combine DB chat, saved local storage chat, current state, and initial system log
         setChatMessages(prev => {
           const combinedChat = [...initialLogs, ...savedChatList, ...prev, ...loadedChat];
           let mergedList: ChatMsg[] = [];
@@ -1600,41 +1575,13 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           }
           return mergedList;
         });
-      } catch (e) {
-        console.error("Failed to load chat: ", e);
-        setChatMessages(prev => {
-          const combinedChat = [...initialLogs, ...savedChatList, ...prev];
-          const uniqueChat = new Map<string, ChatMsg>();
-          combinedChat.forEach(m => {
-            if (m && m.id) uniqueChat.set(m.id, m);
-          });
-          return Array.from(uniqueChat.values());
-        });
-      }
 
-      // Fetch real artifacts and merge with persistent local storage
-      const savedArtStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_artifacts_${id}`) : null;
-      const savedArtList: Artifact[] = savedArtStr ? JSON.parse(savedArtStr) : [];
+        // Process 4: Artifacts
+        const savedArtStr = typeof window !== "undefined" ? localStorage.getItem(`ldk_workspace_artifacts_${id}`) : null;
+        const savedArtList: Artifact[] = savedArtStr ? JSON.parse(savedArtStr) : [];
 
-      try {
-        const { data: dbArtifacts, error: artError } = await supabase
-          .from("project_artifacts")
-          .select(`
-            id,
-            slot_index,
-            slot_name,
-            file_name,
-            file_url,
-            version,
-            is_active,
-            created_at,
-            profiles:uploaded_by ( username )
-          `)
-          .eq("project_space_id", workspaceUuid)
-          .order("created_at", { ascending: false });
-
-        if (!artError && dbArtifacts && dbArtifacts.length > 0) {
-          const loadedArtifacts: Artifact[] = dbArtifacts.map(a => ({
+        if (artifactsSettled.status === "fulfilled" && !artifactsSettled.value.error && artifactsSettled.value.data && artifactsSettled.value.data.length > 0) {
+          const loadedArtifacts: Artifact[] = artifactsSettled.value.data.map(a => ({
             id: a.id,
             slot_index: (a as any).slot_index ?? 0,
             slot_name: (a as any).slot_name || "Artifact",
@@ -1652,38 +1599,54 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         } else if (savedArtList.length > 0) {
           setArtifacts(savedArtList);
         }
-      } catch (e) {
-        console.error("Failed to load artifacts: ", e);
-        if (savedArtList.length > 0) setArtifacts(savedArtList);
-      }
 
-      // Fetch credit application status
-      if (user) {
-        try {
-          const { data: claim, error: claimErr } = await supabase
-            .from("credit_applications")
-            .select("status")
-            .eq("project_space_id", workspaceUuid)
-            .eq("student_id", user.id)
-            .maybeSingle();
-
-          if (!claimErr && claim) {
+        // Process 5: Credit Applications
+        if (creditSettled.status === "fulfilled" && !creditSettled.value.error && creditSettled.value.data) {
+          const claim = (creditSettled.value as any).data;
+          if (claim && claim.status) {
             setClaimStatus(claim.status);
             if (typeof window !== "undefined") {
               localStorage.setItem(`ldk_workspace_credits_${id}`, claim.status);
             }
           }
-        } catch (e) {
-          console.error("Failed to load claim status: ", e);
         }
-      }
 
-      setIsWorkspaceHydrating(false);
+        // Process 6: Project Members
+        if (membersSettled.status === "fulfilled" && !membersSettled.value.error && membersSettled.value.data && membersSettled.value.data.length > 0) {
+          const dbMembers: TeamMember[] = membersSettled.value.data.map((m: any) => {
+            const p = m.profiles || {};
+            return {
+              id: p.id || m.id,
+              name: p.full_name || p.username || "Teammate",
+              isOnline: false,
+              avatarUrl: p.avatar_url || ""
+            };
+          });
+
+          setRoomMembers(prev => {
+            const map = new Map<string, TeamMember>();
+            prev.forEach(item => { if (item.id) map.set(item.id, item); });
+            dbMembers.forEach(item => {
+              const existing = map.get(item.id);
+              map.set(item.id, {
+                ...item,
+                isOnline: existing ? existing.isOnline : false,
+                avatarUrl: existing?.avatarUrl || item.avatarUrl
+              });
+            });
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {
+        console.error("Workspace parallel hydration error:", err);
+      } finally {
+        setIsWorkspaceHydrating(false);
+      }
     };
 
     const safetyTimer = setTimeout(() => {
       setIsWorkspaceHydrating(false);
-    }, 1200);
+    }, 5000);
 
     fetchWorkspaceDetails();
     return () => clearTimeout(safetyTimer);
