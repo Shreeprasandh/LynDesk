@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { POST } from "../../app/api/workspace/rename/route";
 
 describe("POST /api/workspace/rename", () => {
@@ -32,4 +32,6 @@ describe("POST /api/workspace/rename", () => {
     expect(["BAD_REQUEST", "UNAUTHORIZED"]).toContain(data.error.code);
   });
 });
+
+
 

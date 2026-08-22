@@ -390,8 +390,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUserPassword = async (newPassword: string): Promise<{ error: Error | null }> => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    return { error };
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      return { error };
+    } catch (err: any) {
+      return { error: err instanceof Error ? err : new Error(String(err)) };
+    }
   };
 
   const requestPasswordResetOtp = async (input: string): Promise<{ error: Error | null }> => {

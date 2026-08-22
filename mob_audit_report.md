@@ -1,14 +1,14 @@
 # 🌑 THE SEVEN SHADOWS: Master Audit Report
 
-**Last Scan**: 21/8/2026, 3:11:56 pm
-**Files Inspected**: 142
+**Last Scan**: 23/8/2026, 1:25:49 am
+**Files Inspected**: 138
 **Active Target**: ALL 7 SHADOWS
 
 ### 📊 Master Executive Summary
 | Shadow | Codename | Domain | Findings Count | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **4** | ⚠️ Action Required |
-| 🛡️ **Beta** | Secret Sentinel | Security & Secret Leaks | **3** | 🚨 Critical Risk |
+| 🕵️‍♂️ **Alpha** | Logic Auditor | Logic Mismatches & Async Bugs | **3** | ⚠️ Action Required |
+| 🛡️ **Beta** | Secret Sentinel | Security & Secret Leaks | **2** | 🚨 Critical Risk |
 | 🎯 **Gamma** | Schema Validator | DB & API Contract Alignment | **0** | ✅ Clean |
 | ♿ **Delta** | A11y Inspector | Accessibility & ARIA Compliance | **0** | ✅ Accessible |
 | 🧪 **Epsilon** | Test Sentinel | Route & Unit Test Coverage | **0** | ✅ Covered |
@@ -17,7 +17,7 @@
 
 ---
 
-## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (4)
+## 🕵️‍♂️ 1. Alpha (Logic Auditor) Findings (3)
 
 ### 1. `src/app/api/user/profile/route.ts:12`
 - **Issue**: Un-awaited Next.js 15/16 route params/searchParams
@@ -31,21 +31,13 @@
 - **Issue**: Unhandled async database/fetch operation
 - **Impact**: Network failure or DB error will cause unhandled promise rejection.
 
-### 4. `src/app/context/AuthContext.tsx:393`
-- **Issue**: Unhandled async database/fetch operation
-- **Impact**: Network failure or DB error will cause unhandled promise rejection.
+## 🛡️ 2. Beta (Secret Sentinel) Findings (2)
 
-## 🛡️ 2. Beta (Secret Sentinel) Findings (3)
-
-### 1. ⚠️ `src/app/lib/env.ts:10`
+### 1. ⚠️ `src/app/lib/supabaseServer.ts:9`
 - **Leak**: Potential exposed secret or API key token in source code
 - **Risk**: CRITICAL - Secrets should only exist in server-side process.env
 
-### 2. ⚠️ `src/app/lib/supabaseServer.ts:5`
-- **Leak**: Potential exposed secret or API key token in source code
-- **Risk**: CRITICAL - Secrets should only exist in server-side process.env
-
-### 3. ⚠️ `src/app/lib/supabaseServer.ts:16`
+### 2. ⚠️ `src/app/lib/supabaseServer.ts:20`
 - **Leak**: Potential exposed secret or API key token in source code
 - **Risk**: CRITICAL - Secrets should only exist in server-side process.env
 

@@ -22,6 +22,8 @@ const STORAGE_STATS_KEY = "lyndesk_study_stats_cache";
 const STORAGE_ACTIVE_PATH_KEY = "lyndesk_active_study_path_id";
 const STORAGE_DSA_PROGRESS_KEY = "lyndesk_dsa_progress_cache";
 
+const getStudyStorageKey = (key: string, userId?: string) => userId ? `${key}_${userId}` : key;
+
 const calculateTotalDSAXp = (map: UserDSAProgressMap) => {
   let dsaXp = 0;
   DSA_TRACKS.forEach((track) => {
@@ -106,36 +108,36 @@ export default function StudyDeskPage() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_PATHS_KEY, JSON.stringify(paths));
+        localStorage.setItem(getStudyStorageKey(STORAGE_PATHS_KEY, user?.id), JSON.stringify(paths));
       } catch {}
     }
-  }, [paths]);
+  }, [paths, user?.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_MISTAKES_KEY, JSON.stringify(mistakes));
+        localStorage.setItem(getStudyStorageKey(STORAGE_MISTAKES_KEY, user?.id), JSON.stringify(mistakes));
       } catch {}
     }
-  }, [mistakes]);
+  }, [mistakes, user?.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_STATS_KEY, JSON.stringify(stats));
+        localStorage.setItem(getStudyStorageKey(STORAGE_STATS_KEY, user?.id), JSON.stringify(stats));
         window.dispatchEvent(new Event("ldk_study_stats_update"));
       } catch {}
     }
-  }, [stats]);
+  }, [stats, user?.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_DSA_PROGRESS_KEY, JSON.stringify(dsaProgressMap));
+        localStorage.setItem(getStudyStorageKey(STORAGE_DSA_PROGRESS_KEY, user?.id), JSON.stringify(dsaProgressMap));
         window.dispatchEvent(new Event("ldk_study_stats_update"));
       } catch {}
     }
-  }, [dsaProgressMap]);
+  }, [dsaProgressMap, user?.id]);
 
   // Fetch Supabase data when logged in
   useEffect(() => {

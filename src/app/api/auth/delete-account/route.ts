@@ -141,13 +141,20 @@ export async function POST(request: Request) {
       delete updatedMeta.delete_account_otp_expiry;
       await supabaseAdmin.auth.admin.updateUserById(user.id, { user_metadata: updatedMeta });
 
-      // Delete public profile database record first
-      await supabaseAdmin
-        .from("profiles")
-        .delete()
-        .eq("id", user.id);
+      // Pre-emptively clean user records across child tables to guarantee cascade integrity
+      await Promise.allSettled([
+        supabaseAdmin.from("friendships").delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
+        supabaseAdmin.from("project_members").delete().eq("profile_id", user.id),
+        supabaseAdmin.from("credit_applications").delete().eq("student_id", user.id),
+        supabaseAdmin.from("handle_verifications").delete().eq("profile_id", user.id),
+        supabaseAdmin.from("wall_calendar_events").delete().eq("user_id", user.id),
+        supabaseAdmin.from("study_paths").delete().eq("user_id", user.id),
+        supabaseAdmin.from("study_mistakes").delete().eq("user_id", user.id),
+        supabaseAdmin.from("user_dsa_progress").delete().eq("user_id", user.id),
+        supabaseAdmin.from("profiles").delete().eq("id", user.id)
+      ]);
 
-      // Permanently delete user account
+      // Permanently delete user account from Supabase Auth
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
       if (deleteError) throw deleteError;
 

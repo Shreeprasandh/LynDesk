@@ -60,20 +60,19 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      username: profile.username,
-      highScore: profile.high_score ?? 0,
-      connectedAt: new Date().toISOString()
-    });
-  } catch (err: any) {
-    console.error("VanguarDZ connect error:", err);
-    return NextResponse.json(
-      { success: false, message: "Server error authenticating VanguarDZ account." },
-      { status: 500 }
-    );
+      return NextResponse.json({
+        success: true,
+        username: profile.username,
+        highScore: profile.high_score ?? 0,
+        connectedAt: new Date().toISOString()
+      });
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Server error authenticating VanguarDZ account." },
+        { status: 500 }
+      );
+    }
   }
-}
 
 // STRICTLY READ-ONLY GET ROUTE HANDLER FOR LIVE HIGH SCORE POLLING
 export async function GET(req: Request) {

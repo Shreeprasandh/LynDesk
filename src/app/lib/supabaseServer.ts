@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
+if (typeof window !== "undefined") {
+  throw new Error("[Security Violation]: Supabase Admin client cannot be initialized on the client-side.");
+}
+
 /**
  * Server-only Supabase Admin Client helper for Next.js App Router API Route Handlers.
  * Standardizes administrative operations using SUPABASE_SERVICE_ROLE_KEY.

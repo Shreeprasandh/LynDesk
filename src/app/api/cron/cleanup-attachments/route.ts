@@ -17,27 +17,29 @@ export async function GET(req: NextRequest) {
 
     const filesToDelete: string[] = [];
 
-    // 1. List root folder in project-vaults
-    const { data: rootFiles } = await supabaseAdmin.storage
-      .from("project-vaults")
-      .list("", { limit: 1000 });
+    // Recursive helper to traverse directories and locate expired files
+    const scanFolder = async (folderPath: string) => {
+      try {
+        const { data: items } = await supabaseAdmin.storage
+          .from("project-vaults")
+          .list(folderPath, { limit: 1000 });
 
-    (rootFiles || []).forEach((file) => {
-      if (file.id && file.created_at && new Date(file.created_at) < tenDaysAgo) {
-        filesToDelete.push(file.name);
-      }
-    });
+        if (!items || items.length === 0) return;
 
-    // 2. List uploads/ folder in project-vaults
-    const { data: uploadFiles } = await supabaseAdmin.storage
-      .from("project-vaults")
-      .list("uploads", { limit: 1000 });
+        for (const item of items) {
+          const itemFullPath = folderPath ? `${folderPath}/${item.name}` : item.name;
+          if (!item.id || !item.created_at) {
+            // Directory / User subfolder -> recurse
+            await scanFolder(itemFullPath);
+          } else if (new Date(item.created_at) < tenDaysAgo) {
+            filesToDelete.push(itemFullPath);
+          }
+        }
+      } catch {}
+    };
 
-    (uploadFiles || []).forEach((file) => {
-      if (file.id && file.created_at && new Date(file.created_at) < tenDaysAgo) {
-        filesToDelete.push(`uploads/${file.name}`);
-      }
-    });
+    await scanFolder("");
+    await scanFolder("uploads");
 
     if (filesToDelete.length === 0) {
       return NextResponse.json({ message: "No expired files older than 10 days", deletedCount: 0 });

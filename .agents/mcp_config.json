@@ -1,14 +1,118 @@
 {
   "mcpServers": {
-    "postgres-inspector": {
+    "memory": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "${DATABASE_URL}"
-      ],
-      "disabled": true,
-      "description": "PostgreSQL & Supabase direct schema inspector MCP server. Set DATABASE_URL and set disabled to false to activate."
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "description": "Persistent local SQLite knowledge graph for pairing sessions, user preferences, and architectural decisions."
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "description": "Headless Chrome browser for live UI visual verification, DOM inspection, and responsive layout testing."
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "description": "GitHub integration for Pull Requests, issue management, workflow runs, and repository inspection."
+    },
+    "linear": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-linear"],
+      "env": {
+        "LINEAR_API_KEY": "${LINEAR_API_KEY}"
+      },
+      "description": "Linear project management for agile sprints, roadmaps, and bug tracking."
+    },
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-figma"],
+      "env": {
+        "FIGMA_ACCESS_TOKEN": "${FIGMA_PERSONAL_ACCESS_TOKEN}"
+      },
+      "description": "Figma design integration for layer inspection, component hierarchy, and Tailwind CSS token extraction."
+    },
+    "sentry": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sentry"],
+      "env": {
+        "SENTRY_AUTH_TOKEN": "${SENTRY_AUTH_TOKEN}"
+      },
+      "description": "Sentry error tracking for inspecting live production crash reports and uncaught exceptions."
+    },
+    "vercel": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-vercel"],
+      "env": {
+        "VERCEL_TOKEN": "${VERCEL_TOKEN}"
+      },
+      "description": "Vercel platform integration for Next.js preview deployments, build logs, and domain management."
+    },
+    "supabase": {
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN}"
+      },
+      "description": "Supabase management integration for inspecting project health, database configurations, and migrations."
+    },
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-notion"],
+      "env": {
+        "NOTION_API_KEY": "${NOTION_API_KEY}"
+      },
+      "description": "Notion workspace integration for technical documentation, specifications, and task lists."
+    },
+    "huggingface": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-huggingface"],
+      "env": {
+        "HUGGINGFACE_API_KEY": "${HUGGINGFACE_API_KEY}"
+      },
+      "description": "Hugging Face model hub for open-source AI models, embeddings, datasets, and inference."
+    },
+    "spotify": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-spotify"],
+      "env": {
+        "SPOTIFY_CLIENT_ID": "${SPOTIFY_CLIENT_ID}",
+        "SPOTIFY_CLIENT_SECRET": "${SPOTIFY_CLIENT_SECRET}",
+        "SPOTIFY_REDIRECT_URI": "${SPOTIFY_REDIRECT_URI}"
+      },
+      "description": "Spotify media controller for search, playlists, and developer focus audio."
+    },
+    "google-workspace": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-workspace"],
+      "env": {
+        "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+        "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}",
+        "GOOGLE_PROJECT_ID": "${GOOGLE_PROJECT_ID}"
+      },
+      "description": "Google Workspace integration for secondary Gmail, Google Drive, Calendar, Docs, Sheets, and YouTube."
+    },
+    "youtube-transcript": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-youtube-transcript"],
+      "description": "YouTube video transcript and lecture summarizer."
+    },
+    "weather": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-weather"],
+      "description": "Real-time local weather forecasts and atmospheric telemetry via Open-Meteo."
+    },
+    "docker": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-docker"],
+      "description": "Local Docker container lifecycle and container log inspection."
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "description": "Ultra-fast local workspace directory and symbol navigation."
     }
   }
 }
