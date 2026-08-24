@@ -287,6 +287,13 @@ const POPULAR_LOCATIONS = [
     window.addEventListener("ldk_wall_calendar_update", checkCalendarToday);
     return () => window.removeEventListener("ldk_wall_calendar_update", checkCalendarToday);
   }, [user?.id]);
+
+  // Fix #1: Global calendar open event — lets any page open the Header's single WallCalendarModal
+  useEffect(() => {
+    const handleOpenCalendar = () => setIsCalendarOpen(true);
+    window.addEventListener("ldk_open_wall_calendar", handleOpenCalendar);
+    return () => window.removeEventListener("ldk_open_wall_calendar", handleOpenCalendar);
+  }, []);
   useEffect(() => {
     let isMounted = true;
     const resolveHeaderAvatar = async () => {

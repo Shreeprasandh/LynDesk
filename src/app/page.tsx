@@ -34,7 +34,6 @@ import {
   Clock
 } from "lucide-react";
 import PreferencePresetModal from "./components/PreferencePresetModal";
-import WallCalendarModal from "./components/WallCalendarModal";
 import { fetchWallCalendarEvents, WallEvent } from "./lib/wallCalendarSync";
 
 // Brand Icon Helpers
@@ -556,7 +555,13 @@ export default function Home() {
   // Weekly Schedule Horizon State
   const [weekEvents, setWeekEvents] = useState<WallEvent[]>([]);
   const [hoveredWeekDate, setHoveredWeekDate] = useState<string | null>(null);
-  const [isWallModalOpen, setIsWallModalOpen] = useState(false);
+
+  // Fix #1: No duplicate modal — dispatch to Header's single WallCalendarModal instance
+  const openWallCalendar = () => {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ldk_open_wall_calendar"));
+    }
+  };
 
   useEffect(() => {
     if (!user?.id) return;
@@ -1761,7 +1766,7 @@ export default function Home() {
                   </span>
                 </div>
                 <button
-                  onClick={() => setIsWallModalOpen(true)}
+                  onClick={openWallCalendar}
                   className="text-[10px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1"
                 >
                   <Plus size={10} />
@@ -1886,12 +1891,6 @@ export default function Home() {
       <PreferencePresetModal 
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
-      />
-
-      <WallCalendarModal
-        isOpen={isWallModalOpen}
-        onClose={() => setIsWallModalOpen(false)}
-        userId={user?.id}
       />
     </div>
   );

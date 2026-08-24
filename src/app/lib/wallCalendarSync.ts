@@ -63,6 +63,8 @@ export async function fetchWallCalendarEvents(userId?: string): Promise<WallEven
           link: d.link,
           source_type: d.source_type,
           source_id: d.source_id,
+          // Fix #4: correctly flag auto-synced events so delete button is hidden
+          isAutoSynced: !!(d.source_type && d.source_type !== "custom"),
         }));
       }
     } catch {}
@@ -82,6 +84,19 @@ export async function fetchWallCalendarEvents(userId?: string): Promise<WallEven
   // Sync back cleaned active events to local storage if stale past items were pruned
   if (activeEvents.length !== localEvents.length && typeof window !== "undefined") {
     saveLocalEvents(activeEvents, userId);
+  }
+
+  // Fix #3: Prune past DB events server-side (fire-and-forget — no await)
+  if (userId) {
+    const pastDbIds = dbEvents.filter((e) => e.date && e.date < todayStr).map((e) => e.id);
+    if (pastDbIds.length > 0) {
+      supabase
+        .from("wall_calendar_events")
+        .delete()
+        .in("id", pastDbIds)
+        .eq("user_id", userId)
+        .then(() => {});
+    }
   }
 
   return activeEvents;

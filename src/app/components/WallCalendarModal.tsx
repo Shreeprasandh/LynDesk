@@ -116,15 +116,15 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
       loadEvents();
     });
 
-    // Load monthly memo from local storage (scoped per user)
+    // Load monthly memo from local storage (scoped per user) — Fix #5: separate from loadEvents microtask
     if (typeof window !== "undefined") {
       try {
         const userPrefix = userId || "guest";
         const key = `ldk_wall_calendar_memo_${userPrefix}_${currentYear}_${currentMonthIndex}`;
         const storedMemo = localStorage.getItem(key) || localStorage.getItem(`ldk_wall_calendar_memo_${currentYear}_${currentMonthIndex}`);
-        queueMicrotask(() => {
-          setMonthlyMemo(storedMemo || "");
-        });
+        // Use separate queueMicrotask (not nested) to satisfy lint & avoid cascading renders
+        const memo = storedMemo || "";
+        queueMicrotask(() => setMonthlyMemo(memo));
       } catch {}
     }
 
@@ -176,8 +176,8 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
   };
 
   const handleCellClick = (cellDateStr: string) => {
-    setSelectedDateStr(cellDateStr);
-    handleOpenAddModal(cellDateStr);
+    // Fix #2 & #6: toggle selection only — do not auto-open add modal
+    setSelectedDateStr((prev) => (prev === cellDateStr ? null : cellDateStr));
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -443,6 +443,7 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                   {calendarMatrix.map((cell: CalendarCell) => {
                     const dayEvts = eventsByDate[cell.dateStr] || [];
                     const isHovered = hoveredDateStr === cell.dateStr;
+                    const isSelected = selectedDateStr === cell.dateStr;
 
                     return (
                       <div
@@ -453,6 +454,8 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                         className={`min-h-[50px] md:min-h-[56px] p-1.5 border rounded flex flex-col justify-between transition-all cursor-pointer relative ${
                           cell.isToday
                             ? "border-accent-main bg-accent-main/10 font-bold shadow-xs"
+                            : isSelected
+                            ? "border-txt-main/70 bg-bg-card ring-1 ring-txt-main/20"
                             : cell.isCurrentMonth
                             ? "border-border-main/40 bg-bg-base/60 hover:bg-bg-card hover:border-border-main"
                             : "border-border-main/20 bg-bg-base/20 opacity-30"
@@ -488,6 +491,20 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                             </div>
                           )}
                         </div>
+
+                        {/* Hover: "+" quick-add button — Fix #2: only way to open add modal per-cell */}
+                        {isHovered && cell.isCurrentMonth && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenAddModal(cell.dateStr);
+                            }}
+                            className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-accent-main text-bg-base rounded-full opacity-90 hover:opacity-100 transition-opacity z-20"
+                            title={`Add event on ${cell.dateStr}`}
+                          >
+                            <Plus size={9} />
+                          </button>
+                        )}
 
                         {/* Hover Inspector Tooltip Popover */}
                         {isHovered && dayEvts.length > 0 && (
