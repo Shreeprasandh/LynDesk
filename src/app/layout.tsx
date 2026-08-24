@@ -29,11 +29,11 @@ export const metadata: Metadata = {
   keywords: ["LynDesk", "Event Tracker", "Student Collaboration", "Study Desk", "Hackathons", "University Portal"],
   authors: [{ name: "LynDesk Engineering" }],
   manifest: "/manifest.json",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://lyndesk.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://lyndesk.tech"),
   openGraph: {
     title: "LynDesk — Link Your Next Desk",
     description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
-    url: "https://lyndesk.vercel.app",
+    url: "https://lyndesk.tech",
     siteName: "LynDesk",
     locale: "en_US",
     type: "website"
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/logo.svg", type: "image/svg+xml" },
       { url: "/icon.png", type: "image/png" },
       { url: "/favicon.ico" }
     ],
