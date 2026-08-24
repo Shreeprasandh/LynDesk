@@ -55,7 +55,23 @@ const tableColumns = {
     "bio",
     "skills",
     "college_name",
-    "updated_at"
+    "updated_at",
+    "roll_number",
+    "academic_year",
+    "section",
+    "batch_code",
+    "college_linked_status",
+    "grant_share_permission",
+    "placement_consent",
+    "institute_id"
+  ],
+  consent_log: [
+    "id",
+    "student_id",
+    "consent_type",
+    "granted",
+    "ip_hash",
+    "changed_at"
   ],
   institutes: [
     "id",

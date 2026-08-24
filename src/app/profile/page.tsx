@@ -67,6 +67,11 @@ interface BackupProfileData {
   collegeKey: string;
   batchCode: string;
   grantSharePermission: boolean;
+  rollNumber?: string;
+  academicYear?: string;
+  section?: string;
+  placementConsent?: boolean;
+  instituteId?: string;
 }
 
 export function extractPlatformHandle(input: string, platform: string): { handle: string; error?: string } {
@@ -392,6 +397,19 @@ export default function ProfilePage() {
   const [collegeKey, setCollegeKey] = useState("");
   const [batchCode, setBatchCode] = useState("");
   const [grantSharePermission, setGrantSharePermission] = useState(false);
+  const [rollNumber, setRollNumber] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [section, setSection] = useState("");
+  const [placementConsent, setPlacementConsent] = useState(false);
+  const [instituteId, setInstituteId] = useState<string | null>(null);
+  const [isVerifyingCollege, setIsVerifyingCollege] = useState(false);
+  const [collegeAutoResolvedInfo, setCollegeAutoResolvedInfo] = useState<{
+    instituteName: string;
+    department: string;
+    academicYear: string;
+    section: string;
+    batchCode: string;
+  } | null>(null);
   const [academicCredits, setAcademicCredits] = useState(0);
   
   // Coding platforms handles
@@ -636,6 +654,14 @@ export default function ProfilePage() {
           if (profile.institutes) {
             setCollegeName(profile.institutes.name || profile.college_name || "");
           }
+          if (profile.roll_number) setRollNumber(profile.roll_number);
+          if (profile.academic_year) setAcademicYear(profile.academic_year);
+          if (profile.section) setSection(profile.section);
+          if (profile.batch_code) setBatchCode(profile.batch_code);
+          if (profile.college_linked_status) setCollegeLinkedStatus(profile.college_linked_status);
+          if (profile.grant_share_permission !== undefined) setGrantSharePermission(!!profile.grant_share_permission);
+          if (profile.placement_consent !== undefined) setPlacementConsent(!!profile.placement_consent);
+          if (profile.institute_id) setInstituteId(profile.institute_id);
         }
 
         // 2. Fetch detailed record metadata from Auth user metadata & OAuth identities as fallback/extension
@@ -667,9 +693,14 @@ export default function ProfilePage() {
         setDepartment(meta.department || "");
         setGradYear(meta.graduation_year || "");
         setCollegeKey(meta.college_key || "");
-        setBatchCode(meta.batch_code || "");
-        setGrantSharePermission(!!meta.grant_share_permission);
-        setCollegeLinkedStatus(meta.college_linked_status || "none");
+        setBatchCode(profile?.batch_code || meta.batch_code || "");
+        setRollNumber(profile?.roll_number || meta.roll_number || "");
+        setAcademicYear(profile?.academic_year || meta.academic_year || "");
+        setSection(profile?.section || meta.section || "");
+        setGrantSharePermission(profile?.grant_share_permission !== undefined ? !!profile.grant_share_permission : !!meta.grant_share_permission);
+        setPlacementConsent(profile?.placement_consent !== undefined ? !!profile.placement_consent : !!meta.placement_consent);
+        setCollegeLinkedStatus(profile?.college_linked_status || meta.college_linked_status || "none");
+        setInstituteId(profile?.institute_id || meta.institute_id || null);
 
         // 3. Restore unsaved local draft if user typed changes without submitting
         if (typeof window !== "undefined" && user?.id) {
@@ -879,80 +910,191 @@ export default function ProfilePage() {
 
   const handleRequestCollegeLink = async () => {
     if (!user) return;
+    if (!rollNumber.trim()) {
+      setMessage({ text: "Please enter your Institutional Roll Number before verifying.", type: "error" });
+      return;
+    }
     if (!collegeKey.trim()) {
       setMessage({ text: "Please enter a valid College Registrar Key.", type: "error" });
       return;
     }
-    
-    // Check if previously unlinked
-    const requestStored = localStorage.getItem("ldk_institutional_verifications");
-    const requestList = requestStored ? JSON.parse(requestStored) : [];
-    const previouslyUnlinked = requestList.some((r: any) => r.studentId === user.id && r.type === "college" && r.status === "unlinked");
-    
-    const newReq = {
-      id: `link_req_${Date.now()}`,
-      studentId: user.id,
-      studentName: fullName || username || "Anonymous Student",
-      studentEmail: user.email || "",
-      type: "college" as const,
-      key: collegeKey.trim(),
-      batchCode: batchCode.trim(),
-      status: "pending" as const,
-      previouslyUnlinked,
-      date: "Just now"
-    };
-    
-    const updatedList = [newReq, ...requestList.filter((r: any) => !(r.studentId === user.id && r.type === "college" && r.status === "pending"))];
-    localStorage.setItem("ldk_institutional_verifications", JSON.stringify(updatedList));
-    window.dispatchEvent(new Event("ldk_link_requests_update"));
-    
-    const linksStored = localStorage.getItem("ldk_student_links");
-    const linksMap = linksStored ? JSON.parse(linksStored) : {};
-    linksMap[`${user.id}_college`] = { status: "pending", key: collegeKey.trim(), batchCode: batchCode.trim() };
-    localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
-    setCollegeLinkedStatus("pending");
-    
+
     try {
-      await supabase.auth.updateUser({
-        data: {
-          college_key: collegeKey.trim(),
-          batch_code: batchCode.trim(),
-          college_linked_status: "pending"
-        }
+      setIsVerifyingCollege(true);
+      setMessage(null);
+
+      const res = await fetch("/api/institutional/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rollNumber: rollNumber.trim(),
+          collegeKey: collegeKey.trim()
+        })
       });
-    } catch (updateErr) {
-      console.error("Failed updating user metadata:", updateErr);
+
+      const verifyData = await res.json();
+
+      if (!res.ok || !verifyData.success) {
+        setMessage({ 
+          text: verifyData.error || "Failed to verify institutional credentials. Please check your roll number and key.", 
+          type: "error" 
+        });
+        setIsVerifyingCollege(false);
+        return;
+      }
+
+      // Auto-resolve fields
+      const cleanRoll = verifyData.rollNumber;
+      const cleanDept = verifyData.department;
+      const cleanYear = verifyData.academicYear;
+      const cleanSec = verifyData.section;
+      const cleanBatch = verifyData.batchCode;
+      const cleanCollege = verifyData.instituteName;
+      const cleanGrad = verifyData.graduationYear;
+      const cleanInstId = verifyData.instituteId;
+
+      setRollNumber(cleanRoll);
+      setDepartment(cleanDept);
+      setAcademicYear(cleanYear);
+      setSection(cleanSec);
+      setBatchCode(cleanBatch);
+      setCollegeName(cleanCollege);
+      if (cleanGrad) setGradYear(cleanGrad);
+      if (cleanInstId) setInstituteId(cleanInstId);
+      setCollegeLinkedStatus("linked");
+
+      setCollegeAutoResolvedInfo({
+        instituteName: cleanCollege,
+        department: cleanDept,
+        academicYear: cleanYear,
+        section: cleanSec,
+        batchCode: cleanBatch
+      });
+
+      // Update profiles table in Supabase
+      try {
+        await supabase
+          .from("profiles")
+          .update({
+            roll_number: cleanRoll,
+            department: cleanDept,
+            academic_year: cleanYear,
+            section: cleanSec,
+            batch_code: cleanBatch,
+            college_name: cleanCollege,
+            college_key: collegeKey.trim(),
+            college_linked_status: "linked",
+            grant_share_permission: grantSharePermission,
+            placement_consent: placementConsent,
+            institute_id: cleanInstId || null,
+            graduation_year: cleanGrad || gradYear,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", user.id);
+      } catch (dbErr) {
+        console.warn("Profiles DB sync note:", dbErr);
+      }
+
+      // Update Auth Metadata
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            roll_number: cleanRoll,
+            department: cleanDept,
+            academic_year: cleanYear,
+            section: cleanSec,
+            batch_code: cleanBatch,
+            college_name: cleanCollege,
+            college_key: collegeKey.trim(),
+            college_linked_status: "linked",
+            grant_share_permission: grantSharePermission,
+            placement_consent: placementConsent,
+            institute_id: cleanInstId || null,
+            graduation_year: cleanGrad || gradYear
+          }
+        });
+      } catch (metaErr) {
+        console.warn("Auth metadata sync note:", metaErr);
+      }
+
+      // Log consent to consent_log table
+      try {
+        await supabase.from("consent_log").insert([
+          {
+            student_id: user.id,
+            consent_type: "profile_sharing",
+            granted: grantSharePermission,
+            ip_hash: "self_verified"
+          },
+          {
+            student_id: user.id,
+            consent_type: "placement_analytics",
+            granted: placementConsent,
+            ip_hash: "self_verified"
+          }
+        ]);
+      } catch {}
+
+      // Update local storage verification bus
+      const requestStored = localStorage.getItem("ldk_institutional_verifications");
+      const requestList = requestStored ? JSON.parse(requestStored) : [];
+      const newReq = {
+        id: `link_req_${Date.now()}`,
+        studentId: user.id,
+        studentName: fullName || username || "Anonymous Student",
+        studentEmail: user.email || "",
+        type: "college" as const,
+        key: collegeKey.trim(),
+        rollNumber: cleanRoll,
+        department: cleanDept,
+        section: cleanSec,
+        academicYear: cleanYear,
+        batchCode: cleanBatch,
+        status: "linked" as const,
+        previouslyUnlinked: false,
+        date: "Just now"
+      };
+      
+      const updatedList = [newReq, ...requestList.filter((r: any) => !(r.studentId === user.id && r.type === "college"))];
+      localStorage.setItem("ldk_institutional_verifications", JSON.stringify(updatedList));
+      window.dispatchEvent(new Event("ldk_link_requests_update"));
+
+      const linksStored = localStorage.getItem("ldk_student_links");
+      const linksMap = linksStored ? JSON.parse(linksStored) : {};
+      linksMap[`${user.id}_college`] = { 
+        status: "linked", 
+        key: collegeKey.trim(), 
+        rollNumber: cleanRoll,
+        batchCode: cleanBatch,
+        department: cleanDept,
+        section: cleanSec
+      };
+      localStorage.setItem("ldk_student_links", JSON.stringify(linksMap));
+
+      // Global Notification
+      const notifStored = localStorage.getItem("ldk_global_notifications");
+      const notifList = notifStored ? JSON.parse(notifStored) : [];
+      notifList.unshift({
+        id: `notif_link_connected_${Date.now()}`,
+        title: "Institution Connected",
+        message: `Successfully linked with ${cleanCollege} (${cleanDept}, ${cleanYear}, ${cleanSec}).`,
+        type: "system",
+        category: "alerts",
+        role: "student",
+        time: "Just now",
+        read: false
+      });
+      localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
+      window.dispatchEvent(new Event("ldk_notifications_update"));
+
+      setMessage({ text: verifyData.message || "College linked and verified successfully!", type: "success" });
+
+    } catch (err: any) {
+      console.error("Institutional Link Exception:", err);
+      setMessage({ text: "An error occurred during verification. Please try again.", type: "error" });
+    } finally {
+      setIsVerifyingCollege(false);
     }
-    
-    const notifStored = localStorage.getItem("ldk_global_notifications");
-    const notifList = notifStored ? JSON.parse(notifStored) : [];
-    
-    notifList.unshift({
-      id: `notif_link_sent_${Date.now()}`,
-      title: "Linking Request Sent",
-      message: `Your request to link with college key '${collegeKey.trim()}' has been sent to the coordinator for manual approval.`,
-      type: "system",
-      category: "alerts",
-      role: "student",
-      time: "Just now",
-      read: false
-    });
-    
-    notifList.unshift({
-      id: `notif_link_fac_${Date.now()}`,
-      title: "New Linking Request",
-      message: `${fullName || username || 'A student'} has requested to link their profile to your college with key: ${collegeKey.trim()}.`,
-      type: "system",
-      category: "alerts",
-      role: "faculty",
-      time: "Just now",
-      read: false
-    });
-    
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-    window.dispatchEvent(new Event("ldk_notifications_update"));
-    
-    setMessage({ text: "College linking request submitted successfully.", type: "success" });
   };
 
   const handleUnlink = async () => {
@@ -987,47 +1129,45 @@ export default function ProfilePage() {
     setCollegeLinkedStatus("none");
     setCollegeKey("");
     setBatchCode("");
+    setRollNumber("");
+    setAcademicYear("");
+    setSection("");
+    setInstituteId(null);
+    setCollegeAutoResolvedInfo(null);
+
+    try {
+      await supabase
+        .from("profiles")
+        .update({
+          college_key: null,
+          batch_code: null,
+          college_linked_status: "none",
+          roll_number: null,
+          academic_year: null,
+          section: null,
+          institute_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", user.id);
+    } catch {}
+
     try {
       await supabase.auth.updateUser({
         data: {
           college_key: "",
           batch_code: "",
-          college_linked_status: "none"
+          college_linked_status: "none",
+          roll_number: "",
+          academic_year: "",
+          section: "",
+          institute_id: null
         }
       });
     } catch (updateErr) {
       console.error("Failed updating user metadata:", updateErr);
     }
-    
-    const notifStored = localStorage.getItem("ldk_global_notifications");
-    const notifList = notifStored ? JSON.parse(notifStored) : [];
-    
-    notifList.unshift({
-      id: `notif_unlink_${Date.now()}`,
-      title: "College Unlinked",
-      message: "You successfully unlinked from your college.",
-      type: "system",
-      category: "alerts",
-      role: "student",
-      time: "Just now",
-      read: false
-    });
-    
-    notifList.unshift({
-      id: `notif_unlink_fac_${Date.now()}`,
-      title: "Student Unlinked",
-      message: `${fullName || username} has unlinked from your college.`,
-      type: "system",
-      category: "alerts",
-      role: "faculty",
-      time: "Just now",
-      read: false
-    });
-    
-    localStorage.setItem("ldk_global_notifications", JSON.stringify(notifList.slice(0, 100)));
-    window.dispatchEvent(new Event("ldk_notifications_update"));
-    
-    setMessage({ text: "Successfully unlinked your college.", type: "success" });
+
+    setMessage({ text: "Institution unlinked successfully.", type: "success" });
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -1214,6 +1354,14 @@ export default function ProfilePage() {
             unstop_username: unstopUsername.trim() || null,
             hack2skill_username: hack2skillUsername.trim() || null,
             graduation_year: gradYear.trim() || null,
+            roll_number: rollNumber.trim() || null,
+            academic_year: academicYear.trim() || null,
+            section: section.trim() || null,
+            batch_code: batchCode.trim() || null,
+            grant_share_permission: grantSharePermission,
+            placement_consent: placementConsent,
+            college_linked_status: collegeLinkedStatus,
+            institute_id: instituteId || null,
             updated_at: new Date().toISOString()
           })
           .eq("id", user.id);
@@ -1244,6 +1392,10 @@ export default function ProfilePage() {
               unstop_username: unstopUsername.trim(),
               hack2skill_username: hack2skillUsername.trim(),
               graduation_year: gradYear.trim(),
+              roll_number: rollNumber.trim(),
+              academic_year: academicYear.trim(),
+              section: section.trim(),
+              batch_code: batchCode.trim()
             })
           );
           if (location.trim()) {
@@ -1282,7 +1434,13 @@ export default function ProfilePage() {
           graduation_year: gradYear.trim(),
           college_key: collegeKey.trim(),
           batch_code: batchCode.trim(),
+          roll_number: rollNumber.trim(),
+          academic_year: academicYear.trim(),
+          section: section.trim(),
           grant_share_permission: grantSharePermission,
+          placement_consent: placementConsent,
+          college_linked_status: collegeLinkedStatus,
+          institute_id: instituteId || null,
           leetcode_username: leetcodeUsername.trim(),
           codeforces_username: codeforcesUsername.trim(),
           codechef_username: codechefUsername.trim(),
@@ -2510,41 +2668,79 @@ export default function ProfilePage() {
 
                 {/* Institutional Link / Key Enrollment Panel */}
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Institutional Enrollment</span>
+                    {collegeLinkedStatus === "linked" && (
+                      <span className="text-[8.5px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 font-bold flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Verified Student
+                      </span>
+                    )}
+                  </div>
+                  
                   <div className="flex flex-col gap-1.5 border-b border-border-main/40 pb-2.5">
-                    <span className="text-xs font-semibold text-txt-main">Link College</span>
+                    <span className="text-xs font-semibold text-txt-main">Academic Identity & Campus Integration</span>
                     <span className="text-[10px] text-txt-sub font-light leading-relaxed">
-                      Enter verification codes provided by your institution to share accomplishments.
+                      Connect your institutional student credentials to automatically sync departmental leaderboards, faculty event recommendations, and career placement analytics.
                     </span>
                   </div>
                   
                   <div className="flex flex-col gap-4">
                     {/* College Link Segment */}
                     <div className="flex flex-col gap-3 p-3 bg-bg-base/30 border border-border-main/50 rounded-sm">
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-txt-sub">College Enrollment</span>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] text-txt-sub font-semibold">College Enrollment Key</label>
-                        <input 
-                          type="password"
-                          value={collegeKey}
-                          onChange={(e) => setCollegeKey(e.target.value)}
-                          disabled={!isEditing || collegeLinkedStatus === "pending" || collegeLinkedStatus === "linked"}
-                          placeholder="Enter College Registrar Key"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                        />
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-txt-sub">Institutional Credentials</span>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Roll Number */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-txt-sub font-semibold">Institutional Roll / Reg Number</label>
+                          <input 
+                            type="text"
+                            value={rollNumber}
+                            onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+                            disabled={!isEditing || collegeLinkedStatus === "linked"}
+                            placeholder="e.g. RA2311003010045"
+                            className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono uppercase disabled:opacity-60"
+                          />
+                        </div>
+
+                        {/* College Key */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-txt-sub font-semibold">College Registrar Key</label>
+                          <input 
+                            type="password"
+                            value={collegeKey}
+                            onChange={(e) => setCollegeKey(e.target.value)}
+                            disabled={!isEditing || collegeLinkedStatus === "linked"}
+                            placeholder="e.g. COLLEGE_SRM"
+                            className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] text-txt-sub font-semibold">Batch Code / Section</label>
-                        <input 
-                          type="text"
-                          value={batchCode}
-                          onChange={(e) => setBatchCode(e.target.value)}
-                          disabled={!isEditing || collegeLinkedStatus === "pending" || collegeLinkedStatus === "linked"}
-                          placeholder="e.g. Batch A / Class of 2026"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors disabled:opacity-60"
-                        />
-                      </div>
+                      {/* Resolved Hierarchy Details Preview (when linked or auto-resolved) */}
+                      {(collegeLinkedStatus === "linked" || collegeAutoResolvedInfo) && (
+                        <div className="p-2.5 bg-bg-card/70 border border-border-main/70 rounded flex flex-col gap-1.5 animate-fade-in font-mono text-[10px]">
+                          <span className="text-[9px] text-txt-muted uppercase tracking-wider font-semibold">Mapped Campus Hierarchy</span>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-txt-main">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Department</span>
+                              <span className="font-semibold truncate">{department || collegeAutoResolvedInfo?.department || "General"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Year</span>
+                              <span className="font-semibold">{academicYear || collegeAutoResolvedInfo?.academicYear || "3rd Year"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Section</span>
+                              <span className="font-semibold">{section || collegeAutoResolvedInfo?.section || "Section A"}</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Batch Code</span>
+                              <span className="font-semibold truncate">{batchCode || collegeAutoResolvedInfo?.batchCode || "Class of 2026"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* College Status Display & Buttons */}
                       <div className="flex flex-col gap-2 mt-1">
@@ -2552,54 +2748,71 @@ export default function ProfilePage() {
                           <button
                             type="button"
                             onClick={handleRequestCollegeLink}
-                            className="h-8 w-full bg-accent-main hover:opacity-90 text-bg-base text-[9px] font-mono uppercase tracking-wider rounded-sm transition-opacity"
+                            disabled={isVerifyingCollege || !isEditing}
+                            className="h-8 w-full bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base text-[9px] font-mono uppercase tracking-wider rounded-sm transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
                           >
-                            Verify & Link College
+                            {isVerifyingCollege ? (
+                              <>
+                                <span className="w-2.5 h-2.5 border-2 border-bg-base border-t-transparent rounded-full animate-spin" />
+                                Validating Credentials...
+                              </>
+                            ) : (
+                              "Verify & Link College"
+                            )}
                           </button>
                         )}
-                        {collegeLinkedStatus === "pending" && (
-                          <div className="flex flex-col gap-1 text-left">
-                            <span className="text-[9.5px] text-amber-500 font-mono flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" /> Pending Registrar Verification
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleUnlink}
-                              className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
-                            >
-                              Cancel Request & Unlink
-                            </button>
-                          </div>
-                        )}
                         {collegeLinkedStatus === "linked" && (
-                          <div className="flex flex-col gap-1 text-left">
+                          <div className="flex items-center justify-between pt-1">
                             <span className="text-[9.5px] text-emerald-500 font-mono flex items-center gap-1">
-                              <CheckCircle2 size={11} /> Connected & Verified by College Registrar
+                              <CheckCircle2 size={11} /> Connected to {collegeName || "Institution"}
                             </span>
-                            <button
-                              type="button"
-                              onClick={handleUnlink}
-                              className="text-[9px] text-txt-sub font-mono uppercase tracking-wide opacity-50 hover:opacity-100 text-left transition-opacity underline cursor-pointer mt-1"
-                            >
-                              Unlink College
-                            </button>
+                            {isEditing && (
+                              <button
+                                type="button"
+                                onClick={handleUnlink}
+                                className="text-[9px] text-txt-sub hover:text-red-400 font-mono uppercase tracking-wide transition-colors underline cursor-pointer"
+                              >
+                                Unlink College
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2.5 mt-2 border-t border-border-main/40 pt-3">
-                      <input 
-                        type="checkbox"
-                        id="grantSharePermission"
-                        checked={grantSharePermission}
-                        onChange={(e) => setGrantSharePermission(e.target.checked)}
-                        disabled={!isEditing}
-                        className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
-                      />
-                      <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
-                        <strong>Grant Performance Sharing Permission</strong>: I authorize my linked College coordinators and recruitment partners to view, audit, and export my milestones, competitive scores, and code verification statuses.
-                      </label>
+                    {/* Consents & Data Governance Toggles */}
+                    <div className="flex flex-col gap-2.5 mt-1 border-t border-border-main/40 pt-3">
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-txt-muted font-bold">Privacy & Institutional Governance</span>
+                      
+                      {/* Departmental Performance Audit Consent */}
+                      <div className="flex items-start gap-2.5">
+                        <input 
+                          type="checkbox"
+                          id="grantSharePermission"
+                          checked={grantSharePermission}
+                          onChange={(e) => setGrantSharePermission(e.target.checked)}
+                          disabled={!isEditing}
+                          className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
+                        />
+                        <label htmlFor="grantSharePermission" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
+                          <strong>Departmental Academic Audit</strong>: Authorize verified department faculty and coordinators to include your coding activity in internal academic reports and progress evaluations.
+                        </label>
+                      </div>
+
+                      {/* Recruiter Placement Hub Consent */}
+                      <div className="flex items-start gap-2.5">
+                        <input 
+                          type="checkbox"
+                          id="placementConsent"
+                          checked={placementConsent}
+                          onChange={(e) => setPlacementConsent(e.target.checked)}
+                          disabled={!isEditing}
+                          className="mt-0.5 h-3.5 w-3.5 border border-border-main/85 bg-bg-base text-accent-main focus:ring-0 rounded-sm cursor-pointer disabled:opacity-60"
+                        />
+                        <label htmlFor="placementConsent" className="text-[10px] text-txt-sub leading-normal cursor-pointer select-none">
+                          <strong>Campus Placement & Recruiter Intelligence (Opt-in)</strong>: Include anonymized skill benchmarks in corporate recruiter dashboards to increase your institution&apos;s placement visibility.
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
