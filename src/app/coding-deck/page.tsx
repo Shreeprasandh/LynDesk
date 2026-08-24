@@ -1579,7 +1579,7 @@ export default function CodingDeckPage() {
                     <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Browser Extension</span>
                   </div>
                   <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                    v1.0.0
+                    v1.0.2
                   </span>
                 </div>
 
@@ -1594,12 +1594,12 @@ export default function CodingDeckPage() {
 
                 {/* Download Button */}
                 <a
-                  href="/leetie-v1.0.0.zip"
-                  download="leetie-v1.0.0.zip"
+                  href="/leetie-v1.0.2.zip"
+                  download="leetie-v1.0.2.zip"
                   className="w-full py-2 bg-accent-main hover:opacity-90 text-bg-base text-[10px] uppercase font-mono tracking-wider font-bold transition-opacity rounded-sm flex items-center justify-center gap-1.5 cursor-pointer no-underline"
                 >
                   <Download size={12} />
-                  Download Leetie v1.0.0 (.zip)
+                  Download Leetie v1.0.2 (.zip)
                 </a>
 
                 {/* Collapsible Installation Guide (Option A Accordion) */}
@@ -1619,7 +1619,7 @@ export default function CodingDeckPage() {
                     <div className="p-3 bg-bg-base/40 border border-border-main/40 rounded flex flex-col gap-2.5 text-xs text-txt-sub font-light leading-relaxed animate-in fade-in duration-200">
                       <ol className="flex flex-col gap-2 list-decimal list-inside text-[11px] text-txt-sub">
                         <li className="leading-snug">
-                          <strong className="text-txt-main font-semibold">Unzip</strong> the downloaded <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie-v1.0.0.zip</code> file.
+                          <strong className="text-txt-main font-semibold">Unzip</strong> the downloaded <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie-v1.0.2.zip</code> file.
                         </li>
                         <li className="leading-snug">
                           Open <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"chrome://extensions"}</code> or <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"edge://extensions"}</code>.

@@ -45,7 +45,7 @@
 ### 2. 💻 Coding Desk (`/coding-deck`)
 * **Multi-Platform Metric Aggregation**: Synchronized analytics across **LeetCode**, **Codeforces**, **CodeChef**, and **Unstop**.
 * **Daily Streak & Rating Engine**: Activity heatmaps, solve distribution (*Easy, Medium, Hard*), and standardized global percentile calculations.
-* **Leetie Extension (`/public/leetie-v1.0.0.zip`)**: Bundled Chrome extension that automatically archives accepted LeetCode solutions directly to your personal GitHub repository.
+* **Leetie Extension (`/public/leetie-v1.0.2.zip`)**: Bundled Chrome extension that automatically archives accepted LeetCode solutions directly to your personal GitHub repository.
 
 ### 3. 📚 Study Desk (`/study-desk`)
 * **AI Path Studio**: Upload lecture slides, DOCX files, or PDFs to automatically synthesize structured, interactive study paths.
