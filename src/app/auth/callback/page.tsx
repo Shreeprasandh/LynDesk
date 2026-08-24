@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 
 function CallbackHandler() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const queryParams = useSearchParams();
 
   useEffect(() => {
     let isMounted = true;
@@ -15,7 +15,7 @@ function CallbackHandler() {
 
     const handleAuth = async () => {
       try {
-        const nextParam = searchParams.get("next") || "/event-desk";
+        const nextParam = queryParams.get("next") || "/event-desk";
         const isFirstTime = typeof window !== "undefined" && localStorage.getItem("ldk_first_time_signup") === "true";
         const target = isFirstTime ? "/profile" : nextParam;
 
@@ -54,7 +54,7 @@ function CallbackHandler() {
       if (timeoutId) clearTimeout(timeoutId);
       if (authSubscription) authSubscription.unsubscribe();
     };
-  }, [router, searchParams]);
+  }, [router, queryParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-bg-base text-txt-main font-mono text-xs">

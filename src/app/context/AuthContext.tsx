@@ -356,17 +356,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserProfile(newProfileData);
 
           // Save to database
-          await supabase.from("profiles").upsert({
-            id: user.id,
-            full_name: defaultFullName,
-            username: defaultUsername,
-            avatar_url: defaultAvatar,
-            department: "Computer Science",
-            college_key: "COLLEGE_SRM",
-            academic_credits: 0,
-          });
+          try {
+            await supabase.from("profiles").upsert({
+              id: user.id,
+              full_name: defaultFullName,
+              username: defaultUsername,
+              avatar_url: defaultAvatar,
+              department: "Computer Science",
+              college_key: "COLLEGE_SRM",
+              academic_credits: 0,
+            });
+          } catch (err) {
+            console.error("Failed to auto-initialize profile in DB:", err);
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.error("Profile sync error:", err);
+      }
     };
 
     syncProfile();

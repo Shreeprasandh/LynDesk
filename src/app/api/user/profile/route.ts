@@ -8,8 +8,9 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const parseResult = querySchema.safeParse({ userId: searchParams.get("userId") });
+    const { search } = new URL(request.url);
+    const query = new URLSearchParams(search);
+    const parseResult = querySchema.safeParse({ userId: query.get("userId") });
 
     if (!parseResult.success) {
       return apiError(parseResult.error.issues[0]?.message || "Invalid or missing userId parameter", 400, "BAD_REQUEST");
