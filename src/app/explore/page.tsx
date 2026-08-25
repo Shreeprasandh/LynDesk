@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import Header from "../components/Header";
@@ -23,6 +24,14 @@ import {
   Copy,
   AlertTriangle,
   SlidersHorizontal,
+  Star,
+  Eye,
+  Trash2,
+  RefreshCw,
+  X,
+  ChevronDown,
+  Upload,
+  FileText,
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
 
@@ -67,6 +76,33 @@ interface Friendship {
   sender_restricted?: boolean;
   receiver_restricted?: boolean;
   friend: FriendProfile;
+}
+
+interface WorkItem {
+  id: string;
+  institute_id: string;
+  student_id: string;
+  title: string;
+  category: string;
+  description: string | null;
+  is_published: boolean;
+  external_url: string | null;
+  file_path: string | null;
+  is_alias: boolean;
+  status: 'pending' | 'ai_verified' | 'staff_review' | 'approved' | 'rejected';
+  rejection_reason: string | null;
+  views: number;
+  average_rating: number;
+  rating_count: number;
+  tags: string[] | null;
+  how_to_use: string | null;
+  embed_url: string | null;
+  expires_at: string;
+  renewed_at: string | null;
+  created_at: string;
+  student_name?: string;
+  student_department?: string;
+  student_year?: string;
 }
 
 const DEFAULT_EVENTS: OpportunityItem[] = [
@@ -121,7 +157,7 @@ export default function ExplorePage() {
   const { showToast } = useToast();
 
   // Two Main Sub-Tabs: "events" | "friends"
-  const [activeTab, setActiveTab] = useState<"events" | "friends">("events");
+  const [activeTab, setActiveTab] = useState<"events" | "friends" | "works">("events");
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [hasActivePreset, setHasActivePreset] = useState(false);
 
@@ -158,6 +194,8 @@ export default function ExplorePage() {
           setActiveTab("friends");
         } else if (tab === "events" || tab === "contests" || tab === "news" || tab === "hackathons") {
           setActiveTab("events");
+        } else if (tab === "works" || tab === "creations" || tab === "portfolio") {
+          setActiveTab("works");
         }
       });
     }
@@ -196,6 +234,39 @@ export default function ExplorePage() {
 
   // ── FRIENDS & NETWORK STATE (EXACT LEGACY FRIENDS SYSTEM) ────────────────
   const [friendsSubTab, setFriendsSubTab] = useState<"friends" | "requests">("friends");
+
+  // ── WORKS HUB STATE ────────────────────────────────────────────────────
+  const [worksLoading, setWorksLoading] = useState(false);
+  const [works, setWorks] = useState<WorkItem[]>([]);
+  const [myWorks, setMyWorks] = useState<WorkItem[]>([]);
+  const [worksTotal, setWorksTotal] = useState(0);
+  const [worksPage, setWorksPage] = useState(1);
+  const [worksSearch, setWorksSearch] = useState('');
+  const [worksCategoryFilter, setWorksCategoryFilter] = useState('');
+  const [worksDeptFilter, setWorksDeptFilter] = useState('');
+  const [worksYearFilter, setWorksYearFilter] = useState('');
+  const [worksSort, setWorksSort] = useState('trending');
+  const [selectedWork, setSelectedWork] = useState<WorkItem | null>(null);
+  const [showWorkDetail, setShowWorkDetail] = useState(false);
+  const [showMyWorks, setShowMyWorks] = useState(false);
+  const [showAddWork, setShowAddWork] = useState(false);
+  const [collegeLinked, setCollegeLinked] = useState(false);
+  const [worksError, setWorksError] = useState('');
+  // Add Work form state
+  const [addWorkStep, setAddWorkStep] = useState<1|2|3>(1);
+  const [newWorkCategory, setNewWorkCategory] = useState('');
+  const [newWorkIsPublished, setNewWorkIsPublished] = useState(true);
+  const [newWorkTitle, setNewWorkTitle] = useState('');
+  const [newWorkDescription, setNewWorkDescription] = useState('');
+  const [newWorkUrl, setNewWorkUrl] = useState('');
+  const [newWorkIsAlias, setNewWorkIsAlias] = useState(false);
+  const [newWorkTags, setNewWorkTags] = useState('');
+  const [newWorkHowToUse, setNewWorkHowToUse] = useState('');
+  const [newWorkFile, setNewWorkFile] = useState<File | null>(null);
+  const [addWorkLoading, setAddWorkLoading] = useState(false);
+  const [userRatings, setUserRatings] = useState<Record<string, number>>({});
+  const [ratingLoading, setRatingLoading] = useState('');
+  const [showHowToUse, setShowHowToUse] = useState(false);
 
   // Search States
   const [searchQuery, setSearchQuery] = useState("");
@@ -569,6 +640,196 @@ export default function ExplorePage() {
     toggleRestrictFriend(activeFriendship.id, !!isRestrictedByMe);
   };
 
+  // ── WORKS HUB CONFIG ────────────────────────────────────────────────────
+  const WORK_CATEGORIES = [
+    { id: 'book', label: 'Book', icon: '📚' },
+    { id: 'music', label: 'Music', icon: '🎵' },
+    { id: 'web_game', label: 'Web Game', icon: '🎮' },
+    { id: 'software', label: 'Software', icon: '🖥️' },
+    { id: 'art', label: 'Art', icon: '🎨' },
+    { id: 'film', label: 'Film', icon: '🎬' },
+    { id: 'mobile_app', label: 'Mobile App', icon: '📱' },
+    { id: 'podcast', label: 'Podcast', icon: '🎙️' },
+    { id: 'research', label: 'Research', icon: '📜' },
+    { id: 'website', label: 'Website', icon: '🌐' },
+    { id: 'physical_product', label: 'Board Game / Product', icon: '♟️' },
+  ];
+
+  const UNPUBLISHED_ALLOWED = ['book', 'music', 'art', 'research', 'physical_product'];
+
+  const getDaysUntilExpiry = (expiresAt: string): number => {
+    return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  };
+
+  // ── WORKS HUB FUNCTIONS ──────────────────────────────────────────────
+  const loadWorks = async (page = 1) => {
+    if (!user) return;
+    setWorksLoading(true);
+    setWorksError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const params = new URLSearchParams({ page: String(page), sort: worksSort });
+      if (worksSearch) params.set('search', worksSearch);
+      if (worksCategoryFilter) params.set('category', worksCategoryFilter);
+      if (worksDeptFilter) params.set('department', worksDeptFilter);
+      if (worksYearFilter) params.set('academic_year', worksYearFilter);
+      const res = await fetch(`/api/works?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWorks(data.works || []);
+        setWorksTotal(data.total || 0);
+        setWorksPage(page);
+      } else if (res.status === 403) {
+        setCollegeLinked(false);
+        setWorksError('college_not_linked');
+      }
+    } catch {
+      setWorksError('Failed to load works.');
+    } finally {
+      setWorksLoading(false);
+    }
+  };
+
+  const loadMyWorks = async () => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/works/my', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyWorks(data.works || []);
+      }
+    } catch { /* silent */ }
+  };
+
+  const handleRateWork = async (workId: string, rating: number) => {
+    if (!user) return;
+    setRatingLoading(workId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/works/${workId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ rating })
+      });
+      setUserRatings(prev => ({ ...prev, [workId]: rating }));
+    } catch { /* silent */ } finally {
+      setRatingLoading('');
+    }
+  };
+
+  const handleDeleteWork = async (workId: string) => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/works/${workId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      await loadMyWorks();
+      showToast('Work deleted successfully.');
+    } catch { showToast('Failed to delete work.'); }
+  };
+
+  const handleRenewWork = async (workId: string) => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/works/${workId}/renew`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        await loadMyWorks();
+        showToast('Work renewed for 90 more days!');
+      }
+    } catch { showToast('Failed to renew work.'); }
+  };
+
+  const handleSubmitWork = async () => {
+    if (!user || !newWorkTitle || !newWorkCategory) return;
+    setAddWorkLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      let filePath: string | undefined;
+      if (!newWorkIsPublished && newWorkFile) {
+        const fd = new FormData();
+        fd.append('file', newWorkFile);
+        fd.append('bucket', 'student-works');
+        fd.append('category', newWorkCategory);
+        const upRes = await fetch('/api/works/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: fd
+        });
+        if (upRes.ok) {
+          const upData = await upRes.json();
+          filePath = upData.file_path;
+        } else {
+          showToast('File upload failed. Please try again.');
+          setAddWorkLoading(false);
+          return;
+        }
+      }
+      const res = await fetch('/api/works', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          title: newWorkTitle,
+          category: newWorkCategory,
+          description: newWorkDescription,
+          is_published: newWorkIsPublished,
+          external_url: newWorkIsPublished ? newWorkUrl : undefined,
+          is_alias: newWorkIsAlias,
+          tags: newWorkTags ? newWorkTags.split(',').map(t => t.trim()).filter(Boolean) : [],
+          how_to_use: newWorkHowToUse,
+          file_path: filePath
+        })
+      });
+      if (res.ok) {
+        showToast('Work submitted! It will appear once verified.');
+        setShowAddWork(false);
+        setAddWorkStep(1);
+        setNewWorkCategory(''); setNewWorkTitle(''); setNewWorkDescription('');
+        setNewWorkUrl(''); setNewWorkTags(''); setNewWorkHowToUse('');
+        setNewWorkFile(null); setNewWorkIsAlias(false); setNewWorkIsPublished(true);
+        await loadMyWorks();
+        await loadWorks();
+      } else {
+        const err = await res.json();
+        showToast(err.error || 'Failed to submit work.');
+      }
+    } catch { showToast('Failed to submit work.'); }
+    finally { setAddWorkLoading(false); }
+  };
+
+  // Load works when tab is activated
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (activeTab === 'works' && user) {
+      loadWorks(1);
+      loadMyWorks();
+    }
+  }, [activeTab, user]);
+
+  // Re-fetch when filters/sort change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (activeTab === 'works' && user) {
+      loadWorks(1);
+    }
+  }, [worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter, worksSort]);
+
   if (authLoading) {
     return (
       <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
@@ -628,6 +889,17 @@ export default function ExplorePage() {
                 {requestsList.length > 0 && (
                   <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse ml-0.5" />
                 )}
+              </button>
+              <button
+                onClick={() => setActiveTab("works")}
+                className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === "works"
+                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                    : "text-txt-sub hover:text-txt-main"
+                }`}
+              >
+                <span className="text-[11px]">🎨</span>
+                Works Hub
               </button>
             </div>
 
@@ -1303,6 +1575,787 @@ export default function ExplorePage() {
 
           </div>
         )}
+
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {/* SUB-TAB 3: WORKS HUB                                               */}
+        {/* ─────────────────────────────────────────────────────────────────── */}
+        {activeTab === "works" && (
+          <div className="flex flex-col gap-6 pb-12">
+            {worksError === "college_not_linked" ? (
+              /* ── A. College gate ── */
+              <div className="border border-border-main/40 bg-bg-card rounded-xl p-12 flex flex-col items-center gap-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-bg-surface border border-border-main/60 flex items-center justify-center text-2xl">🏛️</div>
+                <h3 className="font-display text-lg font-light text-txt-main">College Network Required</h3>
+                <p className="text-sm text-txt-sub max-w-sm">The Works Hub is exclusive to students connected to their college. Link your college in your profile to access this space.</p>
+                <a href="/profile" className="mt-2 px-5 py-2 bg-accent-main text-bg-base rounded text-xs font-mono uppercase tracking-wider hover:opacity-90 transition-opacity">Go to Profile →</a>
+              </div>
+            ) : (
+              <>
+                {/* ── B. Top Control Bar ── */}
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border border-border-main/70 bg-bg-surface p-4 rounded-md">
+                  <div className="flex flex-col sm:flex-row gap-2 flex-1 flex-wrap">
+                    {/* Search */}
+                    <div className="relative min-w-[200px] flex-1 max-w-xs">
+                      <Search size={13} className="absolute left-3 top-[11px] text-txt-muted" />
+                      <input
+                        type="text"
+                        value={worksSearch}
+                        onChange={e => setWorksSearch(e.target.value)}
+                        placeholder="Search works, authors..."
+                        className="w-full h-9 pl-8 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                      />
+                    </div>
+                    {/* Category filter */}
+                    <select
+                      value={worksCategoryFilter}
+                      onChange={e => setWorksCategoryFilter(e.target.value)}
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
+                    >
+                      <option value="">All Categories</option>
+                      {WORK_CATEGORIES.map(c => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                      ))}
+                    </select>
+                    {/* Dept filter */}
+                    <input
+                      type="text"
+                      value={worksDeptFilter}
+                      onChange={e => setWorksDeptFilter(e.target.value)}
+                      placeholder="Department..."
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono w-36"
+                    />
+                    {/* Year filter */}
+                    <input
+                      type="text"
+                      value={worksYearFilter}
+                      onChange={e => setWorksYearFilter(e.target.value)}
+                      placeholder="Year (e.g. 2024)..."
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono w-36"
+                    />
+                    {/* Sort */}
+                    <select
+                      value={worksSort}
+                      onChange={e => setWorksSort(e.target.value)}
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
+                    >
+                      <option value="trending">Trending</option>
+                      <option value="newest">Newest</option>
+                      <option value="top_rated">Top Rated</option>
+                      <option value="most_viewed">Most Viewed</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* My Works button */}
+                    <button
+                      onClick={() => { setShowMyWorks(true); loadMyWorks(); }}
+                      className="h-9 px-3.5 border border-border-main hover:bg-bg-card text-txt-sub hover:text-txt-main font-mono text-[10px] uppercase tracking-wider rounded cursor-pointer transition-colors flex items-center gap-1.5"
+                    >
+                      <FileText size={12} />
+                      My Works
+                      {myWorks.length > 0 && (
+                        <span className="ml-0.5 px-1.5 py-0.5 bg-accent-main/10 text-accent-main text-[9px] font-bold rounded">
+                          {myWorks.length}/5
+                        </span>
+                      )}
+                    </button>
+                    {/* Add Work */}
+                    <button
+                      onClick={() => { setAddWorkStep(1); setShowAddWork(true); }}
+                      className="h-9 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded cursor-pointer transition-opacity flex items-center gap-1.5"
+                    >
+                      <Plus size={12} />
+                      Add Work
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── B. Works Grid ── */}
+                {worksLoading ? (
+                  /* Loading skeletons */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="border border-border-main/40 bg-bg-surface rounded-lg p-5 flex flex-col gap-3 animate-pulse">
+                        <div className="flex gap-2">
+                          <div className="w-16 h-4 bg-bg-card rounded" />
+                          <div className="w-10 h-4 bg-bg-card rounded" />
+                        </div>
+                        <div className="h-5 bg-bg-card rounded w-3/4" />
+                        <div className="h-3 bg-bg-card rounded w-1/2" />
+                        <div className="h-8 bg-bg-card rounded w-full" />
+                        <div className="flex gap-3 mt-auto pt-2">
+                          <div className="h-3 bg-bg-card rounded w-10" />
+                          <div className="h-3 bg-bg-card rounded w-10" />
+                          <div className="h-3 bg-bg-card rounded w-10" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : works.length === 0 ? (
+                  /* Empty state */
+                  <div className="border border-dashed border-border-main/60 bg-bg-surface p-14 rounded-lg flex flex-col items-center gap-3 text-center">
+                    <span className="text-4xl opacity-40">🎨</span>
+                    <h4 className="font-display text-base font-light text-txt-main">No works found</h4>
+                    <p className="text-xs text-txt-muted max-w-xs">
+                      {worksSearch || worksCategoryFilter ? "Try adjusting your filters." : "Be the first in your college to submit a creative work."}
+                    </p>
+                    <button
+                      onClick={() => { setAddWorkStep(1); setShowAddWork(true); }}
+                      className="mt-2 px-4 py-2 bg-accent-main text-bg-base text-xs font-mono uppercase tracking-wider rounded hover:opacity-90 transition-opacity"
+                    >
+                      + Submit Your Work
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {works.map((w, idx) => {
+                      const cat = WORK_CATEGORIES.find(c => c.id === w.category);
+                      const days = getDaysUntilExpiry(w.expires_at);
+                      return (
+                        <motion.div
+                          key={w.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.04, duration: 0.3 }}
+                          className="border border-border-main/60 bg-bg-surface hover:border-border-main hover:bg-bg-card rounded-lg p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 group"
+                          onClick={() => { setSelectedWork(w); setShowWorkDetail(true); setShowHowToUse(false); }}
+                        >
+                          {/* Category + status badge */}
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded border border-border-main/60 bg-bg-base/60 text-txt-muted flex items-center gap-1">
+                              <span>{cat?.icon ?? '🗂️'}</span>
+                              {cat?.label ?? w.category}
+                            </span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Approved" />
+                          </div>
+
+                          {/* Title */}
+                          <h3 className="font-display text-sm font-medium text-txt-main leading-snug line-clamp-2 group-hover:text-txt-main transition-colors">
+                            {w.title}
+                          </h3>
+
+                          {/* Author line */}
+                          <p className="text-[10px] font-mono text-txt-muted truncate">
+                            By {w.student_name ?? 'A student'}
+                            {w.student_department ? ` · ${w.student_department}` : ''}
+                            {w.student_year ? ` · ${w.student_year}` : ''}
+                          </p>
+
+                          {/* Description */}
+                          {w.description && (
+                            <p className="text-xs text-txt-sub font-light leading-relaxed line-clamp-2">
+                              {w.description}
+                            </p>
+                          )}
+
+                          {/* Stats footer */}
+                          <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-main/30">
+                            <div className="flex items-center gap-3 text-[10px] font-mono text-txt-muted">
+                              <span className="flex items-center gap-0.5">
+                                <Star size={10} className="fill-amber-400 text-amber-400" />
+                                {w.average_rating > 0 ? w.average_rating.toFixed(1) : '—'}
+                              </span>
+                              <span className="flex items-center gap-0.5">
+                                <Eye size={10} />
+                                {w.views}
+                              </span>
+                              <span className="flex items-center gap-0.5 text-txt-muted/70">
+                                {days > 0 ? `${days}d left` : 'Expired'}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-mono text-accent-main opacity-0 group-hover:opacity-100 transition-opacity">
+                              View →
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ── Pagination ── */}
+                {worksTotal > 20 && !worksLoading && (
+                  <div className="flex items-center justify-center gap-3 pt-2">
+                    <button
+                      disabled={worksPage <= 1}
+                      onClick={() => loadWorks(worksPage - 1)}
+                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded disabled:opacity-30 cursor-pointer transition-colors"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="font-mono text-[10px] text-txt-muted">
+                      Page {worksPage} · {worksTotal} total
+                    </span>
+                    <button
+                      disabled={worksPage * 20 >= worksTotal}
+                      onClick={() => loadWorks(worksPage + 1)}
+                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded disabled:opacity-30 cursor-pointer transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── C. My Works Slide-out Panel ── */}
+        <AnimatePresence>
+          {showMyWorks && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                key="my-works-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs"
+                onClick={() => setShowMyWorks(false)}
+              />
+              {/* Drawer */}
+              <motion.div
+                key="my-works-panel"
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="fixed top-0 right-0 h-full w-full max-w-sm z-50 bg-bg-surface border-l border-border-main flex flex-col shadow-2xl"
+              >
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border-main/50 shrink-0">
+                  <div>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Portfolio</span>
+                    <h3 className="font-display text-base font-light text-txt-main mt-0.5">My Works</h3>
+                  </div>
+                  <button onClick={() => setShowMyWorks(false)} className="text-txt-muted hover:text-txt-main transition-colors cursor-pointer">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Work list */}
+                <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
+                  {myWorks.length === 0 && (
+                    <div className="py-12 text-center flex flex-col items-center gap-2 text-txt-muted">
+                      <span className="text-3xl opacity-30">🎨</span>
+                      <p className="text-xs font-mono">No works submitted yet.</p>
+                    </div>
+                  )}
+                  {myWorks.map(w => {
+                    const cat = WORK_CATEGORIES.find(c => c.id === w.category);
+                    const days = getDaysUntilExpiry(w.expires_at);
+                    const canRenew = days <= 7 && w.status === 'approved' && !w.renewed_at;
+                    const statusConfig = {
+                      pending: { label: '🟡 Pending AI Review', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+                      ai_verified: { label: '🔵 AI Verified', cls: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
+                      staff_review: { label: '🔵 Staff Review', cls: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
+                      approved: { label: '🟢 Live', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+                      rejected: { label: '🔴 Rejected', cls: 'text-red-400 bg-red-500/10 border-red-500/30' },
+                    }[w.status] ?? { label: w.status, cls: 'text-txt-muted border-border-main' };
+
+                    return (
+                      <div key={w.id} className="border border-border-main/60 bg-bg-base/40 rounded-lg p-4 flex flex-col gap-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span className="font-mono text-[9px] text-txt-muted uppercase">{cat?.icon} {cat?.label ?? w.category}</span>
+                            <span className="text-xs font-semibold text-txt-main truncate">{w.title}</span>
+                          </div>
+                          <span className={`text-[8px] font-mono uppercase px-2 py-0.5 rounded border shrink-0 ${statusConfig.cls}`}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
+
+                        {w.status === 'rejected' && w.rejection_reason && (
+                          <p className="text-[10px] text-red-400/80 font-mono italic border-l-2 border-red-500/40 pl-2">
+                            {w.rejection_reason}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 text-[9px] font-mono text-txt-muted">
+                          <span>{days > 0 ? `${days}d until expiry` : 'Expired'}</span>
+                          <div className="flex items-center gap-2">
+                            {canRenew && (
+                              <button
+                                onClick={() => handleRenewWork(w.id)}
+                                className="flex items-center gap-0.5 text-accent-main hover:opacity-80 transition-opacity cursor-pointer"
+                              >
+                                <RefreshCw size={10} /> Renew
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteWork(w.id)}
+                              className="flex items-center gap-0.5 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={10} /> Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Panel footer */}
+                <div className="px-5 py-4 border-t border-border-main/50 shrink-0">
+                  {myWorks.length < 5 && (
+                    <button
+                      onClick={() => { setShowMyWorks(false); setAddWorkStep(1); setShowAddWork(true); }}
+                      className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded cursor-pointer transition-opacity flex items-center justify-center gap-1.5"
+                    >
+                      <Plus size={12} /> Add New Work
+                    </button>
+                  )}
+                  {myWorks.length >= 5 && (
+                    <p className="text-[10px] text-txt-muted font-mono text-center">
+                      Portfolio limit reached (5/5). Delete a work to add another.
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── D. Work Detail Modal ── */}
+        <AnimatePresence>
+          {showWorkDetail && selectedWork && (
+            <>
+              <motion.div
+                key="work-detail-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+                onClick={() => setShowWorkDetail(false)}
+              />
+              <motion.div
+                key="work-detail-modal"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 40 }}
+                transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+                className="fixed inset-x-0 bottom-0 md:inset-0 md:m-auto z-50 md:max-w-2xl md:h-fit md:rounded-xl w-full bg-bg-surface border border-border-main/60 flex flex-col shadow-2xl overflow-hidden max-h-[90vh] md:max-h-[85vh]"
+              >
+                {/* Modal header */}
+                <div className="flex items-start justify-between p-5 border-b border-border-main/40 shrink-0">
+                  <div className="flex flex-col gap-1 min-w-0 pr-4">
+                    {(() => {
+                      const cat = WORK_CATEGORIES.find(c => c.id === selectedWork.category);
+                      return (
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted flex items-center gap-1">
+                          <span>{cat?.icon ?? '🗂️'}</span>{cat?.label ?? selectedWork.category}
+                        </span>
+                      );
+                    })()}
+                    <h2 className="font-display text-xl font-light text-txt-main leading-snug">{selectedWork.title}</h2>
+                    <p className="text-[10px] font-mono text-txt-muted">
+                      By {selectedWork.student_name ?? 'A student'}
+                      {selectedWork.student_department ? ` · ${selectedWork.student_department}` : ''}
+                      {selectedWork.student_year ? ` · ${selectedWork.student_year}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowWorkDetail(false)} className="text-txt-muted hover:text-txt-main transition-colors cursor-pointer shrink-0 mt-0.5">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Modal body — scrollable */}
+                <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+                  {/* Tags + expiry */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Verified
+                    </span>
+                    {selectedWork.tags?.map(tag => (
+                      <span key={tag} className="text-[9px] font-mono text-txt-muted border border-border-main/60 bg-bg-base/60 px-2 py-0.5 rounded">
+                        #{tag}
+                      </span>
+                    ))}
+                    <span className="ml-auto text-[9px] font-mono text-txt-muted">
+                      {getDaysUntilExpiry(selectedWork.expires_at)}d until expiry
+                    </span>
+                  </div>
+
+                  {/* ── Content area by category ── */}
+                  {(() => {
+                    const cat = selectedWork.category;
+                    const url = selectedWork.external_url;
+                    const file = selectedWork.file_path;
+
+                    if ((cat === 'web_game' || cat === 'website') && url) {
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <iframe
+                            src={url}
+                            className="w-full h-80 rounded border border-border-main/40 bg-bg-base"
+                            sandbox="allow-scripts allow-same-origin allow-forms"
+                            onError={() => {}}
+                          />
+                          <p className="text-[10px] font-mono text-txt-muted text-center">
+                            Can&apos;t see the content?{' '}
+                            <a href={url} target="_blank" rel="noreferrer" className="text-accent-main hover:underline">
+                              Open in new tab →
+                            </a>
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (cat === 'music' && (file || url)) {
+                      return (
+                        // eslint-disable-next-line jsx-a11y/media-has-caption
+                        <audio controls src={file ?? url ?? ''} className="w-full mt-2" />
+                      );
+                    }
+                    if ((cat === 'book' || cat === 'research') && file) {
+                      return (
+                        <iframe src={file} className="w-full h-[480px] rounded border border-border-main/40 bg-bg-base" />
+                      );
+                    }
+                    if ((cat === 'book' || cat === 'research') && url) {
+                      return (
+                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded px-4 py-3 bg-bg-base/60 w-fit">
+                          <ExternalLink size={13} /> Open on Platform →
+                        </a>
+                      );
+                    }
+                    if ((cat === 'art' || cat === 'physical_product') && file) {
+                      return (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={file} alt={selectedWork.title} className="w-full max-h-96 object-contain rounded border border-border-main/40" />
+                      );
+                    }
+                    if (url) {
+                      return (
+                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded px-4 py-3 bg-bg-base/60 w-fit">
+                          <ExternalLink size={13} /> Open on Platform →
+                        </a>
+                      );
+                    }
+                    return (
+                      <p className="text-xs text-txt-muted font-mono italic">No viewable content available.</p>
+                    );
+                  })()}
+
+                  {/* Description */}
+                  {selectedWork.description && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">About this work</span>
+                      <p className="text-sm text-txt-sub font-light leading-relaxed">{selectedWork.description}</p>
+                    </div>
+                  )}
+
+                  {/* How to use — collapsible */}
+                  {selectedWork.how_to_use && (
+                    <div className="border border-border-main/50 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setShowHowToUse(v => !v)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-txt-sub hover:text-txt-main transition-colors bg-bg-base/40 cursor-pointer"
+                      >
+                        <span className="uppercase tracking-wider text-[9px] font-bold">How to use</span>
+                        <ChevronDown size={13} className={`transition-transform ${showHowToUse ? 'rotate-180' : ''}`} />
+                      </button>
+                      {showHowToUse && (
+                        <div className="px-4 pb-4 pt-2 text-sm text-txt-sub font-light leading-relaxed border-t border-border-main/30">
+                          {selectedWork.how_to_use}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Star rating widget */}
+                  <div className="flex flex-col gap-2 pt-1 border-t border-border-main/30">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                        Rate this work
+                      </span>
+                      <div className="flex items-center gap-1 text-[10px] font-mono text-txt-muted">
+                        <Eye size={11} /> {selectedWork.views} views
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map(star => {
+                        const isOwn = selectedWork.student_id === user?.id;
+                        const myRating = userRatings[selectedWork.id] ?? 0;
+                        return (
+                          <button
+                            key={star}
+                            disabled={isOwn || ratingLoading === selectedWork.id}
+                            onClick={() => handleRateWork(selectedWork.id, star)}
+                            className={`cursor-pointer disabled:cursor-default transition-transform hover:scale-110 ${isOwn ? 'opacity-30' : ''}`}
+                            title={isOwn ? "Can't rate your own work" : `Rate ${star}`}
+                          >
+                            <Star
+                              size={18}
+                              className={star <= myRating ? 'fill-amber-400 text-amber-400' : 'text-txt-muted/40'}
+                            />
+                          </button>
+                        );
+                      })}
+                      {selectedWork.rating_count > 0 && (
+                        <span className="text-[10px] font-mono text-txt-muted ml-1">
+                          {selectedWork.average_rating.toFixed(1)} ({selectedWork.rating_count})
+                        </span>
+                      )}
+                    </div>
+                    {selectedWork.student_id === user?.id && (
+                      <p className="text-[9px] font-mono text-txt-muted italic">You cannot rate your own work.</p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── E. Add Work Wizard Modal ── */}
+        <AnimatePresence>
+          {showAddWork && (
+            <>
+              <motion.div
+                key="add-work-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+                onClick={() => setShowAddWork(false)}
+              />
+              <motion.div
+                key="add-work-modal"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="fixed inset-0 m-auto z-50 w-full max-w-lg h-fit max-h-[90vh] bg-bg-surface border border-border-main/60 rounded-xl flex flex-col shadow-2xl overflow-hidden"
+              >
+                {/* Wizard header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border-main/40 shrink-0">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">
+                      Step {addWorkStep} of 3
+                    </span>
+                    <h3 className="font-display text-base font-light text-txt-main">
+                      {addWorkStep === 1 ? 'Choose a Category' : addWorkStep === 2 ? 'Visibility Type' : 'Work Details'}
+                    </h3>
+                  </div>
+                  <button onClick={() => setShowAddWork(false)} className="text-txt-muted hover:text-txt-main transition-colors cursor-pointer">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Progress bar */}
+                <div className="h-0.5 bg-bg-card shrink-0">
+                  <div
+                    className="h-full bg-accent-main transition-all duration-300"
+                    style={{ width: `${(addWorkStep / 3) * 100}%` }}
+                  />
+                </div>
+
+                {/* Step content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* Step 1: Pick category */}
+                  {addWorkStep === 1 && (
+                    <div className="flex flex-col gap-4">
+                      <p className="text-xs text-txt-sub font-light">Select the type that best describes your work.</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                        {WORK_CATEGORIES.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => setNewWorkCategory(c.id)}
+                            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all cursor-pointer ${
+                              newWorkCategory === c.id
+                                ? 'border-accent-main bg-accent-main/10 text-txt-main'
+                                : 'border-border-main/50 hover:border-border-main bg-bg-base/40 text-txt-sub hover:text-txt-main'
+                            }`}
+                          >
+                            <span className="text-xl">{c.icon}</span>
+                            <span className="font-mono text-[8px] uppercase tracking-wider text-center leading-tight">{c.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Published vs Unpublished */}
+                  {addWorkStep === 2 && (
+                    <div className="flex flex-col gap-4">
+                      <p className="text-xs text-txt-sub font-light">
+                        A published work links to an external platform (e.g. GitHub, Spotify, Itch.io).
+                        {UNPUBLISHED_ALLOWED.includes(newWorkCategory) && ' You can also upload a private file for staff review.'}
+                      </p>
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => setNewWorkIsPublished(true)}
+                          className={`p-4 rounded-lg border text-left transition-all cursor-pointer ${
+                            newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/50 hover:border-border-main bg-bg-base/40'
+                          }`}
+                        >
+                          <div className="font-mono text-xs font-bold text-txt-main mb-1">🔗 Published (External Link)</div>
+                          <div className="text-[10px] text-txt-sub font-light">Link to an existing public platform. AI verifies automatically.</div>
+                        </button>
+                        {UNPUBLISHED_ALLOWED.includes(newWorkCategory) && (
+                          <button
+                            onClick={() => setNewWorkIsPublished(false)}
+                            className={`p-4 rounded-lg border text-left transition-all cursor-pointer ${
+                              !newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/50 hover:border-border-main bg-bg-base/40'
+                            }`}
+                          >
+                            <div className="font-mono text-xs font-bold text-txt-main mb-1">📁 Unpublished (File Upload)</div>
+                            <div className="text-[10px] text-txt-sub font-light">Upload directly. Goes to staff review before publishing.</div>
+                          </button>
+                        )}
+                      </div>
+                      <div className={`text-[10px] font-mono px-3 py-2 rounded border flex items-center gap-2 ${
+                        newWorkIsPublished && !newWorkIsAlias
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                          : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                      }`}>
+                        {newWorkIsPublished && !newWorkIsAlias ? '✓ AI will verify this automatically' : '⚠ This will go to staff review'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Details form */}
+                  {addWorkStep === 3 && (
+                    <div className="flex flex-col gap-4">
+                      {/* Title */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Title *</label>
+                        <input
+                          type="text"
+                          value={newWorkTitle}
+                          onChange={e => setNewWorkTitle(e.target.value)}
+                          placeholder="e.g. My Album — Echoes in the Dark"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Description</label>
+                        <textarea
+                          value={newWorkDescription}
+                          onChange={e => setNewWorkDescription(e.target.value)}
+                          rows={3}
+                          placeholder="Briefly describe your work..."
+                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
+                        />
+                      </div>
+
+                      {/* URL or File upload */}
+                      {newWorkIsPublished ? (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">External URL</label>
+                          <input
+                            type="url"
+                            value={newWorkUrl}
+                            onChange={e => setNewWorkUrl(e.target.value)}
+                            placeholder="https://github.com/you/project"
+                            className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Upload File</label>
+                          <label className="h-10 flex items-center gap-2 px-3 border border-dashed border-border-main/60 bg-bg-base/60 rounded text-xs font-mono text-txt-muted cursor-pointer hover:border-border-main transition-colors">
+                            <Upload size={12} />
+                            {newWorkFile ? newWorkFile.name : 'Click to select file...'}
+                            <input
+                              type="file"
+                              className="sr-only"
+                              onChange={e => setNewWorkFile(e.target.files?.[0] ?? null)}
+                            />
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Alias toggle */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setNewWorkIsAlias(v => !v)}
+                          className={`w-8 h-4.5 rounded-full transition-colors shrink-0 relative cursor-pointer ${newWorkIsAlias ? 'bg-accent-main' : 'bg-bg-card border border-border-main'}`}
+                        >
+                          <span className={`absolute top-0.5 w-3.5 h-3.5 bg-bg-base rounded-full transition-all shadow ${newWorkIsAlias ? 'left-[calc(100%-14px-2px)]' : 'left-0.5'}`} />
+                        </button>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-txt-main">This is an alias / re-submission</span>
+                          <span className="text-[9px] text-txt-muted font-mono">Published elsewhere under a different identity? Enable this.</span>
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Tags (comma-separated)</label>
+                        <input
+                          type="text"
+                          value={newWorkTags}
+                          onChange={e => setNewWorkTags(e.target.value)}
+                          placeholder="e.g. indie, lo-fi, ambient"
+                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                        />
+                      </div>
+
+                      {/* How to use */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">How to Use (optional)</label>
+                        <textarea
+                          value={newWorkHowToUse}
+                          onChange={e => setNewWorkHowToUse(e.target.value)}
+                          rows={2}
+                          placeholder="Instructions, controls, requirements..."
+                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
+                        />
+                      </div>
+
+                      {/* Review notice */}
+                      <div className={`text-[10px] font-mono px-3 py-2 rounded border flex items-center gap-2 ${
+                        newWorkIsPublished && !newWorkIsAlias
+                          ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
+                          : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+                      }`}>
+                        {newWorkIsPublished && !newWorkIsAlias ? '✓ AI will verify this automatically' : '⚠ This will go to staff review first'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Wizard footer buttons */}
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border-main/40 shrink-0 gap-3">
+                  {addWorkStep > 1 ? (
+                    <button
+                      onClick={() => setAddWorkStep(s => (s - 1) as 1|2|3)}
+                      className="h-9 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded cursor-pointer transition-colors"
+                    >
+                      ← Back
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+                  {addWorkStep < 3 ? (
+                    <button
+                      disabled={addWorkStep === 1 && !newWorkCategory}
+                      onClick={() => setAddWorkStep(s => (s + 1) as 1|2|3)}
+                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded cursor-pointer disabled:opacity-40 transition-opacity"
+                    >
+                      Next →
+                    </button>
+                  ) : (
+                    <button
+                      disabled={addWorkLoading || !newWorkTitle || !newWorkCategory}
+                      onClick={handleSubmitWork}
+                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded cursor-pointer disabled:opacity-40 transition-opacity flex items-center gap-1.5"
+                    >
+                      {addWorkLoading ? (
+                        <><span className="w-3.5 h-3.5 border-2 border-bg-base/40 border-t-bg-base rounded-full animate-spin" /> Submitting...</>
+                      ) : (
+                        'Submit Work'
+                      )}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
       </main>
 

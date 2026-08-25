@@ -63,11 +63,15 @@ function CoordinatorConsoleContent() {
   const [isCompanyRecruiter, setIsCompanyRecruiter] = useState(false);
   
   // Handle verifications states
-  const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles" | "links">("credits");
+  const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles" | "links" | "works">("credits");
   const [handleRequests, setHandleRequests] = useState<any[]>([]);
   const [selectedHandleRequest, setSelectedHandleRequest] = useState<any | null>(null);
   const [linkRequests, setLinkRequests] = useState<any[]>([]);
   const [selectedLinkRequest, setSelectedLinkRequest] = useState<any | null>(null);
+  const [worksReviewQueue, setWorksReviewQueue] = useState<any[]>([]);
+  const [selectedWorkReview, setSelectedWorkReview] = useState<any | null>(null);
+  const [reviewActionNote, setReviewActionNote] = useState("");
+  const [reviewActionLoading, setReviewActionLoading] = useState(false);
 
   // Recruiter PINs & Opportunities States
   const [recruiterPins, setRecruiterPins] = useState<any[]>([]);
@@ -1126,6 +1130,60 @@ useEffect(() => {
     addAuditLog(`${isRecommended ? "Recommended" : "Unrecommended"} opportunity: ${title}`);
   };
 
+  const loadWorksReviewQueue = async () => {
+    try {
+      const res = await fetch("/api/coordinator/works-review");
+      if (res.ok) {
+        const data = await res.json();
+        setWorksReviewQueue(data.works || []);
+        if (data.works && data.works.length > 0 && !selectedWorkReview) {
+          setSelectedWorkReview(data.works[0]);
+        }
+      }
+    } catch {
+      console.warn("Failed loading works review queue.");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "verifications" && verifSubTab === "works") {
+      loadWorksReviewQueue();
+    }
+  }, [activeTab, verifSubTab]);
+
+  const handleReviewWork = async (workId: string, decision: "approved" | "rejected") => {
+    setReviewActionLoading(true);
+    try {
+      const res = await fetch(`/api/coordinator/works-review/${workId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision,
+          review_note: reviewActionNote.trim() || undefined
+        })
+      });
+
+      if (res.ok) {
+        setReviewActionNote("");
+        addAuditLog(`Student work ${decision}: ${selectedWorkReview?.title || workId}`);
+        setModalMessage({
+          isOpen: true,
+          title: `Work ${decision === "approved" ? "Approved" : "Declined"}`,
+          text: `The student work has been successfully ${decision}.`
+        });
+        await loadWorksReviewQueue();
+        setSelectedWorkReview(null);
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to process review decision.");
+      }
+    } catch {
+      alert("Network error processing review decision.");
+    } finally {
+      setReviewActionLoading(false);
+    }
+  };
+
   const pendingCount = claims.filter(c => c.status === "pending").length;
   const approvedPoints = claims.filter(c => c.status === "approved").reduce((sum, c) => sum + c.points, 0);
 
@@ -1645,7 +1703,7 @@ useEffect(() => {
             <div className="flex-grow flex flex-col min-h-0 gap-4">
               
               {/* Verification Sub-tabs Select */}
-              <div className="flex border-b border-border-main/40 pb-2 gap-3 text-[10px] uppercase font-mono tracking-wider font-semibold">
+              <div className="flex border-b border-border-main/40 pb-2 gap-3 text-[10px] uppercase font-mono tracking-wider font-semibold flex-wrap">
                 <button
                   type="button"
                   onClick={() => setVerifSubTab("credits")}
@@ -1679,6 +1737,15 @@ useEffect(() => {
                       return linkRequests.filter(l => l.status === "pending" && l.type === requestType && l.key === matchKey).length;
                     })()
                   })
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVerifSubTab("works")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                    verifSubTab === "works" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  🎨 Works Review ({worksReviewQueue.length})
                 </button>
               </div>
 
@@ -1785,7 +1852,7 @@ useEffect(() => {
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : verifSubTab === "links" ? (
                   /* Institutional Links verifications sublist */
                   <div className="flex flex-col divide-y divide-border-main/60">
                     {(() => {
@@ -1850,6 +1917,56 @@ useEffect(() => {
                         </div>
                       ));
                     })()}
+                  </div>
+                ) : (
+                  /* Works Review sublist */
+                  <div className="flex flex-col divide-y divide-border-main/60">
+                    {worksReviewQueue.length === 0 ? (
+                      <div className="p-8 text-center text-txt-muted font-mono text-xs flex flex-col items-center gap-2">
+                        <span>No student works currently awaiting staff review.</span>
+                      </div>
+                    ) : (
+                      worksReviewQueue.map((work) => (
+                        <div
+                          key={work.id}
+                          onClick={() => setSelectedWorkReview(work)}
+                          className={`p-4 flex justify-between items-center gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                            selectedWorkReview?.id === work.id ? "bg-bg-card/30" : ""
+                          }`}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs text-txt-main font-semibold">{work.student_name || "Student"}</span>
+                              {work.student_department && (
+                                <span className="text-[9px] text-txt-muted font-mono">{work.student_department} ({work.student_academic_year || "2026"})</span>
+                              )}
+                            </div>
+                            <span className="text-xs text-accent-main font-medium truncate">{work.title}</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[9px] font-mono uppercase bg-bg-card px-1.5 py-0.5 rounded border border-border-main/60 text-txt-muted">
+                                {work.category}
+                              </span>
+                              {work.is_alias && (
+                                <span className="text-[8px] font-mono uppercase bg-amber-500/10 text-amber-500 border border-amber-500/30 px-1 py-0.2 rounded font-bold">
+                                  Alias Claim
+                                </span>
+                              )}
+                              {!work.is_published && (
+                                <span className="text-[8px] font-mono uppercase bg-blue-500/10 text-blue-500 border border-blue-500/30 px-1 py-0.2 rounded font-bold">
+                                  Unpublished File
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[8px] font-mono tracking-wider border px-2 py-0.5 rounded uppercase bg-amber-500/10 border-amber-500/40 text-amber-500 font-bold">
+                              Needs Review
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -2401,7 +2518,7 @@ useEffect(() => {
                   <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a handle verification request from the pending list to audit owner credentials.</p>
                 </div>
               )
-            ) : (
+            ) : verifSubTab === "links" ? (
               selectedLinkRequest ? (
                 <div className="flex flex-col gap-6 animate-fade-in text-left">
                   {/* Student Details */}
@@ -2479,6 +2596,126 @@ useEffect(() => {
                 <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
                   <span className="text-[10px] font-mono uppercase tracking-wider">Verification Queue Empty</span>
                   <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a linking request from the list to audit student details and approve enrollment.</p>
+                </div>
+              )
+            ) : (
+              /* Works Review Inspector */
+              selectedWorkReview ? (
+                <div className="flex flex-col gap-6 animate-fade-in text-left">
+                  {/* Student Details */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-3">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Creator profile</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-txt-main font-semibold">{selectedWorkReview.student_name || "Student"}</span>
+                      {selectedWorkReview.student_email && (
+                        <span className="text-xs text-txt-muted font-mono">{selectedWorkReview.student_email}</span>
+                      )}
+                      {selectedWorkReview.student_department && (
+                        <span className="text-[10px] text-txt-sub font-mono mt-0.5">
+                          {selectedWorkReview.student_department} • Class of {selectedWorkReview.student_academic_year || "2026"}
+                          {selectedWorkReview.student_roll_number ? ` • Roll: ${selectedWorkReview.student_roll_number}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Work Material & Claims */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-sm flex flex-col gap-4">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Submission Details</span>
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Title & Category</span>
+                      <span className="text-sm text-txt-main font-semibold">{selectedWorkReview.title}</span>
+                      <span className="text-[10px] text-accent-main font-mono uppercase font-bold">{selectedWorkReview.category}</span>
+                    </div>
+
+                    {selectedWorkReview.description && (
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                        <span className="text-[10px] text-txt-sub font-mono uppercase">Description</span>
+                        <p className="text-xs text-txt-main font-light leading-relaxed bg-bg-base/40 p-2.5 rounded border border-border-main/40">
+                          {selectedWorkReview.description}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedWorkReview.external_url && (
+                      <div className="flex flex-col gap-1 pt-1.5 border-t border-border-main/30">
+                        <span className="text-[10px] text-txt-sub font-mono uppercase">External Resource</span>
+                        <a
+                          href={selectedWorkReview.external_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-accent-main font-mono underline break-all flex items-center gap-1 hover:opacity-80"
+                        >
+                          <ExternalLink size={12} />
+                          {selectedWorkReview.external_url}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* AI Audit Verdict if available */}
+                    {selectedWorkReview.ai_verdict && (
+                      <div className="border border-border-main/70 bg-bg-base/60 p-3 rounded flex flex-col gap-2 pt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold flex items-center gap-1">
+                            <Sparkles size={11} />
+                            AI Audit Verdict
+                          </span>
+                          <span className={`text-[8px] font-mono uppercase px-1.5 py-0.2 rounded font-bold border ${
+                            selectedWorkReview.ai_verdict.verdict === "verified"
+                              ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-500"
+                              : "bg-amber-500/10 border-amber-500/40 text-amber-500"
+                          }`}>
+                            {selectedWorkReview.ai_verdict.verdict || "uncertain"}
+                          </span>
+                        </div>
+                        {selectedWorkReview.ai_verdict.reason && (
+                          <p className="text-[10px] text-txt-sub font-light italic">
+                            &ldquo;{selectedWorkReview.ai_verdict.reason}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Review Note Input */}
+                    <div className="flex flex-col gap-1.5 pt-1.5 border-t border-border-main/30">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Review Feedback Note (Optional)</span>
+                      <textarea
+                        value={reviewActionNote}
+                        onChange={(e) => setReviewActionNote(e.target.value)}
+                        placeholder="Provide feedback or reason for approval / rejection..."
+                        rows={2}
+                        className="w-full p-2 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 border-t border-border-main/40 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => handleReviewWork(selectedWorkReview.id, "rejected")}
+                      disabled={reviewActionLoading}
+                      className="flex-1 h-10 border border-red-500/60 hover:bg-red-500/10 text-red-500 text-xs font-mono uppercase tracking-wider rounded-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <XCircle size={12} />
+                      Decline Work
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewWork(selectedWorkReview.id, "approved")}
+                      disabled={reviewActionLoading}
+                      className="flex-1 h-10 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5 font-bold disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={12} />
+                      Approve &amp; Publish
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted animate-fade-in">
+                  <span className="text-[10px] font-mono uppercase tracking-wider">Works Review Queue Empty</span>
+                  <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select a student creative work from the pending list to audit materials and approve publication.</p>
                 </div>
               )
             )
