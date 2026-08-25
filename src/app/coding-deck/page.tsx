@@ -23,7 +23,6 @@ import {
   ChevronDown,
   ChevronUp,
   Puzzle,
-  Download,
   BookOpen
 } from "lucide-react";
 
@@ -1592,17 +1591,18 @@ export default function CodingDeckPage() {
                   </p>
                 </div>
 
-                {/* Download Button */}
+                {/* Chrome Web Store Link */}
                 <a
-                  href="/leetie-v1.0.2.zip"
-                  download="leetie-v1.0.2.zip"
+                  href="https://chrome.google.com/webstore/detail/dladcchefomefppalgbijajgegfhlhcd"
+                  target="_blank"
+                  rel="noreferrer"
                   className="w-full py-2 bg-accent-main hover:opacity-90 text-bg-base text-[10px] uppercase font-mono tracking-wider font-bold transition-opacity rounded-sm flex items-center justify-center gap-1.5 cursor-pointer no-underline"
                 >
-                  <Download size={12} />
-                  Download Leetie v1.0.2 (.zip)
+                  <ExternalLink size={12} />
+                  Add to Chrome (Web Store)
                 </a>
 
-                {/* Collapsible Installation Guide (Option A Accordion) */}
+                {/* Collapsible Installation Guide */}
                 <div className="border-t border-border-main/30 pt-2 flex flex-col gap-2">
                   <button
                     onClick={() => setShowLeetieGuide((prev) => !prev)}
@@ -1610,7 +1610,7 @@ export default function CodingDeckPage() {
                   >
                     <span className="flex items-center gap-1.5">
                       <BookOpen size={11} className="text-accent-main" />
-                      How to Install & Setup
+                      How to Setup
                     </span>
                     {showLeetieGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
@@ -1619,19 +1619,16 @@ export default function CodingDeckPage() {
                     <div className="p-3 bg-bg-base/40 border border-border-main/40 rounded flex flex-col gap-2.5 text-xs text-txt-sub font-light leading-relaxed animate-in fade-in duration-200">
                       <ol className="flex flex-col gap-2 list-decimal list-inside text-[11px] text-txt-sub">
                         <li className="leading-snug">
-                          <strong className="text-txt-main font-semibold">Unzip</strong> the downloaded <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie-v1.0.2.zip</code> file.
+                          Click <strong className="text-txt-main font-semibold">Add to Chrome</strong> on the Chrome Web Store page.
                         </li>
                         <li className="leading-snug">
-                          Open <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"chrome://extensions"}</code> or <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">{"edge://extensions"}</code>.
+                          Pin the <strong className="text-txt-main font-semibold">Leetie</strong> extension to your browser toolbar.
                         </li>
                         <li className="leading-snug">
-                          Toggle <strong className="text-txt-main font-semibold">Developer mode</strong> (top right).
+                          Open the extension popup to connect your <strong className="text-txt-main font-semibold">GitHub Token</strong> &amp; target repository.
                         </li>
                         <li className="leading-snug">
-                          Click <strong className="text-txt-main font-semibold">Load unpacked</strong> and select the unzipped <code className="bg-bg-card px-1 py-0.5 rounded text-[10px] font-mono text-txt-main border border-border-main/50">leetie</code> folder.
-                        </li>
-                        <li className="leading-snug">
-                          Open the extension popup to connect your <strong className="text-txt-main font-semibold">GitHub Token</strong> & repo. Your accepted solutions will auto-sync!
+                          Solve any problem on LeetCode — your accepted code and performance stats will automatically push to your GitHub repo in real time!
                         </li>
                       </ol>
                     </div>
