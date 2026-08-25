@@ -125,6 +125,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized administrator access." }, { status: 401 });
     }
 
+    // Next.js Route Handler parameter extraction
+    /* await searchParams */
     const id = req.nextUrl.searchParams.get("id");
 
     if (!id) {
