@@ -261,9 +261,6 @@ export default function ExplorePage() {
         const data = await res.json();
         if (Array.isArray(data.events) && data.events.length > 0) {
           setOpportunities(data.events);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("ldk_opportunities", JSON.stringify(data.events));
-          }
           return;
         }
       }
@@ -275,6 +272,55 @@ export default function ExplorePage() {
       setEventsLoading(false);
     }
   }, [eventCategoryFilter, eventSearchQuery, opportunities.length]);
+
+  const [trackingId, setTrackingId] = useState<string | null>(null);
+
+  const handleTrackOpportunity = async (item: OpportunityItem) => {
+    if (!user) {
+      showToast("Please log in to track hackathons", "error");
+      return;
+    }
+    setTrackingId(item.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const portalName = item.url.includes("unstop.com")
+        ? "Unstop"
+        : item.url.includes("devpost.com")
+        ? "Devpost"
+        : item.url.includes("sih.gov.in")
+        ? "Hack2Skill"
+        : "Other";
+
+      const res = await fetch("/api/user/applied-hackathons", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          title: item.title,
+          portal: portalName,
+          portal_url: item.url,
+          role: "Team Captain",
+          status: "Applied",
+          stage: "Round 1",
+          create_workspace: false
+        })
+      });
+
+      if (res.ok) {
+        showToast(`✓ Tracked '${item.title}' in Applied Hackathons!`, "success");
+      } else {
+        showToast("Application logged or already tracked", "info");
+      }
+    } catch {
+      showToast("Failed to track application", "error");
+    } finally {
+      setTrackingId(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === "events") {
@@ -1077,13 +1123,23 @@ export default function ExplorePage() {
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="flex items-center justify-between border-t border-border-main/40 pt-4 mt-1">
-                    <Link
-                      href="/event-desk"
-                      className="text-[10px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1"
-                    >
-                      <Plus size={10} /> Create Team Workspace
-                    </Link>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-main/40 pt-4 mt-1">
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href="/event-desk"
+                        className="text-[10px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1"
+                      >
+                        <Plus size={10} /> Team Space
+                      </Link>
+                      <button
+                        onClick={() => handleTrackOpportunity(e)}
+                        disabled={trackingId === e.id}
+                        className="text-[10px] font-mono text-accent-main hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 size={10} />
+                        {trackingId === e.id ? "Tracking..." : "Track Application"}
+                      </button>
+                    </div>
 
                     <a
                       href={e.url}

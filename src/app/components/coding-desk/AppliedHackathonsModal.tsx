@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
@@ -11,19 +11,28 @@ import {
   CheckCircle2, 
   Sparkles, 
   Calendar,
-  UserCheck
+  UserCheck,
+  Trash2,
+  Trophy,
+  Compass,
+  Layers,
+  ChevronRight
 } from "lucide-react";
 
-interface AppliedEventItem {
+export interface UserHackathonApplication {
   id: string;
+  user_id: string;
+  event_id?: string | null;
   title: string;
-  portal: "Unstop" | "Hack2Skill";
-  handle: string;
+  portal: string;
+  portal_url: string;
+  handle?: string | null;
   role: string;
   status: string;
-  deadline: string;
-  portalUrl: string;
-  workspaceId?: string | null;
+  stage: string;
+  deadline?: string | null;
+  workspace_id?: string | null;
+  created_at: string;
 }
 
 interface AppliedHackathonsModalProps {
@@ -39,199 +48,209 @@ export default function AppliedHackathonsModal({
 }: AppliedHackathonsModalProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"all" | "unstop" | "hack2skill">("all");
-  const [createdWorkspaces, setCreatedWorkspaces] = useState<Record<string, string>>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("lyndesk_workspace_map");
-        if (saved) return JSON.parse(saved);
-      } catch {}
-    }
-    return {};
-  });
-  const [creatingId, setCreatingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"all" | "Unstop" | "Hack2Skill" | "Devpost" | "Other">("all");
+  const [applications, setApplications] = useState<UserHackathonApplication[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [creatingWsId, setCreatingWsId] = useState<string | null>(null);
 
-  const initialEvents: AppliedEventItem[] = useMemo(() => [
-    {
-      id: "unstop_uber_2026",
-      title: "Uber HackTag 2026 Hackathon",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "Team Captain",
-      status: "Round 2 Active",
-      deadline: "August 28, 2026",
-      portalUrl: "https://unstop.com/hackathons/uber-hacktag-2026"
-    },
-    {
-      id: "unstop_tata_2026",
-      title: "Tata Crucible Campus Hack 2026",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "Full-Stack Developer",
-      status: "Round 1 Submitted",
-      deadline: "September 15, 2026",
-      portalUrl: "https://unstop.com/competitions/tata-crucible-campus-2026"
-    },
-    {
-      id: "unstop_flipkart_grid",
-      title: "Flipkart GRID 6.0 Software Track",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "Backend Architect",
-      status: "Semi-Finals",
-      deadline: "October 10, 2026",
-      portalUrl: "https://unstop.com/competitions/flipkart-grid-6"
-    },
-    {
-      id: "unstop_loreal_brandstorm",
-      title: "L'Oréal Brandstorm Tech Challenge",
-      portal: "Unstop",
-      handle: unstopUser ? `@${unstopUser}` : "@unstop_user",
-      role: "AI Lead",
-      status: "Registration Open",
-      deadline: "November 05, 2026",
-      portalUrl: "https://unstop.com/competitions/loreal-brandstorm-2026"
-    },
-    {
-      id: "h2s_sih_2026",
-      title: "Smart India Hackathon 2026 (SIH)",
-      portal: "Hack2Skill",
-      handle: hack2skillUser ? `@${hack2skillUser}` : "@h2s_user",
-      role: "Team Captain",
-      status: "Internal Shortlist",
-      deadline: "September 30, 2026",
-      portalUrl: "https://hack2skill.com/hackathons/sih2026"
-    },
-    {
-      id: "h2s_google_cloud",
-      title: "Google Cloud AI Hackathon India",
-      portal: "Hack2Skill",
-      handle: hack2skillUser ? `@${hack2skillUser}` : "@h2s_user",
-      role: "AI Engineer",
-      status: "Building MVP",
-      deadline: "August 25, 2026",
-      portalUrl: "https://hack2skill.com/hackathons/google-cloud-ai"
+  // Form State
+  const [formData, setFormData] = useState({
+    title: "",
+    portal: "Unstop",
+    portal_url: "",
+    role: "Team Captain",
+    status: "Applied",
+    stage: "Round 1",
+    deadline: "",
+    create_workspace: true
+  });
+
+  const loadApplications = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
     }
-  ], [unstopUser, hack2skillUser]);
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setLoading(false);
+        return;
+      }
 
-  const [appliedEvents, setAppliedEvents] = useState<AppliedEventItem[]>(initialEvents);
+      const res = await fetch("/api/user/applied-hackathons", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.warn("[AppliedHackathonsModal] Fetch notice:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    initialEvents.forEach(item => {
-      if (item.portalUrl && item.portal === "Unstop") {
-        fetch("/api/scrape", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: item.portalUrl })
-        })
-          .then(res => res.json())
-          .then(data => {
-            if (data && !data.error) {
-              setAppliedEvents(prev => prev.map(ev => {
-                if (ev.id === item.id) {
-                  return {
-                    ...ev,
-                    title: data.title || ev.title,
-                    status: data.status || ev.status,
-                    deadline: data.deadline || ev.deadline
-                  };
-                }
-                return ev;
-              }));
-            }
-          })
-          .catch(err => console.warn("Live event scrape notice:", err));
-      }
-    });
-  }, [initialEvents]);
+    loadApplications();
+  }, [loadApplications]);
 
-  const unstopCount = appliedEvents.filter((item) => item.portal === "Unstop").length;
-  const h2sCount = appliedEvents.filter((item) => item.portal === "Hack2Skill").length;
+  const handleAddApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title.trim() || !formData.portal_url.trim()) return;
 
-  const filteredEvents = appliedEvents.filter((item) => {
-    if (activeTab === "unstop") return item.portal === "Unstop";
-    if (activeTab === "hack2skill") return item.portal === "Hack2Skill";
-    return true;
-  });
-
-  const handleCreateWorkspace = async (eventItem: AppliedEventItem) => {
-    setCreatingId(eventItem.id);
-    let newSpaceId = `ws_${eventItem.id.replaceAll("-", "_")}`;
-
+    setSubmitting(true);
     try {
-      if (user?.id) {
-        const { data: eventData, error: eventErr } = await supabase
-          .from("events")
-          .insert({
-            title: eventItem.title,
-            description: `Tracked from ${eventItem.portal} handle ${eventItem.handle}`,
-            start_date: new Date().toISOString(),
-            status: "active"
-          })
-          .select()
-          .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-        if (!eventErr && eventData) {
-          const { data: spaceData, error: spaceErr } = await supabase
-            .from("project_spaces")
-            .insert({
-              event_id: eventData.id,
-              project_name: `${eventItem.title} Workspace`,
-              status: "ideation"
-            })
-            .select()
-            .single();
+      const handle = formData.portal === "Unstop" && unstopUser 
+        ? `@${unstopUser}` 
+        : (formData.portal === "Hack2Skill" && hack2skillUser ? `@${hack2skillUser}` : undefined);
 
-          if (!spaceErr && spaceData) {
-            newSpaceId = spaceData.id;
-            await supabase.from("project_members").insert({
-              project_space_id: newSpaceId,
-              profile_id: user.id,
-              role: "leader"
-            });
-          }
-        }
+      const res = await fetch("/api/user/applied-hackathons", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          handle
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setApplications(prev => [data.application, ...prev]);
+        setShowAddModal(false);
+        setFormData({
+          title: "",
+          portal: "Unstop",
+          portal_url: "",
+          role: "Team Captain",
+          status: "Applied",
+          stage: "Round 1",
+          deadline: "",
+          create_workspace: true
+        });
+        setToastMessage(`✓ Successfully tracked '${formData.title.trim()}'!`);
+        setTimeout(() => setToastMessage(null), 4000);
       }
-
-      const updatedMap = { ...createdWorkspaces, [eventItem.id]: newSpaceId };
-      setCreatedWorkspaces(updatedMap);
-      localStorage.setItem("lyndesk_workspace_map", JSON.stringify(updatedMap));
-
-      setToastMessage(`✓ Workspace Created! Linked '${eventItem.title}' to Event Desk.`);
-      setTimeout(() => setToastMessage(null), 4000);
     } catch (err) {
-      console.warn("Workspace creation notice:", err);
-      const updatedMap = { ...createdWorkspaces, [eventItem.id]: newSpaceId };
-      setCreatedWorkspaces(updatedMap);
-      localStorage.setItem("lyndesk_workspace_map", JSON.stringify(updatedMap));
-      setToastMessage(`✓ Workspace Created! Linked '${eventItem.title}'.`);
-      setTimeout(() => setToastMessage(null), 4000);
+      console.error("[AppliedHackathonsModal] Add error:", err);
     } finally {
-      setCreatingId(null);
+      setSubmitting(false);
     }
   };
+
+  const handleDelete = async (id: string, title: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/user/applied-hackathons?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+
+      if (res.ok) {
+        setApplications(prev => prev.filter(a => a.id !== id));
+        setToastMessage(`Untracked '${title}'.`);
+        setTimeout(() => setToastMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
+
+  const handleCreateWorkspace = async (item: UserHackathonApplication) => {
+    setCreatingWsId(item.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !user) return;
+
+      // Provision workspace
+      const { data: wsData, error: wsErr } = await supabase
+        .from("project_spaces")
+        .insert({
+          project_name: `${item.title} Team Workspace`,
+          description: `Tracked hackathon workspace for ${item.title} on ${item.portal}.`,
+          owner_id: user.id,
+          status: "ideation"
+        })
+        .select("id")
+        .single();
+
+      if (!wsErr && wsData) {
+        await supabase.from("project_members").insert({
+          project_space_id: wsData.id,
+          profile_id: user.id,
+          role: "leader"
+        });
+
+        // Link to application record
+        await fetch("/api/user/applied-hackathons", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            id: item.id,
+            workspace_id: wsData.id
+          })
+        });
+
+        setApplications(prev => prev.map(a => a.id === item.id ? { ...a, workspace_id: wsData.id } : a));
+        setToastMessage(`✓ Workspace Created! Linked '${item.title}'.`);
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.warn("Workspace creation error:", err);
+    } finally {
+      setCreatingWsId(null);
+    }
+  };
+
+  const filteredApps = applications.filter(a => {
+    if (activeTab === "all") return true;
+    return a.portal === activeTab;
+  });
 
   return (
     <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans text-txt-main">
       <div className="bg-bg-surface border border-border-main/80 rounded-md max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-        {/* Header matching Profile & Event Desk modal headers */}
+        {/* Header */}
         <div className="p-6 border-b border-border-main/40 flex items-center justify-between bg-bg-surface">
           <div className="flex flex-col gap-1">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-              Hackathon Portals
+              Application Tracker
             </span>
             <h2 className="font-display text-xl font-light text-txt-main tracking-tight">
-              Applied Hackathons
+              Applied Hackathons & Contests
             </h2>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-sm bg-bg-card hover:bg-border-main/40 border border-border-main/70 text-txt-muted flex items-center justify-center cursor-pointer transition-colors"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="h-8 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase font-bold rounded-sm flex items-center gap-1.5 cursor-pointer transition-opacity"
+            >
+              <Plus size={12} /> Track Application
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-sm bg-bg-card hover:bg-border-main/40 border border-border-main/70 text-txt-muted flex items-center justify-center cursor-pointer transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Toast Notification */}
@@ -242,49 +261,64 @@ export default function AppliedHackathonsModal({
           </div>
         )}
 
-        {/* Swiss Monochrome Tabs */}
-        <div className="px-6 pt-4 border-b border-border-main/40 bg-bg-surface flex items-center gap-4">
-          <button
-            onClick={() => setActiveTab("all")}
-            className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer ${
-              activeTab === "all"
-                ? "border-accent-main text-accent-main"
-                : "border-transparent text-txt-muted hover:text-txt-main"
-            }`}
-          >
-            All ({appliedEvents.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("unstop")}
-            className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer ${
-              activeTab === "unstop"
-                ? "border-accent-main text-accent-main"
-                : "border-transparent text-txt-muted hover:text-txt-main"
-            }`}
-          >
-            Unstop ({unstopCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("hack2skill")}
-            className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer ${
-              activeTab === "hack2skill"
-                ? "border-accent-main text-accent-main"
-                : "border-transparent text-txt-muted hover:text-txt-main"
-            }`}
-          >
-            Hack2Skill ({h2sCount})
-          </button>
+        {/* Filter Tabs */}
+        <div className="px-6 pt-4 border-b border-border-main/40 bg-bg-surface flex items-center gap-4 overflow-x-auto">
+          {["all", "Unstop", "Hack2Skill", "Devpost", "Other"].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
+                activeTab === tab
+                  ? "border-accent-main text-accent-main"
+                  : "border-transparent text-txt-muted hover:text-txt-main"
+              }`}
+            >
+              {tab === "all" ? `All (${applications.length})` : `${tab} (${applications.filter(a => a.portal === tab).length})`}
+            </button>
+          ))}
         </div>
 
-        {/* Applied Events Cards List */}
+        {/* Content Area */}
         <div className="p-6 overflow-y-auto space-y-3 flex-1">
-          {filteredEvents.map((item) => {
-            const linkedSpaceId = createdWorkspaces[item.id];
-
-            return (
+          {loading ? (
+            <div className="py-16 text-center space-y-2">
+              <div className="w-5 h-5 border-2 border-accent-main border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="font-mono text-xs text-txt-muted">Loading your tracked applications...</p>
+            </div>
+          ) : filteredApps.length === 0 ? (
+            <div className="border border-dashed border-border-main/60 rounded-md p-10 text-center space-y-4 bg-bg-card/20">
+              <div className="w-12 h-12 rounded-full bg-accent-main/10 border border-accent-main/20 flex items-center justify-center mx-auto text-accent-main">
+                <Trophy size={22} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-display text-base font-normal text-txt-main">No Tracked Applications</h3>
+                <p className="font-mono text-xs text-txt-muted max-w-md mx-auto">
+                  Keep your hackathons, round deadlines, and team spaces synchronized in one real-time dashboard.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="h-8 px-4 bg-accent-main text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+                >
+                  <Plus size={12} /> Track Application
+                </button>
+                <button
+                  onClick={() => {
+                    onClose();
+                    router.push("/explore");
+                  }}
+                  className="h-8 px-4 bg-bg-card border border-border-main text-txt-main font-mono text-[10px] uppercase tracking-wider font-semibold rounded-sm flex items-center gap-1.5 cursor-pointer hover:bg-border-main/40"
+                >
+                  <Compass size={12} /> Browse Explore Arena
+                </button>
+              </div>
+            </div>
+          ) : (
+            filteredApps.map((item) => (
               <div
                 key={item.id}
-                className="border border-border-main/70 bg-bg-surface p-4 rounded-md space-y-3"
+                className="border border-border-main/70 bg-bg-surface p-4 rounded-md space-y-3 hover:border-border-main transition-colors"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -294,43 +328,56 @@ export default function AppliedHackathonsModal({
                     <h3 className="text-xs font-semibold text-txt-main">{item.title}</h3>
                   </div>
 
-                  <span className="px-2 py-0.5 bg-emerald-500/[0.02] border border-emerald-500/10 text-emerald-400/50 font-mono text-[9px] uppercase rounded-sm flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400/50" />
-                    {item.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[9px] uppercase rounded-sm flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      {item.stage || item.status}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(item.id, item.title)}
+                      className="text-txt-muted hover:text-red-400 p-1 transition-colors cursor-pointer"
+                      title="Untrack application"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[10px] text-txt-muted border-t border-b border-border-main/30 py-2">
                   <div className="flex items-center gap-1.5">
-                    <UserCheck size={12} className="text-accent-main" />
+                    <UserCheck size={12} className="text-accent-main shrink-0" />
                     <span>Role: <strong className="text-txt-main font-normal">{item.role}</strong></span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-txt-sub">Handle:</span>
-                    <strong className="text-txt-main font-normal">{item.handle}</strong>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Calendar size={12} className="text-txt-sub" />
-                    <span>Deadline: <strong className="text-txt-main font-normal">{item.deadline}</strong></span>
-                  </div>
+                  {item.handle && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-txt-sub">Handle:</span>
+                      <strong className="text-txt-main font-normal">{item.handle}</strong>
+                    </div>
+                  )}
+                  {item.deadline && (
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={12} className="text-txt-sub shrink-0" />
+                      <span>Deadline: <strong className="text-txt-main font-normal">{new Date(item.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</strong></span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <a
-                    href={item.portalUrl}
+                    href={item.portal_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-mono text-txt-muted hover:text-txt-main flex items-center gap-1 transition-colors"
                   >
-                    View Hackathon <ExternalLink size={10} />
+                    View Official Portal <ExternalLink size={10} />
                   </a>
 
-                  {linkedSpaceId ? (
+                  {item.workspace_id ? (
                     <button
                       onClick={() => {
                         onClose();
-                        router.push(`/workspace/${linkedSpaceId}`);
+                        router.push(`/workspace/${item.workspace_id}`);
                       }}
                       className="h-8 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase font-bold rounded-sm flex items-center gap-1.5 cursor-pointer transition-opacity"
                     >
@@ -339,19 +386,168 @@ export default function AppliedHackathonsModal({
                   ) : (
                     <button
                       onClick={() => handleCreateWorkspace(item)}
-                      disabled={creatingId === item.id}
+                      disabled={creatingWsId === item.id}
                       className="h-8 px-3.5 bg-accent-main hover:opacity-90 disabled:opacity-40 text-bg-base font-mono text-[10px] tracking-wider uppercase font-bold rounded-sm flex items-center gap-1.5 cursor-pointer transition-opacity"
                     >
                       <Plus size={12} />
-                      {creatingId === item.id ? "Creating..." : "Track as New Workspace"}
+                      {creatingWsId === item.id ? "Provisioning..." : "Launch Team Workspace"}
                     </button>
                   )}
                 </div>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
       </div>
+
+      {/* Track Application Dialog */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-60 flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main rounded-md max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Add Application</span>
+                <h3 className="font-display text-lg font-light text-txt-main">Track New Hackathon</h3>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="w-7 h-7 rounded-sm bg-bg-card text-txt-muted hover:text-txt-main flex items-center justify-center cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddApplication} className="space-y-3 font-sans">
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  Hackathon Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Smart India Hackathon 2026"
+                  value={formData.title}
+                  onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-sans focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                    Portal Platform
+                  </label>
+                  <select
+                    value={formData.portal}
+                    onChange={e => setFormData({ ...formData, portal: e.target.value })}
+                    className="w-full h-9 px-2 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                  >
+                    <option value="Unstop">Unstop</option>
+                    <option value="Devpost">Devpost</option>
+                    <option value="Hack2Skill">Hack2Skill</option>
+                    <option value="MLH">MLH</option>
+                    <option value="Other">Other Platform</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                    Your Team Role
+                  </label>
+                  <select
+                    value={formData.role}
+                    onChange={e => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full h-9 px-2 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                  >
+                    <option value="Team Captain">Team Captain</option>
+                    <option value="Full-Stack Developer">Full-Stack Developer</option>
+                    <option value="AI / ML Engineer">AI / ML Engineer</option>
+                    <option value="Backend Architect">Backend Architect</option>
+                    <option value="UI/UX Designer">UI/UX Designer</option>
+                    <option value="Participant">Participant</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  Portal Registration URL *
+                </label>
+                <input
+                  type="url"
+                  required
+                  placeholder="https://unstop.com/hackathons/..."
+                  value={formData.portal_url}
+                  onChange={e => setFormData({ ...formData, portal_url: e.target.value })}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                    Current Stage
+                  </label>
+                  <select
+                    value={formData.stage}
+                    onChange={e => setFormData({ ...formData, stage: e.target.value })}
+                    className="w-full h-9 px-2 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                  >
+                    <option value="Round 1">Round 1 (Idea Submission)</option>
+                    <option value="Round 2">Round 2 (Prototype)</option>
+                    <option value="Building MVP">Building MVP</option>
+                    <option value="Shortlisted">Shortlisted</option>
+                    <option value="Grand Finale">Grand Finale</option>
+                    <option value="Winner">Winner</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                    Next Deadline (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.deadline}
+                    onChange={e => setFormData({ ...formData, deadline: e.target.value })}
+                    className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="create_ws"
+                  checked={formData.create_workspace}
+                  onChange={e => setFormData({ ...formData, create_workspace: e.target.checked })}
+                  className="rounded-sm border-border-main accent-accent-main"
+                />
+                <label htmlFor="create_ws" className="font-mono text-[11px] text-txt-sub cursor-pointer">
+                  Provision a linked team workspace in Project Spaces immediately
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-main/30">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="h-8 px-3 bg-bg-card border border-border-main text-txt-muted hover:text-txt-main font-mono text-[10px] uppercase rounded-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="h-8 px-4 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  {submitting ? "Saving..." : "Save Application"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
