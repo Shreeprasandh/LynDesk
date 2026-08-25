@@ -691,6 +691,30 @@ const POPULAR_LOCATIONS = [
             }
           }
         } catch {}
+
+        // Fetch active institutional staff broadcasts targeting student
+        try {
+          const dept = user?.user_metadata?.department || "";
+          const yr = user?.user_metadata?.academic_year || "";
+          const sec = user?.user_metadata?.section || "";
+          const roll = user?.user_metadata?.roll_number || "";
+          const bRes = await fetch(`/api/user/broadcasts?department=${encodeURIComponent(dept)}&year=${encodeURIComponent(yr)}&section=${encodeURIComponent(sec)}&roll=${encodeURIComponent(roll)}`);
+          if (bRes.ok) {
+            const bData = await bRes.json();
+            if (Array.isArray(bData.broadcasts)) {
+              const staffNotifs: NotificationItem[] = bData.broadcasts.map((b: any) => ({
+                id: `broadcast_${b.id}`,
+                title: `🏫 Staff Message: ${b.title}`,
+                message: b.body,
+                time: new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                read: b.isRead || false,
+                type: b.priority === "urgent" ? "warning" : "info",
+                category: "alerts"
+              }));
+              dbNotifs = [...staffNotifs, ...dbNotifs];
+            }
+          }
+        } catch {}
       }
 
       // Filter out duplicate invites for workspaces the user has already joined

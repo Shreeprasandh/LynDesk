@@ -390,6 +390,26 @@ export default function Home() {
             }
           })
           .catch(err => console.warn("Live events fetch notice:", err));
+
+        // Fetch official faculty-recommended events from database API
+        fetch("/api/events/recommendations")
+          .then(res => res.json())
+          .then(data => {
+            if (data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
+              setOpportunities(prev => {
+                const existingUrls = new Set(prev.map(p => p.url));
+                const newRecs = data.recommendations
+                  .filter((r: any) => !existingUrls.has(r.url))
+                  .map((r: any) => ({
+                    ...r,
+                    facultyRecommended: true,
+                    createdDate: "Faculty Pick"
+                  }));
+                return [...newRecs, ...prev];
+              });
+            }
+          })
+          .catch(err => console.warn("Faculty recommendations fetch notice:", err));
       };
       loadOpps();
       window.addEventListener("ldk_opportunities_update", loadOpps);

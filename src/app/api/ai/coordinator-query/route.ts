@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { query, students } = body;
 
-    const groqApiKey = process.env.GROQ_API_KEY;
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GROQ_API_KEY;
 
-    if (!groqApiKey) {
+    if (!geminiApiKey) {
       const queryLower = (query || "").toLowerCase();
-      let filtered = [...students];
-      let matches = "Filtered using query engine. ";
+      let filtered = [...(students || [])];
+      let matches = "Filtered using internal coordinator query engine. ";
 
       const rangeMatch = queryLower.match(/(?:from\s+)?(\d+)\s*(?:to|and|-)\s*(\d+)/i);
       const firstNMatch = queryLower.match(/first\s+(\d+)\s+roll/i);
@@ -19,27 +20,27 @@ export async function POST(req: NextRequest) {
         const start = parseInt(rangeMatch[1]);
         const end = parseInt(rangeMatch[2]);
         filtered = filtered.filter(s => {
-          const num = parseInt(s.rollNo);
+          const num = parseInt(s.rollNo || s.roll_number || "0");
           return num >= start && num <= end;
         });
         matches += `Matching roll numbers ${start} to ${end}. `;
       } else if (firstNMatch) {
         const count = parseInt(firstNMatch[1]);
-        filtered = filtered.sort((a, b) => parseInt(a.rollNo) - parseInt(b.rollNo)).slice(0, count);
+        filtered = filtered.sort((a, b) => parseInt(a.rollNo || a.roll_number || "0") - parseInt(b.rollNo || b.roll_number || "0")).slice(0, count);
         matches += `Matching first ${count} roll numbers. `;
       } else {
         const singleRollMatch = queryLower.match(/roll\s*(?:no|number)?\s*(\d+)/i);
         if (singleRollMatch) {
           const roll = singleRollMatch[1];
-          filtered = filtered.filter(s => s.rollNo === roll);
+          filtered = filtered.filter(s => (s.rollNo || s.roll_number || "").includes(roll));
           matches += `Matching roll number ${roll}. `;
         }
       }
 
       if (queryLower.includes("total sum") || queryLower.includes("sum they solved") || queryLower.includes("sum of")) {
         const isLastWeek = queryLower.includes("last week") || queryLower.includes("week");
-        const totalSolved = filtered.reduce((acc, s) => acc + (s.leetcodeSolved || 0), 0);
-        const lastWeekSum = filtered.reduce((acc, s) => acc + Math.round((s.leetcodeSolved || 0) * 0.08), 0);
+        const totalSolved = filtered.reduce((acc, s) => acc + (s.leetcodeSolved || s.leetcode_solved || 0), 0);
+        const lastWeekSum = filtered.reduce((acc, s) => acc + Math.round((s.leetcodeSolved || s.leetcode_solved || 0) * 0.08), 0);
         const targetSum = isLastWeek ? lastWeekSum : totalSolved;
         const metricName = isLastWeek ? "Total Solved Last Week" : "Total Solved (Lifetime)";
 
@@ -77,80 +78,79 @@ export async function POST(req: NextRequest) {
         header: columns,
         rows: filtered.map(s => {
           const row = [];
-          if (columns.includes("Roll No")) row.push(s.rollNo || "N/A");
-          if (columns.includes("Name")) row.push(s.name);
-          if (columns.includes("Department")) row.push(s.department);
-          if (columns.includes("LeetCode Solved")) row.push(s.leetcodeSolved?.toString() || "0");
-          if (columns.includes("Codeforces Rating")) row.push(s.codeforcesRating?.toString() || "0");
+          if (columns.includes("Roll No")) row.push(s.rollNo || s.roll_number || "N/A");
+          if (columns.includes("Name")) row.push(s.name || s.full_name || s.username || "Student");
+          if (columns.includes("Department")) row.push(s.department || "IT");
+          if (columns.includes("LeetCode Solved")) row.push((s.leetcodeSolved ?? s.leetcode_solved ?? 0).toString());
+          if (columns.includes("Codeforces Rating")) row.push((s.codeforcesRating ?? s.codeforces_rating ?? 0).toString());
           return row;
         })
       });
     }
 
-    const systemPrompt = `You are a data analyst AI for university faculty. Output JSON matching this schema:
+    // Google Gemini 2.5 Flash Engine Integration
+    try {
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+          temperature: 0.2
+        }
+      });
+
+      const systemPrompt = `You are a high-speed data analyst AI for university department faculty. Analyze the provided student cohort data against the coordinator query. Output valid JSON adhering strictly to this schema:
 {
   "clarificationNeeded": false,
+  "clarificationMessage": "",
   "explanation": "Brief explanation of filter applied",
   "header": ["Roll No", "Name", "LeetCode Solved"],
   "rows": [
-    ["101", "Student Name", "120"]
+    ["RA2311003010261", "Student Name", "342"]
   ]
 }`;
 
-    const userPrompt = `Student Registry Data:
-${JSON.stringify(students, null, 2)}
+      const userPrompt = `Student Cohort Data:
+${JSON.stringify((students || []).slice(0, 100), null, 2)}
 
-User Request: "${query}"`;
+Faculty Query: "${query}"`;
 
-    let groqRes: Response;
-    try {
-      groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${groqApiKey.trim()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.2,
-        }),
-      });
-    } catch (fetchErr) {
-      console.error("Groq fetch error:", fetchErr);
-      return NextResponse.json({
-        isMock: true,
-        explanation: "Processed offline fallback query.",
-        header: ["Student", "Roll No", "LeetCode Solved"],
-        rows: (students || []).slice(0, 5).map((s: any) => [s.name || s.username || "Student", s.rollNo || "101", String(s.leetcodeSolved || 0)])
-      });
-    }
+      const result = await model.generateContent([
+        { text: systemPrompt },
+        { text: userPrompt }
+      ]);
 
-    if (groqRes.ok) {
-      const groqData = await groqRes.json();
-      const replyText = groqData?.choices?.[0]?.message?.content;
-      const data = JSON.parse(replyText || "{}");
+      const responseText = result.response.text();
+      const parsed = JSON.parse(responseText);
 
       return NextResponse.json({
         isMock: false,
-        clarificationNeeded: !!data.clarificationNeeded,
-        clarificationMessage: data.clarificationMessage || "",
-        explanation: data.explanation || "Query processed.",
-        header: Array.isArray(data.header) ? data.header : [],
-        rows: Array.isArray(data.rows) ? data.rows : []
+        clarificationNeeded: !!parsed.clarificationNeeded,
+        clarificationMessage: parsed.clarificationMessage || "",
+        explanation: parsed.explanation || "Query processed with Gemini 2.5 Flash.",
+        header: Array.isArray(parsed.header) ? parsed.header : ["Roll No", "Name", "LeetCode Solved"],
+        rows: Array.isArray(parsed.rows) ? parsed.rows : []
+      });
+
+    } catch (aiErr: any) {
+      console.warn("[Gemini Coordinator Query Fallback]:", aiErr);
+      return NextResponse.json({
+        isMock: true,
+        explanation: `Processed cohort of ${(students || []).length} students.`,
+        header: ["Roll No", "Name", "LeetCode Solved"],
+        rows: (students || []).slice(0, 10).map((s: any) => [
+          s.rollNo || s.roll_number || "RA2311003010261",
+          s.name || s.full_name || s.username || "Student",
+          String(s.leetcodeSolved || s.leetcode_solved || 0)
+        ])
       });
     }
 
-    throw new Error("Groq query evaluation failed.");
-
   } catch (error: any) {
     return NextResponse.json(
-      { error: "Failed to parse query: " + (error?.message || "Unknown error") },
+      { error: "Failed evaluating query: " + (error?.message || "Unknown error") },
       { status: 500 }
     );
   }
 }
+
