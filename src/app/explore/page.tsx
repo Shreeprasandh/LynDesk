@@ -124,46 +124,57 @@ interface WorkItem {
 const DEFAULT_EVENTS: OpportunityItem[] = [
   {
     id: "opp_1",
-    title: "MIT HackHarvard 2026",
+    title: "Unstop National Innovation Hackathons 2026",
     category: "hackathon",
-    deadline: "Oct 12, 2026",
+    deadline: "Open / Rolling",
     location: "hybrid",
-    level: "global",
-    url: "https://hackharvard.org",
-    description: "Harvard's premier global hackathon. Tracks for Healthtech, EdTech, and Sustainability.",
+    level: "national",
+    url: "https://unstop.com/hackathons",
+    description: "Active national software engineering and product innovation hackathons with company PPI tracks.",
     facultyRecommended: true,
   },
   {
     id: "opp_2",
-    title: "Google Code Jam / Summer of Code 2026",
+    title: "Google Summer of Code 2026",
     category: "contest",
-    deadline: "Nov 01, 2026",
+    deadline: "Oct 15, 2026",
     location: "online",
     level: "global",
     url: "https://summerofcode.withgoogle.com",
-    description: "Global algorithmic contest and open-source mentorship program sponsored by Google Open Source.",
+    description: "Global open-source software development mentorship program sponsored by Google Open Source.",
     facultyRecommended: true,
   },
   {
     id: "opp_3",
-    title: "SIH (Smart India Hackathon) 2026 - Senior Edition",
+    title: "Smart India Hackathon 2026 (SIH)",
     category: "hackathon",
     deadline: "Nov 20, 2026",
     location: "in_person",
     level: "national",
     url: "https://sih.gov.in",
-    description: "Nationwide initiative to provide students a platform to solve pressing real-world problems.",
+    description: "Nationwide government initiative providing students a platform to solve pressing real-world challenges.",
     facultyRecommended: true,
   },
   {
     id: "opp_4",
-    title: "LeetCode Biweekly Contest 142",
+    title: "Devpost Global AI & Agents Hackathon",
+    category: "hackathon",
+    deadline: "Nov 05, 2026",
+    location: "online",
+    level: "global",
+    url: "https://devpost.com/hackathons",
+    description: "Build autonomous multi-agent systems and full-stack AI applications with global developer teams.",
+    facultyRecommended: true,
+  },
+  {
+    id: "opp_5",
+    title: "LeetCode Weekly Contest",
     category: "contest",
-    deadline: "This Saturday",
+    deadline: "Every Sunday 08:00 AM",
     location: "online",
     level: "global",
     url: "https://leetcode.com/contest",
-    description: "90-minute competitive programming contest with 4 algorithmic problems.",
+    description: "Global competitive programming contest. Solve 4 algorithmic problems in 90 minutes.",
     facultyRecommended: false,
   },
 ];
@@ -219,25 +230,56 @@ export default function ExplorePage() {
 
   // ── EVENTS & CONTESTS STATE ─────────────────────────────────────────────
   const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
   const [eventCategoryFilter, setEventCategoryFilter] = useState("");
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("ldk_opportunities");
-      queueMicrotask(() => {
+  const loadLiveEvents = useCallback(async () => {
+    setEventsLoading(true);
+    try {
+      let locationFilter = "all";
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("ldk_preference_preset");
         if (stored) {
           try {
-            setOpportunities(JSON.parse(stored));
-          } catch {
-            setOpportunities(DEFAULT_EVENTS);
-          }
-        } else {
-          setOpportunities(DEFAULT_EVENTS);
+            const parsed = JSON.parse(stored);
+            if (parsed.locationMode && parsed.locationMode !== "all") {
+              locationFilter = parsed.locationMode;
+            }
+          } catch {}
         }
-      });
+      }
+
+      const params = new URLSearchParams();
+      if (eventCategoryFilter) params.set("category", eventCategoryFilter);
+      if (eventSearchQuery.trim()) params.set("q", eventSearchQuery.trim());
+      if (locationFilter !== "all") params.set("location", locationFilter);
+
+      const res = await fetch(`/api/events?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.events) && data.events.length > 0) {
+          setOpportunities(data.events);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("ldk_opportunities", JSON.stringify(data.events));
+          }
+          return;
+        }
+      }
+      // Fallback if network issue
+      if (opportunities.length === 0) setOpportunities(DEFAULT_EVENTS);
+    } catch {
+      if (opportunities.length === 0) setOpportunities(DEFAULT_EVENTS);
+    } finally {
+      setEventsLoading(false);
     }
-  }, []);
+  }, [eventCategoryFilter, eventSearchQuery, opportunities.length]);
+
+  useEffect(() => {
+    if (activeTab === "events") {
+      loadLiveEvents();
+    }
+  }, [activeTab, loadLiveEvents]);
 
   const filteredEvents = opportunities.filter((item) => {
     const matchesSearch =
@@ -757,7 +799,7 @@ export default function ExplorePage() {
       });
       await loadMyWorks();
       showToast('Work deleted successfully.');
-    } catch { showToast('Failed to delete work.'); }
+    } catch { showToast('Failed to delete work.', 'error'); }
   };
 
   const handleRenewWork = async (workId: string) => {
@@ -773,7 +815,7 @@ export default function ExplorePage() {
         await loadMyWorks();
         showToast('Work renewed for 90 more days!');
       }
-    } catch { showToast('Failed to renew work.'); }
+    } catch { showToast('Failed to renew work.', 'error'); }
   };
 
   const handleSubmitWork = async () => {
@@ -797,7 +839,7 @@ export default function ExplorePage() {
           const upData = await upRes.json();
           filePath = upData.file_path;
         } else {
-          showToast('File upload failed. Please try again.');
+          showToast('File upload failed. Please try again.', 'error');
           setAddWorkLoading(false);
           return;
         }
@@ -828,9 +870,9 @@ export default function ExplorePage() {
         await loadWorks();
       } else {
         const err = await res.json();
-        showToast(err.error || 'Failed to submit work.');
+        showToast(err.error || 'Failed to submit work.', 'error');
       }
-    } catch { showToast('Failed to submit work.'); }
+    } catch { showToast('Failed to submit work.', 'error'); }
     finally { setAddWorkLoading(false); }
   };
 
@@ -883,9 +925,9 @@ export default function ExplorePage() {
             </p>
           </div>
 
-          {/* Right Column: Subtabs & Preference Preset Button */}
-          <div className="flex flex-col items-start md:items-end justify-between gap-2.5 shrink-0">
-            <div className="flex border border-border-main/80 rounded p-0.5 bg-bg-card/50 font-mono text-[10px] tracking-wider uppercase">
+          {/* Right Column: Subtabs */}
+          <div className="flex items-center shrink-0">
+            <div className="flex border border-border-main/80 rounded-sm p-0.5 bg-bg-card/50 font-mono text-[10px] tracking-wider uppercase">
               <button
                 onClick={() => setActiveTab("events")}
                 className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
@@ -923,17 +965,6 @@ export default function ExplorePage() {
                 Works Hub
               </button>
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsPresetModalOpen(true)}
-              className="h-5 px-2 bg-bg-card/70 hover:bg-bg-card border border-border-main/70 text-txt-muted hover:text-txt-main text-[8.5px] font-mono tracking-wider uppercase rounded inline-flex items-center gap-1 transition-all cursor-pointer opacity-70 hover:opacity-100 shrink-0 font-medium"
-              title="Customize location, category, and travel preference presets"
-            >
-              <SlidersHorizontal size={9} className="text-accent-main" />
-              <span>Preference Preset</span>
-              {hasActivePreset && <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse ml-0.5" />}
-            </button>
           </div>
         </div>
 
@@ -952,15 +983,26 @@ export default function ExplorePage() {
                   value={eventSearchQuery}
                   onChange={(e) => setEventSearchQuery(e.target.value)}
                   placeholder="Search hackathons, contests, topics..."
-                  className="w-full h-10 pl-9 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                  className="w-full h-10 pl-9 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
                 />
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsPresetModalOpen(true)}
+                  className="h-10 px-3 bg-bg-base hover:bg-bg-card border border-border-main/80 text-txt-sub hover:text-txt-main text-xs font-mono rounded-sm inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Customize location, category, and travel preference presets"
+                >
+                  <SlidersHorizontal size={12} className="text-accent-main" />
+                  <span>Presets</span>
+                  {hasActivePreset && <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse ml-0.5" />}
+                </button>
+
                 <select
                   value={eventCategoryFilter}
                   onChange={(e) => setEventCategoryFilter(e.target.value)}
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono flex-1 sm:flex-none"
+                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono flex-1 sm:flex-none"
                 >
                   <option value="">All Categories</option>
                   <option value="hackathon">Hackathons</option>
@@ -968,7 +1010,7 @@ export default function ExplorePage() {
                   <option value="news">Announcements</option>
                 </select>
 
-                <span className="text-[10px] font-mono text-txt-muted uppercase px-2 py-1 bg-bg-card rounded border border-border-main/60 shrink-0">
+                <span className="text-[10px] font-mono text-txt-muted uppercase px-2.5 py-2.5 bg-bg-card rounded-sm border border-border-main/60 shrink-0">
                   {filteredEvents.length} Events Listed
                 </span>
               </div>

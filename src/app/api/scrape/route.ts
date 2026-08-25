@@ -57,24 +57,24 @@ export async function GET() {
   return NextResponse.json({
     events: [
       {
-        id: "live_uber_hacktag",
-        title: "Uber HackTag 2026 Hackathon",
-        organization: "Uber India",
+        id: "live_unstop_hackathons",
+        title: "Unstop National Innovation Hackathons 2026",
+        organization: "Unstop Campus Network",
         portal: "Unstop",
         deadline: d1,
-        portalUrl: "https://unstop.com/hackathons/uber-hacktag-2026",
+        portalUrl: "https://unstop.com/hackathons",
         prizes: "₹5,000,000 Prize Pool & PPI Opportunities",
         status: "Registration Open",
         category: "Hackathon"
       },
       {
-        id: "live_tata_crucible",
-        title: "Tata Crucible Campus Hack 2026",
-        organization: "Tata Group",
-        portal: "Unstop",
+        id: "live_devpost_ai_hack",
+        title: "Devpost Global AI Innovation Hackathon",
+        organization: "Devpost Community",
+        portal: "Devpost",
         deadline: d2,
-        portalUrl: "https://unstop.com/competitions/tata-crucible-campus-2026",
-        prizes: "₹2,500,000 Prize Pool & National Recognition",
+        portalUrl: "https://devpost.com/hackathons",
+        prizes: "$50,000 Prize Pool & Global Recognition",
         status: "Registration Open",
         category: "Hackathon"
       },
@@ -82,9 +82,9 @@ export async function GET() {
         id: "live_sih_2026",
         title: "Smart India Hackathon 2026 (SIH)",
         organization: "Ministry of Education",
-        portal: "Hack2Skill",
+        portal: "SIH Portal",
         deadline: d3,
-        portalUrl: "https://hack2skill.com/hackathons/sih2026",
+        portalUrl: "https://sih.gov.in",
         prizes: "₹1,000,000 per Problem Statement & Incubation Support",
         status: "Registration Open",
         category: "Hackathon"

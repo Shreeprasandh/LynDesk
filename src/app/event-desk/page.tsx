@@ -278,61 +278,61 @@ export default function Home() {
         const defaultOpps = [
           {
             id: "opp_1",
-            title: "Uber HackTag 2026 Hackathon",
+            title: "Unstop National Innovation Hackathons 2026",
             category: "hackathon",
             deadline: d1,
-            location: "online",
+            location: "hybrid",
             level: "national",
-            url: "https://unstop.com/hackathons/uber-hacktag-2026",
-            description: "Official Uber software competition featuring algorithmic and system design challenges.",
+            url: "https://unstop.com/hackathons",
+            description: "Active national software engineering and product innovation hackathons with company PPI tracks.",
             facultyRecommended: true,
             createdDate: "Today"
           },
           {
             id: "opp_2",
-            title: "Tata Crucible Campus Hack 2026",
-            category: "hackathon",
+            title: "Google Summer of Code 2026",
+            category: "contest",
             deadline: d2,
-            location: "hybrid",
-            level: "national",
-            url: "https://unstop.com/competitions/tata-crucible-campus-2026",
-            description: "Premier campus innovation and software development track across top technology institutes.",
+            location: "online",
+            level: "global",
+            url: "https://summerofcode.withgoogle.com",
+            description: "Global open-source software development mentorship program sponsored by Google Open Source.",
             facultyRecommended: true,
             createdDate: "Today"
           },
           {
             id: "opp_3",
-            title: "Flipkart GRID 6.0 Software Track",
+            title: "Devpost Global AI Innovation Hackathon",
             category: "hackathon",
             deadline: d3,
             location: "online",
-            level: "national",
-            url: "https://unstop.com/competitions/flipkart-grid-6",
-            description: "Flagship engineering challenge tackling e-commerce scalability, GenAI, and distributed systems.",
+            level: "global",
+            url: "https://devpost.com/hackathons",
+            description: "Build autonomous multi-agent systems and full-stack AI applications with global developer teams.",
             facultyRecommended: true,
             createdDate: "Today"
           },
           {
             id: "opp_4",
-            title: "Codeforces Round 972 (Div. 2)",
+            title: "Codeforces Rated Rounds (Div. 2 / Div. 3)",
             category: "contest",
             deadline: d4,
             location: "online",
             level: "global",
             url: "https://codeforces.com/contests",
-            description: "Official Div. 2 competitive programming challenge with live global rating updates.",
+            description: "Official competitive programming challenge with live global rating updates.",
             facultyRecommended: false,
             createdDate: "Today"
           },
           {
             id: "opp_5",
-            title: "LeetCode Biweekly Contest 137",
+            title: "LeetCode Weekly & Biweekly Contests",
             category: "contest",
             deadline: d5,
             location: "online",
             level: "global",
-            url: "https://leetcode.com/contest/",
-            description: "Biweekly 90-minute algorithmic competition with global rank leaderboard.",
+            url: "https://leetcode.com/contest",
+            description: "Live 90-minute algorithmic competition with global rank leaderboard and prizes.",
             facultyRecommended: false,
             createdDate: "Today"
           },
@@ -341,9 +341,9 @@ export default function Home() {
             title: "Smart India Hackathon 2026 (SIH)",
             category: "hackathon",
             deadline: d6,
-            location: "hybrid",
+            location: "in_person",
             level: "national",
-            url: "https://hack2skill.com/hackathons/sih2026",
+            url: "https://sih.gov.in",
             description: "Nationwide government initiative solving real-world challenges across AI, IoT, and CleanTech.",
             facultyRecommended: true,
             createdDate: "Today"
@@ -354,7 +354,7 @@ export default function Home() {
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            const activeOnly = parsed.filter((o: any) => !isDatePassed(o.deadline));
+            const activeOnly = parsed.filter((o: any) => !isDatePassed(o.deadline) && !o.url?.includes("uber-hacktag"));
             setOpportunities(activeOnly.length > 0 ? activeOnly : defaultOpps);
           } catch {
             setOpportunities(defaultOpps);

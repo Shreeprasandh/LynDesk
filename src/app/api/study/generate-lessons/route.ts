@@ -30,24 +30,32 @@ function sanitizeTextOutput(str?: string): string {
 function generateFallbackSections(
   pathTitle: string,
   depthMode: string = "standard",
-  files: SourceFileInput[] = []
+  files: SourceFileInput[] = [],
+  subtopics: string = ""
 ) {
   const title = pathTitle || "Academic Study Subject";
   const fileNames = files.map((f) => f.name).join(", ");
   const descPrefix = fileNames ? `Derived from ${fileNames}. ` : "";
+
+  const parsedSubtopics = (subtopics || "")
+    .split(/[,;\n]/)
+    .map(s => s.trim())
+    .filter(s => s.length > 1);
 
   let targetTotal = 16;
   let sectionsCount = 5;
 
   if (depthMode === "sprint") {
     targetTotal = 5;
-    sectionsCount = 2;
+    sectionsCount = Math.max(2, parsedSubtopics.length > 0 ? Math.min(parsedSubtopics.length, 3) : 2);
   } else if (depthMode === "deep") {
     targetTotal = 30;
-    sectionsCount = 8;
+    sectionsCount = Math.max(6, parsedSubtopics.length > 0 ? Math.min(parsedSubtopics.length, 9) : 8);
+  } else {
+    sectionsCount = Math.max(4, parsedSubtopics.length > 0 ? Math.min(parsedSubtopics.length, 6) : 5);
   }
 
-  const topics = [
+  const defaultTopics = [
     { title: "Core Fundamentals & Terminology", badge: "Theory & Definitions", desc: "Foundational rules, core mechanics, and key terminology." },
     { title: "Step-by-Step Practical Application", badge: "Worked Example", desc: "Detailed step-by-step problem solving and practical applications." },
     { title: "Architecture & Visual Systems", badge: "Architecture Map", desc: "Diagrams, flowcharts, and structural relationships." },
@@ -55,6 +63,17 @@ function generateFallbackSections(
     { title: "Edge Cases & Critical Safety Rules", badge: "Edge Cases", desc: "Error handling, boundary conditions, and common pitfalls." },
     { title: "Advanced Real-World Case Studies", badge: "Real World", desc: "Production patterns, real-world case studies, and exam problems." }
   ];
+
+  const topics = parsedSubtopics.length > 0
+    ? parsedSubtopics.map(st => {
+        const capitalized = st.charAt(0).toUpperCase() + st.slice(1);
+        return {
+          title: capitalized,
+          badge: "Module Study",
+          desc: `Comprehensive breakdown and practical applications of ${st.toLowerCase()} in ${title}.`
+        };
+      })
+    : defaultTopics;
 
   const lessonsPerSec = Math.ceil(targetTotal / sectionsCount);
   const sections = [];
@@ -416,39 +435,48 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
         }
 
         if (!jsonText && groqApiKey) {
-          try {
-            const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${groqApiKey.trim()}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: userPrompt },
-                ],
-                response_format: { type: "json_object" },
-                temperature: 0.4,
-                max_tokens: 8000,
-              }),
-            });
+          const candidateModels = ["qwen/qwen3.6-27b", "openai/gpt-oss-120b", "groq/compound", "openai/gpt-oss-20b"];
+          for (const candModel of candidateModels) {
+            try {
+              const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${groqApiKey.trim()}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: candModel,
+                  messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt },
+                  ],
+                  response_format: { type: "json_object" },
+                  temperature: 0.4,
+                  max_tokens: 8000,
+                }),
+              });
 
-            if (groqRes.ok) {
-              const groqData = await groqRes.json();
-              jsonText = groqData?.choices?.[0]?.message?.content || "";
+              if (groqRes.ok) {
+                const groqData = await groqRes.json();
+                const content = groqData?.choices?.[0]?.message?.content || "";
+                if (content) {
+                  jsonText = content;
+                  break;
+                }
+              }
+            } catch {
+              // Try next model candidate
             }
-          } catch (fetchErr) {
-            console.error("Groq study fetch error:", fetchErr);
           }
         }
 
         if (!jsonText) {
           return NextResponse.json({
+            success: true,
             isMock: true,
             title: pathTitle || "Structured Study Path",
-            sections: generateFallbackSections(pathTitle, depthMode, files)
+            description: pathDescription || "Adaptive AI learning curriculum.",
+            sections: generateFallbackSections(pathTitle, depthMode, files, subtopics)
           });
         }
 
@@ -530,8 +558,13 @@ ${sourceSummary || "None (Prompt-driven mode)"}`;
     }
 
     // Fallback curriculum generator
-    const fallbackSections = generateFallbackSections(pathTitle, depthMode, files);
-    return NextResponse.json({ success: true, sections: fallbackSections });
+    const fallbackSections = generateFallbackSections(pathTitle, depthMode, files, subtopics);
+    return NextResponse.json({ 
+      success: true, 
+      title: pathTitle || "Structured Study Path", 
+      description: pathDescription || "Adaptive AI learning curriculum.",
+      sections: fallbackSections 
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to generate AI lessons.";
     return NextResponse.json({ error: message }, { status: 500 });

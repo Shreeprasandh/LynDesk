@@ -1,16 +1,16 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import { CheckCircle2, Info } from "lucide-react";
+import { CheckCircle2, Info, AlertCircle } from "lucide-react";
 
 interface Toast {
   id: string;
   message: string;
-  type?: "success" | "info";
+  type?: "success" | "error" | "info";
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: "success" | "info") => void;
+  showToast: (message: string, type?: "success" | "error" | "info") => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -18,9 +18,10 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
 
-  const showToast = useCallback((message: string, type: "success" | "info" = "success") => {
+  const showToast = useCallback((message: string, type?: "success" | "error" | "info") => {
     const id = Date.now().toString();
-    setToast({ id, message, type });
+    const resolvedType = type || (/fail|error|denied|forbidden|invalid|limit|required|rejected/i.test(message) ? "error" : "success");
+    setToast({ id, message, type: resolvedType });
   }, []);
 
   useEffect(() => {
@@ -39,10 +40,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           key={toast.id}
           className="fixed bottom-5 right-5 z-[9999] bg-bg-surface border border-border-main/80 text-txt-main shadow-2xl rounded-md px-3.5 py-2.5 flex items-center gap-2.5 font-mono text-xs animate-slide-in-right select-none"
         >
-          {toast.type === "success" ? (
-            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-          ) : (
+          {toast.type === "error" ? (
+            <AlertCircle size={14} className="text-red-400 shrink-0" />
+          ) : toast.type === "info" ? (
             <Info size={14} className="text-accent-main shrink-0" />
+          ) : (
+            <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
           )}
           <span className="leading-none text-txt-main font-medium">{toast.message}</span>
         </div>
