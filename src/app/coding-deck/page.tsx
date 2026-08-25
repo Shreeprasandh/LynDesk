@@ -23,7 +23,10 @@ import {
   ChevronDown,
   ChevronUp,
   Puzzle,
-  BookOpen
+  BookOpen,
+  Link2,
+  X,
+  Plus
 } from "lucide-react";
 
 interface PlatformStats {
@@ -117,9 +120,66 @@ export default function CodingDeckPage() {
   const [showAppliedModal, setShowAppliedModal] = useState(false);
   const [showAllContests, setShowAllContests] = useState(false);
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
+  const [showHandleModal, setShowHandleModal] = useState(false);
+  const [inputUnstopHandle, setInputUnstopHandle] = useState("");
+  const [inputH2sHandle, setInputH2sHandle] = useState("");
+  const [savingHandles, setSavingHandles] = useState(false);
+  const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, hack2skill: 0, devpost: 0 });
 
   // Inline handle input state
   const [inputLcHandle, setInputLcHandle] = useState("");
+
+  const handleOpenHandleModal = () => {
+    setInputUnstopHandle(unstopUser || "");
+    setInputH2sHandle(hack2skillUser || "");
+    setShowHandleModal(true);
+  };
+
+  const handleSaveHackathonHandles = async () => {
+    if (!user) return;
+    setSavingHandles(true);
+    let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
+    let cleanH2s = inputH2sHandle.trim().replace(/^@/, "");
+
+    if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
+      try {
+        const u = new URL(/^https?:\/\//i.test(cleanUnstop) ? cleanUnstop : `https://${cleanUnstop}`);
+        const segs = u.pathname.split("/").filter(Boolean);
+        cleanUnstop = segs[segs.length - 1] || cleanUnstop;
+      } catch {}
+    }
+    if (cleanH2s.includes("/") || cleanH2s.includes(".")) {
+      try {
+        const u = new URL(/^https?:\/\//i.test(cleanH2s) ? cleanH2s : `https://${cleanH2s}`);
+        const segs = u.pathname.split("/").filter(Boolean);
+        cleanH2s = segs[segs.length - 1] || cleanH2s;
+      } catch {}
+    }
+
+    setUnstopUser(cleanUnstop);
+    setHack2skillUser(cleanH2s);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_unstop_handle", cleanUnstop);
+      localStorage.setItem("ldk_hack2skill_handle", cleanH2s);
+      if (user.id) {
+        localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
+        localStorage.setItem(`ldk_hack2skill_handle_${user.id}`, cleanH2s);
+      }
+    }
+
+    try {
+      await supabase.from("profiles").update({
+        unstop_username: cleanUnstop || null,
+        hack2skill_username: cleanH2s || null
+      }).eq("id", user.id);
+    } catch (e) {
+      console.warn("Handle save error:", e);
+    } finally {
+      setSavingHandles(false);
+      setShowHandleModal(false);
+    }
+  };
 
   const handleSaveInlineHandle = async () => {
     if (!inputLcHandle.trim()) return;
@@ -388,12 +448,40 @@ export default function CodingDeckPage() {
           fetchStats("codechef", cc)
         ]);
 
+        let realUnstopCount = 0;
+        let realH2sCount = 0;
+        let realDevpostCount = 0;
+        let realTotalCount = 0;
+
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const appRes = await fetch("/api/user/applied-hackathons", {
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            });
+            if (appRes.ok) {
+              const appData = await appRes.json();
+              const apps = appData.applications || [];
+              realTotalCount = apps.length;
+              realUnstopCount = apps.filter((a: any) => a.portal === "Unstop").length;
+              realH2sCount = apps.filter((a: any) => a.portal === "Hack2Skill").length;
+              realDevpostCount = apps.filter((a: any) => a.portal === "Devpost").length;
+              setRealAppliedCounts({
+                total: realTotalCount,
+                unstop: realUnstopCount,
+                hack2skill: realH2sCount,
+                devpost: realDevpostCount
+              });
+            }
+          }
+        } catch {}
+
         const updatedStats = {
           leetcode: leetcodeStats,
           codeforces: codeforcesStats,
           codechef: codechefStats,
-          unstop: un ? { registered: 4, completed: 2, rank: 42 } : null,
-          hack2skill: h2s ? { registered: 2, completed: 1, rank: 12 } : null,
+          unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null,
+          hack2skill: h2s ? { registered: realH2sCount, completed: 0, rank: 0 } : null,
         };
 
         if (typeof window !== "undefined") {
@@ -1471,31 +1559,46 @@ export default function CodingDeckPage() {
                     <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
                     <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
                   </div>
-                  {(unstopUser || hack2skillUser) && (
+                  <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2.5 py-1 border border-border-main/70 rounded-sm font-semibold uppercase tracking-wider">
-                      {((stats.unstop?.registered || 0) + (stats.hack2skill?.registered || 0))} Total Applied
+                      {realAppliedCounts.total} Applied
                     </span>
-                  )}
+                    <button
+                      onClick={handleOpenHandleModal}
+                      className="text-[9px] font-mono text-accent-main hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer"
+                    >
+                      <Link2 size={10} /> Link Handles
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Unstop Row */}
                 <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Unstop Integrations</span>
-                    {!unstopUser && (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    <span className="text-xs font-medium text-txt-main">Unstop</span>
+                    {unstopUser ? (
+                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
+                        Linked
+                      </span>
+                    ) : (
+                      <button
+                        onClick={handleOpenHandleModal}
+                        className="text-[9px] font-mono text-accent-main hover:underline cursor-pointer"
+                      >
+                        + Link Handle
+                      </button>
                     )}
                   </div>
                   {unstopUser ? (
                     <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
                       <span>@{unstopUser}</span>
                       <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.unstop?.registered} Applied
+                        {realAppliedCounts.unstop} Registered
                       </span>
                     </div>
                   ) : (
                     <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Unstop in Profile Settings to sync applications.
+                      Link your Unstop username to track your hackathons.
                     </span>
                   )}
                 </div>
@@ -1503,33 +1606,40 @@ export default function CodingDeckPage() {
                 {/* Hack2Skill Row */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Hack2Skill Integrations</span>
-                    {!hack2skillUser && (
-                      <span className="text-[9px] font-mono text-txt-muted uppercase">Unlinked</span>
+                    <span className="text-xs font-medium text-txt-main">Hack2Skill</span>
+                    {hack2skillUser ? (
+                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
+                        Linked
+                      </span>
+                    ) : (
+                      <button
+                        onClick={handleOpenHandleModal}
+                        className="text-[9px] font-mono text-accent-main hover:underline cursor-pointer"
+                      >
+                        + Link Handle
+                      </button>
                     )}
                   </div>
                   {hack2skillUser ? (
                     <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
                       <span>@{hack2skillUser}</span>
                       <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {stats.hack2skill?.registered} Applied
+                        {realAppliedCounts.hack2skill} Registered
                       </span>
                     </div>
                   ) : (
                     <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link Hack2Skill in Profile Settings to sync applications.
+                      Link your Hack2Skill handle to track your campus events.
                     </span>
                   )}
                 </div>
 
-                {(unstopUser || hack2skillUser) && (
-                  <button
-                    onClick={() => setShowAppliedModal(true)}
-                    className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
-                  >
-                    <FolderKanban size={12} /> Manage Applied Hackathons
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowAppliedModal(true)}
+                  className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
+                >
+                  <FolderKanban size={12} /> Manage Applied Hackathons
+                </button>
               </div>
 
               {/* Active / Upcoming Contests Feed */}
@@ -1647,6 +1757,75 @@ export default function CodingDeckPage() {
           hack2skillUser={hack2skillUser}
           onClose={() => setShowAppliedModal(false)}
         />
+      )}
+
+      {showHandleModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-surface border border-border-main rounded-md max-w-md w-full p-6 shadow-2xl space-y-4 font-sans text-txt-main">
+            <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations</span>
+                <h3 className="font-display text-lg font-light text-txt-main">Manage Hackathon Portals</h3>
+              </div>
+              <button
+                onClick={() => setShowHandleModal(false)}
+                className="w-7 h-7 rounded-sm bg-bg-card text-txt-muted hover:text-txt-main flex items-center justify-center cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  Unstop Handle / Profile Link
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. shreek64346 or https://unstop.com/user/..."
+                  value={inputUnstopHandle}
+                  onChange={e => setInputUnstopHandle(e.target.value)}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  Hack2Skill Handle / Profile Link
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. shreeprasandh_9916 or profile link"
+                  value={inputH2sHandle}
+                  onChange={e => setInputH2sHandle(e.target.value)}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
+              <p className="font-mono text-[10px] text-txt-muted">
+                Tip: Leave blank and save to unlink any handle.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-main/30">
+                <button
+                  type="button"
+                  onClick={() => setShowHandleModal(false)}
+                  className="h-8 px-3 bg-bg-card border border-border-main text-txt-muted hover:text-txt-main font-mono text-[10px] uppercase rounded-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveHackathonHandles}
+                  disabled={savingHandles}
+                  className="h-8 px-4 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  {savingHandles ? "Saving..." : "Save Handles"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <Footer />

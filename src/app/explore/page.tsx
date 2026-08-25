@@ -274,6 +274,23 @@ export default function ExplorePage() {
   }, [eventCategoryFilter, eventSearchQuery, opportunities.length]);
 
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [trackedTitles, setTrackedTitles] = useState<Set<string>>(new Set());
+
+  const loadTrackedApplications = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/api/user/applied-hackathons", {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const titles = new Set<string>((data.applications || []).map((a: any) => a.title.toLowerCase().trim()));
+        setTrackedTitles(titles);
+      }
+    } catch {}
+  }, [user]);
 
   const handleTrackOpportunity = async (item: OpportunityItem) => {
     if (!user) {
@@ -311,6 +328,7 @@ export default function ExplorePage() {
       });
 
       if (res.ok) {
+        setTrackedTitles(prev => new Set([...prev, item.title.toLowerCase().trim()]));
         showToast(`✓ Tracked '${item.title}' in Applied Hackathons!`, "success");
       } else {
         showToast("Application logged or already tracked", "info");
@@ -325,8 +343,9 @@ export default function ExplorePage() {
   useEffect(() => {
     if (activeTab === "events") {
       loadLiveEvents();
+      loadTrackedApplications();
     }
-  }, [activeTab, loadLiveEvents]);
+  }, [activeTab, loadLiveEvents, loadTrackedApplications]);
 
   const filteredEvents = opportunities.filter((item) => {
     const matchesSearch =
@@ -1131,14 +1150,20 @@ export default function ExplorePage() {
                       >
                         <Plus size={10} /> Team Space
                       </Link>
-                      <button
-                        onClick={() => handleTrackOpportunity(e)}
-                        disabled={trackingId === e.id}
-                        className="text-[10px] font-mono text-accent-main hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer"
-                      >
-                        <CheckCircle2 size={10} />
-                        {trackingId === e.id ? "Tracking..." : "Track Application"}
-                      </button>
+                      {trackedTitles.has(e.title.toLowerCase().trim()) ? (
+                        <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 font-semibold">
+                          <CheckCircle2 size={11} className="text-emerald-400" /> Tracked / Registered
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleTrackOpportunity(e)}
+                          disabled={trackingId === e.id}
+                          className="text-[10px] font-mono text-accent-main hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer"
+                        >
+                          <CheckCircle2 size={10} />
+                          {trackingId === e.id ? "Tracking..." : "Track Application"}
+                        </button>
+                      )}
                     </div>
 
                     <a
