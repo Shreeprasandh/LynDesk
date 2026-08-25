@@ -32,6 +32,22 @@ import {
   ChevronDown,
   Upload,
   FileText,
+  BookOpen,
+  Music,
+  Gamepad2,
+  Palette,
+  Film,
+  Smartphone,
+  Mic,
+  Scroll,
+  Globe,
+  Package,
+  FolderKanban,
+  UploadCloud,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Sparkles,
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
 
@@ -642,18 +658,23 @@ export default function ExplorePage() {
 
   // ── WORKS HUB CONFIG ────────────────────────────────────────────────────
   const WORK_CATEGORIES = [
-    { id: 'book', label: 'Book', icon: '📚' },
-    { id: 'music', label: 'Music', icon: '🎵' },
-    { id: 'web_game', label: 'Web Game', icon: '🎮' },
-    { id: 'software', label: 'Software', icon: '🖥️' },
-    { id: 'art', label: 'Art', icon: '🎨' },
-    { id: 'film', label: 'Film', icon: '🎬' },
-    { id: 'mobile_app', label: 'Mobile App', icon: '📱' },
-    { id: 'podcast', label: 'Podcast', icon: '🎙️' },
-    { id: 'research', label: 'Research', icon: '📜' },
-    { id: 'website', label: 'Website', icon: '🌐' },
-    { id: 'physical_product', label: 'Board Game / Product', icon: '♟️' },
+    { id: 'book', label: 'Book', Icon: BookOpen },
+    { id: 'music', label: 'Music', Icon: Music },
+    { id: 'web_game', label: 'Web Game', Icon: Gamepad2 },
+    { id: 'software', label: 'Software', Icon: Code },
+    { id: 'art', label: 'Art & Design', Icon: Palette },
+    { id: 'film', label: 'Film & Media', Icon: Film },
+    { id: 'mobile_app', label: 'Mobile App', Icon: Smartphone },
+    { id: 'podcast', label: 'Podcast & Audio', Icon: Mic },
+    { id: 'research', label: 'Research & Paper', Icon: Scroll },
+    { id: 'website', label: 'Website & Tool', Icon: Globe },
+    { id: 'physical_product', label: 'Product & Hardware', Icon: Package },
   ];
+
+  const getCategoryIconComponent = (catId: string) => {
+    const found = WORK_CATEGORIES.find(c => c.id === catId);
+    return found ? found.Icon : FolderKanban;
+  };
 
   const UNPUBLISHED_ALLOWED = ['book', 'music', 'art', 'research', 'physical_product'];
 
@@ -898,7 +919,7 @@ export default function ExplorePage() {
                     : "text-txt-sub hover:text-txt-main"
                 }`}
               >
-                <span className="text-[11px]">🎨</span>
+                <Palette size={13} />
                 Works Hub
               </button>
             </div>
@@ -1583,11 +1604,17 @@ export default function ExplorePage() {
           <div className="flex flex-col gap-6 pb-12">
             {worksError === "college_not_linked" ? (
               /* ── A. College gate ── */
-              <div className="border border-border-main/40 bg-bg-card rounded-xl p-12 flex flex-col items-center gap-4 text-center">
-                <div className="w-14 h-14 rounded-full bg-bg-surface border border-border-main/60 flex items-center justify-center text-2xl">🏛️</div>
-                <h3 className="font-display text-lg font-light text-txt-main">College Network Required</h3>
-                <p className="text-sm text-txt-sub max-w-sm">The Works Hub is exclusive to students connected to their college. Link your college in your profile to access this space.</p>
-                <a href="/profile" className="mt-2 px-5 py-2 bg-accent-main text-bg-base rounded text-xs font-mono uppercase tracking-wider hover:opacity-90 transition-opacity">Go to Profile →</a>
+              <div className="border border-border-main/60 bg-bg-surface rounded-md p-10 flex flex-col items-center gap-4 text-center">
+                <div className="w-12 h-12 rounded-sm bg-accent-main/10 border border-accent-main/20 flex items-center justify-center text-accent-main">
+                  <GraduationCap size={24} />
+                </div>
+                <h3 className="font-display text-base font-light text-txt-main">Institutional Network Required</h3>
+                <p className="text-xs text-txt-sub max-w-sm font-light leading-relaxed">
+                  The Works Hub is exclusive to students verified with their college institution. Link your institutional credentials in your profile to access this arena.
+                </p>
+                <a href="/profile" className="mt-1 px-4 py-2 bg-accent-main text-bg-base rounded-sm text-xs font-mono uppercase tracking-wider font-semibold hover:opacity-90 transition-opacity">
+                  Connect College in Profile →
+                </a>
               </div>
             ) : (
               <>
@@ -1602,18 +1629,18 @@ export default function ExplorePage() {
                         value={worksSearch}
                         onChange={e => setWorksSearch(e.target.value)}
                         placeholder="Search works, authors..."
-                        className="w-full h-9 pl-8 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
+                        className="w-full h-9 pl-8 pr-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main font-mono"
                       />
                     </div>
                     {/* Category filter */}
                     <select
                       value={worksCategoryFilter}
                       onChange={e => setWorksCategoryFilter(e.target.value)}
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono"
                     >
                       <option value="">All Categories</option>
                       {WORK_CATEGORIES.map(c => (
-                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                        <option key={c.id} value={c.id}>{c.label}</option>
                       ))}
                     </select>
                     {/* Dept filter */}
@@ -1622,7 +1649,7 @@ export default function ExplorePage() {
                       value={worksDeptFilter}
                       onChange={e => setWorksDeptFilter(e.target.value)}
                       placeholder="Department..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono w-36"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono w-36"
                     />
                     {/* Year filter */}
                     <input
@@ -1630,13 +1657,13 @@ export default function ExplorePage() {
                       value={worksYearFilter}
                       onChange={e => setWorksYearFilter(e.target.value)}
                       placeholder="Year (e.g. 2024)..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono w-36"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono w-36"
                     />
                     {/* Sort */}
                     <select
                       value={worksSort}
                       onChange={e => setWorksSort(e.target.value)}
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono"
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono"
                     >
                       <option value="trending">Trending</option>
                       <option value="newest">Newest</option>
@@ -1648,12 +1675,12 @@ export default function ExplorePage() {
                     {/* My Works button */}
                     <button
                       onClick={() => { setShowMyWorks(true); loadMyWorks(); }}
-                      className="h-9 px-3.5 border border-border-main hover:bg-bg-card text-txt-sub hover:text-txt-main font-mono text-[10px] uppercase tracking-wider rounded cursor-pointer transition-colors flex items-center gap-1.5"
+                      className="h-9 px-3.5 border border-border-main hover:bg-bg-card text-txt-sub hover:text-txt-main font-mono text-[10px] uppercase tracking-wider rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
                     >
                       <FileText size={12} />
                       My Works
                       {myWorks.length > 0 && (
-                        <span className="ml-0.5 px-1.5 py-0.5 bg-accent-main/10 text-accent-main text-[9px] font-bold rounded">
+                        <span className="ml-0.5 px-1.5 py-0.5 bg-accent-main/10 text-accent-main text-[9px] font-bold rounded-sm">
                           {myWorks.length}/5
                         </span>
                       )}
@@ -1661,7 +1688,7 @@ export default function ExplorePage() {
                     {/* Add Work */}
                     <button
                       onClick={() => { setAddWorkStep(1); setShowAddWork(true); }}
-                      className="h-9 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded cursor-pointer transition-opacity flex items-center gap-1.5"
+                      className="h-9 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm cursor-pointer transition-opacity flex items-center gap-1.5"
                     >
                       <Plus size={12} />
                       Add Work
@@ -1674,33 +1701,33 @@ export default function ExplorePage() {
                   /* Loading skeletons */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="border border-border-main/40 bg-bg-surface rounded-lg p-5 flex flex-col gap-3 animate-pulse">
+                      <div key={i} className="border border-border-main/40 bg-bg-surface rounded-md p-5 flex flex-col gap-3 animate-pulse">
                         <div className="flex gap-2">
-                          <div className="w-16 h-4 bg-bg-card rounded" />
-                          <div className="w-10 h-4 bg-bg-card rounded" />
+                          <div className="w-16 h-4 bg-bg-card rounded-sm" />
+                          <div className="w-10 h-4 bg-bg-card rounded-sm" />
                         </div>
-                        <div className="h-5 bg-bg-card rounded w-3/4" />
-                        <div className="h-3 bg-bg-card rounded w-1/2" />
-                        <div className="h-8 bg-bg-card rounded w-full" />
+                        <div className="h-5 bg-bg-card rounded-sm w-3/4" />
+                        <div className="h-3 bg-bg-card rounded-sm w-1/2" />
+                        <div className="h-8 bg-bg-card rounded-sm w-full" />
                         <div className="flex gap-3 mt-auto pt-2">
-                          <div className="h-3 bg-bg-card rounded w-10" />
-                          <div className="h-3 bg-bg-card rounded w-10" />
-                          <div className="h-3 bg-bg-card rounded w-10" />
+                          <div className="h-3 bg-bg-card rounded-sm w-10" />
+                          <div className="h-3 bg-bg-card rounded-sm w-10" />
+                          <div className="h-3 bg-bg-card rounded-sm w-10" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : works.length === 0 ? (
                   /* Empty state */
-                  <div className="border border-dashed border-border-main/60 bg-bg-surface p-14 rounded-lg flex flex-col items-center gap-3 text-center">
-                    <span className="text-4xl opacity-40">🎨</span>
+                  <div className="border border-dashed border-border-main/60 bg-bg-surface p-12 rounded-md flex flex-col items-center gap-3 text-center">
+                    <Palette size={32} className="text-txt-muted/30" />
                     <h4 className="font-display text-base font-light text-txt-main">No works found</h4>
-                    <p className="text-xs text-txt-muted max-w-xs">
-                      {worksSearch || worksCategoryFilter ? "Try adjusting your filters." : "Be the first in your college to submit a creative work."}
+                    <p className="text-xs text-txt-muted max-w-xs font-light">
+                      {worksSearch || worksCategoryFilter ? "Try adjusting your search criteria or category filter." : "Be the first creator in your college to publish a work."}
                     </p>
                     <button
                       onClick={() => { setAddWorkStep(1); setShowAddWork(true); }}
-                      className="mt-2 px-4 py-2 bg-accent-main text-bg-base text-xs font-mono uppercase tracking-wider rounded hover:opacity-90 transition-opacity"
+                      className="mt-2 px-4 py-2 bg-accent-main text-bg-base text-xs font-mono uppercase tracking-wider rounded-sm font-semibold hover:opacity-90 transition-opacity cursor-pointer"
                     >
                       + Submit Your Work
                     </button>
@@ -1708,24 +1735,28 @@ export default function ExplorePage() {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {works.map((w, idx) => {
-                      const cat = WORK_CATEGORIES.find(c => c.id === w.category);
+                      const CatIcon = getCategoryIconComponent(w.category);
+                      const catLabel = WORK_CATEGORIES.find(c => c.id === w.category)?.label ?? w.category;
                       const days = getDaysUntilExpiry(w.expires_at);
                       return (
                         <motion.div
                           key={w.id}
-                          initial={{ opacity: 0, y: 8 }}
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.04, duration: 0.3 }}
-                          className="border border-border-main/60 bg-bg-surface hover:border-border-main hover:bg-bg-card rounded-lg p-5 flex flex-col gap-3 cursor-pointer transition-all duration-200 group"
+                          transition={{ delay: idx * 0.03, duration: 0.2 }}
+                          className="border border-border-main/60 bg-bg-surface hover:border-border-main hover:bg-bg-card rounded-md p-4 flex flex-col gap-2.5 cursor-pointer transition-colors duration-150 group"
                           onClick={() => { setSelectedWork(w); setShowWorkDetail(true); setShowHowToUse(false); }}
                         >
                           {/* Category + status badge */}
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded border border-border-main/60 bg-bg-base/60 text-txt-muted flex items-center gap-1">
-                              <span>{cat?.icon ?? '🗂️'}</span>
-                              {cat?.label ?? w.category}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm border border-border-main/60 bg-bg-base/60 text-txt-muted flex items-center gap-1.5">
+                              <CatIcon size={11} className="text-accent-main" />
+                              {catLabel}
                             </span>
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Approved" />
+                            <span className="flex items-center gap-1 font-mono text-[9px] text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              Live
+                            </span>
                           </div>
 
                           {/* Title */}
@@ -1778,7 +1809,7 @@ export default function ExplorePage() {
                     <button
                       disabled={worksPage <= 1}
                       onClick={() => loadWorks(worksPage - 1)}
-                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded disabled:opacity-30 cursor-pointer transition-colors"
+                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded-sm disabled:opacity-30 cursor-pointer transition-colors"
                     >
                       ← Previous
                     </button>
@@ -1788,7 +1819,7 @@ export default function ExplorePage() {
                     <button
                       disabled={worksPage * 20 >= worksTotal}
                       onClick={() => loadWorks(worksPage + 1)}
-                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded disabled:opacity-30 cursor-pointer transition-colors"
+                      className="h-8 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded-sm disabled:opacity-30 cursor-pointer transition-colors"
                     >
                       Next →
                     </button>
@@ -1809,7 +1840,7 @@ export default function ExplorePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs"
+                className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs"
                 onClick={() => setShowMyWorks(false)}
               />
               {/* Drawer */}
@@ -1836,30 +1867,36 @@ export default function ExplorePage() {
                 <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
                   {myWorks.length === 0 && (
                     <div className="py-12 text-center flex flex-col items-center gap-2 text-txt-muted">
-                      <span className="text-3xl opacity-30">🎨</span>
+                      <Palette size={28} className="text-txt-muted/30" />
                       <p className="text-xs font-mono">No works submitted yet.</p>
                     </div>
                   )}
                   {myWorks.map(w => {
-                    const cat = WORK_CATEGORIES.find(c => c.id === w.category);
+                    const CatIcon = getCategoryIconComponent(w.category);
+                    const catLabel = WORK_CATEGORIES.find(c => c.id === w.category)?.label ?? w.category;
                     const days = getDaysUntilExpiry(w.expires_at);
                     const canRenew = days <= 7 && w.status === 'approved' && !w.renewed_at;
                     const statusConfig = {
-                      pending: { label: '🟡 Pending AI Review', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-                      ai_verified: { label: '🔵 AI Verified', cls: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-                      staff_review: { label: '🔵 Staff Review', cls: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-                      approved: { label: '🟢 Live', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
-                      rejected: { label: '🔴 Rejected', cls: 'text-red-400 bg-red-500/10 border-red-500/30' },
-                    }[w.status] ?? { label: w.status, cls: 'text-txt-muted border-border-main' };
+                      pending: { label: 'Pending AI', Icon: Clock, cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+                      ai_verified: { label: 'AI Verified', Icon: Sparkles, cls: 'text-accent-main bg-accent-main/10 border-accent-main/30' },
+                      staff_review: { label: 'Staff Review', Icon: Clock, cls: 'text-accent-main bg-accent-main/10 border-accent-main/30' },
+                      approved: { label: 'Live', Icon: CheckCircle2, cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+                      rejected: { label: 'Declined', Icon: AlertCircle, cls: 'text-red-400 bg-red-500/10 border-red-500/30' },
+                    }[w.status] ?? { label: w.status, Icon: FolderKanban, cls: 'text-txt-muted border-border-main' };
+                    const StatusIcon = statusConfig.Icon;
 
                     return (
-                      <div key={w.id} className="border border-border-main/60 bg-bg-base/40 rounded-lg p-4 flex flex-col gap-2.5">
+                      <div key={w.id} className="border border-border-main/60 bg-bg-base/40 rounded-md p-3.5 flex flex-col gap-2.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex flex-col gap-1 min-w-0">
-                            <span className="font-mono text-[9px] text-txt-muted uppercase">{cat?.icon} {cat?.label ?? w.category}</span>
-                            <span className="text-xs font-semibold text-txt-main truncate">{w.title}</span>
+                            <span className="font-mono text-[9px] text-txt-muted uppercase flex items-center gap-1">
+                              <CatIcon size={10} className="text-accent-main" />
+                              {catLabel}
+                            </span>
+                            <span className="text-xs font-medium text-txt-main truncate">{w.title}</span>
                           </div>
-                          <span className={`text-[8px] font-mono uppercase px-2 py-0.5 rounded border shrink-0 ${statusConfig.cls}`}>
+                          <span className={`text-[8.5px] font-mono uppercase px-2 py-0.5 rounded-sm border shrink-0 flex items-center gap-1 ${statusConfig.cls}`}>
+                            <StatusIcon size={9} />
                             {statusConfig.label}
                           </span>
                         </div>
@@ -1899,7 +1936,7 @@ export default function ExplorePage() {
                   {myWorks.length < 5 && (
                     <button
                       onClick={() => { setShowMyWorks(false); setAddWorkStep(1); setShowAddWork(true); }}
-                      className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded cursor-pointer transition-opacity flex items-center justify-center gap-1.5"
+                      className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm cursor-pointer transition-opacity flex items-center justify-center gap-1.5"
                     >
                       <Plus size={12} /> Add New Work
                     </button>
@@ -1924,25 +1961,27 @@ export default function ExplorePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs"
                 onClick={() => setShowWorkDetail(false)}
               />
               <motion.div
                 key="work-detail-modal"
-                initial={{ opacity: 0, y: 40 }}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 40 }}
+                exit={{ opacity: 0, y: 30 }}
                 transition={{ type: 'spring', damping: 30, stiffness: 320 }}
-                className="fixed inset-x-0 bottom-0 md:inset-0 md:m-auto z-50 md:max-w-2xl md:h-fit md:rounded-xl w-full bg-bg-surface border border-border-main/60 flex flex-col shadow-2xl overflow-hidden max-h-[90vh] md:max-h-[85vh]"
+                className="fixed inset-x-0 bottom-0 md:inset-0 md:m-auto z-50 md:max-w-2xl md:h-fit md:rounded-md w-full bg-bg-surface border border-border-main/70 flex flex-col shadow-2xl overflow-hidden max-h-[90vh] md:max-h-[85vh]"
               >
                 {/* Modal header */}
                 <div className="flex items-start justify-between p-5 border-b border-border-main/40 shrink-0">
                   <div className="flex flex-col gap-1 min-w-0 pr-4">
                     {(() => {
-                      const cat = WORK_CATEGORIES.find(c => c.id === selectedWork.category);
+                      const CatIcon = getCategoryIconComponent(selectedWork.category);
+                      const catLabel = WORK_CATEGORIES.find(c => c.id === selectedWork.category)?.label ?? selectedWork.category;
                       return (
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted flex items-center gap-1">
-                          <span>{cat?.icon ?? '🗂️'}</span>{cat?.label ?? selectedWork.category}
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted flex items-center gap-1.5">
+                          <CatIcon size={11} className="text-accent-main" />
+                          {catLabel}
                         </span>
                       );
                     })()}
@@ -1962,11 +2001,11 @@ export default function ExplorePage() {
                 <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
                   {/* Tags + expiry */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded uppercase">
+                    <span className="flex items-center gap-1.5 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-sm uppercase">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Verified
                     </span>
                     {selectedWork.tags?.map(tag => (
-                      <span key={tag} className="text-[9px] font-mono text-txt-muted border border-border-main/60 bg-bg-base/60 px-2 py-0.5 rounded">
+                      <span key={tag} className="text-[9px] font-mono text-txt-muted border border-border-main/60 bg-bg-base/60 px-2 py-0.5 rounded-sm">
                         #{tag}
                       </span>
                     ))}
@@ -1986,7 +2025,7 @@ export default function ExplorePage() {
                         <div className="flex flex-col gap-2">
                           <iframe
                             src={url}
-                            className="w-full h-80 rounded border border-border-main/40 bg-bg-base"
+                            className="w-full h-80 rounded-sm border border-border-main/40 bg-bg-base"
                             sandbox="allow-scripts allow-same-origin allow-forms"
                             onError={() => {}}
                           />
@@ -2007,12 +2046,12 @@ export default function ExplorePage() {
                     }
                     if ((cat === 'book' || cat === 'research') && file) {
                       return (
-                        <iframe src={file} className="w-full h-[480px] rounded border border-border-main/40 bg-bg-base" />
+                        <iframe src={file} className="w-full h-[480px] rounded-sm border border-border-main/40 bg-bg-base" />
                       );
                     }
                     if ((cat === 'book' || cat === 'research') && url) {
                       return (
-                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded px-4 py-3 bg-bg-base/60 w-fit">
+                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded-sm px-4 py-3 bg-bg-base/60 w-fit">
                           <ExternalLink size={13} /> Open on Platform →
                         </a>
                       );
@@ -2020,12 +2059,12 @@ export default function ExplorePage() {
                     if ((cat === 'art' || cat === 'physical_product') && file) {
                       return (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={file} alt={selectedWork.title} className="w-full max-h-96 object-contain rounded border border-border-main/40" />
+                        <img src={file} alt={selectedWork.title} className="w-full max-h-96 object-contain rounded-sm border border-border-main/40" />
                       );
                     }
                     if (url) {
                       return (
-                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded px-4 py-3 bg-bg-base/60 w-fit">
+                        <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs font-mono text-accent-main hover:underline border border-border-main/60 rounded-sm px-4 py-3 bg-bg-base/60 w-fit">
                           <ExternalLink size={13} /> Open on Platform →
                         </a>
                       );
@@ -2045,7 +2084,7 @@ export default function ExplorePage() {
 
                   {/* How to use — collapsible */}
                   {selectedWork.how_to_use && (
-                    <div className="border border-border-main/50 rounded-lg overflow-hidden">
+                    <div className="border border-border-main/50 rounded-md overflow-hidden">
                       <button
                         onClick={() => setShowHowToUse(v => !v)}
                         className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-txt-sub hover:text-txt-main transition-colors bg-bg-base/40 cursor-pointer"
@@ -2115,7 +2154,7 @@ export default function ExplorePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+                className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs"
                 onClick={() => setShowAddWork(false)}
               />
               <motion.div
@@ -2124,7 +2163,7 @@ export default function ExplorePage() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                className="fixed inset-0 m-auto z-50 w-full max-w-lg h-fit max-h-[90vh] bg-bg-surface border border-border-main/60 rounded-xl flex flex-col shadow-2xl overflow-hidden"
+                className="fixed inset-0 m-auto z-50 w-full max-w-lg h-fit max-h-[90vh] bg-bg-surface border border-border-main/70 rounded-md flex flex-col shadow-2xl overflow-hidden"
               >
                 {/* Wizard header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-border-main/40 shrink-0">
@@ -2133,7 +2172,7 @@ export default function ExplorePage() {
                       Step {addWorkStep} of 3
                     </span>
                     <h3 className="font-display text-base font-light text-txt-main">
-                      {addWorkStep === 1 ? 'Choose a Category' : addWorkStep === 2 ? 'Visibility Type' : 'Work Details'}
+                      {addWorkStep === 1 ? 'Choose a Category' : addWorkStep === 2 ? 'Visibility & Platform' : 'Work Details'}
                     </h3>
                   </div>
                   <button onClick={() => setShowAddWork(false)} className="text-txt-muted hover:text-txt-main transition-colors cursor-pointer">
@@ -2154,22 +2193,26 @@ export default function ExplorePage() {
                   {/* Step 1: Pick category */}
                   {addWorkStep === 1 && (
                     <div className="flex flex-col gap-4">
-                      <p className="text-xs text-txt-sub font-light">Select the type that best describes your work.</p>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
-                        {WORK_CATEGORIES.map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => setNewWorkCategory(c.id)}
-                            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all cursor-pointer ${
-                              newWorkCategory === c.id
-                                ? 'border-accent-main bg-accent-main/10 text-txt-main'
-                                : 'border-border-main/50 hover:border-border-main bg-bg-base/40 text-txt-sub hover:text-txt-main'
-                            }`}
-                          >
-                            <span className="text-xl">{c.icon}</span>
-                            <span className="font-mono text-[8px] uppercase tracking-wider text-center leading-tight">{c.label}</span>
-                          </button>
-                        ))}
+                      <p className="text-xs text-txt-sub font-light">Select the medium that best describes your creative piece.</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {WORK_CATEGORIES.map(c => {
+                          const IconComp = c.Icon;
+                          const isSelected = newWorkCategory === c.id;
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => setNewWorkCategory(c.id)}
+                              className={`flex items-center gap-2.5 p-3 rounded-sm border transition-colors cursor-pointer text-left ${
+                                isSelected
+                                  ? 'border-accent-main bg-accent-main/10 text-txt-main shadow-xs'
+                                  : 'border-border-main/60 hover:border-border-main bg-bg-base/50 text-txt-sub hover:text-txt-main'
+                              }`}
+                            >
+                              <IconComp size={16} className={isSelected ? 'text-accent-main' : 'text-txt-muted'} />
+                              <span className="font-mono text-[9.5px] uppercase tracking-wider leading-tight">{c.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -2178,37 +2221,53 @@ export default function ExplorePage() {
                   {addWorkStep === 2 && (
                     <div className="flex flex-col gap-4">
                       <p className="text-xs text-txt-sub font-light">
-                        A published work links to an external platform (e.g. GitHub, Spotify, Itch.io).
-                        {UNPUBLISHED_ALLOWED.includes(newWorkCategory) && ' You can also upload a private file for staff review.'}
+                        A published work links to an external host (e.g. GitHub, Spotify, Itch.io).
+                        {UNPUBLISHED_ALLOWED.includes(newWorkCategory) && ' You can also upload a private attachment for faculty review.'}
                       </p>
                       <div className="flex flex-col gap-3">
                         <button
                           onClick={() => setNewWorkIsPublished(true)}
-                          className={`p-4 rounded-lg border text-left transition-all cursor-pointer ${
-                            newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/50 hover:border-border-main bg-bg-base/40'
+                          className={`p-4 rounded-sm border text-left transition-colors cursor-pointer ${
+                            newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/60 hover:border-border-main bg-bg-base/50'
                           }`}
                         >
-                          <div className="font-mono text-xs font-bold text-txt-main mb-1">🔗 Published (External Link)</div>
-                          <div className="text-[10px] text-txt-sub font-light">Link to an existing public platform. AI verifies automatically.</div>
+                          <div className="font-mono text-xs font-semibold text-txt-main mb-1 flex items-center gap-1.5">
+                            <ExternalLink size={13} className="text-accent-main" />
+                            Published (External Link)
+                          </div>
+                          <div className="text-[10px] text-txt-sub font-light">Link to an existing public platform. Automated AI verification active.</div>
                         </button>
                         {UNPUBLISHED_ALLOWED.includes(newWorkCategory) && (
                           <button
                             onClick={() => setNewWorkIsPublished(false)}
-                            className={`p-4 rounded-lg border text-left transition-all cursor-pointer ${
-                              !newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/50 hover:border-border-main bg-bg-base/40'
+                            className={`p-4 rounded-sm border text-left transition-colors cursor-pointer ${
+                              !newWorkIsPublished ? 'border-accent-main bg-accent-main/10' : 'border-border-main/60 hover:border-border-main bg-bg-base/50'
                             }`}
                           >
-                            <div className="font-mono text-xs font-bold text-txt-main mb-1">📁 Unpublished (File Upload)</div>
-                            <div className="text-[10px] text-txt-sub font-light">Upload directly. Goes to staff review before publishing.</div>
+                            <div className="font-mono text-xs font-semibold text-txt-main mb-1 flex items-center gap-1.5">
+                              <UploadCloud size={13} className="text-accent-main" />
+                              Unpublished (File Attachment)
+                            </div>
+                            <div className="text-[10px] text-txt-sub font-light">Upload document or media file. Routed to faculty coordinator review.</div>
                           </button>
                         )}
                       </div>
-                      <div className={`text-[10px] font-mono px-3 py-2 rounded border flex items-center gap-2 ${
+                      <div className={`text-[9.5px] font-mono px-3 py-2 rounded-sm border flex items-center gap-1.5 ${
                         newWorkIsPublished && !newWorkIsAlias
                           ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
                           : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
                       }`}>
-                        {newWorkIsPublished && !newWorkIsAlias ? '✓ AI will verify this automatically' : '⚠ This will go to staff review'}
+                        {newWorkIsPublished && !newWorkIsAlias ? (
+                          <>
+                            <CheckCircle2 size={12} />
+                            Automated AI Verification Active
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle size={12} />
+                            Submission Requires Faculty Review
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2223,8 +2282,8 @@ export default function ExplorePage() {
                           type="text"
                           value={newWorkTitle}
                           onChange={e => setNewWorkTitle(e.target.value)}
-                          placeholder="e.g. My Album — Echoes in the Dark"
-                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                          placeholder="e.g. Echoes in the Dark"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
                         />
                       </div>
 
@@ -2235,8 +2294,8 @@ export default function ExplorePage() {
                           value={newWorkDescription}
                           onChange={e => setNewWorkDescription(e.target.value)}
                           rows={3}
-                          placeholder="Briefly describe your work..."
-                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
+                          placeholder="Briefly describe the inspiration, technology, or overview..."
+                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
                         />
                       </div>
 
@@ -2249,13 +2308,13 @@ export default function ExplorePage() {
                             value={newWorkUrl}
                             onChange={e => setNewWorkUrl(e.target.value)}
                             placeholder="https://github.com/you/project"
-                            className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                            className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
                           />
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1.5">
                           <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Upload File</label>
-                          <label className="h-10 flex items-center gap-2 px-3 border border-dashed border-border-main/60 bg-bg-base/60 rounded text-xs font-mono text-txt-muted cursor-pointer hover:border-border-main transition-colors">
+                          <label className="h-9 flex items-center gap-2 px-3 border border-dashed border-border-main/60 bg-bg-base/60 rounded-sm text-xs font-mono text-txt-muted cursor-pointer hover:border-border-main transition-colors">
                             <Upload size={12} />
                             {newWorkFile ? newWorkFile.name : 'Click to select file...'}
                             <input
@@ -2277,8 +2336,8 @@ export default function ExplorePage() {
                           <span className={`absolute top-0.5 w-3.5 h-3.5 bg-bg-base rounded-full transition-all shadow ${newWorkIsAlias ? 'left-[calc(100%-14px-2px)]' : 'left-0.5'}`} />
                         </button>
                         <div className="flex flex-col">
-                          <span className="text-xs text-txt-main">This is an alias / re-submission</span>
-                          <span className="text-[9px] text-txt-muted font-mono">Published elsewhere under a different identity? Enable this.</span>
+                          <span className="text-xs text-txt-main">Published under an alias or stage name</span>
+                          <span className="text-[9px] text-txt-muted font-mono">Requires faculty review to verify institutional student ownership.</span>
                         </div>
                       </div>
 
@@ -2290,29 +2349,39 @@ export default function ExplorePage() {
                           value={newWorkTags}
                           onChange={e => setNewWorkTags(e.target.value)}
                           placeholder="e.g. indie, lo-fi, ambient"
-                          className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
+                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-mono placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main"
                         />
                       </div>
 
                       {/* How to use */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">How to Use (optional)</label>
+                        <label className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Instructions &amp; How to Use (optional)</label>
                         <textarea
                           value={newWorkHowToUse}
                           onChange={e => setNewWorkHowToUse(e.target.value)}
                           rows={2}
-                          placeholder="Instructions, controls, requirements..."
-                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
+                          placeholder="Instructions, game controls, setup details..."
+                          className="px-3 py-2 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs font-light placeholder:text-txt-muted/40 focus:outline-none focus:border-txt-main resize-none"
                         />
                       </div>
 
                       {/* Review notice */}
-                      <div className={`text-[10px] font-mono px-3 py-2 rounded border flex items-center gap-2 ${
+                      <div className={`text-[9.5px] font-mono px-3 py-2 rounded-sm border flex items-center gap-1.5 ${
                         newWorkIsPublished && !newWorkIsAlias
                           ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
                           : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
                       }`}>
-                        {newWorkIsPublished && !newWorkIsAlias ? '✓ AI will verify this automatically' : '⚠ This will go to staff review first'}
+                        {newWorkIsPublished && !newWorkIsAlias ? (
+                          <>
+                            <CheckCircle2 size={12} />
+                            Automated AI Verification Active
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle size={12} />
+                            Submission Requires Faculty Review
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2323,7 +2392,7 @@ export default function ExplorePage() {
                   {addWorkStep > 1 ? (
                     <button
                       onClick={() => setAddWorkStep(s => (s - 1) as 1|2|3)}
-                      className="h-9 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded cursor-pointer transition-colors"
+                      className="h-9 px-4 border border-border-main hover:bg-bg-card text-txt-sub font-mono text-[10px] uppercase rounded-sm cursor-pointer transition-colors"
                     >
                       ← Back
                     </button>
@@ -2334,7 +2403,7 @@ export default function ExplorePage() {
                     <button
                       disabled={addWorkStep === 1 && !newWorkCategory}
                       onClick={() => setAddWorkStep(s => (s + 1) as 1|2|3)}
-                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded cursor-pointer disabled:opacity-40 transition-opacity"
+                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded-sm cursor-pointer disabled:opacity-40 transition-opacity"
                     >
                       Next →
                     </button>
@@ -2342,7 +2411,7 @@ export default function ExplorePage() {
                     <button
                       disabled={addWorkLoading || !newWorkTitle || !newWorkCategory}
                       onClick={handleSubmitWork}
-                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded cursor-pointer disabled:opacity-40 transition-opacity flex items-center gap-1.5"
+                      className="h-9 px-5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase font-bold rounded-sm cursor-pointer disabled:opacity-40 transition-opacity flex items-center gap-1.5"
                     >
                       {addWorkLoading ? (
                         <><span className="w-3.5 h-3.5 border-2 border-bg-base/40 border-t-bg-base rounded-full animate-spin" /> Submitting...</>

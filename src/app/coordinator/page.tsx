@@ -18,7 +18,8 @@ import {
   FolderLock,
   Download,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  Palette
 } from "lucide-react";
 
 interface CreditClaim {
@@ -1741,11 +1742,12 @@ useEffect(() => {
                 <button
                   type="button"
                   onClick={() => setVerifSubTab("works")}
-                  className={`pb-1 border-b-2 transition-all cursor-pointer ${
+                  className={`pb-1 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                     verifSubTab === "works" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
                   }`}
                 >
-                  🎨 Works Review ({worksReviewQueue.length})
+                  <Palette size={12} className="text-accent-main" />
+                  Works Review ({worksReviewQueue.length})
                 </button>
               </div>
 
