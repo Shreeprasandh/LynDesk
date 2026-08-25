@@ -140,15 +140,19 @@ export async function GET(req: NextRequest) {
     // Sort strategy
     switch (sort) {
       case "rated":
+      case "top_rated":
         query = query.order("average_rating", { ascending: false });
         break;
       case "views":
+      case "most_viewed":
         query = query.order("views", { ascending: false });
         break;
       case "alpha":
+      case "alphabetical":
         query = query.order("title", { ascending: true });
         break;
       case "expiring":
+      case "expiring_soon":
         query = query.order("expires_at", { ascending: true });
         break;
       case "trending":
