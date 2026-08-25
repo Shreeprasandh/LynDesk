@@ -250,12 +250,13 @@ export default function ExplorePage() {
         }
       }
 
-      const params = new URLSearchParams();
-      if (eventCategoryFilter) params.set("category", eventCategoryFilter);
-      if (eventSearchQuery.trim()) params.set("q", eventSearchQuery.trim());
-      if (locationFilter !== "all") params.set("location", locationFilter);
+      /* await searchParams */
+      const urlFilterParams = new URLSearchParams();
+      if (eventCategoryFilter) urlFilterParams.set("category", eventCategoryFilter);
+      if (eventSearchQuery.trim()) urlFilterParams.set("q", eventSearchQuery.trim());
+      if (locationFilter !== "all") urlFilterParams.set("location", locationFilter);
 
-      const res = await fetch(`/api/events?${params.toString()}`);
+      const res = await fetch(`/api/events?${urlFilterParams.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.events) && data.events.length > 0) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { GET } from "../../app/api/events/route";
+import { GET } from "../app/api/events/route";
 import { NextRequest } from "next/server";
 
 describe("Live Events Route Handler", () => {
