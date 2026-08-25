@@ -1556,20 +1556,15 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
                   <div className="flex flex-col gap-0.5">
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Integrations Hub</span>
-                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Portals</h3>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Portals & Applications</span>
+                    <h3 className="text-xs font-semibold text-txt-main">Hackathon Hub</h3>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2.5 py-1 border border-border-main/70 rounded-sm font-semibold uppercase tracking-wider">
-                      {realAppliedCounts.total} Applied
-                    </span>
-                    <button
-                      onClick={handleOpenHandleModal}
-                      className="text-[9px] font-mono text-accent-main hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer"
-                    >
-                      <Link2 size={10} /> Link Handles
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleOpenHandleModal}
+                    className="text-[9px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    Edit Handles
+                  </button>
                 </div>
                 
                 {/* Unstop Row */}
@@ -1577,30 +1572,29 @@ export default function CodingDeckPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Unstop</span>
                     {unstopUser ? (
-                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-                        Linked
-                      </span>
+                      <a
+                        href={`https://unstop.com/u/${unstopUser}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
+                      >
+                        @{unstopUser} <ExternalLink size={9} />
+                      </a>
                     ) : (
                       <button
                         onClick={handleOpenHandleModal}
-                        className="text-[9px] font-mono text-accent-main hover:underline cursor-pointer"
+                        className="text-[9px] font-mono text-txt-muted hover:text-accent-main cursor-pointer"
                       >
-                        + Link Handle
+                        + Connect
                       </button>
                     )}
                   </div>
-                  {unstopUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{unstopUser}</span>
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {realAppliedCounts.unstop} Registered
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link your Unstop username to track your hackathons.
+                  <div className="flex items-center justify-between font-mono text-[10px] text-txt-muted">
+                    <span>Tracked Applications</span>
+                    <span className="font-semibold text-txt-main">
+                      {realAppliedCounts.unstop}
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 {/* Hack2Skill Row */}
@@ -1608,37 +1602,31 @@ export default function CodingDeckPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Hack2Skill</span>
                     {hack2skillUser ? (
-                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-sm">
-                        Linked
+                      <span className="text-[10px] font-mono text-accent-main">
+                        @{hack2skillUser}
                       </span>
                     ) : (
                       <button
                         onClick={handleOpenHandleModal}
-                        className="text-[9px] font-mono text-accent-main hover:underline cursor-pointer"
+                        className="text-[9px] font-mono text-txt-muted hover:text-accent-main cursor-pointer"
                       >
-                        + Link Handle
+                        + Connect
                       </button>
                     )}
                   </div>
-                  {hack2skillUser ? (
-                    <div className="flex items-center justify-between font-mono text-[10px] text-txt-sub">
-                      <span>@{hack2skillUser}</span>
-                      <span className="text-[9px] font-mono text-txt-sub bg-bg-card px-2 py-0.5 border border-border-main/70 rounded-sm font-semibold">
-                        {realAppliedCounts.hack2skill} Registered
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-txt-muted font-light leading-relaxed">
-                      Link your Hack2Skill handle to track your campus events.
+                  <div className="flex items-center justify-between font-mono text-[10px] text-txt-muted">
+                    <span>Tracked Applications</span>
+                    <span className="font-semibold text-txt-main">
+                      {realAppliedCounts.hack2skill}
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 <button
                   onClick={() => setShowAppliedModal(true)}
                   className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
                 >
-                  <FolderKanban size={12} /> Manage Applied Hackathons
+                  <FolderKanban size={12} /> Manage Application Tracker
                 </button>
               </div>
 
