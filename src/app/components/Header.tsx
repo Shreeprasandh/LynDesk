@@ -65,8 +65,9 @@ export default function Header() {
   // Global authentication route guard: redirects unauthorized sessions immediately to landing page
   useEffect(() => {
     if (loading) return; // Wait until authentication check completes!
-    const publicPaths = ["/", "/terms", "/privacy", "/help"];
-    if (!user && !publicPaths.includes(pathname)) {
+    const publicPaths = ["/", "/terms", "/privacy", "/help", "/auth/callback"];
+    const isInstitutionalPath = pathname.startsWith("/admin") || pathname.startsWith("/coordinator") || pathname.startsWith("/recruiter");
+    if (!user && !publicPaths.includes(pathname) && !isInstitutionalPath) {
       router.push("/");
     }
   }, [user, loading, pathname, router]);
