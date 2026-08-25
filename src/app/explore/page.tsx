@@ -669,12 +669,12 @@ export default function ExplorePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-      const params = new URLSearchParams({ page: String(page), sort: worksSort });
-      if (worksSearch) params.set('search', worksSearch);
-      if (worksCategoryFilter) params.set('category', worksCategoryFilter);
-      if (worksDeptFilter) params.set('department', worksDeptFilter);
-      if (worksYearFilter) params.set('academic_year', worksYearFilter);
-      const res = await fetch(`/api/works?${params}`, {
+      const workQueryParams = new URLSearchParams({ page: String(page), sort: worksSort });
+      if (worksSearch) workQueryParams.set('search', worksSearch);
+      if (worksCategoryFilter) workQueryParams.set('category', worksCategoryFilter);
+      if (worksDeptFilter) workQueryParams.set('department', worksDeptFilter);
+      if (worksYearFilter) workQueryParams.set('academic_year', worksYearFilter);
+      const res = await fetch(`/api/works?${workQueryParams}`, {
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
       if (res.ok) {

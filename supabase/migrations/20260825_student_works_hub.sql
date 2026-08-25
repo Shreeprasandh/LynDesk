@@ -85,9 +85,9 @@ CREATE INDEX IF NOT EXISTS idx_work_views_work         ON public.student_work_vi
 -- ========================================================
 -- ROW LEVEL SECURITY
 -- ========================================================
-ALTER TABLE public.student_works              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.student_work_ratings       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.student_work_views         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_works ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_work_ratings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_work_views ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_work_staff_reviews ENABLE ROW LEVEL SECURITY;
 
 -- ────────────────────────────────────────────────────────

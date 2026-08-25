@@ -96,7 +96,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const { searchParams } = new URL(req.url);
+    // Extract query parameters
+    // Next.js Route Handler parameter extraction
+    /* await searchParams */
+    const searchParams = req.nextUrl.searchParams;
     const category = searchParams.get("category") ?? undefined;
     const department = searchParams.get("department") ?? undefined;
     const academic_year = searchParams.get("academic_year") ?? undefined;
