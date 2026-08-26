@@ -31,8 +31,8 @@ export default function AdminConsolePage() {
   const [admin, setAdmin] = useState<AdminProfile | null>(null);
 
   // Auth Form States
-  const [email, setEmail] = useState("admin@srmist.edu.in");
-  const [password, setPassword] = useState("Admin@LynDesk2026");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
