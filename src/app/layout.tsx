@@ -30,18 +30,30 @@ export const metadata: Metadata = {
   authors: [{ name: "LynDesk Engineering" }],
   manifest: "/manifest.json",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://lyndesk.tech"),
+  alternates: {
+    canonical: "/"
+  },
   openGraph: {
     title: "LynDesk — Link Your Next Desk",
     description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
     url: "https://lyndesk.tech",
     siteName: "LynDesk",
     locale: "en_US",
-    type: "website"
+    type: "website",
+    images: [
+      {
+        url: "/lyndesk-logo.jpg",
+        width: 1200,
+        height: 630,
+        alt: "LynDesk — Link Your Next Desk"
+      }
+    ]
   },
   twitter: {
     card: "summary_large_image",
     title: "LynDesk — Link Your Next Desk",
-    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk."
+    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+    images: ["/lyndesk-logo.jpg"]
   },
   icons: {
     icon: [

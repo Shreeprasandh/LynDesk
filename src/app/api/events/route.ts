@@ -239,11 +239,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      count: filtered.length,
-      events: filtered
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        count: filtered.length,
+        events: filtered
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      }
+    );
   } catch (error: any) {
     console.error("[GET /api/events] Unexpected error:", error);
     return NextResponse.json(

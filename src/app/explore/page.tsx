@@ -968,7 +968,6 @@ export default function ExplorePage() {
     );
   }
 
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
@@ -1192,6 +1191,21 @@ export default function ExplorePage() {
         {/* SUB-TAB 2: FRIENDS & NETWORK (FULL RESTORED FRIEND SYSTEM)         */}
         {/* ─────────────────────────────────────────────────────────────────── */}
         {activeTab === "friends" && (
+          !user ? (
+            <div className="border border-border-main/70 bg-bg-surface p-12 rounded-md text-center flex flex-col items-center justify-center gap-3 pb-12 mb-12">
+              <Users size={32} className="text-accent-main opacity-80" />
+              <h3 className="font-display text-lg font-light text-txt-main">Connect with Student Developers</h3>
+              <p className="text-xs text-txt-muted max-w-md">
+                Sign in to add friends, share institutional roll numbers, and collaborate across campus projects.
+              </p>
+              <Link
+                href="/?auth=login"
+                className="px-4 py-2 bg-accent-main hover:opacity-90 text-bg-base font-mono text-xs font-bold uppercase rounded-sm cursor-pointer mt-2"
+              >
+                Sign In to Continue
+              </Link>
+            </div>
+          ) : (
           <div className="flex flex-col gap-6 pb-12">
 
             {/* Top Bar: Copy UID + Search form */}
@@ -1719,6 +1733,7 @@ export default function ExplorePage() {
             )}
 
           </div>
+          )
         )}
 
         {/* ─────────────────────────────────────────────────────────────────── */}

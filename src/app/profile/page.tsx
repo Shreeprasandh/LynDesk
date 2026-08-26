@@ -1673,7 +1673,29 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans">
+        <Header />
+        <main className="flex-1 max-w-lg w-full mx-auto px-6 py-24 flex flex-col items-center justify-center text-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-accent-main/10 border border-accent-main/20 flex items-center justify-center text-accent-main">
+            <User size={24} />
+          </div>
+          <h1 className="font-display text-2xl font-light text-txt-main">Student Profile Access</h1>
+          <p className="text-xs text-txt-muted font-light leading-relaxed">
+            Please sign in to view and manage your university credentials, verified platform handles, and projects.
+          </p>
+          <Link
+            href="/?auth=login"
+            className="px-6 py-2.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-xs uppercase tracking-wider font-bold rounded-sm transition-opacity mt-2"
+          >
+            Sign In to Continue
+          </Link>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">

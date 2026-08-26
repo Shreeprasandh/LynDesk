@@ -225,7 +225,7 @@ export default function AppliedHackathonsModal({
 
   return (
     <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans text-txt-main">
-      <div className="bg-bg-surface border border-border-main/80 rounded-md max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="bg-bg-surface border border-border-main/80 rounded-md max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] overscroll-contain">
         {/* Header */}
         <div className="p-6 border-b border-border-main/40 flex items-center justify-between bg-bg-surface">
           <div className="flex flex-col gap-1">
