@@ -771,65 +771,55 @@ export async function GET(request: Request) {
       let languages: string[] = [];
       let fetchedSuccessfully = false;
 
+      const hrHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      };
+
       try {
-        // 1. Fetch Profile Details
-        const profRes = await fetch(`https://www.hackerrank.com/rest/contests/master/hackers/${cleanUsername}/profile`, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json"
-          },
-          cache: "no-store"
-        });
+        const [profRes, badgeRes, scoreRes] = await Promise.allSettled([
+          fetch(`https://www.hackerrank.com/rest/contests/master/hackers/${cleanUsername}/profile`, { headers: hrHeaders, cache: "no-store" }),
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, { headers: hrHeaders, cache: "no-store" }),
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/scores_elo`, { headers: hrHeaders, cache: "no-store" })
+        ]);
 
-        if (profRes.ok) {
-          const profData = await profRes.json();
-          const model = profData?.model || {};
-          if (model.id) {
-            fetchedSuccessfully = true;
-            rank = model.title || (model.level ? `Level ${model.level}` : "Gold");
-            languages = Array.isArray(model.languages) ? model.languages : [];
-          }
+        if (profRes.status === "fulfilled" && profRes.value.ok) {
+          try {
+            const profData = await profRes.value.json();
+            const model = profData?.model || {};
+            if (model.id) {
+              fetchedSuccessfully = true;
+              rank = model.title || (model.level ? `Level ${model.level}` : "Gold");
+              languages = Array.isArray(model.languages) ? model.languages : [];
+            }
+          } catch {}
         }
 
-        // 2. Fetch Badges & Stars
-        const badgeRes = await fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json"
-          },
-          cache: "no-store"
-        });
-
-        if (badgeRes.ok) {
-          const badgeData = await badgeRes.json();
-          const models = Array.isArray(badgeData?.models) ? badgeData.models : [];
-          models.forEach((b: any) => {
-            const bSolved = parseInt(b.solved || 0);
-            solved += bSolved;
-            badges.push({
-              name: b.badge_name || b.badge_type || "Skill",
-              stars: parseInt(b.stars || 0),
-              points: parseInt(b.current_points || 0)
+        if (badgeRes.status === "fulfilled" && badgeRes.value.ok) {
+          try {
+            const badgeData = await badgeRes.value.json();
+            const models = Array.isArray(badgeData?.models) ? badgeData.models : [];
+            models.forEach((b: any) => {
+              const bSolved = parseInt(b.solved || 0);
+              solved += bSolved;
+              badges.push({
+                name: b.badge_name || b.badge_type || "Skill",
+                stars: parseInt(b.stars || 0),
+                points: parseInt(b.current_points || 0)
+              });
             });
-          });
-          if (models.length > 0) fetchedSuccessfully = true;
+            if (models.length > 0) fetchedSuccessfully = true;
+          } catch {}
         }
 
-        // 3. Fetch Scores & ELO Rating
-        const scoreRes = await fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/scores_elo`, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json"
-          },
-          cache: "no-store"
-        });
-
-        if (scoreRes.ok) {
-          const scoreData = await scoreRes.json();
-          if (Array.isArray(scoreData) && scoreData.length > 0) {
-            const eloSum = scoreData.reduce((acc: number, s: any) => acc + (parseFloat(s.score) || 0), 0);
-            rating = Math.round(eloSum / scoreData.length) || rating;
-          }
+        if (scoreRes.status === "fulfilled" && scoreRes.value.ok) {
+          try {
+            const scoreData = await scoreRes.value.json();
+            if (Array.isArray(scoreData) && scoreData.length > 0) {
+              const eloSum = scoreData.reduce((acc: number, s: any) => acc + (parseFloat(s.score) || 0), 0);
+              rating = Math.round(eloSum / scoreData.length) || rating;
+            }
+          } catch {}
         }
       } catch (err) {
         console.warn("HackerRank API fetch notice:", err);
