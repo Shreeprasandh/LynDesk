@@ -135,6 +135,22 @@ export function extractPlatformHandle(input: string, platform: string): { handle
         return { handle: username };
       }
 
+      if (platform === "HackerRank") {
+        if (!host.includes("hackerrank")) {
+          return { handle: "", error: "Invalid HackerRank URL. Must be a hackerrank.com profile link." };
+        }
+        let username = "";
+        if (pathSegments[0] === "profile" && pathSegments[1]) {
+          username = pathSegments[1];
+        } else if (pathSegments[0]) {
+          username = pathSegments[0];
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract HackerRank username from URL." };
+        }
+        return { handle: username };
+      }
+
       if (platform === "Unstop") {
         if (!host.includes("unstop")) {
           return { handle: "", error: "Invalid Unstop URL. Must be an unstop.com profile link." };
@@ -437,6 +453,14 @@ export default function ProfilePage() {
     }
     return "";
   });
+  const [hackerrankUsername, setHackerrankUsername] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("ldk_hackerrank_handle") || "";
+      } catch {}
+    }
+    return "";
+  });
   const [unstopUsername, setUnstopUsername] = useState("");
   const [hack2skillUsername, setHack2skillUsername] = useState("");
 
@@ -444,6 +468,7 @@ export default function ProfilePage() {
   const [leetcodeVerified, setLeetcodeVerified] = useState(false);
   const [codeforcesVerified, setCodeforcesVerified] = useState(false);
   const [codechefVerified, setCodechefVerified] = useState(false);
+  const [hackerrankVerified, setHackerrankVerified] = useState(false);
   const [unstopVerified, setUnstopVerified] = useState(false);
   const [hack2skillVerified, setHack2skillVerified] = useState(false);
 
@@ -634,12 +659,14 @@ export default function ProfilePage() {
           setLeetcodeUsername(profile.leetcode_username || "");
           setCodeforcesUsername(profile.codeforces_username || "");
           setCodechefUsername(profile.codechef_username || "");
+          setHackerrankUsername(profile.hackerrank_username || "");
           setUnstopUsername(profile.unstop_username || "");
           setHack2skillUsername(profile.hack2skill_username || "");
           const hasKeys = (profile.college_key || "").trim() !== "";
           setLeetcodeVerified(hasKeys ? !!profile.leetcode_verified : true);
           setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
           setCodechefVerified(hasKeys ? !!profile.codechef_verified : true);
+          setHackerrankVerified(hasKeys ? !!profile.hackerrank_verified : true);
           setUnstopVerified(hasKeys ? !!profile.unstop_verified : true);
           setHack2skillVerified(hasKeys ? !!profile.hack2skill_verified : true);
 
@@ -647,6 +674,7 @@ export default function ProfilePage() {
           if (profile.leetcode_verified) verifiedBackup["LeetCode"] = profile.leetcode_username || "";
           if (profile.codeforces_verified) verifiedBackup["Codeforces"] = profile.codeforces_username || "";
           if (profile.codechef_verified) verifiedBackup["CodeChef"] = profile.codechef_username || "";
+          if (profile.hackerrank_verified) verifiedBackup["HackerRank"] = profile.hackerrank_username || "";
           if (profile.unstop_verified) verifiedBackup["Unstop"] = profile.unstop_username || "";
           if (profile.hack2skill_verified) verifiedBackup["Hack2Skill"] = profile.hack2skill_username || "";
           setVerifiedHandlesBackup(verifiedBackup);
@@ -678,6 +706,7 @@ export default function ProfilePage() {
         setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
         setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
         setCodechefUsername(meta.codechef_username || profile?.codechef_username || "");
+        setHackerrankUsername(meta.hackerrank_username || profile?.hackerrank_username || "");
         setUnstopUsername(meta.unstop_username || profile?.unstop_username || "");
         setHack2skillUsername(meta.hack2skill_username || profile?.hack2skill_username || "");
         setBio(meta.bio || "");
@@ -1213,8 +1242,9 @@ export default function ProfilePage() {
     // Auto-extract and validate coding platform handles or links
     const platformList = [
       { name: "LeetCode", raw: leetcodeUsername, setFn: setLeetcodeUsername },
-      { name: "Codeforces", raw: codeforcesUsername, setFn: setCodeforcesUsername },
       { name: "CodeChef", raw: codechefUsername, setFn: setCodechefUsername },
+      { name: "HackerRank", raw: hackerrankUsername, setFn: setHackerrankUsername },
+      { name: "Codeforces", raw: codeforcesUsername, setFn: setCodeforcesUsername },
       { name: "Unstop", raw: unstopUsername, setFn: setUnstopUsername },
       { name: "Hack2Skill", raw: hack2skillUsername, setFn: setHack2skillUsername },
     ];
@@ -1249,17 +1279,18 @@ export default function ProfilePage() {
       const lcTrim = extractedHandles["LeetCode"] || leetcodeUsername.trim();
       const cfTrim = extractedHandles["Codeforces"] || codeforcesUsername.trim();
       const ccTrim = extractedHandles["CodeChef"] || codechefUsername.trim();
+      const hrTrim = extractedHandles["HackerRank"] || hackerrankUsername.trim();
       const usTrim = extractedHandles["Unstop"] || unstopUsername.trim();
       const h2sTrim = extractedHandles["Hack2Skill"] || hack2skillUsername.trim();
 
-      if (lcTrim || cfTrim || ccTrim || usTrim || h2sTrim) {
+      if (lcTrim || cfTrim || ccTrim || hrTrim || usTrim || h2sTrim) {
         const { data: existingProfiles } = await supabase
           .from("profiles")
-          .select("id, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username")
+          .select("id, leetcode_username, codeforces_username, codechef_username, hackerrank_username, unstop_username, hack2skill_username")
           .neq("id", user.id);
           
         if (existingProfiles) {
-          for (const ep of existingProfiles) {
+          for (const ep of existingProfiles as any[]) {
             if (lcTrim && ep.leetcode_username && ep.leetcode_username.toLowerCase() === lcTrim.toLowerCase()) {
               throw new Error(`The LeetCode handle @${lcTrim} is already registered by another student.`);
             }
@@ -1268,6 +1299,9 @@ export default function ProfilePage() {
             }
             if (ccTrim && ep.codechef_username && ep.codechef_username.toLowerCase() === ccTrim.toLowerCase()) {
               throw new Error(`The CodeChef handle @${ccTrim} is already registered by another student.`);
+            }
+            if (hrTrim && ep.hackerrank_username && ep.hackerrank_username.toLowerCase() === hrTrim.toLowerCase()) {
+              throw new Error(`The HackerRank handle @${hrTrim} is already registered by another student.`);
             }
             if (usTrim && ep.unstop_username && ep.unstop_username.toLowerCase() === usTrim.toLowerCase()) {
               throw new Error(`The Unstop handle @${usTrim} is already registered by another student.`);
@@ -1294,6 +1328,7 @@ export default function ProfilePage() {
         let nextLcVerified = leetcodeVerified;
         let nextCfVerified = codeforcesVerified;
         let nextCcVerified = codechefVerified;
+        let nextHrVerified = hackerrankVerified;
         let nextUsVerified = unstopVerified;
         let nextH2sVerified = hack2skillVerified;
 
@@ -1302,6 +1337,7 @@ export default function ProfilePage() {
             nextLcVerified = false;
             nextCfVerified = false;
             nextCcVerified = false;
+            nextHrVerified = false;
             nextUsVerified = false;
             nextH2sVerified = false;
           } else {
@@ -1313,6 +1349,9 @@ export default function ProfilePage() {
             }
             if (codechefUsername.trim() !== (currentDbProfile?.codechef_username || "").trim()) {
               nextCcVerified = false;
+            }
+            if (hackerrankUsername.trim() !== (currentDbProfile?.hackerrank_username || "").trim()) {
+              nextHrVerified = false;
             }
             if (unstopUsername.trim() !== (currentDbProfile?.unstop_username || "").trim()) {
               nextUsVerified = false;
@@ -1326,6 +1365,7 @@ export default function ProfilePage() {
           nextLcVerified = true;
           nextCfVerified = true;
           nextCcVerified = true;
+          nextHrVerified = true;
           nextUsVerified = true;
           nextH2sVerified = true;
         }
@@ -1333,6 +1373,7 @@ export default function ProfilePage() {
         setLeetcodeVerified(nextLcVerified);
         setCodeforcesVerified(nextCfVerified);
         setCodechefVerified(nextCcVerified);
+        setHackerrankVerified(nextHrVerified);
         setUnstopVerified(nextUsVerified);
         setHack2skillVerified(nextH2sVerified);
 
@@ -1351,6 +1392,8 @@ export default function ProfilePage() {
             leetcode_username: leetcodeUsername.trim() || null,
             codeforces_username: codeforcesUsername.trim() || null,
             codechef_username: codechefUsername.trim() || null,
+            hackerrank_username: hackerrankUsername.trim() || null,
+            hackerrank_verified: nextHrVerified,
             unstop_username: unstopUsername.trim() || null,
             hack2skill_username: hack2skillUsername.trim() || null,
             graduation_year: gradYear.trim() || null,
@@ -1389,6 +1432,7 @@ export default function ProfilePage() {
               leetcode_username: leetcodeUsername.trim(),
               codeforces_username: codeforcesUsername.trim(),
               codechef_username: codechefUsername.trim(),
+              hackerrank_username: hackerrankUsername.trim(),
               unstop_username: unstopUsername.trim(),
               hack2skill_username: hack2skillUsername.trim(),
               graduation_year: gradYear.trim(),
@@ -1401,6 +1445,13 @@ export default function ProfilePage() {
           if (location.trim()) {
             localStorage.setItem("ldk_user_location", location.trim());
             window.dispatchEvent(new Event("ldk_preferences_update"));
+          }
+          if (hackerrankUsername.trim()) {
+            localStorage.setItem("ldk_hackerrank_handle", hackerrankUsername.trim());
+            localStorage.setItem(`ldk_hackerrank_handle_${user.id}`, hackerrankUsername.trim());
+          } else {
+            localStorage.removeItem("ldk_hackerrank_handle");
+            localStorage.removeItem(`ldk_hackerrank_handle_${user.id}`);
           }
           if (avatarUrl) {
             localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
@@ -1444,6 +1495,7 @@ export default function ProfilePage() {
           leetcode_username: leetcodeUsername.trim(),
           codeforces_username: codeforcesUsername.trim(),
           codechef_username: codechefUsername.trim(),
+          hackerrank_username: hackerrankUsername.trim(),
           unstop_username: unstopUsername.trim(),
           hack2skill_username: hack2skillUsername.trim()
         }
@@ -2150,7 +2202,8 @@ export default function ProfilePage() {
                 <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                   <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Coding Platform Integrations</span>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* 1. LeetCode */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">LeetCode</label>
@@ -2197,54 +2250,7 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
-                        {codeforcesUsername.trim() && (
-                          (codeforcesVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setVerifyPlatform("Codeforces");
-                                setVerifyReason("");
-                              }}
-                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
-                            >
-                              Unverified (Verify Handle)
-                            </button>
-                          )
-                        )}
-                      </div>
-                      <input 
-                        type="text" 
-                        value={codeforcesUsername}
-                        onChange={(e) => {
-                          setCodeforcesUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
-                        }}
-                        onBlur={() => {
-                          if (codeforcesUsername.trim()) {
-                            const res = extractPlatformHandle(codeforcesUsername, "Codeforces");
-                            if (res.handle) setCodeforcesUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Codeforces: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
-                          }
-                        }}
-                        disabled={!isEditing}
-                        placeholder="Enter handle or profile link (e.g. https://codeforces.com/profile/id)"
-                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
-                          platformInputErrors.Codeforces ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
-                        }`}
-                      />
-                      {platformInputErrors.Codeforces && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Codeforces}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* 2. CodeChef */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">CodeChef</label>
@@ -2291,6 +2297,101 @@ export default function ProfilePage() {
                       )}
                     </div>
 
+                    {/* 3. HackerRank */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">HackerRank</label>
+                        {hackerrankUsername.trim() && (
+                          (hackerrankVerified || !collegeKey.trim()) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("HackerRank");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={hackerrankUsername}
+                        onChange={(e) => {
+                          setHackerrankUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, HackerRank: "" }));
+                        }}
+                        onBlur={() => {
+                          if (hackerrankUsername.trim()) {
+                            const res = extractPlatformHandle(hackerrankUsername, "HackerRank");
+                            if (res.handle) setHackerrankUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, HackerRank: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, HackerRank: "" }));
+                          }
+                        }}
+                        disabled={!isEditing}
+                        placeholder="Enter handle or profile link (e.g. https://hackerrank.com/profile/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.HackerRank ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
+                      />
+                      {platformInputErrors.HackerRank && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.HackerRank}</span>
+                      )}
+                    </div>
+
+                    {/* 4. Codeforces */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
+                        {codeforcesUsername.trim() && (
+                          (codeforcesVerified || !collegeKey.trim()) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("Codeforces");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={codeforcesUsername}
+                        onChange={(e) => {
+                          setCodeforcesUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
+                        }}
+                        onBlur={() => {
+                          if (codeforcesUsername.trim()) {
+                            const res = extractPlatformHandle(codeforcesUsername, "Codeforces");
+                            if (res.handle) setCodeforcesUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Codeforces: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
+                          }
+                        }}
+                        disabled={!isEditing}
+                        placeholder="Enter handle or profile link (e.g. https://codeforces.com/profile/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.Codeforces ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
+                      />
+                      {platformInputErrors.Codeforces && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Codeforces}</span>
+                      )}
+                    </div>
+
+                    {/* 5. Unstop */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Unstop</label>
@@ -2337,6 +2438,7 @@ export default function ProfilePage() {
                       )}
                     </div>
 
+                    {/* 6. Hack2Skill */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Hack2Skill</label>

@@ -762,6 +762,119 @@ export async function GET(request: Request) {
       });
     }
 
+    if (platform === "hackerrank") {
+      let solved = 0;
+      let rating = 0;
+      let rank = "Bronze";
+      let globalRank = 0;
+      let badges: Array<{ name: string; stars: number; points: number }> = [];
+      let languages: string[] = [];
+      let fetchedSuccessfully = false;
+
+      try {
+        // 1. Fetch Profile Details
+        const profRes = await fetch(`https://www.hackerrank.com/rest/contests/master/hackers/${cleanUsername}/profile`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+          },
+          cache: "no-store"
+        });
+
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          const model = profData?.model || {};
+          if (model.id) {
+            fetchedSuccessfully = true;
+            rank = model.title || (model.level ? `Level ${model.level}` : "Gold");
+            languages = Array.isArray(model.languages) ? model.languages : [];
+          }
+        }
+
+        // 2. Fetch Badges & Stars
+        const badgeRes = await fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+          },
+          cache: "no-store"
+        });
+
+        if (badgeRes.ok) {
+          const badgeData = await badgeRes.json();
+          const models = Array.isArray(badgeData?.models) ? badgeData.models : [];
+          models.forEach((b: any) => {
+            const bSolved = parseInt(b.solved || 0);
+            solved += bSolved;
+            badges.push({
+              name: b.badge_name || b.badge_type || "Skill",
+              stars: parseInt(b.stars || 0),
+              points: parseInt(b.current_points || 0)
+            });
+          });
+          if (models.length > 0) fetchedSuccessfully = true;
+        }
+
+        // 3. Fetch Scores & ELO Rating
+        const scoreRes = await fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/scores_elo`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+          },
+          cache: "no-store"
+        });
+
+        if (scoreRes.ok) {
+          const scoreData = await scoreRes.json();
+          if (Array.isArray(scoreData) && scoreData.length > 0) {
+            const eloSum = scoreData.reduce((acc: number, s: any) => acc + (parseFloat(s.score) || 0), 0);
+            rating = Math.round(eloSum / scoreData.length) || rating;
+          }
+        }
+      } catch (err) {
+        console.warn("HackerRank API fetch notice:", err);
+      }
+
+      if (!fetchedSuccessfully) {
+        return NextResponse.json({
+          solved: 0,
+          solvedEasy: 0,
+          solvedMedium: 0,
+          solvedHard: 0,
+          totalSubmissions: 0,
+          acceptedSubmissions: 0,
+          rank: "Unranked",
+          rating: 0,
+          highestRating: 0,
+          globalRank: 0,
+          badges: [],
+          languages: [],
+          submissionCalendar: {},
+          isFallback: true
+        }, { status: 200 });
+      }
+
+      return NextResponse.json({
+        solved: solved || 0,
+        solvedEasy: 0,
+        solvedMedium: 0,
+        solvedHard: 0,
+        totalSubmissions: solved || 0,
+        acceptedSubmissions: solved || 0,
+        rank: rank || "Gold",
+        rating: rating || 1500,
+        highestRating: rating || 1500,
+        globalRank: globalRank || 0,
+        badges,
+        languages,
+        submissionCalendar: {}
+      }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
     return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
   } catch (err) {
     console.error(`Error loading stats for ${platform} (${cleanUsername}):`, err);

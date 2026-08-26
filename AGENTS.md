@@ -81,4 +81,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Diagnostic Default ("Double-Check Principle")**: All integrations default strictly to **Read/Inspect mode** (inspecting logs, reviewing Figma layers, checking build statuses, querying calendar schedules). Always double-check parameters before executing multi-system commands.
 - **Persona Alignment & Anti-Suspicious Activity**: All actions must strictly match Sir's authentic persona and instructions. Never run high-volume automated scraping loops or abnormal request bursts that could trigger rate limits or security flags on any platform.
 - **Zero Secret Exposure**: All integration tokens and credentials must be permanently isolated in local `.env.mcp` files and NEVER exposed in plain text output, code artifacts, or public git commits.
-- **Token Renewal Radar**: Maintain proactive awareness of integration renewal cycles (Figma: Nov 19, 2026; Spotify: Feb 19, 2027; Supabase: Jan 1, 2027) and notify Sir gently prior to expiration.
+## 12. Industry-Level Gold Standard Priority
+- **Always Provide Industry-Level Solutions**: Never resort to cheap workarounds, dummy fallbacks, or substandard shortcuts. Every architectural, UI, API, and database solution must represent gold-standard, production-grade industry engineering that is robust, clean, and permanently scalable.
+
+## 13. Deep Pre-Execution Research & Zero Side-Effect Guarantee
+- **Mandatory Deep Research**: Always conduct comprehensive, full-depth research across the entire codebase, database schemas, and data pipelines BEFORE executing fixes, refactors, or feature additions.
+- **Zero Side-Effect Guarantee**: Map and verify all dependent components, state stores, and UI contracts prior to editing, ensuring that new implementations seamlessly integrate with existing systems without breaking, mismatching, or causing unintended regressions across the platform.
+

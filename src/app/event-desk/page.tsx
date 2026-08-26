@@ -422,11 +422,12 @@ export default function Home() {
     if (!user) return;
     const meta = user.user_metadata || {};
     const lc = meta.leetcode_username || "";
-    const cf = meta.codeforces_username || "";
     const cc = meta.codechef_username || "";
+    const hr = meta.hackerrank_username || "";
+    const cf = meta.codeforces_username || "";
     const un = meta.unstop_username || "";
 
-    if (!lc && !cf && !cc && !un) return;
+    if (!lc && !cf && !cc && !hr && !un) return;
 
     const cacheKey = `ldk_coding_stats_${user.id}`;
     
@@ -459,10 +460,11 @@ export default function Home() {
           return null;
         };
 
-        const [lcStats, cfStats, ccStats] = await Promise.all([
+        const [lcStats, ccStats, hrStats, cfStats] = await Promise.all([
           fetchPlatformStats("leetcode", lc),
-          fetchPlatformStats("codeforces", cf),
-          fetchPlatformStats("codechef", cc)
+          fetchPlatformStats("codechef", cc),
+          fetchPlatformStats("hackerrank", hr),
+          fetchPlatformStats("codeforces", cf)
         ]);
 
         let realUnstopCount = 0;
@@ -481,8 +483,9 @@ export default function Home() {
 
         const updatedStats = {
           leetcode: lcStats,
-          codeforces: cfStats,
           codechef: ccStats,
+          hackerrank: hrStats,
+          codeforces: cfStats,
           unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null
         };
 

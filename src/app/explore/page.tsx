@@ -75,8 +75,9 @@ interface FriendProfile {
   graduation_year?: string;
   college_name?: string;
   leetcode_username?: string;
-  codeforces_username?: string;
   codechef_username?: string;
+  hackerrank_username?: string;
+  codeforces_username?: string;
   unstop_username?: string;
   hack2skill_username?: string;
   github_url?: string;
@@ -441,8 +442,8 @@ export default function ExplorePage() {
           status,
           sender_restricted,
           receiver_restricted,
-          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
-          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codeforces_username, codechef_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
+          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
+          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
         `);
 
       if (!error && data && data.length > 0) {
@@ -464,8 +465,9 @@ export default function ExplorePage() {
                 department: partner.department,
                 graduation_year: partner.graduation_year,
                 leetcode_username: partner.leetcode_username,
-                codeforces_username: partner.codeforces_username,
                 codechef_username: partner.codechef_username,
+                hackerrank_username: partner.hackerrank_username,
+                codeforces_username: partner.codeforces_username,
                 unstop_username: partner.unstop_username,
                 hack2skill_username: partner.hack2skill_username,
                 github_url: partner.github_url,
@@ -531,8 +533,9 @@ export default function ExplorePage() {
           linkedin_url: meta.linkedin_url || "",
           portfolio_url: meta.portfolio_url || "",
           leetcode_username: meta.leetcode_username || "",
-          codeforces_username: meta.codeforces_username || "",
           codechef_username: meta.codechef_username || "",
+          hackerrank_username: meta.hackerrank_username || "",
+          codeforces_username: meta.codeforces_username || "",
           unstop_username: meta.unstop_username || "",
           hack2skill_username: meta.hack2skill_username || "",
           avatar_url: meta.avatar_url || "",
@@ -598,8 +601,9 @@ export default function ExplorePage() {
             department: p.department,
             graduation_year: p.graduation_year,
             leetcode_username: p.leetcode_username,
-            codeforces_username: p.codeforces_username,
             codechef_username: p.codechef_username,
+            hackerrank_username: p.hackerrank_username,
+            codeforces_username: p.codeforces_username,
             unstop_username: p.unstop_username,
             hack2skill_username: p.hack2skill_username,
             github_url: p.github_url,
@@ -1428,20 +1432,28 @@ export default function ExplorePage() {
                         meta.leetcode_username ||
                         "";
 
-                      const codeforces =
-                        selectedFriend.codeforces_username ||
-                        draft.codeforcesUsername ||
-                        draft.codeforces_username ||
-                        publicCached.codeforces_username ||
-                        meta.codeforces_username ||
-                        "";
-
                       const codechef =
                         selectedFriend.codechef_username ||
                         draft.codechefUsername ||
                         draft.codechef_username ||
                         publicCached.codechef_username ||
                         meta.codechef_username ||
+                        "";
+
+                      const hackerrank =
+                        selectedFriend.hackerrank_username ||
+                        draft.hackerrankUsername ||
+                        draft.hackerrank_username ||
+                        publicCached.hackerrank_username ||
+                        meta.hackerrank_username ||
+                        "";
+
+                      const codeforces =
+                        selectedFriend.codeforces_username ||
+                        draft.codeforcesUsername ||
+                        draft.codeforces_username ||
+                        publicCached.codeforces_username ||
+                        meta.codeforces_username ||
                         "";
 
                       const unstop =
@@ -1531,7 +1543,7 @@ export default function ExplorePage() {
                                 <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
                                   Competitive Handles
                                 </span>
-                                {leetcode || codeforces || codechef || unstop || hack2skill ? (
+                                {leetcode || codechef || hackerrank || codeforces || unstop || hack2skill ? (
                                   <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                                     {leetcode && (
                                       <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
@@ -1541,19 +1553,27 @@ export default function ExplorePage() {
                                         </span>
                                       </div>
                                     )}
-                                    {codeforces && (
-                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
-                                        <span className="text-[8px] text-txt-muted uppercase">Codeforces</span>
-                                        <span className="text-txt-main font-semibold truncate">
-                                          @{codeforces}
-                                        </span>
-                                      </div>
-                                    )}
                                     {codechef && (
                                       <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
                                         <span className="text-[8px] text-txt-muted uppercase">CodeChef</span>
                                         <span className="text-txt-main font-semibold truncate">
                                           @{codechef}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {hackerrank && (
+                                      <div className="bg-bg-base/40 p-2 border border-[#00EA64]/30 rounded flex flex-col bg-[#00EA64]/5">
+                                        <span className="text-[8px] text-[#00EA64] uppercase font-bold">HackerRank</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{hackerrank}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {codeforces && (
+                                      <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
+                                        <span className="text-[8px] text-txt-muted uppercase">Codeforces</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{codeforces}
                                         </span>
                                       </div>
                                     )}

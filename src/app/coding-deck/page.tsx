@@ -105,6 +105,12 @@ export default function CodingDeckPage() {
     }
     return "";
   });
+  const [hackerrankUser, setHackerrankUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_hackerrank_handle") || "";
+    }
+    return "";
+  });
   const [unstopUser, setUnstopUser] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("ldk_unstop_handle") || "";
@@ -121,6 +127,7 @@ export default function CodingDeckPage() {
   const [showAllContests, setShowAllContests] = useState(false);
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
   const [showHandleModal, setShowHandleModal] = useState(false);
+  const [inputHackerrankHandle, setInputHackerrankHandle] = useState("");
   const [inputUnstopHandle, setInputUnstopHandle] = useState("");
   const [inputH2sHandle, setInputH2sHandle] = useState("");
   const [savingHandles, setSavingHandles] = useState(false);
@@ -130,6 +137,7 @@ export default function CodingDeckPage() {
   const [inputLcHandle, setInputLcHandle] = useState("");
 
   const handleOpenHandleModal = () => {
+    setInputHackerrankHandle(hackerrankUser || "");
     setInputUnstopHandle(unstopUser || "");
     setInputH2sHandle(hack2skillUser || "");
     setShowHandleModal(true);
@@ -138,9 +146,17 @@ export default function CodingDeckPage() {
   const handleSaveHackathonHandles = async () => {
     if (!user) return;
     setSavingHandles(true);
+    let cleanHr = inputHackerrankHandle.trim().replace(/^@/, "");
     let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
     let cleanH2s = inputH2sHandle.trim().replace(/^@/, "");
 
+    if (cleanHr.includes("/") || cleanHr.includes(".")) {
+      try {
+        const u = new URL(/^https?:\/\//i.test(cleanHr) ? cleanHr : `https://${cleanHr}`);
+        const segs = u.pathname.split("/").filter(Boolean);
+        cleanHr = segs[segs.length - 1] || cleanHr;
+      } catch {}
+    }
     if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
       try {
         const u = new URL(/^https?:\/\//i.test(cleanUnstop) ? cleanUnstop : `https://${cleanUnstop}`);
@@ -156,13 +172,16 @@ export default function CodingDeckPage() {
       } catch {}
     }
 
+    setHackerrankUser(cleanHr);
     setUnstopUser(cleanUnstop);
     setHack2skillUser(cleanH2s);
 
     if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_hackerrank_handle", cleanHr);
       localStorage.setItem("ldk_unstop_handle", cleanUnstop);
       localStorage.setItem("ldk_hack2skill_handle", cleanH2s);
       if (user.id) {
+        localStorage.setItem(`ldk_hackerrank_handle_${user.id}`, cleanHr);
         localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
         localStorage.setItem(`ldk_hack2skill_handle_${user.id}`, cleanH2s);
       }
@@ -170,6 +189,7 @@ export default function CodingDeckPage() {
 
     try {
       await supabase.from("profiles").update({
+        hackerrank_username: cleanHr || null,
         unstop_username: cleanUnstop || null,
         hack2skill_username: cleanH2s || null
       }).eq("id", user.id);
@@ -299,8 +319,9 @@ export default function CodingDeckPage() {
   // Platforms stats with 0ms SWR Cache Initialization
   const [stats, setStats] = useState<{
     leetcode: PlatformStats | null;
-    codeforces: PlatformStats | null;
     codechef: PlatformStats | null;
+    hackerrank: PlatformStats | null;
+    codeforces: PlatformStats | null;
     unstop: { registered: number; completed: number; rank: number } | null;
     hack2skill: { registered: number; completed: number; rank: number } | null;
   }>(() => {
@@ -312,8 +333,9 @@ export default function CodingDeckPage() {
     }
     return {
       leetcode: null,
-      codeforces: null,
       codechef: null,
+      hackerrank: null,
+      codeforces: null,
       unstop: null,
       hack2skill: null,
     };
@@ -397,26 +419,30 @@ export default function CodingDeckPage() {
         const meta = user?.user_metadata || {};
         
         const userLcKey = user?.id ? `ldk_leetcode_handle_${user.id}` : "ldk_leetcode_handle";
-        const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
         const userCcKey = user?.id ? `ldk_codechef_handle_${user.id}` : "ldk_codechef_handle";
+        const userHrKey = user?.id ? `ldk_hackerrank_handle_${user.id}` : "ldk_hackerrank_handle";
+        const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
         const userUnKey = user?.id ? `ldk_unstop_handle_${user.id}` : "ldk_unstop_handle";
         const userH2sKey = user?.id ? `ldk_hack2skill_handle_${user.id}` : "ldk_hack2skill_handle";
 
         const localLc = typeof window !== "undefined" ? (localStorage.getItem(userLcKey) || localStorage.getItem("ldk_leetcode_handle") || "") : "";
-        const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
         const localCc = typeof window !== "undefined" ? (localStorage.getItem(userCcKey) || localStorage.getItem("ldk_codechef_handle") || "") : "";
+        const localHr = typeof window !== "undefined" ? (localStorage.getItem(userHrKey) || localStorage.getItem("ldk_hackerrank_handle") || "") : "";
+        const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
         const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
         const localH2s = typeof window !== "undefined" ? (localStorage.getItem(userH2sKey) || localStorage.getItem("ldk_hack2skill_handle") || "") : "";
 
         const lc = meta.leetcode_username || localLc;
-        const cf = meta.codeforces_username || localCf;
         const cc = meta.codechef_username || localCc;
+        const hr = meta.hackerrank_username || localHr;
+        const cf = meta.codeforces_username || localCf;
         const un = meta.unstop_username || localUn;
         const h2s = meta.hack2skill_username || localH2s;
 
         setLeetcodeUser(lc);
-        setCodeforcesUser(cf);
         setCodechefUser(cc);
+        setHackerrankUser(hr);
+        setCodeforcesUser(cf);
         setUnstopUser(un);
         setHack2skillUser(h2s);
 
@@ -442,10 +468,11 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+        const [leetcodeStats, codechefStats, hackerrankStats, codeforcesStats] = await Promise.all([
           fetchStats("leetcode", lc, selectedLcYear),
-          fetchStats("codeforces", cf),
-          fetchStats("codechef", cc)
+          fetchStats("codechef", cc),
+          fetchStats("hackerrank", hr),
+          fetchStats("codeforces", cf)
         ]);
 
         let realUnstopCount = 0;
@@ -478,8 +505,9 @@ export default function CodingDeckPage() {
 
         const updatedStats = {
           leetcode: leetcodeStats,
-          codeforces: codeforcesStats,
           codechef: codechefStats,
+          hackerrank: hackerrankStats,
+          codeforces: codeforcesStats,
           unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null,
           hack2skill: h2s ? { registered: realH2sCount, completed: 0, rank: 0 } : null,
         };
@@ -579,8 +607,9 @@ export default function CodingDeckPage() {
     setIsManualSyncing(true);
     try {
       const lc = leetcodeUser;
-      const cf = codeforcesUser;
       const cc = codechefUser;
+      const hr = hackerrankUser;
+      const cf = codeforcesUser;
 
       const fetchStats = async (platform: string, username: string, year?: number | null) => {
         if (!username) return null;
@@ -597,17 +626,19 @@ export default function CodingDeckPage() {
         return null;
       };
 
-      const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+      const [leetcodeStats, codechefStats, hackerrankStats, codeforcesStats] = await Promise.all([
         lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
-        cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
-        cc ? fetchStats("codechef", cc) : Promise.resolve(null)
+        cc ? fetchStats("codechef", cc) : Promise.resolve(null),
+        hr ? fetchStats("hackerrank", hr) : Promise.resolve(null),
+        cf ? fetchStats("codeforces", cf) : Promise.resolve(null)
       ]);
 
       setStats(prev => ({
         ...prev,
         leetcode: leetcodeStats || prev.leetcode,
-        codeforces: codeforcesStats || prev.codeforces,
         codechef: codechefStats || prev.codechef,
+        hackerrank: hackerrankStats || prev.hackerrank,
+        codeforces: codeforcesStats || prev.codeforces,
       }));
       setMessage({ text: "Live coding platform stats synced!", type: "success" });
     } finally {
@@ -1332,6 +1363,98 @@ export default function CodingDeckPage() {
                 )}
               </div>
 
+              {/* HackerRank Profile Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-md bg-[#00EA64]/10 border border-[#00EA64]/30 flex items-center justify-center">
+                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7 6v12h3v-4.5h4V18h3V6h-3v4.5h-4V6H7z" fill="#00EA64" />
+                      </svg>
+                    </span>
+                    <div className="flex flex-col">
+                      <h3 className="text-sm font-semibold text-txt-main">HackerRank Profile</h3>
+                      <span className="text-[10px] text-txt-muted">Domain mastery, stars &amp; skill badges</span>
+                    </div>
+                  </div>
+
+                  {hackerrankUser && (
+                    <a 
+                      href={`https://www.hackerrank.com/profile/${hackerrankUser}`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                    >
+                      <span className="truncate max-w-[140px]">@{hackerrankUser}</span>
+                      <ExternalLink size={10} className="shrink-0" />
+                    </a>
+                  )}
+                </div>
+
+                {!hackerrankUser ? (
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                    <span>HackerRank account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync badges &amp; stars.</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 w-full">
+                    {platformErrors.hackerrank && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.hackerrank}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Verify that your HackerRank username handle is correct and public.
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Mastery Title</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.hackerrank?.rank ?? "Gold"}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">HackerRank Level</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Challenges Solved</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.hackerrank?.solved ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Across all domains</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Skill Badges</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {Array.isArray((stats.hackerrank as any)?.badges) ? (stats.hackerrank as any).badges.length : 0}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Verified domains</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Contest Score</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {stats.hackerrank?.rating ?? 1500}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Competitive ELO</span>
+                      </div>
+                    </div>
+
+                    {/* HackerRank Domain Badges Showcase */}
+                    {Array.isArray((stats.hackerrank as any)?.badges) && (stats.hackerrank as any).badges.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1 border-t border-border-main/30">
+                        {(stats.hackerrank as any).badges.map((b: any, idx: number) => (
+                          <span 
+                            key={idx}
+                            className="text-[10px] font-mono px-2.5 py-1 rounded bg-[#00EA64]/10 text-[#00EA64] border border-[#00EA64]/30 flex items-center gap-1.5"
+                          >
+                            <span>⭐ {b.stars || 1}★</span>
+                            <span className="font-sans font-medium text-txt-main">{b.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Codeforces Profile Card */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
@@ -1764,6 +1887,19 @@ export default function CodingDeckPage() {
             </div>
 
             <div className="space-y-3">
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  HackerRank Handle / Profile Link
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. tourist or https://hackerrank.com/profile/..."
+                  value={inputHackerrankHandle}
+                  onChange={e => setInputHackerrankHandle(e.target.value)}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
               <div>
                 <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
                   Unstop Handle / Profile Link
