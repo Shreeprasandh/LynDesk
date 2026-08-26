@@ -364,21 +364,21 @@ export default function Home() {
           localStorage.setItem("ldk_opportunities", JSON.stringify(defaultOpps));
         }
 
-        // Fetch live active events from scraper API
-        fetch("/api/scrape")
+        // Fetch live active events from unified events API
+        fetch("/api/events")
           .then(res => res.json())
           .then(data => {
             if (data.events && Array.isArray(data.events) && data.events.length > 0) {
               const liveMapped = data.events.map((ev: any, idx: number) => ({
                 id: ev.id || `live_opp_${idx}`,
                 title: ev.title,
-                category: "hackathon",
+                category: ev.category || "hackathon",
                 deadline: ev.deadline,
-                location: "online",
-                level: "national",
-                url: ev.portalUrl || ev.url || "https://unstop.com",
-                description: ev.description || `${ev.title} on ${ev.portal || "Unstop"}. Prizes: ${ev.prizes || "Cash Prizes & Certificates"}`,
-                facultyRecommended: true,
+                location: ev.location || "online",
+                level: ev.level || "national",
+                url: ev.url || "https://unstop.com",
+                description: ev.description || `${ev.title}. Verified event opportunity.`,
+                facultyRecommended: ev.facultyRecommended ?? true,
                 createdDate: "Live"
               }));
               setOpportunities(prev => {
@@ -465,11 +465,25 @@ export default function Home() {
           fetchPlatformStats("codechef", cc)
         ]);
 
+        let realUnstopCount = 0;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const appRes = await fetch("/api/user/applied-hackathons", {
+              headers: { Authorization: `Bearer ${session.access_token}` }
+            });
+            if (appRes.ok) {
+              const appData = await appRes.json();
+              realUnstopCount = (appData.applications || []).filter((a: any) => a.portal === "Unstop").length;
+            }
+          }
+        } catch {}
+
         const updatedStats = {
           leetcode: lcStats,
           codeforces: cfStats,
           codechef: ccStats,
-          unstop: un ? { registered: 6, completed: 4, rank: 42 } : null
+          unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null
         };
 
         setCodingStats(updatedStats);
@@ -722,7 +736,7 @@ export default function Home() {
             const realTitle = space?.project_name || ev?.title;
             const resolvedTitle = (localWorkspaceName && localWorkspaceName !== "Hackathon Project Desk" && localWorkspaceName !== "Workspace Desk") 
               ? localWorkspaceName 
-              : realTitle || "Smart India Hackathon 2026 (SIH)";
+              : realTitle || "Workspace Desk";
 
             if (typeof window !== "undefined" && realTitle) {
               localStorage.setItem(`ldk_workspace_name_${spaceId}`, realTitle);
@@ -995,9 +1009,7 @@ export default function Home() {
         const targetUuid = getWorkspaceUuid(idToRemove);
         await Promise.allSettled([
           supabase.from("project_members").delete().eq("project_space_id", idToRemove).eq("profile_id", user.id),
-          supabase.from("project_members").delete().eq("project_space_id", targetUuid).eq("profile_id", user.id),
-          supabase.from("project_spaces").delete().eq("id", idToRemove),
-          supabase.from("project_spaces").delete().eq("id", targetUuid)
+          supabase.from("project_members").delete().eq("project_space_id", targetUuid).eq("profile_id", user.id)
         ]);
       } catch (e) {
         console.error("Failed removing workspace in DB:", e);
