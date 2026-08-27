@@ -8,6 +8,7 @@ import Link from "next/link";
 import { extractAvatarFromUser } from "../lib/avatar";
 import { normalizeTitleCase, getSpellingSuggestion, normalizeSkillsList, getAutocompleteSuggestions } from "../lib/textNormalization";
 import { validatePassword } from "../lib/passwordValidation";
+import { isHarassmentOrOffensive } from "../lib/moderation";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import AvatarCropModal from "../components/AvatarCropModal";
@@ -1301,6 +1302,22 @@ export default function ProfilePage() {
       const firstErr = Object.values(newPlatformErrors)[0];
       setMessage({ text: `Validation Error: ${firstErr}. Please fix the indicated handle issue to save your profile.`, type: "error" });
       return;
+    }
+
+    // Safety & Anti-Harassment Screening for Public Profile
+    if (bio && bio.trim()) {
+      const bioCheck = isHarassmentOrOffensive(bio);
+      if (!bioCheck.safe) {
+        setMessage({ text: bioCheck.reason || "Profile bio contains inappropriate content.", type: "error" });
+        return;
+      }
+    }
+    if (username && username.trim()) {
+      const usernameCheck = isHarassmentOrOffensive(username);
+      if (!usernameCheck.safe) {
+        setMessage({ text: "Username contains inappropriate content.", type: "error" });
+        return;
+      }
     }
 
     setSaving(true);

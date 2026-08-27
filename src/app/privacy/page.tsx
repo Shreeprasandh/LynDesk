@@ -55,7 +55,7 @@ export default function PrivacyPolicy() {
 
           <div className="flex flex-col gap-6 text-sm text-txt-sub font-light leading-relaxed">
             <p>
-              At LynDesk (&quot;Link Your Next Desk&quot;), we believe technical accomplishment should be documented transparently and protected securely. 
+              At LynDesk (&quot;Link Your Next Desk — The Future in Your Hands&quot;), we believe technical accomplishment should be documented transparently and protected securely. 
               This Policy details how we collect, store, safeguard, and utilize your information across the LynDesk Campus network and workspace ecosystem.
             </p>
 

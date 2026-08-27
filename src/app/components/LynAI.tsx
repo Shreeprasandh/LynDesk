@@ -29,6 +29,81 @@ interface Message {
   };
 }
 
+function renderInlineMarkdown(str: string) {
+  const parts = str.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={idx} className="font-semibold text-txt-main">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return (
+        <code key={idx} className="font-mono bg-bg-card px-1.5 py-0.5 rounded text-[10.5px] text-accent-main border border-border-main/50">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    return part;
+  });
+}
+
+function renderFormattedMessage(text: string, isUser: boolean) {
+  if (isUser) {
+    return <span>{text}</span>;
+  }
+
+  const blocks = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+
+  return (
+    <div className="space-y-2 text-xs leading-relaxed font-light">
+      {blocks.map((block, bIdx) => {
+        const lines = block.split("\n");
+        const isList = lines.length > 1 && lines.every(l => /^\s*[-*•]\s+/.test(l) || /^\s*\d+\.\s+/.test(l));
+
+        if (isList) {
+          return (
+            <ul key={bIdx} className="space-y-1 my-1 pl-1">
+              {lines.map((line, lIdx) => {
+                const clean = line.replace(/^\s*[-*•]\s+|\s*\d+\.\s+/, "");
+                return (
+                  <li key={lIdx} className="flex items-start gap-1.5">
+                    <span className="text-accent-main font-bold mt-0.5">•</span>
+                    <span>{renderInlineMarkdown(clean)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          );
+        }
+
+        if (block.startsWith("### ")) {
+          return (
+            <h4 key={bIdx} className="font-semibold text-txt-main text-xs pt-1">
+              {renderInlineMarkdown(block.replace("### ", ""))}
+            </h4>
+          );
+        }
+        if (block.startsWith("## ")) {
+          return (
+            <h3 key={bIdx} className="font-semibold text-txt-main text-sm pt-1">
+              {renderInlineMarkdown(block.replace("## ", ""))}
+            </h3>
+          );
+        }
+
+        return (
+          <p key={bIdx} className="leading-relaxed">
+            {renderInlineMarkdown(block)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 // Global in-memory cache for AI messages
 let cachedMessages: Message[] = [];
 let cachedUserId: string | null = null;
@@ -312,13 +387,13 @@ export default function LynAI() {
                       )}
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <div className={`px-4 py-3 rounded text-xs leading-relaxed whitespace-pre-line ${
+                    <div className="flex flex-col gap-1 max-w-full">
+                      <div className={`px-4 py-3 rounded text-xs leading-relaxed ${
                         msg.sender === "user"
                           ? "bg-accent-main text-bg-base font-medium rounded-tr-none"
                           : "bg-bg-base/60 border border-border-main/50 text-txt-sub rounded-tl-none font-light"
                       }`}>
-                        {msg.text}
+                        {renderFormattedMessage(msg.text, msg.sender === "user")}
 
                         {msg.actionLink && (
                           <Link 

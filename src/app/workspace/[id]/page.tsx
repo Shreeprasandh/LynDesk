@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { supabase } from "../../lib/supabase";
 import { getCachedWorkspaceSnapshot } from "../../lib/workspacePrefetch";
+import { isHarassmentOrOffensive } from "../../lib/moderation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
@@ -2046,6 +2047,15 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMsg.trim() && !chatAttachment) return;
+
+    // Safety & Anti-Harassment Screening
+    if (newMsg.trim()) {
+      const modCheck = isHarassmentOrOffensive(newMsg);
+      if (!modCheck.safe) {
+        showToast(modCheck.reason || "Message flagged for inappropriate content.", "error");
+        return;
+      }
+    }
 
     setIsUploadingChatFile(true);
     let attachedFileUrl = "";

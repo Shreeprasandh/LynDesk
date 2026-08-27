@@ -166,7 +166,7 @@ export async function POST(request: Request) {
                 <tr>
                   <td style="padding: 20px 32px; background-color: #090d16; border-top: 1px solid #1e293b; text-align: center;">
                     <p style="font-family: monospace; font-size: 10px; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 1.5px;">
-                      Link Your Next Desk &bull; LynDesk Security Team
+                      Link Your Next Desk &mdash; The Future in Your Hands &bull; LynDesk Security Team
                     </p>
                   </td>
                 </tr>

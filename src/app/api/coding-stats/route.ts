@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/app/lib/moderation";
 
 export const dynamic = "force-dynamic";
 
-
-
 export async function GET(request: Request) {
+  // Rate limiting protection (Max 60 requests/min per IP)
+  const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+  const rateLimit = checkRateLimit(`coding_stats_${clientIp}`, 60, 60000);
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
+  }
+
   const queryParams = new URL(request.url).searchParams;
   const platform = queryParams.get("platform");
   const username = queryParams.get("username");

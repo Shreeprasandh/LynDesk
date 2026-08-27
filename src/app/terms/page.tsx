@@ -55,7 +55,7 @@ export default function TermsOfService() {
 
           <div className="flex flex-col gap-6 text-sm text-txt-sub font-light leading-relaxed">
             <p>
-              Welcome to LynDesk (&quot;Link Your Next Desk&quot;). By accessing or utilizing our workspace dashboards, tracking registries, study desks, and institutional portals, you agree to comply with the terms detailed below.
+              Welcome to LynDesk (&quot;Link Your Next Desk — The Future in Your Hands&quot;). By accessing or utilizing our workspace dashboards, tracking registries, study desks, and institutional portals, you agree to comply with the terms detailed below.
             </p>
 
             <div className="flex flex-col gap-2">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/app/lib/supabaseServer";
+import { isHarassmentOrOffensive } from "@/app/lib/moderation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -320,6 +321,12 @@ export async function POST(req: NextRequest) {
     if (!title) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
     }
+
+    const titleSafety = isHarassmentOrOffensive(title);
+    if (!titleSafety.safe) {
+      return NextResponse.json({ error: "Work title contains inappropriate or offensive content." }, { status: 400 });
+    }
+
     if (
       !VALID_CATEGORIES.includes(
         category as (typeof VALID_CATEGORIES)[number]
@@ -333,6 +340,13 @@ export async function POST(req: NextRequest) {
 
     const description =
       typeof body.description === "string" ? body.description.trim() : null;
+
+    if (description) {
+      const descSafety = isHarassmentOrOffensive(description);
+      if (!descSafety.safe) {
+        return NextResponse.json({ error: "Work description contains inappropriate or offensive content." }, { status: 400 });
+      }
+    }
     const is_published =
       typeof body.is_published === "boolean" ? body.is_published : true;
     const external_url =

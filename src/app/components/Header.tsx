@@ -2047,7 +2047,7 @@ const POPULAR_LOCATIONS = [
               {activeLegalModal === "privacy" ? (
                 <>
                   <p className="text-sm font-normal text-txt-main">
-                    At LynDesk (&quot;Link Your Next Desk&quot;), we believe technical accomplishment should be documented transparently and protected securely. This Policy details how we collect, store, and utilize your information across the LynDesk Campus network.
+                    At LynDesk (&quot;Link Your Next Desk — The Future in Your Hands&quot;), we believe technical accomplishment should be documented transparently and protected securely. This Policy details how we collect, store, and utilize your information across the LynDesk Campus network.
                   </p>
                   <div className="space-y-1.5 border-t border-border-main/40 pt-3">
                     <h3 className="font-display text-sm font-semibold text-txt-main">1. Scope of Data Collection</h3>
@@ -2086,7 +2086,7 @@ const POPULAR_LOCATIONS = [
               ) : (
                 <>
                   <p className="text-sm font-normal text-txt-main">
-                    Welcome to LynDesk (&quot;Link Your Next Desk&quot;). By accessing or utilizing our workspace dashboards, tracking registries, and institutional portals, you agree to comply with the terms detailed below.
+                    Welcome to LynDesk (&quot;Link Your Next Desk — The Future in Your Hands&quot;). By accessing or utilizing our workspace dashboards, tracking registries, and institutional portals, you agree to comply with the terms detailed below.
                   </p>
                   <div className="space-y-1.5 border-t border-border-main/40 pt-3">
                     <h3 className="font-display text-sm font-semibold text-txt-main">1. Access and Account Registration</h3>
