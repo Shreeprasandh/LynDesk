@@ -6,7 +6,8 @@
     "dev": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next dev",
     "build": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next build",
     "start": "node --max-http-header-size=65536 ./node_modules/next/dist/bin/next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

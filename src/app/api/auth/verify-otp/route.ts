@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyOtpCode } from "../../../lib/otpStore";
 import { validatePassword } from "../../../lib/passwordValidation";
+import { checkRateLimit } from "../../../lib/rateLimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -16,11 +17,19 @@ export async function POST(request: Request) {
 
     const passRules = validatePassword(newPassword, confirmPassword);
     if (!passRules.isValid) {
-      return NextResponse.json({ error: "Password does not satisfy security rules." }, { status: 400 });
+      return NextResponse.json({ error: "Password must be at least 8 characters with uppercase, lowercase, number, and special character." }, { status: 400 });
     }
 
     const trimmedInput = input.trim();
     let targetEmail = trimmedInput.toLowerCase();
+
+    const rateLimit = checkRateLimit(`verify_otp_${targetEmail}`, 6, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many verification attempts. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
     let userId = "";
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       }
     });
 
-  } catch (error: any) {
+  } catch {
     return NextResponse.json(
       { authenticated: false, error: "Failed to verify admin identity." },
       { status: 500 }

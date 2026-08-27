@@ -2163,7 +2163,7 @@ const POPULAR_LOCATIONS = [
 
       {/* Log Out Confirmation Modal */}
       {showLogoutConfirm && (
-        <div className="fixed inset-0 z-[10000] overflow-hidden font-sans">
+        <div className="fixed inset-0 z-[10000] overflow-hidden font-sans" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title">
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowLogoutConfirm(false)} />
           
@@ -2172,7 +2172,7 @@ const POPULAR_LOCATIONS = [
               
               <div className="flex flex-col gap-1 border-b border-border-main/40 pb-3">
                 <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Security Check</span>
-                <h3 className="text-sm font-semibold text-txt-main font-display">Confirm Sign Out</h3>
+                <h3 id="logout-confirm-title" className="text-sm font-semibold text-txt-main font-display">Confirm Sign Out</h3>
               </div>
               
               <p className="text-xs text-txt-sub font-light leading-relaxed">

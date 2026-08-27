@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 describe("Coding Stats & HackerRank Integration", () => {
   it("extracts clean handle from various HackerRank input formats", () => {
     const extractHackerRank = (input: string) => {
-      let clean = input.trim().replace(/^@/, "");
+      const clean = input.trim().replace(/^@/, "");
       if (clean.includes("/") || clean.includes(".")) {
         try {
           const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;

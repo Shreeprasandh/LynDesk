@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 import { storeOtp } from "../../../lib/otpStore";
 import { validateEmail } from "../../../lib/emailValidation";
+import { checkRateLimit } from "../../../lib/rateLimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -16,6 +17,14 @@ export async function POST(request: Request) {
 
     const trimmed = input.trim();
     let targetEmail = trimmed.toLowerCase();
+
+    const rateLimit = checkRateLimit(`send_otp_${targetEmail}`, 5, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many OTP requests. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
 
     // Initialize Supabase Admin client
     if (!supabaseUrl || !serviceKey) {

@@ -20,6 +20,18 @@ export interface UserProfileData {
   linkedin_url?: string;
   portfolio_url?: string;
   leetcode_username?: string;
+  codechef_username?: string;
+  hackerrank_username?: string;
+  hackerrank_verified?: boolean;
+  geeksforgeeks_username?: string;
+  geeksforgeeks_verified?: boolean;
+  codeforces_username?: string;
+  unstop_username?: string;
+  hack2skill_username?: string;
+  college_name?: string;
+  graduation_year?: string;
+  roll_number?: string;
+  batch_code?: string;
 }
 
 type AuthContextType = {

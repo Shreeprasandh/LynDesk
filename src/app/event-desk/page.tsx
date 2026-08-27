@@ -424,10 +424,11 @@ export default function Home() {
     const lc = meta.leetcode_username || "";
     const cc = meta.codechef_username || "";
     const hr = meta.hackerrank_username || "";
+    const gfg = meta.geeksforgeeks_username || "";
     const cf = meta.codeforces_username || "";
     const un = meta.unstop_username || "";
 
-    if (!lc && !cf && !cc && !hr && !un) return;
+    if (!lc && !cf && !cc && !hr && !gfg && !un) return;
 
     const cacheKey = `ldk_coding_stats_${user.id}`;
     
@@ -460,10 +461,11 @@ export default function Home() {
           return null;
         };
 
-        const [lcStats, ccStats, hrStats, cfStats] = await Promise.all([
+        const [lcStats, ccStats, hrStats, gfgStats, cfStats] = await Promise.all([
           fetchPlatformStats("leetcode", lc),
           fetchPlatformStats("codechef", cc),
           fetchPlatformStats("hackerrank", hr),
+          fetchPlatformStats("geeksforgeeks", gfg),
           fetchPlatformStats("codeforces", cf)
         ]);
 
@@ -485,6 +487,7 @@ export default function Home() {
           leetcode: lcStats,
           codechef: ccStats,
           hackerrank: hrStats,
+          geeksforgeeks: gfgStats,
           codeforces: cfStats,
           unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null
         };
@@ -1546,7 +1549,7 @@ export default function Home() {
           <section className="lg:col-span-7 flex flex-col items-start gap-12 lg:pr-8">
             <div className="flex flex-col gap-4">
               <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-txt-muted font-semibold">
-                Link Your Next Desk
+                Link Your Next Desk — The Future in Your Hands
               </span>
               <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-light tracking-[-0.03em] text-txt-main leading-[1.08]">
                 The space where technical projects <span className="font-normal border-b border-txt-main/30">take shape.</span>

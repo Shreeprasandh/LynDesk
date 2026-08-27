@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { supabase } from "../lib/supabase";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -1131,7 +1131,7 @@ useEffect(() => {
     addAuditLog(`${isRecommended ? "Recommended" : "Unrecommended"} opportunity: ${title}`);
   };
 
-  const loadWorksReviewQueue = async () => {
+  const loadWorksReviewQueue = useCallback(async () => {
     try {
       const res = await fetch("/api/coordinator/works-review");
       if (res.ok) {
@@ -1144,13 +1144,27 @@ useEffect(() => {
     } catch {
       console.warn("Failed loading works review queue.");
     }
-  };
+  }, [selectedWorkReview]);
 
   useEffect(() => {
+    let isMounted = true;
     if (activeTab === "verifications" && verifSubTab === "works") {
-      loadWorksReviewQueue();
+      fetch("/api/coordinator/works-review")
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (isMounted && data?.works) {
+            setWorksReviewQueue(data.works);
+            if (data.works.length > 0 && !selectedWorkReview) {
+              setSelectedWorkReview(data.works[0]);
+            }
+          }
+        })
+        .catch(() => {
+          console.warn("Failed loading works review queue.");
+        });
     }
-  }, [activeTab, verifSubTab]);
+    return () => { isMounted = false; };
+  }, [activeTab, verifSubTab, selectedWorkReview]);
 
   const handleReviewWork = async (workId: string, decision: "approved" | "rejected") => {
     setReviewActionLoading(true);

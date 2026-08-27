@@ -766,8 +766,8 @@ export async function GET(request: Request) {
       let solved = 0;
       let rating = 0;
       let rank = "Bronze";
-      let globalRank = 0;
-      let badges: Array<{ name: string; stars: number; points: number }> = [];
+      const globalRank = 0;
+      const badges: Array<{ name: string; stars: number; points: number }> = [];
       let languages: string[] = [];
       let fetchedSuccessfully = false;
 
@@ -857,6 +857,201 @@ export async function GET(request: Request) {
         globalRank: globalRank || 0,
         badges,
         languages,
+        submissionCalendar: {}
+      }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
+    if (platform === "geeksforgeeks" || platform === "gfg") {
+      let solved = 0;
+      let solvedEasy = 0;
+      let solvedMedium = 0;
+      let solvedHard = 0;
+      let solvedBasic = 0;
+      let solvedSchool = 0;
+      let codingScore = 0;
+      let rating = 0;
+      let highestRating = 0;
+      let rank = "Practitioner";
+      let globalRank = 0;
+      let instituteRank = 0;
+      let streak = 0;
+      const podCompleted = false;
+      let fetchedSuccessfully = false;
+
+      const gfgHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.geeksforgeeks.org/"
+      };
+
+      // Method 1: Try public GFG proxy API first
+      try {
+        const proxyRes = await fetch(`https://geeks-for-geeks-api.vercel.app/${cleanUsername}`, {
+          cache: "no-store",
+          headers: { Accept: "application/json" }
+        });
+        if (proxyRes.ok) {
+          const pData = await proxyRes.json();
+          if (pData && (pData.totalProblemsSolved !== undefined || pData.info || pData.totalSolved !== undefined)) {
+            solved = parseInt(pData.totalProblemsSolved || pData.totalSolved || pData.info?.totalProblemsSolved || 0);
+            codingScore = parseInt(pData.codingScore || pData.info?.codingScore || pData.score || 0);
+            instituteRank = parseInt(pData.institutionRank || pData.instituteRank || pData.info?.institutionRank || 0);
+            globalRank = parseInt(pData.globalRank || pData.info?.globalRank || instituteRank || 0);
+            streak = parseInt(pData.currentStreak || pData.info?.currentStreak || pData.streak || 0);
+            rating = parseInt(pData.contestRating || pData.info?.contestRating || pData.rating || 0);
+            highestRating = rating;
+
+            // Difficulty breakdown if available
+            solvedSchool = parseInt(pData.schoolProblemsSolved || pData.school || 0);
+            solvedBasic = parseInt(pData.basicProblemsSolved || pData.basic || 0);
+            solvedEasy = parseInt(pData.easyProblemsSolved || pData.easy || 0) + solvedSchool + solvedBasic;
+            solvedMedium = parseInt(pData.mediumProblemsSolved || pData.medium || 0);
+            solvedHard = parseInt(pData.hardProblemsSolved || pData.hard || 0);
+
+            if (solved > 0 || codingScore > 0 || instituteRank > 0) {
+              fetchedSuccessfully = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("GFG proxy API notice:", err);
+      }
+
+      // Method 2: Direct GFG profile HTML scraping & __NEXT_DATA__ extraction
+      if (!fetchedSuccessfully || solved === 0) {
+        try {
+          const profileRes = await fetch(`https://www.geeksforgeeks.org/user/${cleanUsername}/?t=${Date.now()}`, {
+            headers: gfgHeaders,
+            cache: "no-store"
+          });
+
+          if (profileRes.ok) {
+            const html = await profileRes.text();
+
+            // 1. Try __NEXT_DATA__ JSON script tag
+            const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+            if (nextDataMatch) {
+              try {
+                const nextData = JSON.parse(nextDataMatch[1]);
+                const pageProps = nextData?.props?.pageProps;
+                const userInfo = pageProps?.userInfo || pageProps?.user_data || pageProps?.data || {};
+
+                if (userInfo.user_handle || userInfo.name || pageProps?.userHandle) {
+                  fetchedSuccessfully = true;
+                  solved = parseInt(userInfo.total_problems_solved || userInfo.totalProblemsSolved || pageProps?.totalProblemsSolved || 0);
+                  codingScore = parseInt(userInfo.score || userInfo.coding_score || userInfo.codingScore || pageProps?.codingScore || 0);
+                  instituteRank = parseInt(userInfo.institute_rank || userInfo.institutionRank || pageProps?.institutionRank || 0);
+                  globalRank = parseInt(userInfo.global_rank || userInfo.rank || instituteRank || 0);
+                  streak = parseInt(userInfo.pod_solved_long || userInfo.currentStreak || pageProps?.currentStreak || 0);
+                  rating = parseInt(userInfo.contest_rating || userInfo.contestRating || pageProps?.contestRating || 0);
+                  highestRating = rating;
+
+                  // Parse difficulties
+                  const diffObj = pageProps?.userDifficultyStats || userInfo.difficultyStats || {};
+                  solvedSchool = parseInt(diffObj.school?.count || diffObj.School || 0);
+                  solvedBasic = parseInt(diffObj.basic?.count || diffObj.Basic || 0);
+                  solvedEasy = parseInt(diffObj.easy?.count || diffObj.Easy || 0) + solvedSchool + solvedBasic;
+                  solvedMedium = parseInt(diffObj.medium?.count || diffObj.Medium || 0);
+                  solvedHard = parseInt(diffObj.hard?.count || diffObj.Hard || 0);
+                }
+              } catch {}
+            }
+
+            // 2. DOM regex fallbacks if __NEXT_DATA__ didn't yield values
+            if (!fetchedSuccessfully || solved === 0) {
+              const solvedMatch = html.match(/Problems Solved[\s\S]*?(\d+)/i) || 
+                                  html.match(/Total Problems Solved[\s\S]*?(\d+)/i) ||
+                                  html.match(/problemSolved[^>]*>\s*(\d+)/i) ||
+                                  html.match(/(\d+)\s*Problems Solved/i);
+              if (solvedMatch) {
+                solved = parseInt(solvedMatch[1]);
+                fetchedSuccessfully = true;
+              }
+
+              const scoreMatch = html.match(/Coding Score[\s\S]*?(\d+)/i) ||
+                                 html.match(/score_card_value[^>]*>\s*(\d+)/i) ||
+                                 html.match(/Overall Coding Score[\s\S]*?(\d+)/i);
+              if (scoreMatch) {
+                codingScore = parseInt(scoreMatch[1]);
+                fetchedSuccessfully = true;
+              }
+
+              const rankMatch = html.match(/Institute Rank[\s\S]*?(\d+)/i) ||
+                                html.match(/Institution Rank[\s\S]*?(\d+)/i);
+              if (rankMatch) {
+                instituteRank = parseInt(rankMatch[1]);
+                globalRank = instituteRank;
+                fetchedSuccessfully = true;
+              }
+
+              const streakMatch = html.match(/POTD Streak[\s\S]*?(\d+)/i) ||
+                                  html.match(/Current Streak[\s\S]*?(\d+)/i);
+              if (streakMatch) {
+                streak = parseInt(streakMatch[1]);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("GFG HTML scraping notice:", err);
+        }
+      }
+
+      if (instituteRank > 0) {
+        if (instituteRank <= 10) rank = "Institute Top 10";
+        else if (instituteRank <= 50) rank = "Institute Top 50";
+        else if (instituteRank <= 100) rank = "Institute Top 100";
+        else rank = `Rank #${instituteRank}`;
+      } else if (codingScore > 1000) {
+        rank = "Grandmaster";
+      } else if (codingScore > 500) {
+        rank = "Master";
+      } else if (codingScore > 100) {
+        rank = "Specialist";
+      } else {
+        rank = "Practitioner";
+      }
+
+      if (!fetchedSuccessfully && solved === 0 && codingScore === 0) {
+        return NextResponse.json({
+          solved: 0,
+          solvedEasy: 0,
+          solvedMedium: 0,
+          solvedHard: 0,
+          codingScore: 0,
+          totalSubmissions: 0,
+          acceptedSubmissions: 0,
+          rank: "Practitioner",
+          rating: 0,
+          highestRating: 0,
+          globalRank: 0,
+          instituteRank: 0,
+          streak: 0,
+          podCompleted: false,
+          submissionCalendar: {},
+          isFallback: true
+        }, { status: 200 });
+      }
+
+      return NextResponse.json({
+        solved: solved || 0,
+        solvedEasy: solvedEasy || 0,
+        solvedMedium: solvedMedium || 0,
+        solvedHard: solvedHard || 0,
+        codingScore: codingScore || 0,
+        totalSubmissions: solved || 0,
+        acceptedSubmissions: solved || 0,
+        rank: rank || "Practitioner",
+        rating: rating || codingScore || 0,
+        highestRating: highestRating || codingScore || 0,
+        globalRank: globalRank || instituteRank || 0,
+        instituteRank: instituteRank || 0,
+        streak: streak || 0,
+        podCompleted: podCompleted || false,
         submissionCalendar: {}
       }, {
         headers: {

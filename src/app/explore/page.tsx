@@ -77,6 +77,7 @@ interface FriendProfile {
   leetcode_username?: string;
   codechef_username?: string;
   hackerrank_username?: string;
+  geeksforgeeks_username?: string;
   codeforces_username?: string;
   unstop_username?: string;
   hack2skill_username?: string;
@@ -230,68 +231,11 @@ export default function ExplorePage() {
   }, []);
 
   // ── EVENTS & CONTESTS STATE ─────────────────────────────────────────────
-  const [opportunities, setOpportunities] = useState<OpportunityItem[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
+  const [opportunities, setOpportunities] = useState<OpportunityItem[]>(DEFAULT_EVENTS);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
   const [eventCategoryFilter, setEventCategoryFilter] = useState("");
-
-  const loadLiveEvents = useCallback(async () => {
-    setEventsLoading(true);
-    try {
-      let locationFilter = "all";
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("ldk_preference_preset");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed.locationMode && parsed.locationMode !== "all") {
-              locationFilter = parsed.locationMode;
-            }
-          } catch {}
-        }
-      }
-
-      /* await searchParams */
-      const urlFilterParams = new URLSearchParams();
-      if (eventCategoryFilter) urlFilterParams.set("category", eventCategoryFilter);
-      if (eventSearchQuery.trim()) urlFilterParams.set("q", eventSearchQuery.trim());
-      if (locationFilter !== "all") urlFilterParams.set("location", locationFilter);
-
-      const res = await fetch(`/api/events?${urlFilterParams.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.events) && data.events.length > 0) {
-          setOpportunities(data.events);
-          return;
-        }
-      }
-      // Fallback if network issue
-      if (opportunities.length === 0) setOpportunities(DEFAULT_EVENTS);
-    } catch {
-      if (opportunities.length === 0) setOpportunities(DEFAULT_EVENTS);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, [eventCategoryFilter, eventSearchQuery, opportunities.length]);
-
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [trackedTitles, setTrackedTitles] = useState<Set<string>>(new Set());
-
-  const loadTrackedApplications = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const res = await fetch("/api/user/applied-hackathons", {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const titles = new Set<string>((data.applications || []).map((a: any) => a.title.toLowerCase().trim()));
-        setTrackedTitles(titles);
-      }
-    } catch {}
-  }, [user]);
 
   const handleTrackOpportunity = async (item: OpportunityItem) => {
     if (!user) {
@@ -342,11 +286,39 @@ export default function ExplorePage() {
   };
 
   useEffect(() => {
+    let isMounted = true;
     if (activeTab === "events") {
-      loadLiveEvents();
-      loadTrackedApplications();
+      const urlFilterParams = new URLSearchParams();
+      if (eventCategoryFilter) urlFilterParams.set("category", eventCategoryFilter);
+      if (eventSearchQuery.trim()) urlFilterParams.set("q", eventSearchQuery.trim());
+      fetch(`/api/events?${urlFilterParams.toString()}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (isMounted && data?.events && Array.isArray(data.events)) {
+            setOpportunities(data.events);
+          }
+        })
+        .catch(() => {});
+
+      if (user) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session || !isMounted) return;
+          fetch("/api/user/applied-hackathons", {
+            headers: { Authorization: `Bearer ${session.access_token}` }
+          })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (isMounted && data?.applications) {
+                const titles = new Set<string>((data.applications || []).map((a: any) => a.title.toLowerCase().trim()));
+                setTrackedTitles(titles);
+              }
+            })
+            .catch(() => {});
+        });
+      }
     }
-  }, [activeTab, loadLiveEvents, loadTrackedApplications]);
+    return () => { isMounted = false; };
+  }, [activeTab, eventCategoryFilter, eventSearchQuery, user]);
 
   const filteredEvents = opportunities.filter((item) => {
     const matchesSearch =
@@ -375,7 +347,6 @@ export default function ExplorePage() {
   const [showWorkDetail, setShowWorkDetail] = useState(false);
   const [showMyWorks, setShowMyWorks] = useState(false);
   const [showAddWork, setShowAddWork] = useState(false);
-  const [collegeLinked, setCollegeLinked] = useState(false);
   const [worksError, setWorksError] = useState('');
   // Add Work form state
   const [addWorkStep, setAddWorkStep] = useState<1|2|3>(1);
@@ -442,8 +413,8 @@ export default function ExplorePage() {
           status,
           sender_restricted,
           receiver_restricted,
-          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
-          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
+          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
+          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
         `);
 
       if (!error && data && data.length > 0) {
@@ -467,6 +438,7 @@ export default function ExplorePage() {
                 leetcode_username: partner.leetcode_username,
                 codechef_username: partner.codechef_username,
                 hackerrank_username: partner.hackerrank_username,
+                geeksforgeeks_username: partner.geeksforgeeks_username,
                 codeforces_username: partner.codeforces_username,
                 unstop_username: partner.unstop_username,
                 hack2skill_username: partner.hack2skill_username,
@@ -535,6 +507,7 @@ export default function ExplorePage() {
           leetcode_username: meta.leetcode_username || "",
           codechef_username: meta.codechef_username || "",
           hackerrank_username: meta.hackerrank_username || "",
+          geeksforgeeks_username: meta.geeksforgeeks_username || "",
           codeforces_username: meta.codeforces_username || "",
           unstop_username: meta.unstop_username || "",
           hack2skill_username: meta.hack2skill_username || "",
@@ -603,6 +576,7 @@ export default function ExplorePage() {
             leetcode_username: p.leetcode_username,
             codechef_username: p.codechef_username,
             hackerrank_username: p.hackerrank_username,
+            geeksforgeeks_username: p.geeksforgeeks_username,
             codeforces_username: p.codeforces_username,
             unstop_username: p.unstop_username,
             hack2skill_username: p.hack2skill_username,
@@ -790,15 +764,14 @@ export default function ExplorePage() {
 
   const UNPUBLISHED_ALLOWED = ['book', 'music', 'art', 'research', 'physical_product'];
 
+  const [referenceNow] = useState(() => Date.now());
   const getDaysUntilExpiry = (expiresAt: string): number => {
-    return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    return Math.ceil((new Date(expiresAt).getTime() - referenceNow) / (1000 * 60 * 60 * 24));
   };
 
   // ── WORKS HUB FUNCTIONS ──────────────────────────────────────────────
-  const loadWorks = async (page = 1) => {
+  const loadWorks = useCallback(async (page = 1) => {
     if (!user) return;
-    setWorksLoading(true);
-    setWorksError('');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -816,17 +789,14 @@ export default function ExplorePage() {
         setWorksTotal(data.total || 0);
         setWorksPage(page);
       } else if (res.status === 403) {
-        setCollegeLinked(false);
         setWorksError('college_not_linked');
       }
     } catch {
       setWorksError('Failed to load works.');
-    } finally {
-      setWorksLoading(false);
     }
-  };
+  }, [user, worksSort, worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter]);
 
-  const loadMyWorks = async () => {
+  const loadMyWorks = useCallback(async () => {
     if (!user) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -839,7 +809,7 @@ export default function ExplorePage() {
         setMyWorks(data.works || []);
       }
     } catch { /* silent */ }
-  };
+  }, [user]);
 
   const handleRateWork = async (workId: string, rating: number) => {
     if (!user) return;
@@ -946,22 +916,48 @@ export default function ExplorePage() {
     finally { setAddWorkLoading(false); }
   };
 
-  // Load works when tab is activated
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Load works when tab is activated or filters change
   useEffect(() => {
+    let isMounted = true;
     if (activeTab === 'works' && user) {
-      loadWorks(1);
-      loadMyWorks();
-    }
-  }, [activeTab, user]);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session || !isMounted) return;
+        const workQueryParams = new URLSearchParams({ page: '1', sort: worksSort });
+        if (worksSearch) workQueryParams.set('search', worksSearch);
+        if (worksCategoryFilter) workQueryParams.set('category', worksCategoryFilter);
+        if (worksDeptFilter) workQueryParams.set('department', worksDeptFilter);
+        if (worksYearFilter) workQueryParams.set('academic_year', worksYearFilter);
 
-  // Re-fetch when filters/sort change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (activeTab === 'works' && user) {
-      loadWorks(1);
+        fetch(`/api/works?${workQueryParams}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (isMounted && data?.works) {
+              setWorks(data.works);
+              setWorksTotal(data.total || 0);
+              setWorksPage(1);
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (isMounted) setWorksLoading(false);
+          });
+
+        fetch('/api/works/my', {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (isMounted && data?.works) {
+              setMyWorks(data.works);
+            }
+          })
+          .catch(() => {});
+      });
     }
-  }, [worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter, worksSort]);
+    return () => { isMounted = false; };
+  }, [activeTab, user, worksSort, worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter]);
 
   if (authLoading) {
     return (
@@ -1448,6 +1444,14 @@ export default function ExplorePage() {
                         meta.hackerrank_username ||
                         "";
 
+                      const geeksforgeeks =
+                        selectedFriend.geeksforgeeks_username ||
+                        draft.geeksforgeeksUsername ||
+                        draft.geeksforgeeks_username ||
+                        publicCached.geeksforgeeks_username ||
+                        meta.geeksforgeeks_username ||
+                        "";
+
                       const codeforces =
                         selectedFriend.codeforces_username ||
                         draft.codeforcesUsername ||
@@ -1543,7 +1547,7 @@ export default function ExplorePage() {
                                 <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
                                   Competitive Handles
                                 </span>
-                                {leetcode || codechef || hackerrank || codeforces || unstop || hack2skill ? (
+                                {leetcode || codechef || hackerrank || geeksforgeeks || codeforces || unstop || hack2skill ? (
                                   <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                                     {leetcode && (
                                       <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
@@ -1566,6 +1570,14 @@ export default function ExplorePage() {
                                         <span className="text-[8px] text-[#00EA64] uppercase font-bold">HackerRank</span>
                                         <span className="text-txt-main font-semibold truncate">
                                           @{hackerrank}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {geeksforgeeks && (
+                                      <div className="bg-bg-base/40 p-2 border border-[#2F8D46]/30 rounded flex flex-col bg-[#2F8D46]/5">
+                                        <span className="text-[8px] text-[#2F8D46] uppercase font-bold">GeeksforGeeks</span>
+                                        <span className="text-txt-main font-semibold truncate">
+                                          @{geeksforgeeks}
                                         </span>
                                       </div>
                                     )}
@@ -2199,7 +2211,6 @@ export default function ExplorePage() {
                     }
                     if (cat === 'music' && (file || url)) {
                       return (
-                        // eslint-disable-next-line jsx-a11y/media-has-caption
                         <audio controls src={file ?? url ?? ''} className="w-full mt-2" />
                       );
                     }

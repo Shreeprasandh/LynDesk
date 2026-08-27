@@ -2,9 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (process as any).loadEnvFile?.(".env.local");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (process as any).loadEnvFile?.(".env");
 } catch {}
 

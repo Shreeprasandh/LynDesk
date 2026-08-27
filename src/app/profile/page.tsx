@@ -151,6 +151,24 @@ export function extractPlatformHandle(input: string, platform: string): { handle
         return { handle: username };
       }
 
+      if (platform === "GeeksforGeeks" || platform === "GFG") {
+        if (!host.includes("geeksforgeeks")) {
+          return { handle: "", error: "Invalid GeeksforGeeks URL. Must be a geeksforgeeks.org profile link." };
+        }
+        let username = "";
+        if (pathSegments[0] === "user" && pathSegments[1]) {
+          username = pathSegments[1];
+        } else if (pathSegments[0] && pathSegments[0] !== "user" && pathSegments[0] !== "practice") {
+          username = pathSegments[0];
+        } else if (pathSegments[pathSegments.length - 1]) {
+          username = pathSegments[pathSegments.length - 1];
+        }
+        if (!username) {
+          return { handle: "", error: "Could not extract GeeksforGeeks username from URL." };
+        }
+        return { handle: username };
+      }
+
       if (platform === "Unstop") {
         if (!host.includes("unstop")) {
           return { handle: "", error: "Invalid Unstop URL. Must be an unstop.com profile link." };
@@ -461,6 +479,14 @@ export default function ProfilePage() {
     }
     return "";
   });
+  const [geeksforgeeksUsername, setGeeksforgeeksUsername] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem("ldk_geeksforgeeks_handle") || "";
+      } catch {}
+    }
+    return "";
+  });
   const [unstopUsername, setUnstopUsername] = useState("");
   const [hack2skillUsername, setHack2skillUsername] = useState("");
 
@@ -469,6 +495,7 @@ export default function ProfilePage() {
   const [codeforcesVerified, setCodeforcesVerified] = useState(false);
   const [codechefVerified, setCodechefVerified] = useState(false);
   const [hackerrankVerified, setHackerrankVerified] = useState(false);
+  const [geeksforgeeksVerified, setGeeksforgeeksVerified] = useState(false);
   const [unstopVerified, setUnstopVerified] = useState(false);
   const [hack2skillVerified, setHack2skillVerified] = useState(false);
 
@@ -657,24 +684,27 @@ export default function ProfilePage() {
           setAcademicCredits(profile.academic_credits || 0);
           setCollegeName(profile.college_name || "");
           setLeetcodeUsername(profile.leetcode_username || "");
-          setCodeforcesUsername(profile.codeforces_username || "");
           setCodechefUsername(profile.codechef_username || "");
           setHackerrankUsername(profile.hackerrank_username || "");
+          setGeeksforgeeksUsername(profile.geeksforgeeks_username || "");
+          setCodeforcesUsername(profile.codeforces_username || "");
           setUnstopUsername(profile.unstop_username || "");
           setHack2skillUsername(profile.hack2skill_username || "");
           const hasKeys = (profile.college_key || "").trim() !== "";
           setLeetcodeVerified(hasKeys ? !!profile.leetcode_verified : true);
-          setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
           setCodechefVerified(hasKeys ? !!profile.codechef_verified : true);
           setHackerrankVerified(hasKeys ? !!profile.hackerrank_verified : true);
+          setGeeksforgeeksVerified(hasKeys ? !!profile.geeksforgeeks_verified : true);
+          setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
           setUnstopVerified(hasKeys ? !!profile.unstop_verified : true);
           setHack2skillVerified(hasKeys ? !!profile.hack2skill_verified : true);
 
           const verifiedBackup: Record<string, string> = {};
           if (profile.leetcode_verified) verifiedBackup["LeetCode"] = profile.leetcode_username || "";
-          if (profile.codeforces_verified) verifiedBackup["Codeforces"] = profile.codeforces_username || "";
           if (profile.codechef_verified) verifiedBackup["CodeChef"] = profile.codechef_username || "";
           if (profile.hackerrank_verified) verifiedBackup["HackerRank"] = profile.hackerrank_username || "";
+          if (profile.geeksforgeeks_verified) verifiedBackup["GeeksforGeeks"] = profile.geeksforgeeks_username || "";
+          if (profile.codeforces_verified) verifiedBackup["Codeforces"] = profile.codeforces_username || "";
           if (profile.unstop_verified) verifiedBackup["Unstop"] = profile.unstop_username || "";
           if (profile.hack2skill_verified) verifiedBackup["Hack2Skill"] = profile.hack2skill_username || "";
           setVerifiedHandlesBackup(verifiedBackup);
@@ -704,9 +734,10 @@ export default function ProfilePage() {
         setAvatarUrl(bestAvatar);
 
         setLeetcodeUsername(meta.leetcode_username || profile?.leetcode_username || "");
-        setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
         setCodechefUsername(meta.codechef_username || profile?.codechef_username || "");
         setHackerrankUsername(meta.hackerrank_username || profile?.hackerrank_username || "");
+        setGeeksforgeeksUsername(meta.geeksforgeeks_username || profile?.geeksforgeeks_username || "");
+        setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
         setUnstopUsername(meta.unstop_username || profile?.unstop_username || "");
         setHack2skillUsername(meta.hack2skill_username || profile?.hack2skill_username || "");
         setBio(meta.bio || "");
@@ -1244,6 +1275,7 @@ export default function ProfilePage() {
       { name: "LeetCode", raw: leetcodeUsername, setFn: setLeetcodeUsername },
       { name: "CodeChef", raw: codechefUsername, setFn: setCodechefUsername },
       { name: "HackerRank", raw: hackerrankUsername, setFn: setHackerrankUsername },
+      { name: "GeeksforGeeks", raw: geeksforgeeksUsername, setFn: setGeeksforgeeksUsername },
       { name: "Codeforces", raw: codeforcesUsername, setFn: setCodeforcesUsername },
       { name: "Unstop", raw: unstopUsername, setFn: setUnstopUsername },
       { name: "Hack2Skill", raw: hack2skillUsername, setFn: setHack2skillUsername },
@@ -1280,13 +1312,14 @@ export default function ProfilePage() {
       const cfTrim = extractedHandles["Codeforces"] || codeforcesUsername.trim();
       const ccTrim = extractedHandles["CodeChef"] || codechefUsername.trim();
       const hrTrim = extractedHandles["HackerRank"] || hackerrankUsername.trim();
+      const gfgTrim = extractedHandles["GeeksforGeeks"] || geeksforgeeksUsername.trim();
       const usTrim = extractedHandles["Unstop"] || unstopUsername.trim();
       const h2sTrim = extractedHandles["Hack2Skill"] || hack2skillUsername.trim();
 
-      if (lcTrim || cfTrim || ccTrim || hrTrim || usTrim || h2sTrim) {
+      if (lcTrim || cfTrim || ccTrim || hrTrim || gfgTrim || usTrim || h2sTrim) {
         const { data: existingProfiles } = await supabase
           .from("profiles")
-          .select("id, leetcode_username, codeforces_username, codechef_username, hackerrank_username, unstop_username, hack2skill_username")
+          .select("id, leetcode_username, codeforces_username, codechef_username, hackerrank_username, geeksforgeeks_username, unstop_username, hack2skill_username")
           .neq("id", user.id);
           
         if (existingProfiles) {
@@ -1302,6 +1335,9 @@ export default function ProfilePage() {
             }
             if (hrTrim && ep.hackerrank_username && ep.hackerrank_username.toLowerCase() === hrTrim.toLowerCase()) {
               throw new Error(`The HackerRank handle @${hrTrim} is already registered by another student.`);
+            }
+            if (gfgTrim && ep.geeksforgeeks_username && ep.geeksforgeeks_username.toLowerCase() === gfgTrim.toLowerCase()) {
+              throw new Error(`The GeeksforGeeks handle @${gfgTrim} is already registered by another student.`);
             }
             if (usTrim && ep.unstop_username && ep.unstop_username.toLowerCase() === usTrim.toLowerCase()) {
               throw new Error(`The Unstop handle @${usTrim} is already registered by another student.`);
@@ -1329,6 +1365,7 @@ export default function ProfilePage() {
         let nextCfVerified = codeforcesVerified;
         let nextCcVerified = codechefVerified;
         let nextHrVerified = hackerrankVerified;
+        let nextGfgVerified = geeksforgeeksVerified;
         let nextUsVerified = unstopVerified;
         let nextH2sVerified = hack2skillVerified;
 
@@ -1338,6 +1375,7 @@ export default function ProfilePage() {
             nextCfVerified = false;
             nextCcVerified = false;
             nextHrVerified = false;
+            nextGfgVerified = false;
             nextUsVerified = false;
             nextH2sVerified = false;
           } else {
@@ -1353,6 +1391,9 @@ export default function ProfilePage() {
             if (hackerrankUsername.trim() !== (currentDbProfile?.hackerrank_username || "").trim()) {
               nextHrVerified = false;
             }
+            if (geeksforgeeksUsername.trim() !== (currentDbProfile?.geeksforgeeks_username || "").trim()) {
+              nextGfgVerified = false;
+            }
             if (unstopUsername.trim() !== (currentDbProfile?.unstop_username || "").trim()) {
               nextUsVerified = false;
             }
@@ -1366,6 +1407,7 @@ export default function ProfilePage() {
           nextCfVerified = true;
           nextCcVerified = true;
           nextHrVerified = true;
+          nextGfgVerified = true;
           nextUsVerified = true;
           nextH2sVerified = true;
         }
@@ -1374,6 +1416,7 @@ export default function ProfilePage() {
         setCodeforcesVerified(nextCfVerified);
         setCodechefVerified(nextCcVerified);
         setHackerrankVerified(nextHrVerified);
+        setGeeksforgeeksVerified(nextGfgVerified);
         setUnstopVerified(nextUsVerified);
         setHack2skillVerified(nextH2sVerified);
 
@@ -1390,10 +1433,12 @@ export default function ProfilePage() {
             linkedin_url: linkedinUrl.trim() || null,
             portfolio_url: portfolioUrl.trim() || null,
             leetcode_username: leetcodeUsername.trim() || null,
-            codeforces_username: codeforcesUsername.trim() || null,
             codechef_username: codechefUsername.trim() || null,
             hackerrank_username: hackerrankUsername.trim() || null,
             hackerrank_verified: nextHrVerified,
+            geeksforgeeks_username: geeksforgeeksUsername.trim() || null,
+            geeksforgeeks_verified: nextGfgVerified,
+            codeforces_username: codeforcesUsername.trim() || null,
             unstop_username: unstopUsername.trim() || null,
             hack2skill_username: hack2skillUsername.trim() || null,
             graduation_year: gradYear.trim() || null,
@@ -1430,9 +1475,10 @@ export default function ProfilePage() {
               linkedin_url: linkedinUrl.trim(),
               portfolio_url: portfolioUrl.trim(),
               leetcode_username: leetcodeUsername.trim(),
-              codeforces_username: codeforcesUsername.trim(),
               codechef_username: codechefUsername.trim(),
               hackerrank_username: hackerrankUsername.trim(),
+              geeksforgeeks_username: geeksforgeeksUsername.trim(),
+              codeforces_username: codeforcesUsername.trim(),
               unstop_username: unstopUsername.trim(),
               hack2skill_username: hack2skillUsername.trim(),
               graduation_year: gradYear.trim(),
@@ -1452,6 +1498,13 @@ export default function ProfilePage() {
           } else {
             localStorage.removeItem("ldk_hackerrank_handle");
             localStorage.removeItem(`ldk_hackerrank_handle_${user.id}`);
+          }
+          if (geeksforgeeksUsername.trim()) {
+            localStorage.setItem("ldk_geeksforgeeks_handle", geeksforgeeksUsername.trim());
+            localStorage.setItem(`ldk_geeksforgeeks_handle_${user.id}`, geeksforgeeksUsername.trim());
+          } else {
+            localStorage.removeItem("ldk_geeksforgeeks_handle");
+            localStorage.removeItem(`ldk_geeksforgeeks_handle_${user.id}`);
           }
           if (avatarUrl) {
             localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
@@ -1493,9 +1546,10 @@ export default function ProfilePage() {
           college_linked_status: collegeLinkedStatus,
           institute_id: instituteId || null,
           leetcode_username: leetcodeUsername.trim(),
-          codeforces_username: codeforcesUsername.trim(),
           codechef_username: codechefUsername.trim(),
           hackerrank_username: hackerrankUsername.trim(),
+          geeksforgeeks_username: geeksforgeeksUsername.trim(),
+          codeforces_username: codeforcesUsername.trim(),
           unstop_username: unstopUsername.trim(),
           hack2skill_username: hack2skillUsername.trim()
         }
@@ -2344,7 +2398,54 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    {/* 4. Codeforces */}
+                    {/* 4. GeeksforGeeks */}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between items-baseline">
+                        <label className="text-xs text-txt-sub font-semibold">GeeksforGeeks</label>
+                        {geeksforgeeksUsername.trim() && (
+                          (geeksforgeeksVerified || !collegeKey.trim()) ? (
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVerifyPlatform("GeeksforGeeks");
+                                setVerifyReason("");
+                              }}
+                              className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                            >
+                              Unverified (Verify Handle)
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <input 
+                        type="text" 
+                        value={geeksforgeeksUsername}
+                        onChange={(e) => {
+                          setGeeksforgeeksUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: "" }));
+                        }}
+                        onBlur={() => {
+                          if (geeksforgeeksUsername.trim()) {
+                            const res = extractPlatformHandle(geeksforgeeksUsername, "GeeksforGeeks");
+                            if (res.handle) setGeeksforgeeksUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: "" }));
+                          }
+                        }}
+                        disabled={!isEditing}
+                        placeholder="Enter handle or profile link (e.g. https://geeksforgeeks.org/user/id)"
+                        className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
+                          platformInputErrors.GeeksforGeeks ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                        }`}
+                      />
+                      {platformInputErrors.GeeksforGeeks && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.GeeksforGeeks}</span>
+                      )}
+                    </div>
+
+                    {/* 5. Codeforces */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
@@ -2391,7 +2492,7 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    {/* 5. Unstop */}
+                    {/* 6. Unstop */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Unstop</label>
@@ -2438,7 +2539,7 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    {/* 6. Hack2Skill */}
+                    {/* 7. Hack2Skill */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
                         <label className="text-xs text-txt-sub font-semibold">Hack2Skill</label>

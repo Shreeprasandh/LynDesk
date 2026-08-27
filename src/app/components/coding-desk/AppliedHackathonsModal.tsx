@@ -1,104 +1,104 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { 
   X, 
-  ExternalLink, 
   Plus, 
-  CheckCircle2, 
+  Trash2, 
   Sparkles, 
-  Calendar,
-  UserCheck,
-  Trash2,
   Trophy,
+  Calendar,
   Compass,
-  Layers,
-  ChevronRight
+  UserCheck,
+  ExternalLink
 } from "lucide-react";
 
-export interface UserHackathonApplication {
+interface ApplicationItem {
   id: string;
-  user_id: string;
-  event_id?: string | null;
   title: string;
-  portal: string;
+  portal: "Unstop" | "Hack2Skill" | "Devpost" | "Other";
   portal_url: string;
-  handle?: string | null;
+  handle?: string;
+  user_handle?: string;
   role: string;
-  status: string;
+  status: "Applied" | "Under Review" | "Shortlisted" | "Won" | "Rejected";
   stage: string;
-  deadline?: string | null;
-  workspace_id?: string | null;
+  deadline?: string;
+  workspace_id?: string;
   created_at: string;
+  updated_at: string;
 }
 
 interface AppliedHackathonsModalProps {
-  unstopUser: string | null;
-  hack2skillUser: string | null;
+  isOpen?: boolean;
   onClose: () => void;
+  unstopUser?: string;
+  hack2skillUser?: string;
+  onRefreshCount?: () => void;
 }
 
 export default function AppliedHackathonsModal({
+  isOpen = true,
+  onClose,
   unstopUser,
   hack2skillUser,
-  onClose
+  onRefreshCount
 }: AppliedHackathonsModalProps) {
   const { user } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"all" | "Unstop" | "Hack2Skill" | "Devpost" | "Other">("all");
-  const [applications, setApplications] = useState<UserHackathonApplication[]>([]);
+  const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [filterPortal, setFilterPortal] = useState<string>("all");
+  const [showAddForm, setShowAddForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [creatingWsId, setCreatingWsId] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
     title: "",
-    portal: "Unstop",
+    portal: "Unstop" as "Unstop" | "Hack2Skill" | "Devpost" | "Other",
     portal_url: "",
-    role: "Team Captain",
-    status: "Applied",
+    role: "Team Leader / Solo",
+    status: "Applied" as const,
     stage: "Round 1",
     deadline: "",
     create_workspace: true
   });
 
-  const loadApplications = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setLoading(false);
+  useEffect(() => {
+    let isMounted = true;
+    async function initialFetch() {
+      if (!user) {
+        if (isMounted) setLoading(false);
         return;
       }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          if (isMounted) setLoading(false);
+          return;
+        }
 
-      const res = await fetch("/api/user/applied-hackathons", {
-        headers: { Authorization: `Bearer ${session.access_token}` }
-      });
+        const res = await fetch("/api/user/applied-hackathons", {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        setApplications(data.applications || []);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setApplications(data.applications || []);
+        }
+      } catch (err) {
+        console.warn("[AppliedHackathonsModal] Fetch notice:", err);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-    } catch (err) {
-      console.warn("[AppliedHackathonsModal] Fetch notice:", err);
-    } finally {
-      setLoading(false);
     }
+    initialFetch();
+    return () => { isMounted = false; };
   }, [user]);
-
-  useEffect(() => {
-    loadApplications();
-  }, [loadApplications]);
 
   const handleAddApplication = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +128,7 @@ export default function AppliedHackathonsModal({
       if (res.ok) {
         const data = await res.json();
         setApplications(prev => [data.application, ...prev]);
-        setShowAddModal(false);
+        setShowAddForm(false);
         setFormData({
           title: "",
           portal: "Unstop",
@@ -139,8 +139,7 @@ export default function AppliedHackathonsModal({
           deadline: "",
           create_workspace: true
         });
-        setToastMessage(`✓ Successfully tracked '${formData.title.trim()}'!`);
-        setTimeout(() => setToastMessage(null), 4000);
+        onRefreshCount?.();
       }
     } catch (err) {
       console.error("[AppliedHackathonsModal] Add error:", err);
@@ -149,7 +148,7 @@ export default function AppliedHackathonsModal({
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
+  const handleDelete = async (id: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -161,15 +160,14 @@ export default function AppliedHackathonsModal({
 
       if (res.ok) {
         setApplications(prev => prev.filter(a => a.id !== id));
-        setToastMessage(`Untracked '${title}'.`);
-        setTimeout(() => setToastMessage(null), 3000);
+        onRefreshCount?.();
       }
     } catch (err) {
       console.error("Delete error:", err);
     }
   };
 
-  const handleCreateWorkspace = async (item: UserHackathonApplication) => {
+  const handleCreateWorkspace = async (item: ApplicationItem) => {
     setCreatingWsId(item.id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -208,8 +206,7 @@ export default function AppliedHackathonsModal({
         });
 
         setApplications(prev => prev.map(a => a.id === item.id ? { ...a, workspace_id: wsData.id } : a));
-        setToastMessage(`✓ Workspace Created! Linked '${item.title}'.`);
-        setTimeout(() => setToastMessage(null), 4000);
+        onRefreshCount?.();
       }
     } catch (err) {
       console.warn("Workspace creation error:", err);
@@ -219,9 +216,11 @@ export default function AppliedHackathonsModal({
   };
 
   const filteredApps = applications.filter(a => {
-    if (activeTab === "all") return true;
-    return a.portal === activeTab;
+    if (filterPortal === "all") return true;
+    return a.portal === filterPortal;
   });
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-bg-base/80 backdrop-blur-xs z-50 flex items-center justify-center p-4 font-sans text-txt-main">
@@ -239,7 +238,7 @@ export default function AppliedHackathonsModal({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => setShowAddForm(true)}
               className="h-8 px-3 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] tracking-wider uppercase font-bold rounded-sm flex items-center gap-1.5 cursor-pointer transition-opacity"
             >
               <Plus size={12} /> Track Application
@@ -253,22 +252,14 @@ export default function AppliedHackathonsModal({
           </div>
         </div>
 
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-6 py-2 text-xs font-mono text-emerald-400 flex items-center gap-2 animate-fade-in">
-            <CheckCircle2 size={14} />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
         {/* Filter Tabs */}
         <div className="px-6 pt-4 border-b border-border-main/40 bg-bg-surface flex items-center gap-4 overflow-x-auto">
           {["all", "Unstop", "Hack2Skill", "Devpost", "Other"].map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => setFilterPortal(tab)}
               className={`pb-3 text-xs font-mono uppercase tracking-wider font-semibold border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                activeTab === tab
+                filterPortal === tab
                   ? "border-accent-main text-accent-main"
                   : "border-transparent text-txt-muted hover:text-txt-main"
               }`}
@@ -298,7 +289,7 @@ export default function AppliedHackathonsModal({
               </div>
               <div className="flex items-center justify-center gap-3 pt-2">
                 <button
-                  onClick={() => setShowAddModal(true)}
+                  onClick={() => setShowAddForm(true)}
                   className="h-8 px-4 bg-accent-main text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer hover:opacity-90"
                 >
                   <Plus size={12} /> Track Application
@@ -334,7 +325,7 @@ export default function AppliedHackathonsModal({
                       {item.stage || item.status}
                     </span>
                     <button
-                      onClick={() => handleDelete(item.id, item.title)}
+                      onClick={() => handleDelete(item.id)}
                       className="text-txt-muted hover:text-red-400 p-1 transition-colors cursor-pointer"
                       title="Untrack application"
                     >
@@ -348,10 +339,10 @@ export default function AppliedHackathonsModal({
                     <UserCheck size={12} className="text-accent-main shrink-0" />
                     <span>Role: <strong className="text-txt-main font-normal">{item.role}</strong></span>
                   </div>
-                  {item.handle && (
+                  {(item.handle || item.user_handle) && (
                     <div className="flex items-center gap-1.5">
                       <span className="text-txt-sub">Handle:</span>
-                      <strong className="text-txt-main font-normal">{item.handle}</strong>
+                      <strong className="text-txt-main font-normal">{item.handle || item.user_handle}</strong>
                     </div>
                   )}
                   {item.deadline && (
@@ -401,7 +392,7 @@ export default function AppliedHackathonsModal({
       </div>
 
       {/* Track Application Dialog */}
-      {showAddModal && (
+      {showAddForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-60 flex items-center justify-center p-4">
           <div className="bg-bg-surface border border-border-main rounded-md max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
@@ -410,7 +401,7 @@ export default function AppliedHackathonsModal({
                 <h3 className="font-display text-lg font-light text-txt-main">Track New Hackathon</h3>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                onClick={() => setShowAddForm(false)}
                 className="w-7 h-7 rounded-sm bg-bg-card text-txt-muted hover:text-txt-main flex items-center justify-center cursor-pointer"
               >
                 <X size={14} />
@@ -439,7 +430,7 @@ export default function AppliedHackathonsModal({
                   </label>
                   <select
                     value={formData.portal}
-                    onChange={e => setFormData({ ...formData, portal: e.target.value })}
+                    onChange={e => setFormData({ ...formData, portal: e.target.value as "Unstop" | "Hack2Skill" | "Devpost" | "Other" })}
                     className="w-full h-9 px-2 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
                   >
                     <option value="Unstop">Unstop</option>
@@ -531,7 +522,7 @@ export default function AppliedHackathonsModal({
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-main/30">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => setShowAddForm(false)}
                   className="h-8 px-3 bg-bg-card border border-border-main text-txt-muted hover:text-txt-main font-mono text-[10px] uppercase rounded-sm cursor-pointer"
                 >
                   Cancel

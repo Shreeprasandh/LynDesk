@@ -286,8 +286,10 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
             {Array.from({ length: 12 }).map((_, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => handleJumpMonth(idx)}
                 title={`Jump to ${MONTH_NAMES[idx]}`}
+                aria-label={`Jump to ${MONTH_NAMES[idx]}`}
                 className={`w-3.5 h-3.5 md:w-4 md:h-4 rounded-full border border-border-main transition-all cursor-pointer ${
                   currentMonthIndex === idx
                     ? "bg-accent-main border-accent-main shadow-xs scale-110"

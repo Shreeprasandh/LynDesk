@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -138,7 +138,7 @@ const CORE_GLOBAL_EVENTS: IngestedEvent[] = [
   }
 ];
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     const cfEvents = await fetchCodeforcesEvents();
     const lcEvents = await fetchLeetCodeEvents();
@@ -205,6 +205,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
-  return POST(req);
+export async function GET() {
+  return POST();
 }

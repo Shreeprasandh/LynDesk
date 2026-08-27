@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import mammoth from "mammoth";
 import * as xlsx from "xlsx";
+import { checkRateLimit } from "@/app/lib/rateLimit";
+
+const MAX_FILE_SIZE = 12 * 1024 * 1024; // 12MB
+const MAX_FILES_COUNT = 10;
+const ALLOWED_EXTS = [".pdf", ".docx", ".doc", ".xlsx", ".xls", ".csv", ".txt", ".md", ".json"];
 
 function sanitizeString(str?: string): string {
   if (!str) return "";
@@ -19,11 +24,31 @@ function sanitizeString(str?: string): string {
 
 export async function POST(req: Request) {
   try {
+    const rateLimit = checkRateLimit("study_parse_files_global", 30, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: "Rate limit exceeded. Please wait a few seconds." }, { status: 429 });
+    }
+
     const formData = await req.formData();
     const files = formData.getAll("files") as File[];
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: "No files uploaded." }, { status: 400 });
+    }
+
+    if (files.length > MAX_FILES_COUNT) {
+      return NextResponse.json({ error: `Maximum of ${MAX_FILES_COUNT} files permitted per upload.` }, { status: 400 });
+    }
+
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json({ error: `File "${file.name}" exceeds maximum allowed size of 12MB.` }, { status: 413 });
+      }
+      const lowerName = file.name.toLowerCase();
+      const hasValidExt = ALLOWED_EXTS.some(ext => lowerName.endsWith(ext));
+      if (!hasValidExt) {
+        return NextResponse.json({ error: `File "${file.name}" has an unsupported format. Allowed: PDF, Word, Excel, CSV, Text.` }, { status: 400 });
+      }
     }
 
     const parsedFiles = await Promise.all(

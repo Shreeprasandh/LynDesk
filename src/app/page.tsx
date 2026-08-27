@@ -897,7 +897,7 @@ export default function Home() {
               <div className="flex items-center gap-2.5">
                 <LynDeskLogo size={28} />
                 <span className="font-mono text-[9px] uppercase tracking-[0.25em] text-txt-muted font-semibold">
-                  Link Your Next Desk
+                  Link Your Next Desk — The Future in Your Hands
                 </span>
               </div>
               <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-light tracking-[-0.03em] text-txt-main leading-[1.08]">

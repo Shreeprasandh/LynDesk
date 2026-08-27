@@ -90,7 +90,7 @@ export default function MermaidVisualRenderer({ code }: MermaidVisualRendererPro
                   <span className="text-[9px] uppercase tracking-wider text-txt-muted block font-semibold">
                     {isFirst ? "Step 1 • Entrance" : isLast ? `Step ${index + 1} • Output` : `Step ${index + 1}`}
                   </span>
-                  <span className="font-medium truncate block mt-0.5">{node.label}</span>
+                  <span className="font-medium break-words block mt-0.5">{node.label}</span>
                 </div>
 
                 {isLast && <CheckCircle size={16} className="text-emerald-400 shrink-0" />}
@@ -98,8 +98,8 @@ export default function MermaidVisualRenderer({ code }: MermaidVisualRendererPro
 
               {/* Connecting Arrow */}
               {!isLast && (
-                <div className="flex flex-col items-center justify-center my-0.5 text-accent-main/70">
-                  <ArrowDown size={16} className="animate-bounce" />
+                <div className="flex flex-col items-center justify-center my-0.5 text-accent-main/80">
+                  <ArrowDown size={14} />
                 </div>
               )}
             </React.Fragment>

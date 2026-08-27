@@ -24,8 +24,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LynDesk — Link Your Next Desk",
-  description: "Link Your Next Desk — Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+  title: "LynDesk — Link Your Next Desk | The Future in Your Hands",
+  description: "Link Your Next Desk — The Future Desks, in Your Hands. Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
   keywords: ["LynDesk", "Event Tracker", "Student Collaboration", "Study Desk", "Hackathons", "University Portal"],
   authors: [{ name: "LynDesk Engineering" }],
   manifest: "/manifest.json",
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     canonical: "/"
   },
   openGraph: {
-    title: "LynDesk — Link Your Next Desk",
-    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+    title: "LynDesk — Link Your Next Desk | The Future in Your Hands",
+    description: "Link Your Next Desk — The Future Desks, in Your Hands. Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
     url: "https://lyndesk.tech",
     siteName: "LynDesk",
     locale: "en_US",
@@ -45,14 +45,14 @@ export const metadata: Metadata = {
         url: "/lyndesk-logo.jpg",
         width: 1200,
         height: 630,
-        alt: "LynDesk — Link Your Next Desk"
+        alt: "LynDesk — Link Your Next Desk | The Future in Your Hands"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "LynDesk — Link Your Next Desk",
-    description: "Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+    title: "LynDesk — Link Your Next Desk | The Future in Your Hands",
+    description: "Link Your Next Desk — The Future Desks, in Your Hands. Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
     images: ["/lyndesk-logo.jpg"]
   },
   icons: {

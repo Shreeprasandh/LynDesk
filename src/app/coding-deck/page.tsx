@@ -24,9 +24,7 @@ import {
   ChevronUp,
   Puzzle,
   BookOpen,
-  Link2,
-  X,
-  Plus
+  X
 } from "lucide-react";
 
 interface PlatformStats {
@@ -64,7 +62,7 @@ export default function CodingDeckPage() {
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (parsed && (parsed.leetcode || parsed.codeforces || parsed.codechef)) {
+          if (parsed && (parsed.leetcode || parsed.codeforces || parsed.codechef || parsed.geeksforgeeks || parsed.hackerrank)) {
             return false;
           }
         } catch {}
@@ -83,8 +81,6 @@ export default function CodingDeckPage() {
       return () => clearTimeout(handle);
     }
   }, [message]);
-
-
 
   // Platform usernames - instant 0ms cache initialization
   const [leetcodeUser, setLeetcodeUser] = useState(() => {
@@ -111,6 +107,12 @@ export default function CodingDeckPage() {
     }
     return "";
   });
+  const [geeksforgeeksUser, setGeeksforgeeksUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_geeksforgeeks_handle") || "";
+    }
+    return "";
+  });
   const [unstopUser, setUnstopUser] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("ldk_unstop_handle") || "";
@@ -128,6 +130,7 @@ export default function CodingDeckPage() {
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
   const [showHandleModal, setShowHandleModal] = useState(false);
   const [inputHackerrankHandle, setInputHackerrankHandle] = useState("");
+  const [inputGfgHandle, setInputGfgHandle] = useState("");
   const [inputUnstopHandle, setInputUnstopHandle] = useState("");
   const [inputH2sHandle, setInputH2sHandle] = useState("");
   const [savingHandles, setSavingHandles] = useState(false);
@@ -138,6 +141,7 @@ export default function CodingDeckPage() {
 
   const handleOpenHandleModal = () => {
     setInputHackerrankHandle(hackerrankUser || "");
+    setInputGfgHandle(geeksforgeeksUser || "");
     setInputUnstopHandle(unstopUser || "");
     setInputH2sHandle(hack2skillUser || "");
     setShowHandleModal(true);
@@ -147,6 +151,7 @@ export default function CodingDeckPage() {
     if (!user) return;
     setSavingHandles(true);
     let cleanHr = inputHackerrankHandle.trim().replace(/^@/, "");
+    let cleanGfg = inputGfgHandle.trim().replace(/^@/, "");
     let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
     let cleanH2s = inputH2sHandle.trim().replace(/^@/, "");
 
@@ -155,6 +160,14 @@ export default function CodingDeckPage() {
         const u = new URL(/^https?:\/\//i.test(cleanHr) ? cleanHr : `https://${cleanHr}`);
         const segs = u.pathname.split("/").filter(Boolean);
         cleanHr = segs[segs.length - 1] || cleanHr;
+      } catch {}
+    }
+    if (cleanGfg.includes("/") || cleanGfg.includes(".")) {
+      try {
+        const u = new URL(/^https?:\/\//i.test(cleanGfg) ? cleanGfg : `https://${cleanGfg}`);
+        const segs = u.pathname.split("/").filter(Boolean);
+        if (segs[0] === "user" && segs[1]) cleanGfg = segs[1];
+        else cleanGfg = segs[segs.length - 1] || cleanGfg;
       } catch {}
     }
     if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
@@ -173,15 +186,18 @@ export default function CodingDeckPage() {
     }
 
     setHackerrankUser(cleanHr);
+    setGeeksforgeeksUser(cleanGfg);
     setUnstopUser(cleanUnstop);
     setHack2skillUser(cleanH2s);
 
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_hackerrank_handle", cleanHr);
+      localStorage.setItem("ldk_geeksforgeeks_handle", cleanGfg);
       localStorage.setItem("ldk_unstop_handle", cleanUnstop);
       localStorage.setItem("ldk_hack2skill_handle", cleanH2s);
       if (user.id) {
         localStorage.setItem(`ldk_hackerrank_handle_${user.id}`, cleanHr);
+        localStorage.setItem(`ldk_geeksforgeeks_handle_${user.id}`, cleanGfg);
         localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
         localStorage.setItem(`ldk_hack2skill_handle_${user.id}`, cleanH2s);
       }
@@ -190,6 +206,7 @@ export default function CodingDeckPage() {
     try {
       await supabase.from("profiles").update({
         hackerrank_username: cleanHr || null,
+        geeksforgeeks_username: cleanGfg || null,
         unstop_username: cleanUnstop || null,
         hack2skill_username: cleanH2s || null
       }).eq("id", user.id);
@@ -321,6 +338,7 @@ export default function CodingDeckPage() {
     leetcode: PlatformStats | null;
     codechef: PlatformStats | null;
     hackerrank: PlatformStats | null;
+    geeksforgeeks: PlatformStats | null;
     codeforces: PlatformStats | null;
     unstop: { registered: number; completed: number; rank: number } | null;
     hack2skill: { registered: number; completed: number; rank: number } | null;
@@ -335,6 +353,7 @@ export default function CodingDeckPage() {
       leetcode: null,
       codechef: null,
       hackerrank: null,
+      geeksforgeeks: null,
       codeforces: null,
       unstop: null,
       hack2skill: null,
@@ -421,6 +440,7 @@ export default function CodingDeckPage() {
         const userLcKey = user?.id ? `ldk_leetcode_handle_${user.id}` : "ldk_leetcode_handle";
         const userCcKey = user?.id ? `ldk_codechef_handle_${user.id}` : "ldk_codechef_handle";
         const userHrKey = user?.id ? `ldk_hackerrank_handle_${user.id}` : "ldk_hackerrank_handle";
+        const userGfgKey = user?.id ? `ldk_geeksforgeeks_handle_${user.id}` : "ldk_geeksforgeeks_handle";
         const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
         const userUnKey = user?.id ? `ldk_unstop_handle_${user.id}` : "ldk_unstop_handle";
         const userH2sKey = user?.id ? `ldk_hack2skill_handle_${user.id}` : "ldk_hack2skill_handle";
@@ -428,6 +448,7 @@ export default function CodingDeckPage() {
         const localLc = typeof window !== "undefined" ? (localStorage.getItem(userLcKey) || localStorage.getItem("ldk_leetcode_handle") || "") : "";
         const localCc = typeof window !== "undefined" ? (localStorage.getItem(userCcKey) || localStorage.getItem("ldk_codechef_handle") || "") : "";
         const localHr = typeof window !== "undefined" ? (localStorage.getItem(userHrKey) || localStorage.getItem("ldk_hackerrank_handle") || "") : "";
+        const localGfg = typeof window !== "undefined" ? (localStorage.getItem(userGfgKey) || localStorage.getItem("ldk_geeksforgeeks_handle") || "") : "";
         const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
         const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
         const localH2s = typeof window !== "undefined" ? (localStorage.getItem(userH2sKey) || localStorage.getItem("ldk_hack2skill_handle") || "") : "";
@@ -435,6 +456,7 @@ export default function CodingDeckPage() {
         const lc = meta.leetcode_username || localLc;
         const cc = meta.codechef_username || localCc;
         const hr = meta.hackerrank_username || localHr;
+        const gfg = meta.geeksforgeeks_username || localGfg;
         const cf = meta.codeforces_username || localCf;
         const un = meta.unstop_username || localUn;
         const h2s = meta.hack2skill_username || localH2s;
@@ -442,6 +464,7 @@ export default function CodingDeckPage() {
         setLeetcodeUser(lc);
         setCodechefUser(cc);
         setHackerrankUser(hr);
+        setGeeksforgeeksUser(gfg);
         setCodeforcesUser(cf);
         setUnstopUser(un);
         setHack2skillUser(h2s);
@@ -468,10 +491,11 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codechefStats, hackerrankStats, codeforcesStats] = await Promise.all([
+        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats] = await Promise.all([
           fetchStats("leetcode", lc, selectedLcYear),
           fetchStats("codechef", cc),
           fetchStats("hackerrank", hr),
+          fetchStats("geeksforgeeks", gfg),
           fetchStats("codeforces", cf)
         ]);
 
@@ -507,6 +531,7 @@ export default function CodingDeckPage() {
           leetcode: leetcodeStats,
           codechef: codechefStats,
           hackerrank: hackerrankStats,
+          geeksforgeeks: geeksforgeeksStats,
           codeforces: codeforcesStats,
           unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null,
           hack2skill: h2s ? { registered: realH2sCount, completed: 0, rank: 0 } : null,
@@ -1455,6 +1480,97 @@ export default function CodingDeckPage() {
                 )}
               </div>
 
+              {/* GeeksforGeeks Profile Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-8 h-8 rounded-md bg-[#2F8D46]/10 border border-[#2F8D46]/30 flex items-center justify-center text-[#2F8D46]">
+                      <svg viewBox="0 0 32 32" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M16 2.5C8.544 2.5 2.5 8.544 2.5 16S8.544 29.5 16 29.5 29.5 23.456 29.5 16 23.456 2.5 16 2.5z" fill="#2F8D46" fillOpacity="0.15"/>
+                        <path d="M12.8 10.5c-2.4 0-4.3 1.9-4.3 4.3v2.4c0 2.4 1.9 4.3 4.3 4.3h1.2v-2.2h-1.2c-1.2 0-2.1-.9-2.1-2.1v-2.4c0-1.2.9-2.1 2.1-2.1h1.2v-2.2H12.8zm6.4 0v2.2h1.2c1.2 0 2.1.9 2.1 2.1v2.4c0 1.2-.9 2.1-2.1 2.1h-1.2v2.2h1.2c2.4 0 4.3-1.9 4.3-4.3v-2.4c0-2.4-1.9-4.3-4.3-4.3h-1.2z" fill="#2F8D46"/>
+                      </svg>
+                    </span>
+                    <div className="flex flex-col">
+                      <h3 className="text-sm font-semibold text-txt-main">GeeksforGeeks Profile</h3>
+                      <span className="text-[10px] text-txt-muted">POTD streaks, coding score &amp; campus rank</span>
+                    </div>
+                  </div>
+
+                  {geeksforgeeksUser && (
+                    <a 
+                      href={`https://www.geeksforgeeks.org/user/${geeksforgeeksUser}/`}
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                    >
+                      <span className="truncate max-w-[140px]">@{geeksforgeeksUser}</span>
+                      <ExternalLink size={10} className="shrink-0" />
+                    </a>
+                  )}
+                </div>
+
+                {!geeksforgeeksUser ? (
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                    <span>GeeksforGeeks account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync solved problems &amp; coding score.</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4 w-full">
+                    {platformErrors.geeksforgeeks && (
+                      <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
+                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span>{platformErrors.geeksforgeeks}</span>
+                        <span className="text-[10px] text-txt-muted font-sans">
+                          Verify that your GeeksforGeeks username is spelled correctly and the account exists.
+                        </span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Solved Problems</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{stats.geeksforgeeks?.solved ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">
+                          {stats.geeksforgeeks
+                            ? `E: ${stats.geeksforgeeks.solvedEasy} | M: ${stats.geeksforgeeks.solvedMedium} | H: ${stats.geeksforgeeks.solvedHard}`
+                            : "E: 0 | M: 0 | H: 0"}
+                        </span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Coding Score</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">{(stats.geeksforgeeks as any)?.codingScore ?? 0}</span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Overall GFG Score</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Institute Rank</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {(stats.geeksforgeeks as any)?.instituteRank ? `#${(stats.geeksforgeeks as any).instituteRank}` : "N/A"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">{stats.geeksforgeeks?.rank || "Practitioner"}</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">POTD Streak</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {(stats.geeksforgeeks as any)?.streak ?? 0}
+                          <span className="text-xs font-normal text-txt-muted ml-1">Days</span>
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Problem of the Day</span>
+                      </div>
+
+                      <div className="border border-border-main/40 bg-bg-surface/50 backdrop-blur-sm p-3.5 rounded flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-txt-muted uppercase font-semibold">Contest Rating</span>
+                        <span className="text-xl font-semibold text-txt-main font-display">
+                          {stats.geeksforgeeks?.rating ? stats.geeksforgeeks.rating : "Active"}
+                        </span>
+                        <span className="text-[9px] text-txt-sub font-mono tracking-tight">Competitive Tier</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Codeforces Profile Card */}
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
@@ -1896,6 +2012,19 @@ export default function CodingDeckPage() {
                   placeholder="e.g. tourist or https://hackerrank.com/profile/..."
                   value={inputHackerrankHandle}
                   onChange={e => setInputHackerrankHandle(e.target.value)}
+                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
+                />
+              </div>
+
+              <div>
+                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
+                  GeeksforGeeks Handle / Profile Link
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. sandeepgfg or https://geeksforgeeks.org/user/..."
+                  value={inputGfgHandle}
+                  onChange={e => setInputGfgHandle(e.target.value)}
                   className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
                 />
               </div>

@@ -48,8 +48,16 @@ export default function StudyDeskPage() {
   const [paths, setPaths] = useState<StudyPath[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(STORAGE_PATHS_KEY);
-        if (cached) return JSON.parse(cached);
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_PATHS_KEY)) {
+            const cached = localStorage.getItem(k);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+          }
+        }
       } catch {}
     }
     return [];
@@ -58,8 +66,16 @@ export default function StudyDeskPage() {
   const [mistakes, setMistakes] = useState<StudyMistake[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(STORAGE_MISTAKES_KEY);
-        if (cached) return JSON.parse(cached);
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_MISTAKES_KEY)) {
+            const cached = localStorage.getItem(k);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+          }
+        }
       } catch {}
     }
     return [];
@@ -68,8 +84,16 @@ export default function StudyDeskPage() {
   const [stats, setStats] = useState<StudyStats>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(STORAGE_STATS_KEY);
-        if (cached) return JSON.parse(cached);
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_STATS_KEY)) {
+            const cached = localStorage.getItem(k);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed && typeof parsed.totalXp === "number") return parsed;
+            }
+          }
+        }
       } catch {}
     }
     return {
@@ -84,8 +108,16 @@ export default function StudyDeskPage() {
   const [dsaProgressMap, setDsaProgressMap] = useState<UserDSAProgressMap>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem(STORAGE_DSA_PROGRESS_KEY);
-        if (cached) return JSON.parse(cached);
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(STORAGE_DSA_PROGRESS_KEY)) {
+            const cached = localStorage.getItem(k);
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed && typeof parsed === "object") return parsed;
+            }
+          }
+        }
       } catch {}
     }
     return {};
