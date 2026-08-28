@@ -772,7 +772,7 @@ export async function GET(request: Request) {
       let solved = 0;
       let rating = 0;
       let rank = "Bronze";
-      const globalRank = 0;
+      let globalRank = 0;
       const badges: Array<{ name: string; stars: number; points: number }> = [];
       let languages: string[] = [];
       let fetchedSuccessfully = false;
@@ -783,35 +783,25 @@ export async function GET(request: Request) {
       };
 
       try {
-        const [profRes, badgeRes, scoreRes] = await Promise.allSettled([
-          fetch(`https://www.hackerrank.com/rest/contests/master/hackers/${cleanUsername}/profile`, { headers: hrHeaders, cache: "no-store" }),
+        const [badgeRes, scoreRes, recentRes] = await Promise.allSettled([
           fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, { headers: hrHeaders, cache: "no-store" }),
-          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/scores_elo`, { headers: hrHeaders, cache: "no-store" })
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/scores_elo`, { headers: hrHeaders, cache: "no-store" }),
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/recent_challenges`, { headers: hrHeaders, cache: "no-store" })
         ]);
-
-        if (profRes.status === "fulfilled" && profRes.value.ok) {
-          try {
-            const profData = await profRes.value.json();
-            const model = profData?.model || {};
-            if (model.id) {
-              fetchedSuccessfully = true;
-              rank = model.title || (model.level ? `Level ${model.level}` : "Gold");
-              languages = Array.isArray(model.languages) ? model.languages : [];
-            }
-          } catch {}
-        }
 
         if (badgeRes.status === "fulfilled" && badgeRes.value.ok) {
           try {
             const badgeData = await badgeRes.value.json();
             const models = Array.isArray(badgeData?.models) ? badgeData.models : [];
             models.forEach((b: any) => {
-              const bSolved = parseInt(b.solved || 0);
+              const stars = parseInt(b.total_stars || b.stars || 0);
+              const pts = parseInt(b.total_points || b.current_points || 0);
+              const bSolved = parseInt(b.solved || Math.max(stars * 10, pts > 0 ? Math.round(pts / 15) : 0));
               solved += bSolved;
               badges.push({
                 name: b.badge_name || b.badge_type || "Skill",
-                stars: parseInt(b.stars || 0),
-                points: parseInt(b.current_points || 0)
+                stars: stars,
+                points: pts
               });
             });
             if (models.length > 0) fetchedSuccessfully = true;
@@ -822,8 +812,29 @@ export async function GET(request: Request) {
           try {
             const scoreData = await scoreRes.value.json();
             if (Array.isArray(scoreData) && scoreData.length > 0) {
-              const eloSum = scoreData.reduce((acc: number, s: any) => acc + (parseFloat(s.score) || 0), 0);
-              rating = Math.round(eloSum / scoreData.length) || rating;
+              const eloScores = scoreData
+                .map((s: any) => parseFloat(s.practice?.score || s.contest?.score || s.score || 0))
+                .filter((s: number) => s > 0);
+              if (eloScores.length > 0) {
+                const avgScore = Math.round(eloScores.reduce((a: number, b: number) => a + b, 0) / eloScores.length);
+                if (avgScore > 0) rating = avgScore;
+              }
+              const bestRank = scoreData
+                .map((s: any) => parseInt(s.practice?.rank || 0))
+                .filter((r: number) => r > 0)
+                .sort((a: number, b: number) => a - b)[0];
+              if (bestRank) globalRank = bestRank;
+              fetchedSuccessfully = true;
+            }
+          } catch {}
+        }
+
+        if (recentRes.status === "fulfilled" && recentRes.value.ok) {
+          try {
+            const recentData = await recentRes.value.json();
+            if (Array.isArray(recentData?.models) && recentData.models.length > 0) {
+              solved = Math.max(solved, recentData.models.length);
+              fetchedSuccessfully = true;
             }
           } catch {}
         }
@@ -876,8 +887,6 @@ export async function GET(request: Request) {
       let solvedEasy = 0;
       let solvedMedium = 0;
       let solvedHard = 0;
-      let solvedBasic = 0;
-      let solvedSchool = 0;
       let codingScore = 0;
       let rating = 0;
       let highestRating = 0;
@@ -885,141 +894,66 @@ export async function GET(request: Request) {
       let globalRank = 0;
       let instituteRank = 0;
       let streak = 0;
-      const podCompleted = false;
       let fetchedSuccessfully = false;
 
       const gfgHeaders = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Referer": "https://www.geeksforgeeks.org/"
       };
 
-      // Method 1: Try public GFG proxy API first
       try {
-        const proxyRes = await fetch(`https://geeks-for-geeks-api.vercel.app/${cleanUsername}`, {
-          cache: "no-store",
-          headers: { Accept: "application/json" }
+        const profileRes = await fetch(`https://www.geeksforgeeks.org/user/${cleanUsername}/`, {
+          headers: gfgHeaders,
+          cache: "no-store"
         });
-        if (proxyRes.ok) {
-          const pData = await proxyRes.json();
-          if (pData && (pData.totalProblemsSolved !== undefined || pData.info || pData.totalSolved !== undefined)) {
-            solved = parseInt(pData.totalProblemsSolved || pData.totalSolved || pData.info?.totalProblemsSolved || 0);
-            codingScore = parseInt(pData.codingScore || pData.info?.codingScore || pData.score || 0);
-            instituteRank = parseInt(pData.institutionRank || pData.instituteRank || pData.info?.institutionRank || 0);
-            globalRank = parseInt(pData.globalRank || pData.info?.globalRank || instituteRank || 0);
-            streak = parseInt(pData.currentStreak || pData.info?.currentStreak || pData.streak || 0);
-            rating = parseInt(pData.contestRating || pData.info?.contestRating || pData.rating || 0);
-            highestRating = rating;
 
-            // Difficulty breakdown if available
-            solvedSchool = parseInt(pData.schoolProblemsSolved || pData.school || 0);
-            solvedBasic = parseInt(pData.basicProblemsSolved || pData.basic || 0);
-            solvedEasy = parseInt(pData.easyProblemsSolved || pData.easy || 0) + solvedSchool + solvedBasic;
-            solvedMedium = parseInt(pData.mediumProblemsSolved || pData.medium || 0);
-            solvedHard = parseInt(pData.hardProblemsSolved || pData.hard || 0);
+        if (profileRes.ok) {
+          const html = await profileRes.text();
 
-            if (solved > 0 || codingScore > 0 || instituteRank > 0) {
-              fetchedSuccessfully = true;
+          if (!html.includes("User does not exist") && !html.includes("Page Not Found")) {
+            fetchedSuccessfully = true;
+
+            const parseNum = (pattern: RegExp) => {
+              const m = html.match(pattern);
+              return m && m[1] ? parseInt(m[1], 10) : 0;
+            };
+
+            const parseStr = (pattern: RegExp) => {
+              const m = html.match(pattern);
+              return m && m[1] ? m[1].replace(/\\"/g, '"').trim() : "";
+            };
+
+            codingScore = parseNum(/\\?"score\\?":\s*(\d+)/) || parseNum(/\\?"coding_score\\?":\s*(\d+)/);
+            solved = parseNum(/\\?"total_problems_solved\\?":\s*(\d+)/);
+            streak = parseNum(/\\?"pod_solved_current_streak\\?":\s*(\d+)/) || parseNum(/\\?"pod_solved_longest_streak\\?":\s*(\d+)/);
+
+            const instRankStr = parseStr(/\\?"institute_rank\\?":\s*\\?"([^\\",}]+)\\?"/);
+            if (instRankStr && !isNaN(parseInt(instRankStr, 10))) {
+              instituteRank = parseInt(instRankStr, 10);
+            }
+
+            solvedEasy = parseNum(/\\?"easy\\?":\s*(\d+)/) || parseNum(/\\?"Easy\\?":\s*(\d+)/);
+            solvedMedium = parseNum(/\\?"medium\\?":\s*(\d+)/) || parseNum(/\\?"Medium\\?":\s*(\d+)/);
+            solvedHard = parseNum(/\\?"hard\\?":\s*(\d+)/) || parseNum(/\\?"Hard\\?":\s*(\d+)/);
+
+            if (instituteRank > 0) {
+              if (instituteRank <= 10) rank = "Institute Top 10";
+              else if (instituteRank <= 50) rank = "Institute Top 50";
+              else rank = `Rank #${instituteRank}`;
+            } else if (codingScore > 1000) {
+              rank = "Grandmaster";
+            } else if (codingScore > 500) {
+              rank = "Master";
+            } else if (codingScore > 100) {
+              rank = "Specialist";
+            } else {
+              rank = "Practitioner";
             }
           }
         }
       } catch (err) {
-        console.warn("GFG proxy API notice:", err);
-      }
-
-      // Method 2: Direct GFG profile HTML scraping & __NEXT_DATA__ extraction
-      if (!fetchedSuccessfully || solved === 0) {
-        try {
-          const profileRes = await fetch(`https://www.geeksforgeeks.org/user/${cleanUsername}/?t=${Date.now()}`, {
-            headers: gfgHeaders,
-            cache: "no-store"
-          });
-
-          if (profileRes.ok) {
-            const html = await profileRes.text();
-
-            // 1. Try __NEXT_DATA__ JSON script tag
-            const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-            if (nextDataMatch) {
-              try {
-                const nextData = JSON.parse(nextDataMatch[1]);
-                const pageProps = nextData?.props?.pageProps;
-                const userInfo = pageProps?.userInfo || pageProps?.user_data || pageProps?.data || {};
-
-                if (userInfo.user_handle || userInfo.name || pageProps?.userHandle) {
-                  fetchedSuccessfully = true;
-                  solved = parseInt(userInfo.total_problems_solved || userInfo.totalProblemsSolved || pageProps?.totalProblemsSolved || 0);
-                  codingScore = parseInt(userInfo.score || userInfo.coding_score || userInfo.codingScore || pageProps?.codingScore || 0);
-                  instituteRank = parseInt(userInfo.institute_rank || userInfo.institutionRank || pageProps?.institutionRank || 0);
-                  globalRank = parseInt(userInfo.global_rank || userInfo.rank || instituteRank || 0);
-                  streak = parseInt(userInfo.pod_solved_long || userInfo.currentStreak || pageProps?.currentStreak || 0);
-                  rating = parseInt(userInfo.contest_rating || userInfo.contestRating || pageProps?.contestRating || 0);
-                  highestRating = rating;
-
-                  // Parse difficulties
-                  const diffObj = pageProps?.userDifficultyStats || userInfo.difficultyStats || {};
-                  solvedSchool = parseInt(diffObj.school?.count || diffObj.School || 0);
-                  solvedBasic = parseInt(diffObj.basic?.count || diffObj.Basic || 0);
-                  solvedEasy = parseInt(diffObj.easy?.count || diffObj.Easy || 0) + solvedSchool + solvedBasic;
-                  solvedMedium = parseInt(diffObj.medium?.count || diffObj.Medium || 0);
-                  solvedHard = parseInt(diffObj.hard?.count || diffObj.Hard || 0);
-                }
-              } catch {}
-            }
-
-            // 2. DOM regex fallbacks if __NEXT_DATA__ didn't yield values
-            if (!fetchedSuccessfully || solved === 0) {
-              const solvedMatch = html.match(/Problems Solved[\s\S]*?(\d+)/i) || 
-                                  html.match(/Total Problems Solved[\s\S]*?(\d+)/i) ||
-                                  html.match(/problemSolved[^>]*>\s*(\d+)/i) ||
-                                  html.match(/(\d+)\s*Problems Solved/i);
-              if (solvedMatch) {
-                solved = parseInt(solvedMatch[1]);
-                fetchedSuccessfully = true;
-              }
-
-              const scoreMatch = html.match(/Coding Score[\s\S]*?(\d+)/i) ||
-                                 html.match(/score_card_value[^>]*>\s*(\d+)/i) ||
-                                 html.match(/Overall Coding Score[\s\S]*?(\d+)/i);
-              if (scoreMatch) {
-                codingScore = parseInt(scoreMatch[1]);
-                fetchedSuccessfully = true;
-              }
-
-              const rankMatch = html.match(/Institute Rank[\s\S]*?(\d+)/i) ||
-                                html.match(/Institution Rank[\s\S]*?(\d+)/i);
-              if (rankMatch) {
-                instituteRank = parseInt(rankMatch[1]);
-                globalRank = instituteRank;
-                fetchedSuccessfully = true;
-              }
-
-              const streakMatch = html.match(/POTD Streak[\s\S]*?(\d+)/i) ||
-                                  html.match(/Current Streak[\s\S]*?(\d+)/i);
-              if (streakMatch) {
-                streak = parseInt(streakMatch[1]);
-              }
-            }
-          }
-        } catch (err) {
-          console.warn("GFG HTML scraping notice:", err);
-        }
-      }
-
-      if (instituteRank > 0) {
-        if (instituteRank <= 10) rank = "Institute Top 10";
-        else if (instituteRank <= 50) rank = "Institute Top 50";
-        else if (instituteRank <= 100) rank = "Institute Top 100";
-        else rank = `Rank #${instituteRank}`;
-      } else if (codingScore > 1000) {
-        rank = "Grandmaster";
-      } else if (codingScore > 500) {
-        rank = "Master";
-      } else if (codingScore > 100) {
-        rank = "Specialist";
-      } else {
-        rank = "Practitioner";
+        console.warn("GFG fetch error:", err);
       }
 
       if (!fetchedSuccessfully && solved === 0 && codingScore === 0) {
@@ -1057,8 +991,96 @@ export async function GET(request: Request) {
         globalRank: globalRank || instituteRank || 0,
         instituteRank: instituteRank || 0,
         streak: streak || 0,
-        podCompleted: podCompleted || false,
+        podCompleted: false,
         submissionCalendar: {}
+      }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
+    if (platform === "unstop") {
+      let participations = 0;
+      let points = 0;
+      let badgesCount = 0;
+      let certificatesCount = 0;
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let organisationName = "";
+      let avatar = "";
+      let fullName = "";
+      let certificates: Array<{ title: string; organiser: string; issueDate: string }> = [];
+      let fetchedSuccessfully = false;
+
+      const unstopHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": `https://unstop.com/u/${cleanUsername}`
+      };
+
+      try {
+        const unstopRes = await fetch(`https://unstop.com/api/gamification/get-user-widget-data/${cleanUsername}/21/global`, {
+          headers: unstopHeaders,
+          cache: "no-store"
+        });
+
+        if (unstopRes.ok) {
+          const uData = await unstopRes.json();
+          if (uData && (uData.user || uData.participations !== undefined || uData.points !== undefined)) {
+            fetchedSuccessfully = true;
+            participations = parseInt(uData.participations || 0);
+            points = parseInt(uData.points || 0);
+            badgesCount = parseInt(uData.badges_count || 0);
+            certificatesCount = parseInt(uData.certificates_count || (Array.isArray(uData.certificates) ? uData.certificates.length : 0));
+            organisationName = uData.user?.organisation_name || "";
+            avatar = uData.user?.avatar || "";
+            fullName = uData.user?.name || "";
+
+            const streakStats = uData.streaks?.stats;
+            if (Array.isArray(streakStats) && streakStats.length > 0) {
+              currentStreak = parseInt(streakStats[0].current_streak || 0);
+              longestStreak = parseInt(streakStats[0].longest_streak || 0);
+            }
+
+            if (Array.isArray(uData.certificates)) {
+              certificates = uData.certificates.map((c: any) => ({
+                title: c.certData?.event || c.title || "Hackathon Participation",
+                organiser: c.certData?.organiser || c.certData?.organisation || c.issued_by || "Unstop Partner",
+                issueDate: c.sent_at ? c.sent_at.split(" ")[0] : ""
+              }));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Unstop API fetch error:", err);
+      }
+
+      if (!fetchedSuccessfully) {
+        return NextResponse.json({
+          participations: 0,
+          points: 0,
+          badgesCount: 0,
+          certificatesCount: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          organisationName: "",
+          certificates: [],
+          isFallback: true
+        }, { status: 200 });
+      }
+
+      return NextResponse.json({
+        participations,
+        points,
+        badgesCount,
+        certificatesCount,
+        currentStreak,
+        longestStreak,
+        organisationName,
+        avatar,
+        fullName,
+        certificates
       }, {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"

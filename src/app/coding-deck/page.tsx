@@ -150,26 +150,9 @@ export default function CodingDeckPage() {
   const handleSaveHackathonHandles = async () => {
     if (!user) return;
     setSavingHandles(true);
-    let cleanHr = inputHackerrankHandle.trim().replace(/^@/, "");
-    let cleanGfg = inputGfgHandle.trim().replace(/^@/, "");
     let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
     let cleanH2s = inputH2sHandle.trim().replace(/^@/, "");
 
-    if (cleanHr.includes("/") || cleanHr.includes(".")) {
-      try {
-        const u = new URL(/^https?:\/\//i.test(cleanHr) ? cleanHr : `https://${cleanHr}`);
-        const segs = u.pathname.split("/").filter(Boolean);
-        cleanHr = segs[segs.length - 1] || cleanHr;
-      } catch {}
-    }
-    if (cleanGfg.includes("/") || cleanGfg.includes(".")) {
-      try {
-        const u = new URL(/^https?:\/\//i.test(cleanGfg) ? cleanGfg : `https://${cleanGfg}`);
-        const segs = u.pathname.split("/").filter(Boolean);
-        if (segs[0] === "user" && segs[1]) cleanGfg = segs[1];
-        else cleanGfg = segs[segs.length - 1] || cleanGfg;
-      } catch {}
-    }
     if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
       try {
         const u = new URL(/^https?:\/\//i.test(cleanUnstop) ? cleanUnstop : `https://${cleanUnstop}`);
@@ -185,19 +168,13 @@ export default function CodingDeckPage() {
       } catch {}
     }
 
-    setHackerrankUser(cleanHr);
-    setGeeksforgeeksUser(cleanGfg);
     setUnstopUser(cleanUnstop);
     setHack2skillUser(cleanH2s);
 
     if (typeof window !== "undefined") {
-      localStorage.setItem("ldk_hackerrank_handle", cleanHr);
-      localStorage.setItem("ldk_geeksforgeeks_handle", cleanGfg);
       localStorage.setItem("ldk_unstop_handle", cleanUnstop);
       localStorage.setItem("ldk_hack2skill_handle", cleanH2s);
       if (user.id) {
-        localStorage.setItem(`ldk_hackerrank_handle_${user.id}`, cleanHr);
-        localStorage.setItem(`ldk_geeksforgeeks_handle_${user.id}`, cleanGfg);
         localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
         localStorage.setItem(`ldk_hack2skill_handle_${user.id}`, cleanH2s);
       }
@@ -205,13 +182,11 @@ export default function CodingDeckPage() {
 
     try {
       await supabase.from("profiles").update({
-        hackerrank_username: cleanHr || null,
-        geeksforgeeks_username: cleanGfg || null,
         unstop_username: cleanUnstop || null,
         hack2skill_username: cleanH2s || null
       }).eq("id", user.id);
     } catch (e) {
-      console.warn("Handle save error:", e);
+      console.warn("Hackathon handle save error:", e);
     } finally {
       setSavingHandles(false);
       setShowHandleModal(false);
@@ -491,12 +466,13 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats] = await Promise.all([
+        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats, unstopStats] = await Promise.all([
           fetchStats("leetcode", lc, selectedLcYear),
           fetchStats("codechef", cc),
           fetchStats("hackerrank", hr),
           fetchStats("geeksforgeeks", gfg),
-          fetchStats("codeforces", cf)
+          fetchStats("codeforces", cf),
+          fetchStats("unstop", un)
         ]);
 
         let realUnstopCount = 0;
@@ -533,7 +509,7 @@ export default function CodingDeckPage() {
           hackerrank: hackerrankStats,
           geeksforgeeks: geeksforgeeksStats,
           codeforces: codeforcesStats,
-          unstop: un ? { registered: realUnstopCount, completed: 0, rank: 0 } : null,
+          unstop: unstopStats || (un ? { participations: realUnstopCount, points: 0, badgesCount: 0, certificatesCount: 0 } : null),
           hack2skill: h2s ? { registered: realH2sCount, completed: 0, rank: 0 } : null,
         };
 
@@ -680,8 +656,11 @@ export default function CodingDeckPage() {
         const lc = leetcodeUser;
         const cf = codeforcesUser;
         const cc = codechefUser;
+        const hr = hackerrankUser;
+        const gfg = geeksforgeeksUser;
+        const un = unstopUser;
         
-        if (!lc && !cf && !cc) return;
+        if (!lc && !cf && !cc && !hr && !gfg && !un) return;
         
         const fetchStats = async (platform: string, username: string, year?: number | null) => {
           if (!username) return null;
@@ -700,10 +679,13 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codeforcesStats, codechefStats] = await Promise.all([
+        const [leetcodeStats, codeforcesStats, codechefStats, hackerrankStats, gfgStats, unstopStats] = await Promise.all([
           lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
           cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
-          cc ? fetchStats("codechef", cc) : Promise.resolve(null)
+          cc ? fetchStats("codechef", cc) : Promise.resolve(null),
+          hr ? fetchStats("hackerrank", hr) : Promise.resolve(null),
+          gfg ? fetchStats("geeksforgeeks", gfg) : Promise.resolve(null),
+          un ? fetchStats("unstop", un) : Promise.resolve(null),
         ]);
 
         setStats(prev => ({
@@ -711,6 +693,9 @@ export default function CodingDeckPage() {
           leetcode: leetcodeStats || prev.leetcode,
           codeforces: codeforcesStats || prev.codeforces,
           codechef: codechefStats || prev.codechef,
+          hackerrank: hackerrankStats || prev.hackerrank,
+          geeksforgeeks: gfgStats || prev.geeksforgeeks,
+          unstop: unstopStats || prev.unstop,
         }));
       };
       
@@ -718,7 +703,7 @@ export default function CodingDeckPage() {
     }, 15000); // 15 seconds live auto-poll
     
     return () => clearInterval(interval);
-  }, [user, leetcodeUser, codeforcesUser, codechefUser, selectedLcYear]);
+  }, [user, leetcodeUser, codeforcesUser, codechefUser, hackerrankUser, geeksforgeeksUser, unstopUser, selectedLcYear]);
 
 
 
@@ -740,6 +725,8 @@ export default function CodingDeckPage() {
     addCalendar(stats.leetcode?.submissionCalendar);
     addCalendar(stats.codeforces?.submissionCalendar);
     addCalendar(stats.codechef?.submissionCalendar);
+    addCalendar(stats.hackerrank?.submissionCalendar);
+    addCalendar(stats.geeksforgeeks?.submissionCalendar);
 
     // 2. Generate 371 days based on selected year (full calendar year) or current date (last 12 months)
     const cells: { dateStr: string; level: number; dateLabel: string; monthYearKey: string; cellMonthName: string }[] = [];
@@ -1392,10 +1379,8 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-[#00EA64]/10 border border-[#00EA64]/30 flex items-center justify-center">
-                      <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M7 6v12h3v-4.5h4V18h3V6h-3v4.5h-4V6H7z" fill="#00EA64" />
-                      </svg>
+                    <span className="w-8 h-8 rounded-md bg-[#00EA64]/10 border border-[#00EA64]/30 flex items-center justify-center p-1 overflow-hidden shrink-0">
+                      <img src="/hh.png" alt="HackerRank" className="w-5 h-5 object-contain" />
                     </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">HackerRank Profile</h3>
@@ -1403,7 +1388,7 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {hackerrankUser && (
+                  {hackerrankUser ? (
                     <a 
                       href={`https://www.hackerrank.com/profile/${hackerrankUser}`}
                       target="_blank" 
@@ -1413,13 +1398,26 @@ export default function CodingDeckPage() {
                       <span className="truncate max-w-[140px]">@{hackerrankUser}</span>
                       <ExternalLink size={10} className="shrink-0" />
                     </a>
+                  ) : (
+                    <Link
+                      href="/profile"
+                      className="text-[9px] font-mono text-txt-muted hover:text-accent-main transition-colors cursor-pointer"
+                    >
+                      + Connect
+                    </Link>
                   )}
                 </div>
 
                 {!hackerrankUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1.5 items-center py-6">
                     <span>HackerRank account is not linked.</span>
                     <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync badges &amp; stars.</span>
+                    <Link
+                      href="/profile"
+                      className="mt-1 text-[10px] font-mono uppercase tracking-wider text-accent-main hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      Go to Profile Settings &rarr;
+                    </Link>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1484,11 +1482,8 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-[#2F8D46]/10 border border-[#2F8D46]/30 flex items-center justify-center text-[#2F8D46]">
-                      <svg viewBox="0 0 32 32" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M16 2.5C8.544 2.5 2.5 8.544 2.5 16S8.544 29.5 16 29.5 29.5 23.456 29.5 16 23.456 2.5 16 2.5z" fill="#2F8D46" fillOpacity="0.15"/>
-                        <path d="M12.8 10.5c-2.4 0-4.3 1.9-4.3 4.3v2.4c0 2.4 1.9 4.3 4.3 4.3h1.2v-2.2h-1.2c-1.2 0-2.1-.9-2.1-2.1v-2.4c0-1.2.9-2.1 2.1-2.1h1.2v-2.2H12.8zm6.4 0v2.2h1.2c1.2 0 2.1.9 2.1 2.1v2.4c0 1.2-.9 2.1-2.1 2.1h-1.2v2.2h1.2c2.4 0 4.3-1.9 4.3-4.3v-2.4c0-2.4-1.9-4.3-4.3-4.3h-1.2z" fill="#2F8D46"/>
-                      </svg>
+                    <span className="w-8 h-8 rounded-md bg-[#2F8D46]/10 border border-[#2F8D46]/30 flex items-center justify-center p-1 overflow-hidden shrink-0">
+                      <img src="/gfg.jpg" alt="GeeksforGeeks" className="w-5 h-5 object-contain rounded-[2px]" />
                     </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">GeeksforGeeks Profile</h3>
@@ -1496,7 +1491,7 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {geeksforgeeksUser && (
+                  {geeksforgeeksUser ? (
                     <a 
                       href={`https://www.geeksforgeeks.org/user/${geeksforgeeksUser}/`}
                       target="_blank" 
@@ -1506,13 +1501,26 @@ export default function CodingDeckPage() {
                       <span className="truncate max-w-[140px]">@{geeksforgeeksUser}</span>
                       <ExternalLink size={10} className="shrink-0" />
                     </a>
+                  ) : (
+                    <Link
+                      href="/profile"
+                      className="text-[9px] font-mono text-txt-muted hover:text-accent-main transition-colors cursor-pointer"
+                    >
+                      + Connect
+                    </Link>
                   )}
                 </div>
 
                 {!geeksforgeeksUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1.5 items-center py-6">
                     <span>GeeksforGeeks account is not linked.</span>
                     <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync solved problems &amp; coding score.</span>
+                    <Link
+                      href="/profile"
+                      className="mt-1 text-[10px] font-mono uppercase tracking-wider text-accent-main hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      Go to Profile Settings &rarr;
+                    </Link>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1807,7 +1815,7 @@ export default function CodingDeckPage() {
                 </div>
                 
                 {/* Unstop Row */}
-                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-1.5">
+                <div className="border-b border-border-main/40 pb-3 flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Unstop</span>
                     {unstopUser ? (
@@ -1828,8 +1836,32 @@ export default function CodingDeckPage() {
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] text-txt-muted">
-                    <span>Tracked Applications</span>
+
+                  <div className="grid grid-cols-2 gap-2 pt-0.5 font-mono text-[10px]">
+                    <div className="bg-bg-card border border-border-main/50 p-2 rounded flex flex-col">
+                      <span className="text-txt-muted text-[9px] uppercase">Registered Events</span>
+                      <span className="text-xs font-bold text-txt-main font-display">
+                        {(stats.unstop as any)?.participations !== undefined 
+                          ? (stats.unstop as any).participations 
+                          : realAppliedCounts.unstop}
+                      </span>
+                      <span className="text-[8px] text-txt-muted">Unstop profile</span>
+                    </div>
+                    <div className="bg-bg-card border border-border-main/50 p-2 rounded flex flex-col">
+                      <span className="text-txt-muted text-[9px] uppercase">Unstop Points</span>
+                      <span className="text-xs font-bold text-txt-main font-display">
+                        {(stats.unstop as any)?.points !== undefined 
+                          ? (stats.unstop as any).points.toLocaleString() 
+                          : "—"}
+                      </span>
+                      <span className="text-[8px] text-txt-muted">
+                        {(stats.unstop as any)?.badgesCount ? `${(stats.unstop as any).badgesCount} Badges` : "Gamification"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between font-mono text-[9.5px] text-txt-muted px-0.5">
+                    <span>LynDesk Tracked:</span>
                     <span className="font-semibold text-txt-main">
                       {realAppliedCounts.unstop}
                     </span>
@@ -1837,7 +1869,7 @@ export default function CodingDeckPage() {
                 </div>
 
                 {/* Hack2Skill Row */}
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 pt-0.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Hack2Skill</span>
                     {hack2skillUser ? (
@@ -1853,8 +1885,8 @@ export default function CodingDeckPage() {
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] text-txt-muted">
-                    <span>Tracked Applications</span>
+                  <div className="flex items-center justify-between font-mono text-[9.5px] text-txt-muted px-0.5">
+                    <span>LynDesk Tracked:</span>
                     <span className="font-semibold text-txt-main">
                       {realAppliedCounts.hack2skill}
                     </span>
@@ -2005,37 +2037,11 @@ export default function CodingDeckPage() {
             <div className="space-y-3">
               <div>
                 <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
-                  HackerRank Handle / Profile Link
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. tourist or https://hackerrank.com/profile/..."
-                  value={inputHackerrankHandle}
-                  onChange={e => setInputHackerrankHandle(e.target.value)}
-                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
-                  GeeksforGeeks Handle / Profile Link
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. sandeepgfg or https://geeksforgeeks.org/user/..."
-                  value={inputGfgHandle}
-                  onChange={e => setInputGfgHandle(e.target.value)}
-                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
                   Unstop Handle / Profile Link
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. shreek64346 or https://unstop.com/user/..."
+                  placeholder="e.g. shreek64346 or https://unstop.com/u/..."
                   value={inputUnstopHandle}
                   onChange={e => setInputUnstopHandle(e.target.value)}
                   className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"

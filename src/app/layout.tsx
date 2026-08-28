@@ -24,8 +24,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LynDesk — Link Your Next Desk | The Future in Your Hands",
-  description: "Link Your Next Desk — The Future Desks, in Your Hands. Pinned Events, Team Collaboration, University Portals, and Academic Study Desk.",
+  title: "LynDesk",
+  description: "Link Your Next Desk — The Future in Your Hands.",
   keywords: ["LynDesk", "Event Tracker", "Student Collaboration", "Study Desk", "Hackathons", "University Portal"],
   authors: [{ name: "LynDesk Engineering" }],
   manifest: "/manifest.json",
