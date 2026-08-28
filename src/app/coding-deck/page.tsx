@@ -24,6 +24,9 @@ import {
   ChevronUp,
   Puzzle,
   BookOpen,
+  Award,
+  ShieldCheck,
+  Star,
   X
 } from "lucide-react";
 
@@ -119,9 +122,9 @@ export default function CodingDeckPage() {
     }
     return "";
   });
-  const [hack2skillUser, setHack2skillUser] = useState(() => {
+  const [devpostUser, setDevpostUser] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("ldk_hack2skill_handle") || "";
+      return localStorage.getItem("ldk_devpost_handle") || "";
     }
     return "";
   });
@@ -132,18 +135,18 @@ export default function CodingDeckPage() {
   const [inputHackerrankHandle, setInputHackerrankHandle] = useState("");
   const [inputGfgHandle, setInputGfgHandle] = useState("");
   const [inputUnstopHandle, setInputUnstopHandle] = useState("");
-  const [inputH2sHandle, setInputH2sHandle] = useState("");
+  const [inputDevpostHandle, setInputDevpostHandle] = useState("");
   const [savingHandles, setSavingHandles] = useState(false);
-  const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, hack2skill: 0, devpost: 0 });
+  const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, devpost: 0 });
+  const [syncingCertId, setSyncingCertId] = useState<string | null>(null);
+  const [syncedCerts, setSyncedCerts] = useState<Record<string, boolean>>({});
 
   // Inline handle input state
   const [inputLcHandle, setInputLcHandle] = useState("");
 
   const handleOpenHandleModal = () => {
-    setInputHackerrankHandle(hackerrankUser || "");
-    setInputGfgHandle(geeksforgeeksUser || "");
     setInputUnstopHandle(unstopUser || "");
-    setInputH2sHandle(hack2skillUser || "");
+    setInputDevpostHandle(devpostUser || "");
     setShowHandleModal(true);
   };
 
@@ -151,7 +154,7 @@ export default function CodingDeckPage() {
     if (!user) return;
     setSavingHandles(true);
     let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
-    let cleanH2s = inputH2sHandle.trim().replace(/^@/, "");
+    let cleanDevpost = inputDevpostHandle.trim().replace(/^@/, "");
 
     if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
       try {
@@ -160,36 +163,87 @@ export default function CodingDeckPage() {
         cleanUnstop = segs[segs.length - 1] || cleanUnstop;
       } catch {}
     }
-    if (cleanH2s.includes("/") || cleanH2s.includes(".")) {
+    if (cleanDevpost.includes("/") || cleanDevpost.includes(".")) {
       try {
-        const u = new URL(/^https?:\/\//i.test(cleanH2s) ? cleanH2s : `https://${cleanH2s}`);
+        const u = new URL(/^https?:\/\//i.test(cleanDevpost) ? cleanDevpost : `https://${cleanDevpost}`);
         const segs = u.pathname.split("/").filter(Boolean);
-        cleanH2s = segs[segs.length - 1] || cleanH2s;
+        cleanDevpost = segs[segs.length - 1] || cleanDevpost;
       } catch {}
     }
 
     setUnstopUser(cleanUnstop);
-    setHack2skillUser(cleanH2s);
+    setDevpostUser(cleanDevpost);
 
     if (typeof window !== "undefined") {
       localStorage.setItem("ldk_unstop_handle", cleanUnstop);
-      localStorage.setItem("ldk_hack2skill_handle", cleanH2s);
+      localStorage.setItem("ldk_devpost_handle", cleanDevpost);
       if (user.id) {
         localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
-        localStorage.setItem(`ldk_hack2skill_handle_${user.id}`, cleanH2s);
+        localStorage.setItem(`ldk_devpost_handle_${user.id}`, cleanDevpost);
       }
     }
 
     try {
       await supabase.from("profiles").update({
         unstop_username: cleanUnstop || null,
-        hack2skill_username: cleanH2s || null
+        devpost_username: cleanDevpost || null
       }).eq("id", user.id);
     } catch (e) {
       console.warn("Hackathon handle save error:", e);
     } finally {
       setSavingHandles(false);
       setShowHandleModal(false);
+    }
+  };
+
+  const handleImportCertificate = async (cert: {
+    id: string;
+    certId?: string;
+    title: string;
+    organiser?: string;
+    organisation?: string;
+    issueDate?: string;
+    url?: string;
+  }) => {
+    if (!user) {
+      setMessage({ text: "Please sign in to sync certificates to your LynDesk portfolio.", type: "error" });
+      return;
+    }
+    const cKey = cert.id || cert.certId || cert.title;
+    setSyncingCertId(cKey);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch("/api/works", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          title: `${cert.title} - Hackathon Certification`,
+          category: "software",
+          description: `Official verified hackathon accreditation issued by ${cert.organiser || "Unstop"}${cert.issueDate ? ` on ${cert.issueDate}` : ""}. Certificate ID: ${cert.certId || "Verified"}.`,
+          external_url: cert.url || (cert.certId ? `https://unstop.com/api/certificate/${cert.certId}` : ""),
+          tags: ["hackathon", "unstop", "verified-credential", "competitive-programming"],
+          is_published: true,
+          status: "approved"
+        })
+      });
+
+      if (res.ok) {
+        setSyncedCerts(prev => ({ ...prev, [cKey]: true }));
+        setMessage({ text: `Successfully imported "${cert.title}" to your LynDesk Verified Portfolio!`, type: "success" });
+      } else {
+        const err = await res.json();
+        setMessage({ text: err.error || "Failed to sync certificate.", type: "error" });
+      }
+    } catch (e) {
+      console.warn("Cert sync error:", e);
+      setMessage({ text: "Network error while saving certificate.", type: "error" });
+    } finally {
+      setSyncingCertId(null);
     }
   };
 
@@ -315,8 +369,36 @@ export default function CodingDeckPage() {
     hackerrank: PlatformStats | null;
     geeksforgeeks: PlatformStats | null;
     codeforces: PlatformStats | null;
-    unstop: { registered: number; completed: number; rank: number } | null;
-    hack2skill: { registered: number; completed: number; rank: number } | null;
+    unstop: {
+      registered?: number;
+      participations?: number;
+      points?: number;
+      badgesCount?: number;
+      certificatesCount?: number;
+      currentStreak?: number;
+      longestStreak?: number;
+      organisationName?: string;
+      fullName?: string;
+      avatar?: string;
+      certificates?: Array<{
+        id: string;
+        certId?: string;
+        title: string;
+        organiser: string;
+        organisation?: string;
+        issueDate: string;
+        url?: string;
+        eventLogo?: string;
+      }>;
+    } | null;
+    devpost: {
+      projectsCount?: number;
+      hackathonsCount?: number;
+      followersCount?: number;
+      fullName?: string;
+      avatar?: string;
+      participations?: number;
+    } | null;
   }>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -331,7 +413,7 @@ export default function CodingDeckPage() {
       geeksforgeeks: null,
       codeforces: null,
       unstop: null,
-      hack2skill: null,
+      devpost: null
     };
   });
 
@@ -418,7 +500,7 @@ export default function CodingDeckPage() {
         const userGfgKey = user?.id ? `ldk_geeksforgeeks_handle_${user.id}` : "ldk_geeksforgeeks_handle";
         const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
         const userUnKey = user?.id ? `ldk_unstop_handle_${user.id}` : "ldk_unstop_handle";
-        const userH2sKey = user?.id ? `ldk_hack2skill_handle_${user.id}` : "ldk_hack2skill_handle";
+        const userDpKey = user?.id ? `ldk_devpost_handle_${user.id}` : "ldk_devpost_handle";
 
         const localLc = typeof window !== "undefined" ? (localStorage.getItem(userLcKey) || localStorage.getItem("ldk_leetcode_handle") || "") : "";
         const localCc = typeof window !== "undefined" ? (localStorage.getItem(userCcKey) || localStorage.getItem("ldk_codechef_handle") || "") : "";
@@ -426,7 +508,7 @@ export default function CodingDeckPage() {
         const localGfg = typeof window !== "undefined" ? (localStorage.getItem(userGfgKey) || localStorage.getItem("ldk_geeksforgeeks_handle") || "") : "";
         const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
         const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
-        const localH2s = typeof window !== "undefined" ? (localStorage.getItem(userH2sKey) || localStorage.getItem("ldk_hack2skill_handle") || "") : "";
+        const localDp = typeof window !== "undefined" ? (localStorage.getItem(userDpKey) || localStorage.getItem("ldk_devpost_handle") || "") : "";
 
         const lc = meta.leetcode_username || localLc;
         const cc = meta.codechef_username || localCc;
@@ -434,7 +516,7 @@ export default function CodingDeckPage() {
         const gfg = meta.geeksforgeeks_username || localGfg;
         const cf = meta.codeforces_username || localCf;
         const un = meta.unstop_username || localUn;
-        const h2s = meta.hack2skill_username || localH2s;
+        const dp = meta.devpost_username || localDp;
 
         setLeetcodeUser(lc);
         setCodechefUser(cc);
@@ -442,7 +524,7 @@ export default function CodingDeckPage() {
         setGeeksforgeeksUser(gfg);
         setCodeforcesUser(cf);
         setUnstopUser(un);
-        setHack2skillUser(h2s);
+        setDevpostUser(dp);
 
         const fetchStats = async (platform: string, username: string, year?: number | null) => {
           if (!username) return null;
@@ -466,17 +548,17 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats, unstopStats] = await Promise.all([
+        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats, unstopStats, devpostStats] = await Promise.all([
           fetchStats("leetcode", lc, selectedLcYear),
           fetchStats("codechef", cc),
           fetchStats("hackerrank", hr),
           fetchStats("geeksforgeeks", gfg),
           fetchStats("codeforces", cf),
-          fetchStats("unstop", un)
+          fetchStats("unstop", un),
+          fetchStats("devpost", dp)
         ]);
 
         let realUnstopCount = 0;
-        let realH2sCount = 0;
         let realDevpostCount = 0;
         let realTotalCount = 0;
 
@@ -491,12 +573,10 @@ export default function CodingDeckPage() {
               const apps = appData.applications || [];
               realTotalCount = apps.length;
               realUnstopCount = apps.filter((a: any) => a.portal === "Unstop").length;
-              realH2sCount = apps.filter((a: any) => a.portal === "Hack2Skill").length;
               realDevpostCount = apps.filter((a: any) => a.portal === "Devpost").length;
               setRealAppliedCounts({
                 total: realTotalCount,
                 unstop: realUnstopCount,
-                hack2skill: realH2sCount,
                 devpost: realDevpostCount
               });
             }
@@ -510,7 +590,7 @@ export default function CodingDeckPage() {
           geeksforgeeks: geeksforgeeksStats,
           codeforces: codeforcesStats,
           unstop: unstopStats || (un ? { participations: realUnstopCount, points: 0, badgesCount: 0, certificatesCount: 0 } : null),
-          hack2skill: h2s ? { registered: realH2sCount, completed: 0, rank: 0 } : null,
+          devpost: devpostStats || null
         };
 
         if (typeof window !== "undefined") {
@@ -1090,7 +1170,6 @@ export default function CodingDeckPage() {
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-txt-main flex items-center gap-1.5">
-                      <Flame size={13} className="text-amber-500 shrink-0" />
                       Daily Streak Maintained ({stats.leetcode.leetcodeStreak || 1} Days)
                     </span>
                     <span className="text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded">Active Today</span>
@@ -1379,8 +1458,8 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-[#00EA64]/10 border border-[#00EA64]/30 flex items-center justify-center p-1 overflow-hidden shrink-0">
-                      <img src="/hh.png" alt="HackerRank" className="w-5 h-5 object-contain" />
+                    <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center shrink-0">
+                      <img src="/hh.png" alt="HackerRank" className="w-6 h-6 object-contain" />
                     </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">HackerRank Profile</h3>
@@ -1462,15 +1541,19 @@ export default function CodingDeckPage() {
 
                     {/* HackerRank Domain Badges Showcase */}
                     {Array.isArray((stats.hackerrank as any)?.badges) && (stats.hackerrank as any).badges.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-1 border-t border-border-main/30">
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-border-main/30">
                         {(stats.hackerrank as any).badges.map((b: any, idx: number) => (
-                          <span 
+                          <div 
                             key={idx}
-                            className="text-[10px] font-mono px-2.5 py-1 rounded bg-[#00EA64]/10 text-[#00EA64] border border-[#00EA64]/30 flex items-center gap-1.5"
+                            className="text-[10px] font-mono px-2.5 py-1 rounded bg-bg-card border border-border-main/70 text-txt-main flex items-center gap-1.5 shadow-xs"
                           >
-                            <span>⭐ {b.stars || 1}★</span>
+                            <span className="flex items-center gap-1 text-amber-400 font-semibold font-mono">
+                              <Star size={11} className="fill-amber-400 text-amber-400" />
+                              {b.stars || 1}★
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-border-main" />
                             <span className="font-sans font-medium text-txt-main">{b.name}</span>
-                          </span>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -1482,8 +1565,8 @@ export default function CodingDeckPage() {
               <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-4 border-b border-border-main/40 pb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-8 h-8 rounded-md bg-[#2F8D46]/10 border border-[#2F8D46]/30 flex items-center justify-center p-1 overflow-hidden shrink-0">
-                      <img src="/gfg.jpg" alt="GeeksforGeeks" className="w-5 h-5 object-contain rounded-[2px]" />
+                    <span className="w-8 h-8 rounded-md bg-bg-card border border-border-main/60 flex items-center justify-center p-1 overflow-hidden shrink-0">
+                      <img src="/gfg.jpg" alt="GeeksforGeeks" className="w-5.5 h-5.5 object-contain rounded-xs" />
                     </span>
                     <div className="flex flex-col">
                       <h3 className="text-sm font-semibold text-txt-main">GeeksforGeeks Profile</h3>
@@ -1868,14 +1951,19 @@ export default function CodingDeckPage() {
                   </div>
                 </div>
 
-                {/* Hack2Skill Row */}
+                {/* Devpost Row */}
                 <div className="flex flex-col gap-1.5 pt-0.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-txt-main">Hack2Skill</span>
-                    {hack2skillUser ? (
-                      <span className="text-[10px] font-mono text-accent-main">
-                        @{hack2skillUser}
-                      </span>
+                    <span className="text-xs font-medium text-txt-main">Devpost</span>
+                    {devpostUser ? (
+                      <a
+                        href={`https://devpost.com/${devpostUser}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
+                      >
+                        @{devpostUser} <ExternalLink size={9} />
+                      </a>
                     ) : (
                       <button
                         onClick={handleOpenHandleModal}
@@ -1888,7 +1976,7 @@ export default function CodingDeckPage() {
                   <div className="flex items-center justify-between font-mono text-[9.5px] text-txt-muted px-0.5">
                     <span>LynDesk Tracked:</span>
                     <span className="font-semibold text-txt-main">
-                      {realAppliedCounts.hack2skill}
+                      {realAppliedCounts.devpost}
                     </span>
                   </div>
                 </div>
@@ -1897,7 +1985,7 @@ export default function CodingDeckPage() {
                   onClick={() => setShowAppliedModal(true)}
                   className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
                 >
-                  <FolderKanban size={12} /> Manage Application Tracker
+                  <FolderKanban size={12} /> Live Application Tracker
                 </button>
               </div>
 
@@ -1936,6 +2024,95 @@ export default function CodingDeckPage() {
                     <span>{showAllContests ? "Show Less" : `Show More (${contests.length - 3} more)`}</span>
                     {showAllContests ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
+                )}
+              </div>
+
+              {/* Dedicated Verified Accreditations & Hackathon Certifications Card (Moved Below Active Contest Feed) */}
+              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Award size={14} className="text-accent-main" />
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                      Accreditations & Certificates
+                    </span>
+                  </div>
+                </div>
+
+                {stats.unstop?.certificates && stats.unstop.certificates.length > 0 ? (
+                  <div className="flex flex-col gap-2.5">
+                    {stats.unstop.certificates.map((cert) => {
+                      const cKey = cert.id || cert.certId || cert.title;
+                      const isSynced = syncedCerts[cKey];
+                      const isSyncing = syncingCertId === cKey;
+
+                      return (
+                        <div
+                          key={cKey}
+                          className="border border-border-main/50 bg-bg-card/30 p-3 rounded flex flex-col gap-2 hover:border-border-main transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 space-y-0.5">
+                              <h4 className="text-xs font-semibold text-txt-main truncate">{cert.title}</h4>
+                              <p className="text-[10px] font-mono text-txt-muted truncate">
+                                Issued by {cert.organiser || "Chennai Institute of Technology"}
+                              </p>
+                            </div>
+                            {cert.issueDate && (
+                              <span className="text-[9px] font-mono text-txt-sub shrink-0">
+                                {cert.issueDate}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-main/30">
+                            {cert.url ? (
+                              <a
+                                href={cert.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[9px] font-mono text-txt-muted hover:text-accent-main flex items-center gap-1 transition-colors"
+                              >
+                                View Official Certificate <ExternalLink size={8} />
+                              </a>
+                            ) : (
+                              <span className="text-[9px] font-mono text-txt-sub">Verified Credential</span>
+                            )}
+
+                            <button
+                              onClick={() => handleImportCertificate(cert)}
+                              disabled={isSynced || isSyncing}
+                              className={`h-6 px-2.5 font-mono text-[9px] uppercase tracking-wider font-semibold rounded-xs flex items-center gap-1 cursor-pointer transition-all ${
+                                isSynced
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 cursor-default"
+                                  : "bg-accent-main hover:opacity-90 text-bg-base"
+                              }`}
+                            >
+                              {isSynced ? (
+                                <>
+                                  <CheckCircle2 size={9} /> Synced
+                                </>
+                              ) : isSyncing ? (
+                                "Syncing..."
+                              ) : (
+                                <>
+                                  <ShieldCheck size={9} /> 1-Click Import
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-border-main/50 rounded-md p-4 text-center space-y-2 bg-bg-card/20">
+                    <div className="w-8 h-8 rounded-full bg-accent-main/10 border border-accent-main/20 flex items-center justify-center mx-auto text-accent-main">
+                      <Award size={16} />
+                    </div>
+                    <p className="text-[11px] font-mono text-txt-muted leading-relaxed">
+                      Connect your <strong className="text-txt-main font-semibold">Unstop</strong> handle to automatically sync and verify hackathon credentials.
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -2013,7 +2190,7 @@ export default function CodingDeckPage() {
       {showAppliedModal && (
         <AppliedHackathonsModal
           unstopUser={unstopUser}
-          hack2skillUser={hack2skillUser}
+          devpostUser={devpostUser}
           onClose={() => setShowAppliedModal(false)}
         />
       )}
@@ -2050,13 +2227,13 @@ export default function CodingDeckPage() {
 
               <div>
                 <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
-                  Hack2Skill Handle / Profile Link
+                  Devpost Handle / Profile Link
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. shreeprasandh_9916 or profile link"
-                  value={inputH2sHandle}
-                  onChange={e => setInputH2sHandle(e.target.value)}
+                  placeholder="e.g. your_devpost_id or https://devpost.com/..."
+                  value={inputDevpostHandle}
+                  onChange={e => setInputDevpostHandle(e.target.value)}
                   className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
                 />
               </div>

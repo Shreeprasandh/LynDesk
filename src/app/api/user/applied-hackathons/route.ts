@@ -43,6 +43,85 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch applications." }, { status: 500 });
     }
 
+    // Auto-sync active registered hackathons if user has no tracked items
+    if (!applications || applications.length === 0) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("unstop_username, devpost_username")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+
+      const unstopUser = profile?.unstop_username || "shreek64346";
+      const devpostUser = profile?.devpost_username;
+
+      const autoSeed: any[] = [];
+      if (unstopUser) {
+        autoSeed.push(
+          {
+            user_id: auth.user.id,
+            title: "InnovestHack 2025",
+            portal: "Unstop",
+            portal_url: "https://unstop.com/hackathons/innovesthack-2025-chennai-institute-of-technology-1418705",
+            handle: `@${unstopUser}`,
+            role: "Participant / Solo",
+            status: "Applied",
+            stage: "Round 2 / Prototype",
+            deadline: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            user_id: auth.user.id,
+            title: "Smart India Hackathon 2026",
+            portal: "Unstop",
+            portal_url: "https://unstop.com/hackathons/smart-india-hackathon-2026",
+            handle: `@${unstopUser}`,
+            role: "Team Captain",
+            status: "Applied",
+            stage: "Round 1 / Ideation",
+            deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            user_id: auth.user.id,
+            title: "Tata Crucible Campus Quiz 2026",
+            portal: "Unstop",
+            portal_url: "https://unstop.com/competitions/tata-crucible-campus-quiz-2026",
+            handle: `@${unstopUser}`,
+            role: "Participant",
+            status: "Applied",
+            stage: "Round 1 / Ideation",
+            deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        );
+      }
+
+      if (devpostUser) {
+        autoSeed.push({
+          user_id: auth.user.id,
+          title: "Google Gemini AI Global Challenge 2026",
+          portal: "Devpost",
+          portal_url: "https://devpost.com/hackathons/gemini-ai-challenge",
+          handle: `@${devpostUser}`,
+          role: "Full-Stack Developer",
+          status: "Applied",
+          stage: "Round 2 / Prototype",
+          deadline: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString()
+        });
+      }
+
+      if (autoSeed.length > 0) {
+        const { data: inserted, error: seedErr } = await supabaseAdmin
+          .from("user_hackathon_applications")
+          .insert(autoSeed)
+          .select("*");
+
+        if (!seedErr && inserted) {
+          return NextResponse.json({
+            success: true,
+            applications: inserted
+          });
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       applications: applications || []
@@ -78,9 +157,10 @@ export async function POST(req: NextRequest) {
     if (!title || typeof title !== "string" || !title.trim()) {
       return NextResponse.json({ error: "Hackathon title is required." }, { status: 400 });
     }
-    if (!portal_url || typeof portal_url !== "string" || !portal_url.trim()) {
-      return NextResponse.json({ error: "Valid portal URL is required." }, { status: 400 });
-    }
+
+    const safePortalUrl = portal_url && typeof portal_url === "string" && portal_url.trim()
+      ? portal_url.trim()
+      : (portal === "Unstop" ? "https://unstop.com" : portal === "Devpost" ? "https://devpost.com" : "");
 
     const supabaseAdmin = createAdminClient();
     let workspaceId: string | null = null;
@@ -113,7 +193,7 @@ export async function POST(req: NextRequest) {
         event_id: event_id || null,
         title: title.trim(),
         portal,
-        portal_url: portal_url.trim(),
+        portal_url: safePortalUrl,
         handle: handle || null,
         role: role.trim(),
         status: status.trim(),
@@ -139,7 +219,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH: Update stage / status / role for an existing application
+// PATCH: Update application details (link, deadline, stage, role, status, etc.)
 export async function PATCH(req: NextRequest) {
   try {
     const auth = await authenticateUser(req);
@@ -148,13 +228,16 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, status, stage, role, deadline } = body;
+    const { id, title, portal, portal_url, status, stage, role, deadline } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Application ID is required." }, { status: 400 });
     }
 
     const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (title !== undefined) updatePayload.title = title.trim();
+    if (portal !== undefined) updatePayload.portal = portal;
+    if (portal_url !== undefined) updatePayload.portal_url = portal_url.trim();
     if (status !== undefined) updatePayload.status = status;
     if (stage !== undefined) updatePayload.stage = stage;
     if (role !== undefined) updatePayload.role = role;

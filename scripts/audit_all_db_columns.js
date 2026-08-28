@@ -47,7 +47,7 @@ const tableColumns = {
     "geeksforgeeks_verified",
     "codeforces_username",
     "unstop_username",
-    "hack2skill_username",
+    "devpost_username",
     "college_key",
     "company_key",
     "department",

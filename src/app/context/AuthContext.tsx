@@ -27,7 +27,7 @@ export interface UserProfileData {
   geeksforgeeks_verified?: boolean;
   codeforces_username?: string;
   unstop_username?: string;
-  hack2skill_username?: string;
+  devpost_username?: string;
   college_name?: string;
   graduation_year?: string;
   roll_number?: string;

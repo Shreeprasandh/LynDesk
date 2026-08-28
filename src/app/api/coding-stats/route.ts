@@ -3,6 +3,14 @@ import { checkRateLimit } from "@/app/lib/moderation";
 
 export const dynamic = "force-dynamic";
 
+// In-Memory SWR Cache with 5-minute TTL
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+const STATS_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 export async function GET(request: Request) {
   // Rate limiting protection (Max 60 requests/min per IP)
   const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
@@ -15,6 +23,7 @@ export async function GET(request: Request) {
   const platform = queryParams.get("platform");
   const username = queryParams.get("username");
   const yearParam = queryParams.get("year");
+  const forceFresh = queryParams.get("force") === "true";
 
   if (!platform || !username) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -22,6 +31,20 @@ export async function GET(request: Request) {
 
   const cleanUsername = username.trim();
   const currentYear = yearParam ? parseInt(yearParam) : new Date().getFullYear();
+  const cacheKey = `${platform.toLowerCase()}:${cleanUsername.toLowerCase()}:${yearParam || "default"}`;
+
+  // Check in-memory SWR cache unless forceFresh is requested
+  if (!forceFresh) {
+    const cached = STATS_CACHE.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      return NextResponse.json(cached.data, {
+        headers: {
+          "X-Cache": "HIT",
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+  }
 
   try {
     if (platform === "leetcode") {
@@ -1027,10 +1050,10 @@ export async function GET(request: Request) {
 
         if (unstopRes.ok) {
           const uData = await unstopRes.json();
-          if (uData && (uData.user || uData.participations !== undefined || uData.points !== undefined)) {
+          if (uData && (uData.user || uData.participations !== undefined || uData.points !== undefined || uData.perks?.points !== undefined)) {
             fetchedSuccessfully = true;
             participations = parseInt(uData.participations || 0);
-            points = parseInt(uData.points || 0);
+            points = parseInt(uData.perks?.points || uData.points || 0);
             badgesCount = parseInt(uData.badges_count || 0);
             certificatesCount = parseInt(uData.certificates_count || (Array.isArray(uData.certificates) ? uData.certificates.length : 0));
             organisationName = uData.user?.organisation_name || "";
@@ -1045,9 +1068,14 @@ export async function GET(request: Request) {
 
             if (Array.isArray(uData.certificates)) {
               certificates = uData.certificates.map((c: any) => ({
+                id: c.id || c.cert_id || String(Math.random()),
+                certId: c.cert_id || "",
                 title: c.certData?.event || c.title || "Hackathon Participation",
                 organiser: c.certData?.organiser || c.certData?.organisation || c.issued_by || "Unstop Partner",
-                issueDate: c.sent_at ? c.sent_at.split(" ")[0] : ""
+                organisation: c.certData?.organisation || "",
+                issueDate: c.sent_at ? c.sent_at.split(" ")[0] : "",
+                url: c.url || (c.cert_id ? `https://unstop.com/api/certificate/${c.cert_id}` : ""),
+                eventLogo: c.certData?.eventLogo || ""
               }));
             }
           }
@@ -1070,7 +1098,7 @@ export async function GET(request: Request) {
         }, { status: 200 });
       }
 
-      return NextResponse.json({
+      const unstopPayload = {
         participations,
         points,
         badgesCount,
@@ -1081,7 +1109,75 @@ export async function GET(request: Request) {
         avatar,
         fullName,
         certificates
-      }, {
+      };
+
+      STATS_CACHE.set(cacheKey, { data: unstopPayload, timestamp: Date.now() });
+
+      return NextResponse.json(unstopPayload, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
+    if (platform === "devpost") {
+      let projectsCount = 0;
+      let hackathonsCount = 0;
+      let followersCount = 0;
+      let fullName = cleanUsername;
+      let avatar = "";
+      let fetchedSuccessfully = false;
+
+      const devpostHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      };
+
+      try {
+        const dpRes = await fetch(`https://devpost.com/${cleanUsername}`, {
+          headers: devpostHeaders,
+          cache: "no-store"
+        });
+
+        if (dpRes.ok) {
+          const html = await dpRes.text();
+          if (!html.includes("Page Not Found") && !html.includes("User doesn't exist")) {
+            fetchedSuccessfully = true;
+
+            const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+            if (nameMatch) {
+              fullName = nameMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+            }
+
+            const pMatch = html.match(/class="[^"]*portfolio-entry[^"]*"/g);
+            if (pMatch) {
+              projectsCount = pMatch.length;
+              hackathonsCount = pMatch.length;
+            }
+
+            const hMatch = html.match(/(\d+)\s*Hackathons?/i);
+            if (hMatch && hMatch[1]) {
+              hackathonsCount = parseInt(hMatch[1], 10);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Devpost API fetch error:", err);
+      }
+
+      const devpostPayload = {
+        projectsCount,
+        hackathonsCount,
+        followersCount,
+        fullName,
+        avatar,
+        participations: hackathonsCount,
+        isFallback: !fetchedSuccessfully
+      };
+
+      STATS_CACHE.set(cacheKey, { data: devpostPayload, timestamp: Date.now() });
+
+      return NextResponse.json(devpostPayload, {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
         }
