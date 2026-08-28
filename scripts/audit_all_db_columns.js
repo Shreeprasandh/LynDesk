@@ -307,6 +307,77 @@ const tableColumns = {
     "is_starred",
     "notes",
     "completed_at"
+  ],
+  workspace_presence: [
+    "workspace_id",
+    "user_id",
+    "status_text",
+    "is_online",
+    "last_seen_at"
+  ],
+  student_works: [
+    "id",
+    "institute_id",
+    "student_id",
+    "title",
+    "category",
+    "description",
+    "is_published",
+    "external_url",
+    "file_path",
+    "is_alias",
+    "alias_proof_path",
+    "status",
+    "ai_verdict",
+    "ai_verified_at",
+    "rejection_reason",
+    "views",
+    "average_rating",
+    "rating_count",
+    "tags",
+    "how_to_use",
+    "embed_url",
+    "expires_at",
+    "renewed_at",
+    "created_at",
+    "updated_at"
+  ],
+  student_work_ratings: [
+    "id",
+    "work_id",
+    "rater_id",
+    "rating",
+    "created_at"
+  ],
+  student_work_views: [
+    "id",
+    "work_id",
+    "viewer_id",
+    "viewed_at"
+  ],
+  student_work_staff_reviews: [
+    "id",
+    "work_id",
+    "reviewed_by",
+    "decision",
+    "review_note",
+    "reviewed_at"
+  ],
+  user_hackathon_applications: [
+    "id",
+    "user_id",
+    "event_id",
+    "title",
+    "portal",
+    "portal_url",
+    "handle",
+    "role",
+    "status",
+    "stage",
+    "deadline",
+    "workspace_id",
+    "created_at",
+    "updated_at"
   ]
 };
 
@@ -326,7 +397,12 @@ async function auditDB() {
       .limit(1);
 
     if (tableError) {
-      if (tableError.code === "PGRST205" || tableError.message.includes("does not exist") || tableError.code === "42P01") {
+      if (
+        tableError.code === "PGRST205" || 
+        tableError.message.includes("does not exist") || 
+        tableError.message.includes("schema cache") ||
+        tableError.code === "42P01"
+      ) {
         console.log(`❌ Table MISSING: ${table}`);
         missingTables.push(table);
         continue;
@@ -338,10 +414,10 @@ async function auditDB() {
     for (const col of cols) {
       const { error: colError } = await supabase
         .from(table)
-        .update({ [col]: null })
-        .eq("id", "00000000-0000-0000-0000-000000000000");
+        .select(col)
+        .limit(1);
 
-      if (colError && colError.code === "PGRST204") {
+      if (colError && (colError.code === "PGRST204" || colError.message.includes("does not exist"))) {
         console.log(`   ❌ Column MISSING in '${table}': ${col}`);
         missingColumns.push({ table, col });
       }

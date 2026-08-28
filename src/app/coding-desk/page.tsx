@@ -1,5 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import CodingDeskPage from "../coding-deck/page";
+export default function CodingDeskRedirect() {
+  redirect("/coding-deck");
+}
 
-export default CodingDeskPage;

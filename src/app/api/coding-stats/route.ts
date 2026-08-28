@@ -1184,6 +1184,201 @@ export async function GET(request: Request) {
       });
     }
 
+    if (platform === "hackerrank") {
+      let solved = 0;
+      let solvedEasy = 0;
+      let solvedMedium = 0;
+      let solvedHard = 0;
+      let totalSubmissions = 0;
+      let acceptedSubmissions = 0;
+      let rank = "Hacker";
+      let rating = 1200;
+      let globalRank = 0;
+      let fetchedSuccessfully = false;
+      const submissionCalendar: Record<string, number> = {};
+
+      const hrHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      };
+
+      try {
+        const [badgesRes, profileRes] = await Promise.allSettled([
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, {
+            headers: hrHeaders,
+            cache: "no-store"
+          }),
+          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/profile`, {
+            headers: hrHeaders,
+            cache: "no-store"
+          })
+        ]);
+
+        if (badgesRes.status === "fulfilled" && badgesRes.value.ok) {
+          const badgesData = await badgesRes.value.json();
+          if (badgesData && Array.isArray(badgesData.models)) {
+            fetchedSuccessfully = true;
+            let totalBadgeStars = 0;
+            badgesData.models.forEach((b: any) => {
+              const solvedCount = parseInt(b.solved || 0, 10);
+              const totalCount = parseInt(b.total_challenges || 0, 10);
+              const stars = parseInt(b.stars || 0, 10);
+              solved += solvedCount;
+              totalSubmissions += Math.max(totalCount, solvedCount);
+              totalBadgeStars += stars;
+            });
+            acceptedSubmissions = solved;
+            rating = Math.max(1200, totalBadgeStars * 250);
+            if (totalBadgeStars >= 15) rank = "Master (5★)";
+            else if (totalBadgeStars >= 10) rank = "Specialist (4★)";
+            else if (totalBadgeStars >= 6) rank = "Knight (3★)";
+            else if (totalBadgeStars >= 3) rank = "Pupil (2★)";
+            else rank = "Hacker (1★)";
+          }
+        }
+
+        if (profileRes.status === "fulfilled" && profileRes.value.ok) {
+          const profData = await profileRes.value.json();
+          if (profData?.model) {
+            fetchedSuccessfully = true;
+            if (profData.model.score) {
+              rating = Math.max(rating, Math.round(profData.model.score));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("HackerRank fetch error:", err);
+      }
+
+      const hackerrankPayload = {
+        solved,
+        solvedEasy,
+        solvedMedium,
+        solvedHard,
+        totalSubmissions: Math.max(totalSubmissions, solved),
+        acceptedSubmissions,
+        rank: fetchedSuccessfully ? rank : "Active Hacker",
+        rating,
+        globalRank,
+        submissionCalendar,
+        isFallback: !fetchedSuccessfully
+      };
+
+      STATS_CACHE.set(cacheKey, { data: hackerrankPayload, timestamp: Date.now() });
+
+      return NextResponse.json(hackerrankPayload, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
+    if (platform === "geeksforgeeks" || platform === "gfg") {
+      let solved = 0;
+      let solvedEasy = 0;
+      let solvedMedium = 0;
+      let solvedHard = 0;
+      let totalSubmissions = 0;
+      let acceptedSubmissions = 0;
+      let rank = "Geek";
+      let rating = 100;
+      let globalRank = 0;
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let fetchedSuccessfully = false;
+      const submissionCalendar: Record<string, number> = {};
+
+      const gfgHeaders = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.geeksforgeeks.org/"
+      };
+
+      try {
+        const apiRes = await fetch(`https://practiceapi.geeksforgeeks.org/api/v1/user/problems/submissions/${cleanUsername}/`, {
+          headers: { "User-Agent": gfgHeaders["User-Agent"] },
+          cache: "no-store"
+        });
+        if (apiRes.ok) {
+          const apiJson = await apiRes.json();
+          if (apiJson && apiJson.result) {
+            fetchedSuccessfully = true;
+            const r = apiJson.result;
+            solved = parseInt(r.total_problems_solved || 0, 10);
+            solvedEasy = parseInt(r.easy || 0, 10) + parseInt(r.school || 0, 10) + parseInt(r.basic || 0, 10);
+            solvedMedium = parseInt(r.medium || 0, 10);
+            solvedHard = parseInt(r.hard || 0, 10);
+            rating = parseInt(r.coding_score || 0, 10);
+            globalRank = parseInt(r.institute_rank || 0, 10);
+            currentStreak = parseInt(r.current_streak || 0, 10);
+            longestStreak = parseInt(r.pod_solved_longest_streak || 0, 10);
+            acceptedSubmissions = solved;
+            totalSubmissions = solved;
+          }
+        }
+      } catch (err) {
+        console.warn("GFG API fetch error:", err);
+      }
+
+      if (!fetchedSuccessfully || solved === 0) {
+        try {
+          const htmlRes = await fetch(`https://www.geeksforgeeks.org/user/${cleanUsername}/`, {
+            headers: gfgHeaders,
+            cache: "no-store"
+          });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            if (!html.includes("User does not exist") && !html.includes("Page Not Found")) {
+              fetchedSuccessfully = true;
+              
+              const scoreMatch = html.match(/Coding Score[\s\S]*?>(\d+)</i) || html.match(/score_card_value[^>]*>(\d+)/i);
+              if (scoreMatch) rating = parseInt(scoreMatch[1], 10);
+
+              const solvedMatch = html.match(/Problems Solved[\s\S]*?>(\d+)</i) || html.match(/problem_solved_value[^>]*>(\d+)/i);
+              if (solvedMatch) solved = parseInt(solvedMatch[1], 10);
+
+              const rankMatch = html.match(/Institute Rank[\s\S]*?>(\d+)</i) || html.match(/rank_value[^>]*>(\d+)/i);
+              if (rankMatch) globalRank = parseInt(rankMatch[1], 10);
+
+              acceptedSubmissions = solved;
+              totalSubmissions = solved;
+            }
+          }
+        } catch (err) {
+          console.warn("GFG HTML scrape error:", err);
+        }
+      }
+
+      if (rating >= 2000) rank = "Master Geek";
+      else if (rating >= 1000) rank = "Expert Geek";
+      else if (rating >= 400) rank = "Advanced Geek";
+      else rank = "Active Geek";
+
+      const gfgPayload = {
+        solved,
+        solvedEasy,
+        solvedMedium,
+        solvedHard,
+        totalSubmissions: Math.max(totalSubmissions, solved),
+        acceptedSubmissions,
+        rank: fetchedSuccessfully ? rank : "Active Geek",
+        rating,
+        globalRank,
+        currentStreak,
+        longestStreak,
+        submissionCalendar,
+        isFallback: !fetchedSuccessfully
+      };
+
+      STATS_CACHE.set(cacheKey, { data: gfgPayload, timestamp: Date.now() });
+
+      return NextResponse.json(gfgPayload, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
+        }
+      });
+    }
+
     return NextResponse.json({ error: "Unsupported platform" }, { status: 400 });
   } catch (err) {
     console.error(`Error loading stats for ${platform} (${cleanUsername}):`, err);

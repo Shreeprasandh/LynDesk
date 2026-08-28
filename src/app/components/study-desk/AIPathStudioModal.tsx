@@ -46,7 +46,17 @@ export default function AIPathStudioModal({ onClose, onPathCreated }: AIPathStud
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
-      setUploadedFiles((prev) => [...prev, ...newFiles]);
+      const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+      const oversized = newFiles.filter(f => f.size > MAX_FILE_SIZE);
+
+      if (oversized.length > 0) {
+        setErrorMsg(`"${oversized[0].name}" exceeds the 4.5MB upload ceiling. Please provide concise notes or slide decks.`);
+      }
+
+      const validFiles = newFiles.filter(f => f.size <= MAX_FILE_SIZE);
+      if (validFiles.length > 0) {
+        setUploadedFiles((prev) => [...prev, ...validFiles]);
+      }
     }
   };
 

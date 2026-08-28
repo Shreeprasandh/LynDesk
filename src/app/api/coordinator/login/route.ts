@@ -82,21 +82,24 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // 2. Check default dev staff fallback
+    // 2. Check default dev staff fallback (in dev mode or when explicitly enabled)
     if (!authenticatedStaff) {
-      const matchedDev = DEFAULT_DEV_STAFF.find(s => s.email === cleanEmail && s.passkey === cleanKey);
-      if (matchedDev) {
-        authenticatedStaff = {
-          id: matchedDev.id,
-          email: matchedDev.email,
-          name: matchedDev.name,
-          role: matchedDev.role,
-          departmentScope: matchedDev.department_scope,
-          assignedSections: matchedDev.assigned_sections,
-          assignedYears: matchedDev.assigned_years,
-          instituteId: matchedDev.institute_id,
-          instituteName: matchedDev.institute_name
-        };
+      const allowDevFallbacks = process.env.NODE_ENV !== "production" || process.env.ENABLE_DEV_DEMO_ACCOUNTS === "true";
+      if (allowDevFallbacks) {
+        const matchedDev = DEFAULT_DEV_STAFF.find(s => s.email === cleanEmail && s.passkey === cleanKey);
+        if (matchedDev) {
+          authenticatedStaff = {
+            id: matchedDev.id,
+            email: matchedDev.email,
+            name: matchedDev.name,
+            role: matchedDev.role,
+            departmentScope: matchedDev.department_scope,
+            assignedSections: matchedDev.assigned_sections,
+            assignedYears: matchedDev.assigned_years,
+            instituteId: matchedDev.institute_id,
+            instituteName: matchedDev.institute_name
+          };
+        }
       }
     }
 

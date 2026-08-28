@@ -36,70 +36,97 @@ function saveLocalEvents(events: WallEvent[], userId?: string) {
   } catch {}
 }
 
+let inFlightCalendarPromise: Promise<WallEvent[]> | null = null;
+let lastCalendarFetchTime = 0;
+let lastCalendarCachedEvents: WallEvent[] | null = null;
+const CALENDAR_CACHE_TTL_MS = 2000;
+
 /**
  * Fetch all WallCalendar events for a user (combining DB, auto-sync, and localStorage)
  * Automatically filters out past/expired events (< today)
  */
 export async function fetchWallCalendarEvents(userId?: string): Promise<WallEvent[]> {
   const localEvents = getLocalEvents(userId);
-  let dbEvents: WallEvent[] = [];
+  if (!userId) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    return localEvents.filter((e) => e.date && e.date >= todayStr);
+  }
 
-  if (userId) {
+  const now = Date.now();
+  if (lastCalendarCachedEvents && now - lastCalendarFetchTime < CALENDAR_CACHE_TTL_MS) {
+    return lastCalendarCachedEvents;
+  }
+
+  if (inFlightCalendarPromise) {
+    return inFlightCalendarPromise;
+  }
+
+  inFlightCalendarPromise = (async () => {
     try {
-      const { data, error } = await supabase
-        .from("wall_calendar_events")
-        .select("*")
-        .eq("user_id", userId);
+      let dbEvents: WallEvent[] = [];
+      try {
+        const { data, error } = await supabase
+          .from("wall_calendar_events")
+          .select("*")
+          .eq("user_id", userId);
 
-      if (!error && data) {
-        dbEvents = data.map((d: any) => ({
-          id: d.id,
-          user_id: d.user_id,
-          title: d.title,
-          date: d.event_date,
-          time: d.event_time,
-          category: d.category,
-          description: d.description,
-          link: d.link,
-          source_type: d.source_type,
-          source_id: d.source_id,
-          // Fix #4: correctly flag auto-synced events so delete button is hidden
-          isAutoSynced: !!(d.source_type && d.source_type !== "custom"),
-        }));
+        if (!error && data) {
+          dbEvents = data.map((d: any) => ({
+            id: d.id,
+            user_id: d.user_id,
+            title: d.title,
+            date: d.event_date,
+            time: d.event_time,
+            category: d.category,
+            description: d.description,
+            link: d.link,
+            source_type: d.source_type,
+            source_id: d.source_id,
+            isAutoSynced: !!(d.source_type && d.source_type !== "custom"),
+          }));
+        }
+      } catch (err) {
+        console.warn("Wall calendar DB query notice:", err);
       }
-    } catch {}
-  }
 
-  // Merge DB and local events
-  const map = new Map<string, WallEvent>();
-  localEvents.forEach((e) => map.set(e.id, e));
-  dbEvents.forEach((e) => map.set(e.id, e));
+      // Merge DB and local events
+      const map = new Map<string, WallEvent>();
+      localEvents.forEach((e) => map.set(e.id, e));
+      dbEvents.forEach((e) => map.set(e.id, e));
 
-  const all = Array.from(map.values());
-  const todayStr = new Date().toISOString().split("T")[0];
+      const all = Array.from(map.values());
+      const todayStr = new Date().toISOString().split("T")[0];
 
-  // Auto-prune and return only active and upcoming events (>= today)
-  const activeEvents = all.filter((e) => e.date && e.date >= todayStr);
+      // Auto-prune and return only active and upcoming events (>= today)
+      const activeEvents = all.filter((e) => e.date && e.date >= todayStr);
 
-  // Sync back cleaned active events to local storage if stale past items were pruned
-  if (activeEvents.length !== localEvents.length && typeof window !== "undefined") {
-    saveLocalEvents(activeEvents, userId);
-  }
+      // Sync back cleaned active events to local storage if stale past items were pruned
+      if (activeEvents.length !== localEvents.length && typeof window !== "undefined") {
+        saveLocalEvents(activeEvents, userId);
+      }
 
-  // Fix #3: Prune past DB events server-side (fire-and-forget — no await)
-  if (userId) {
-    const pastDbIds = dbEvents.filter((e) => e.date && e.date < todayStr).map((e) => e.id);
-    if (pastDbIds.length > 0) {
-      supabase
-        .from("wall_calendar_events")
-        .delete()
-        .in("id", pastDbIds)
-        .eq("user_id", userId)
-        .then(() => {});
+      // Prune past DB events server-side
+      if (dbEvents.length > 0) {
+        const pastDbIds = dbEvents.filter((e) => e.date && e.date < todayStr).map((e) => e.id);
+        if (pastDbIds.length > 0) {
+          supabase
+            .from("wall_calendar_events")
+            .delete()
+            .in("id", pastDbIds)
+            .eq("user_id", userId)
+            .then(() => {}, () => {});
+        }
+      }
+
+      lastCalendarCachedEvents = activeEvents;
+      lastCalendarFetchTime = Date.now();
+      return activeEvents;
+    } finally {
+      inFlightCalendarPromise = null;
     }
-  }
+  })();
 
-  return activeEvents;
+  return inFlightCalendarPromise;
 }
 
 /**

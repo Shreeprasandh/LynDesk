@@ -76,9 +76,10 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // 2. Check default dev admin fallback
+    // 2. Check default dev admin fallback (in dev mode or when explicitly enabled)
     if (!authenticatedAdmin) {
-      if (cleanEmail === DEFAULT_DEV_ADMIN.email && cleanPass === DEFAULT_DEV_ADMIN.passkey) {
+      const allowDevFallbacks = process.env.NODE_ENV !== "production" || process.env.ENABLE_DEV_DEMO_ACCOUNTS === "true";
+      if (allowDevFallbacks && cleanEmail === DEFAULT_DEV_ADMIN.email && cleanPass === DEFAULT_DEV_ADMIN.passkey) {
         authenticatedAdmin = {
           id: DEFAULT_DEV_ADMIN.id,
           email: DEFAULT_DEV_ADMIN.email,

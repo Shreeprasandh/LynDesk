@@ -666,10 +666,10 @@ export default function ProfilePage() {
           .from("profiles")
           .select("*, institutes(name)")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
           
-        if (error) {
-          console.error("Database profiles load error:", error);
+        if (error && error.code !== "PGRST116") {
+          console.warn("Database profiles load notice:", error.message || error);
         }
         if (profile) {
           setFullName(profile.full_name || "");

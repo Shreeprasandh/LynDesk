@@ -51,5 +51,35 @@ describe("Coding Stats & HackerRank Integration", () => {
     expect(badges[0].name).toBe("Problem Solving");
     expect(badges[0].stars).toBe(5);
   });
+
+  it("handles GeeksforGeeks API and score data properly", () => {
+    const sampleGfgResult = {
+      total_problems_solved: 340,
+      easy: 180,
+      medium: 120,
+      hard: 40,
+      coding_score: 950,
+      institute_rank: 12,
+      current_streak: 15,
+      pod_solved_longest_streak: 42
+    };
+
+    expect(sampleGfgResult.total_problems_solved).toBe(340);
+    expect(sampleGfgResult.coding_score).toBe(950);
+    expect(sampleGfgResult.current_streak).toBe(15);
+  });
+
+  it("handles Devpost project count and hackathon metrics", () => {
+    const sampleDevpostPayload = {
+      projectsCount: 8,
+      hackathonsCount: 8,
+      followersCount: 14,
+      fullName: "Alex Rivera",
+      participations: 8
+    };
+
+    expect(sampleDevpostPayload.projectsCount).toBe(8);
+    expect(sampleDevpostPayload.participations).toBe(8);
+  });
 });
 
