@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import AppliedHackathonsModal from "../components/coding-desk/AppliedHackathonsModal";
 import LynDeskLoadingCard from "../components/LynDeskLoadingCard";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -18,7 +17,6 @@ import {
   Sparkles,
   Flame,
   RotateCw,
-  FolderKanban,
   Lock,
   ChevronDown,
   ChevronUp,
@@ -128,7 +126,6 @@ export default function CodingDeckPage() {
     }
     return "";
   });
-  const [showAppliedModal, setShowAppliedModal] = useState(false);
   const [showAllContests, setShowAllContests] = useState(false);
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
   const [showHandleModal, setShowHandleModal] = useState(false);
@@ -1549,7 +1546,7 @@ export default function CodingDeckPage() {
                           >
                             <span className="flex items-center gap-1 text-amber-400 font-semibold font-mono">
                               <Star size={11} className="fill-amber-400 text-amber-400" />
-                              {b.stars || 1}★
+                              <span>{b.stars || 1}</span>
                             </span>
                             <span className="w-1 h-1 rounded-full bg-border-main" />
                             <span className="font-sans font-medium text-txt-main">{b.name}</span>
@@ -1980,13 +1977,6 @@ export default function CodingDeckPage() {
                     </span>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setShowAppliedModal(true)}
-                  className="w-full h-9 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 rounded-sm transition-opacity font-bold cursor-pointer mt-1"
-                >
-                  <FolderKanban size={12} /> Live Application Tracker
-                </button>
               </div>
 
               {/* Active / Upcoming Contests Feed */}
@@ -2186,14 +2176,6 @@ export default function CodingDeckPage() {
           </div>
 
       </main>
-
-      {showAppliedModal && (
-        <AppliedHackathonsModal
-          unstopUser={unstopUser}
-          devpostUser={devpostUser}
-          onClose={() => setShowAppliedModal(false)}
-        />
-      )}
 
       {showHandleModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">

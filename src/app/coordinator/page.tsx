@@ -923,8 +923,10 @@ useEffect(() => {
         if (lowerPlat.includes("leetcode")) columnName = "leetcode_verified";
         else if (lowerPlat.includes("codeforces")) columnName = "codeforces_verified";
         else if (lowerPlat.includes("codechef")) columnName = "codechef_verified";
+        else if (lowerPlat.includes("hackerrank")) columnName = "hackerrank_verified";
+        else if (lowerPlat.includes("geeksforgeeks")) columnName = "geeksforgeeks_verified";
         else if (lowerPlat.includes("unstop")) columnName = "unstop_verified";
-        else if (lowerPlat.includes("hack2skill")) columnName = "hack2skill_verified";
+        else if (lowerPlat.includes("devpost")) columnName = "devpost_verified";
 
         if (columnName) {
           await supabase

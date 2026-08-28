@@ -80,7 +80,7 @@ interface FriendProfile {
   geeksforgeeks_username?: string;
   codeforces_username?: string;
   unstop_username?: string;
-  hack2skill_username?: string;
+  devpost_username?: string;
   github_url?: string;
   linkedin_url?: string;
   portfolio_url?: string;
@@ -251,8 +251,6 @@ export default function ExplorePage() {
         ? "Unstop"
         : item.url.includes("devpost.com")
         ? "Devpost"
-        : item.url.includes("sih.gov.in")
-        ? "Hack2Skill"
         : "Other";
 
       const res = await fetch("/api/user/applied-hackathons", {
@@ -413,8 +411,8 @@ export default function ExplorePage() {
           status,
           sender_restricted,
           receiver_restricted,
-          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name ),
-          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, hack2skill_username, github_url, linkedin_url, portfolio_url, college_name )
+          sender:sender_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, devpost_username, github_url, linkedin_url, portfolio_url, college_name ),
+          receiver:receiver_id ( id, username, full_name, avatar_url, academic_credits, department, graduation_year, leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, devpost_username, github_url, linkedin_url, portfolio_url, college_name )
         `);
 
       if (!error && data && data.length > 0) {
@@ -441,7 +439,7 @@ export default function ExplorePage() {
                 geeksforgeeks_username: partner.geeksforgeeks_username,
                 codeforces_username: partner.codeforces_username,
                 unstop_username: partner.unstop_username,
-                hack2skill_username: partner.hack2skill_username,
+                devpost_username: partner.devpost_username,
                 github_url: partner.github_url,
                 linkedin_url: partner.linkedin_url,
                 portfolio_url: partner.portfolio_url,
@@ -510,7 +508,7 @@ export default function ExplorePage() {
           geeksforgeeks_username: meta.geeksforgeeks_username || "",
           codeforces_username: meta.codeforces_username || "",
           unstop_username: meta.unstop_username || "",
-          hack2skill_username: meta.hack2skill_username || "",
+          devpost_username: meta.devpost_username || "",
           avatar_url: meta.avatar_url || "",
           full_name: meta.full_name || "",
           username: meta.username || "",
@@ -579,7 +577,7 @@ export default function ExplorePage() {
             geeksforgeeks_username: p.geeksforgeeks_username,
             codeforces_username: p.codeforces_username,
             unstop_username: p.unstop_username,
-            hack2skill_username: p.hack2skill_username,
+            devpost_username: p.devpost_username,
             github_url: p.github_url,
             linkedin_url: p.linkedin_url,
             portfolio_url: p.portfolio_url,
@@ -1468,12 +1466,12 @@ export default function ExplorePage() {
                         meta.unstop_username ||
                         "";
 
-                      const hack2skill =
-                        selectedFriend.hack2skill_username ||
-                        draft.hack2skillUsername ||
-                        draft.hack2skill_username ||
-                        publicCached.hack2skill_username ||
-                        meta.hack2skill_username ||
+                      const devpost =
+                        selectedFriend.devpost_username ||
+                        draft.devpostUsername ||
+                        draft.devpost_username ||
+                        publicCached.devpost_username ||
+                        meta.devpost_username ||
                         "";
 
                       const github =
@@ -1547,7 +1545,7 @@ export default function ExplorePage() {
                                 <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
                                   Competitive Handles
                                 </span>
-                                {leetcode || codechef || hackerrank || geeksforgeeks || codeforces || unstop || hack2skill ? (
+                                {leetcode || codechef || hackerrank || geeksforgeeks || codeforces || unstop || devpost ? (
                                   <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
                                     {leetcode && (
                                       <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
@@ -1597,11 +1595,11 @@ export default function ExplorePage() {
                                         </span>
                                       </div>
                                     )}
-                                    {hack2skill && (
+                                    {devpost && (
                                       <div className="bg-bg-base/40 p-2 border border-border-main/50 rounded flex flex-col">
-                                        <span className="text-[8px] text-txt-muted uppercase">Hack2Skill</span>
+                                        <span className="text-[8px] text-txt-muted uppercase">Devpost</span>
                                         <span className="text-txt-main font-semibold truncate">
-                                          @{hack2skill}
+                                          @{devpost}
                                         </span>
                                       </div>
                                     )}

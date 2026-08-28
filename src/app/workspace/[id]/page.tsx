@@ -474,9 +474,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     "ws_unstop_uber_2026": { title: "Uber HackTag 2026 Hackathon", portalUrl: "https://unstop.com/hackathons/uber-hacktag-2026" },
     "ws_unstop_tata_2026": { title: "Tata Crucible Campus Hack 2026", portalUrl: "https://unstop.com/competitions/tata-crucible-campus-2026" },
     "ws_unstop_flipkart_grid": { title: "Flipkart GRID 6.0 Software Track", portalUrl: "https://unstop.com/competitions/flipkart-grid-6" },
-    "ws_unstop_loreal_brandstorm": { title: "L'Oréal Brandstorm Tech Challenge", portalUrl: "https://unstop.com/competitions/loreal-brandstorm-2026" },
-    "ws_h2s_sih_2026": { title: "Smart India Hackathon 2026 (SIH)", portalUrl: "https://hack2skill.com/hackathons/sih2026" },
-    "ws_h2s_google_cloud": { title: "Google Cloud AI Hackathon India", portalUrl: "https://hack2skill.com/hackathons/google-cloud-ai" },
+    "ws_devpost_gemini_2026": { title: "Google Gemini AI Global Challenge 2026", portalUrl: "https://devpost.com/hackathons/gemini-ai-challenge" },
+    "ws_devpost_cloud_2026": { title: "Google Cloud AI Hackathon", portalUrl: "https://devpost.com/hackathons/google-cloud-ai" },
     "0d72f1f4-cf25-4a99-bac4-37685be55df1": { title: "Adobe University Hackathon 2026", portalUrl: "https://unstop.com/hackathons/crp-adobe-university-hackathon-2026-adobe-1715333" }
   };
 

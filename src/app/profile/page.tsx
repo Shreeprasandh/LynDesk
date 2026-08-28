@@ -184,16 +184,16 @@ export function extractPlatformHandle(input: string, platform: string): { handle
         return { handle: username };
       }
 
-      if (platform === "Hack2Skill") {
-        if (!host.includes("hack2skill")) {
-          return { handle: "", error: "Invalid Hack2Skill URL. Must be a hack2skill.com profile link." };
+      if (platform === "Devpost") {
+        if (!host.includes("devpost")) {
+          return { handle: "", error: "Invalid Devpost URL. Must be a devpost.com profile link." };
         }
         let username = pathSegments[pathSegments.length - 1] || "";
         if (pathSegments[0] === "user" || pathSegments[0] === "u") {
           username = pathSegments[1] || username;
         }
         if (!username) {
-          return { handle: "", error: "Could not extract Hack2Skill username from URL." };
+          return { handle: "", error: "Could not extract Devpost username from URL." };
         }
         return { handle: username };
       }
@@ -489,7 +489,7 @@ export default function ProfilePage() {
     return "";
   });
   const [unstopUsername, setUnstopUsername] = useState("");
-  const [hack2skillUsername, setHack2skillUsername] = useState("");
+  const [devpostUsername, setDevpostUsername] = useState("");
 
   // Handle verification statuses
   const [leetcodeVerified, setLeetcodeVerified] = useState(false);
@@ -498,7 +498,7 @@ export default function ProfilePage() {
   const [hackerrankVerified, setHackerrankVerified] = useState(false);
   const [geeksforgeeksVerified, setGeeksforgeeksVerified] = useState(false);
   const [unstopVerified, setUnstopVerified] = useState(false);
-  const [hack2skillVerified, setHack2skillVerified] = useState(false);
+  const [devpostVerified, setDevpostVerified] = useState(false);
 
   // Coding Platform & Social Input Errors
   const [platformInputErrors, setPlatformInputErrors] = useState<Record<string, string>>({});
@@ -690,7 +690,7 @@ export default function ProfilePage() {
           setGeeksforgeeksUsername(profile.geeksforgeeks_username || "");
           setCodeforcesUsername(profile.codeforces_username || "");
           setUnstopUsername(profile.unstop_username || "");
-          setHack2skillUsername(profile.hack2skill_username || "");
+          setDevpostUsername(profile.devpost_username || "");
           const hasKeys = (profile.college_key || "").trim() !== "";
           setLeetcodeVerified(hasKeys ? !!profile.leetcode_verified : true);
           setCodechefVerified(hasKeys ? !!profile.codechef_verified : true);
@@ -698,7 +698,7 @@ export default function ProfilePage() {
           setGeeksforgeeksVerified(hasKeys ? !!profile.geeksforgeeks_verified : true);
           setCodeforcesVerified(hasKeys ? !!profile.codeforces_verified : true);
           setUnstopVerified(hasKeys ? !!profile.unstop_verified : true);
-          setHack2skillVerified(hasKeys ? !!profile.hack2skill_verified : true);
+          setDevpostVerified(hasKeys ? !!profile.devpost_verified : true);
 
           const verifiedBackup: Record<string, string> = {};
           if (profile.leetcode_verified) verifiedBackup["LeetCode"] = profile.leetcode_username || "";
@@ -707,7 +707,7 @@ export default function ProfilePage() {
           if (profile.geeksforgeeks_verified) verifiedBackup["GeeksforGeeks"] = profile.geeksforgeeks_username || "";
           if (profile.codeforces_verified) verifiedBackup["Codeforces"] = profile.codeforces_username || "";
           if (profile.unstop_verified) verifiedBackup["Unstop"] = profile.unstop_username || "";
-          if (profile.hack2skill_verified) verifiedBackup["Hack2Skill"] = profile.hack2skill_username || "";
+          if (profile.devpost_verified) verifiedBackup["Devpost"] = profile.devpost_username || "";
           setVerifiedHandlesBackup(verifiedBackup);
 
           if (profile.institutes) {
@@ -740,7 +740,7 @@ export default function ProfilePage() {
         setGeeksforgeeksUsername(meta.geeksforgeeks_username || profile?.geeksforgeeks_username || "");
         setCodeforcesUsername(meta.codeforces_username || profile?.codeforces_username || "");
         setUnstopUsername(meta.unstop_username || profile?.unstop_username || "");
-        setHack2skillUsername(meta.hack2skill_username || profile?.hack2skill_username || "");
+        setDevpostUsername(meta.devpost_username || profile?.devpost_username || "");
         setBio(meta.bio || "");
         setLocation(meta.location || profile?.location || "");
         setSkills(meta.skills || "");
@@ -786,7 +786,7 @@ export default function ProfilePage() {
               if (draft.codeforcesUsername !== undefined) setCodeforcesUsername(draft.codeforcesUsername);
               if (draft.codechefUsername !== undefined) setCodechefUsername(draft.codechefUsername);
               if (draft.unstopUsername !== undefined) setUnstopUsername(draft.unstopUsername);
-              if (draft.hack2skillUsername !== undefined) setHack2skillUsername(draft.hack2skillUsername);
+              if (draft.devpostUsername !== undefined) setDevpostUsername(draft.devpostUsername);
               if (draft.isPublic !== undefined) setIsPublic(draft.isPublic);
               if (draft.grantSharePermission !== undefined) setGrantSharePermission(draft.grantSharePermission);
             } catch (draftErr) {
@@ -832,7 +832,7 @@ export default function ProfilePage() {
       codeforcesUsername,
       codechefUsername,
       unstopUsername,
-      hack2skillUsername,
+      devpostUsername,
       updatedAt: Date.now()
     };
 
@@ -849,7 +849,7 @@ export default function ProfilePage() {
     user, fullName, username, bio, skills, githubUrl, linkedinUrl, discordUsername,
     portfolioUrl, collegeName, department, gradYear, isPublic, collegeKey, batchCode,
     grantSharePermission, leetcodeUsername, codeforcesUsername, codechefUsername,
-    unstopUsername, hack2skillUsername, isEditing
+    unstopUsername, devpostUsername, isEditing
   ]);
 
   // Sync institutional link status in real-time
@@ -1279,7 +1279,7 @@ export default function ProfilePage() {
       { name: "GeeksforGeeks", raw: geeksforgeeksUsername, setFn: setGeeksforgeeksUsername },
       { name: "Codeforces", raw: codeforcesUsername, setFn: setCodeforcesUsername },
       { name: "Unstop", raw: unstopUsername, setFn: setUnstopUsername },
-      { name: "Hack2Skill", raw: hack2skillUsername, setFn: setHack2skillUsername },
+      { name: "Devpost", raw: devpostUsername, setFn: setDevpostUsername },
     ];
 
     const newPlatformErrors: Record<string, string> = {};
@@ -1331,12 +1331,12 @@ export default function ProfilePage() {
       const hrTrim = extractedHandles["HackerRank"] || hackerrankUsername.trim();
       const gfgTrim = extractedHandles["GeeksforGeeks"] || geeksforgeeksUsername.trim();
       const usTrim = extractedHandles["Unstop"] || unstopUsername.trim();
-      const h2sTrim = extractedHandles["Hack2Skill"] || hack2skillUsername.trim();
+      const dpTrim = extractedHandles["Devpost"] || devpostUsername.trim();
 
-      if (lcTrim || cfTrim || ccTrim || hrTrim || gfgTrim || usTrim || h2sTrim) {
+      if (lcTrim || cfTrim || ccTrim || hrTrim || gfgTrim || usTrim || dpTrim) {
         const { data: existingProfiles } = await supabase
           .from("profiles")
-          .select("id, leetcode_username, codeforces_username, codechef_username, hackerrank_username, geeksforgeeks_username, unstop_username, hack2skill_username")
+          .select("id, leetcode_username, codeforces_username, codechef_username, hackerrank_username, geeksforgeeks_username, unstop_username, devpost_username")
           .neq("id", user.id);
           
         if (existingProfiles) {
@@ -1359,8 +1359,8 @@ export default function ProfilePage() {
             if (usTrim && ep.unstop_username && ep.unstop_username.toLowerCase() === usTrim.toLowerCase()) {
               throw new Error(`The Unstop handle @${usTrim} is already registered by another student.`);
             }
-            if (h2sTrim && ep.hack2skill_username && ep.hack2skill_username.toLowerCase() === h2sTrim.toLowerCase()) {
-              throw new Error(`The Hack2Skill handle @${h2sTrim} is already registered by another student.`);
+            if (dpTrim && ep.devpost_username && ep.devpost_username.toLowerCase() === dpTrim.toLowerCase()) {
+              throw new Error(`The Devpost handle @${dpTrim} is already registered by another student.`);
             }
           }
         }
@@ -1384,7 +1384,7 @@ export default function ProfilePage() {
         let nextHrVerified = hackerrankVerified;
         let nextGfgVerified = geeksforgeeksVerified;
         let nextUsVerified = unstopVerified;
-        let nextH2sVerified = hack2skillVerified;
+        let nextDpVerified = devpostVerified;
 
         if (hasCollege) {
           if (joinedOrChangedInstitution) {
@@ -1394,7 +1394,7 @@ export default function ProfilePage() {
             nextHrVerified = false;
             nextGfgVerified = false;
             nextUsVerified = false;
-            nextH2sVerified = false;
+            nextDpVerified = false;
           } else {
             if (leetcodeUsername.trim() !== (currentDbProfile?.leetcode_username || "").trim()) {
               nextLcVerified = false;
@@ -1414,8 +1414,8 @@ export default function ProfilePage() {
             if (unstopUsername.trim() !== (currentDbProfile?.unstop_username || "").trim()) {
               nextUsVerified = false;
             }
-            if (hack2skillUsername.trim() !== (currentDbProfile?.hack2skill_username || "").trim()) {
-              nextH2sVerified = false;
+            if (devpostUsername.trim() !== (currentDbProfile?.devpost_username || "").trim()) {
+              nextDpVerified = false;
             }
           }
         } else {
@@ -1426,7 +1426,7 @@ export default function ProfilePage() {
           nextHrVerified = true;
           nextGfgVerified = true;
           nextUsVerified = true;
-          nextH2sVerified = true;
+          nextDpVerified = true;
         }
 
         setLeetcodeVerified(nextLcVerified);
@@ -1435,7 +1435,7 @@ export default function ProfilePage() {
         setHackerrankVerified(nextHrVerified);
         setGeeksforgeeksVerified(nextGfgVerified);
         setUnstopVerified(nextUsVerified);
-        setHack2skillVerified(nextH2sVerified);
+        setDevpostVerified(nextDpVerified);
 
         const { error: profileError } = await supabase
           .from("profiles")
@@ -1457,7 +1457,8 @@ export default function ProfilePage() {
             geeksforgeeks_verified: nextGfgVerified,
             codeforces_username: codeforcesUsername.trim() || null,
             unstop_username: unstopUsername.trim() || null,
-            hack2skill_username: hack2skillUsername.trim() || null,
+            devpost_username: devpostUsername.trim() || null,
+            devpost_verified: nextDpVerified,
             graduation_year: gradYear.trim() || null,
             roll_number: rollNumber.trim() || null,
             academic_year: academicYear.trim() || null,
@@ -1497,7 +1498,7 @@ export default function ProfilePage() {
               geeksforgeeks_username: geeksforgeeksUsername.trim(),
               codeforces_username: codeforcesUsername.trim(),
               unstop_username: unstopUsername.trim(),
-              hack2skill_username: hack2skillUsername.trim(),
+              devpost_username: devpostUsername.trim(),
               graduation_year: gradYear.trim(),
               roll_number: rollNumber.trim(),
               academic_year: academicYear.trim(),
@@ -1522,6 +1523,13 @@ export default function ProfilePage() {
           } else {
             localStorage.removeItem("ldk_geeksforgeeks_handle");
             localStorage.removeItem(`ldk_geeksforgeeks_handle_${user.id}`);
+          }
+          if (devpostUsername.trim()) {
+            localStorage.setItem("ldk_devpost_handle", devpostUsername.trim());
+            localStorage.setItem(`ldk_devpost_handle_${user.id}`, devpostUsername.trim());
+          } else {
+            localStorage.removeItem("ldk_devpost_handle");
+            localStorage.removeItem(`ldk_devpost_handle_${user.id}`);
           }
           if (avatarUrl) {
             localStorage.setItem(`ldk_user_avatar_${user.id}`, avatarUrl);
@@ -1568,7 +1576,7 @@ export default function ProfilePage() {
           geeksforgeeks_username: geeksforgeeksUsername.trim(),
           codeforces_username: codeforcesUsername.trim(),
           unstop_username: unstopUsername.trim(),
-          hack2skill_username: hack2skillUsername.trim()
+          devpost_username: devpostUsername.trim()
         }
       });
 
@@ -2556,18 +2564,18 @@ export default function ProfilePage() {
                       )}
                     </div>
 
-                    {/* 7. Hack2Skill */}
+                    {/* 7. Devpost */}
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between items-baseline">
-                        <label className="text-xs text-txt-sub font-semibold">Hack2Skill</label>
-                        {hack2skillUsername.trim() && (
-                          (hack2skillVerified || !collegeKey.trim()) ? (
+                        <label className="text-xs text-txt-sub font-semibold">Devpost</label>
+                        {devpostUsername.trim() && (
+                          (devpostVerified || !collegeKey.trim()) ? (
                             <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
                           ) : (
                             <button
                               type="button"
                               onClick={() => {
-                                setVerifyPlatform("Hack2Skill");
+                                setVerifyPlatform("Devpost");
                                 setVerifyReason("");
                               }}
                               className="text-[7.5px] font-mono text-yellow-500 hover:underline bg-yellow-500/10 px-1.5 py-0.2 rounded border border-yellow-500/30 cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
@@ -2579,27 +2587,27 @@ export default function ProfilePage() {
                       </div>
                       <input 
                         type="text" 
-                        value={hack2skillUsername}
+                        value={devpostUsername}
                         onChange={(e) => {
-                          setHack2skillUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: "" }));
+                          setDevpostUsername(e.target.value);
+                          setPlatformInputErrors(prev => ({ ...prev, Devpost: "" }));
                         }}
                         onBlur={() => {
-                          if (hack2skillUsername.trim()) {
-                            const res = extractPlatformHandle(hack2skillUsername, "Hack2Skill");
-                            if (res.handle) setHack2skillUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, Hack2Skill: "" }));
+                          if (devpostUsername.trim()) {
+                            const res = extractPlatformHandle(devpostUsername, "Devpost");
+                            if (res.handle) setDevpostUsername(res.handle);
+                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Devpost: res.error || "" }));
+                            else setPlatformInputErrors(prev => ({ ...prev, Devpost: "" }));
                           }
                         }}
                         disabled={!isEditing}
-                        placeholder="Enter handle or profile link (e.g. https://hack2skill.com/user/id)"
+                        placeholder="Enter handle or profile link (e.g. https://devpost.com/username)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
-                          platformInputErrors.Hack2Skill ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
+                          platformInputErrors.Devpost ? "border-red-500/70 focus:border-red-500" : "border-border-main/80 focus:border-txt-main"
                         }`}
                       />
-                      {platformInputErrors.Hack2Skill && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Hack2Skill}</span>
+                      {platformInputErrors.Devpost && (
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Devpost}</span>
                       )}
                     </div>
                   </div>
@@ -3197,8 +3205,10 @@ export default function ProfilePage() {
         const handleName = verifyPlatform === "LeetCode" ? leetcodeUsername
                          : verifyPlatform === "Codeforces" ? codeforcesUsername
                          : verifyPlatform === "CodeChef" ? codechefUsername
+                         : verifyPlatform === "HackerRank" ? hackerrankUsername
+                         : verifyPlatform === "GeeksforGeeks" ? geeksforgeeksUsername
                          : verifyPlatform === "Unstop" ? unstopUsername
-                         : hack2skillUsername;
+                         : devpostUsername;
         const prevVerifiedHandle = verifiedHandlesBackup[verifyPlatform] || "";
         const isSwitch = !!prevVerifiedHandle;
 
