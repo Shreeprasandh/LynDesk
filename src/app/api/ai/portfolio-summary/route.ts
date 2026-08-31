@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { checkRateLimit } from "@/app/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const rateLimit = checkRateLimit(`ai_portfolio_${clientIp}`, 15, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { leetcode, codeforces, codechef } = body;
 

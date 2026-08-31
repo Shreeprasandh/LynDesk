@@ -23,18 +23,35 @@ export const INSTITUTIONAL_COOKIE_NAMES = {
   RECRUITER: "lyndesk_session_recruiter"
 } as const;
 
-// Secret key fallback if not explicitly set in server environment
-const SESSION_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || "lyndesk_enterprise_auth_secret_salt_2026";
-const IP_SALT = process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 16) || "lyndesk_ip_salt_2026";
+// Secret key resolution with fail-closed security in production
+function getSessionSecret(): string {
+  const secret = process.env.INSTITUTIONAL_AUTH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("process.env.SUPABASE_SERVICE_ROLE_KEY is required for signing session tokens in production.");
+    }
+    return "lyndesk_dev_session_signing_key";
+  }
+  return secret;
+}
+
+function getIpSalt(): string {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) {
+    return "lyndesk_dev_ip_hasher";
+  }
+  return secret.slice(0, 16);
+}
 
 /**
  * Derives a WebCrypto CryptoKey for HMAC-SHA256 signing
  */
 async function getCryptoKey(): Promise<CryptoKey> {
   const enc = new TextEncoder();
+  const secret = getSessionSecret();
   return crypto.subtle.importKey(
     "raw",
-    enc.encode(SESSION_SECRET),
+    enc.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"]
@@ -153,9 +170,10 @@ export async function hashClientIp(req: NextRequest): Promise<string> {
       "127.0.0.1";
 
     const enc = new TextEncoder();
+    const ipSalt = getIpSalt();
     const buffer = await crypto.subtle.digest(
       "SHA-256",
-      enc.encode(`${rawIp}_${IP_SALT}`)
+      enc.encode(`${rawIp}_${ipSalt}`)
     );
 
     const hashArray = Array.from(new Uint8Array(buffer));

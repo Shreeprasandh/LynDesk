@@ -43,25 +43,16 @@ export async function POST(request: Request) {
       const { data: prof } = await supabaseAdmin
         .from("profiles")
         .select("id, email")
-        .eq("username", cleanUsername)
+        .ilike("username", cleanUsername)
         .maybeSingle();
 
       if (prof?.email) {
         targetEmail = prof.email;
       } else {
-        // Fallback: search auth users list
-        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-        const matched = authUsers?.users?.find(
-          (u) => u.user_metadata?.username?.toLowerCase() === cleanUsername
+        return NextResponse.json(
+          { error: `No registered user found with username @${cleanUsername}.` },
+          { status: 404 }
         );
-        if (matched?.email) {
-          targetEmail = matched.email;
-        } else {
-          return NextResponse.json(
-            { error: `No registered user found with username @${cleanUsername}.` },
-            { status: 404 }
-          );
-        }
       }
     }
 
@@ -80,19 +71,24 @@ export async function POST(request: Request) {
 
     // Persist OTP in Supabase user metadata for serverless cross-instance verification
     try {
-      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const matched = authUsers?.users?.find(
-        (u) => u.email?.toLowerCase() === targetEmail
-      );
-      if (matched?.id) {
-        await supabaseAdmin.auth.admin.updateUserById(matched.id, {
-          user_metadata: {
-            ...(matched.user_metadata || {}),
-            reset_otp: otp,
-            reset_otp_expiry: Date.now() + 10 * 60 * 1000,
-            reset_attempts: 0,
-          },
-        });
+      const { data: userProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .ilike("email", targetEmail)
+        .maybeSingle();
+
+      if (userProfile?.id) {
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userProfile.id);
+        if (authUser?.user) {
+          await supabaseAdmin.auth.admin.updateUserById(authUser.user.id, {
+            user_metadata: {
+              ...(authUser.user.user_metadata || {}),
+              reset_otp: otp,
+              reset_otp_expiry: Date.now() + 10 * 60 * 1000,
+              reset_attempts: 0,
+            },
+          });
+        }
       }
     } catch (metaErr) {
       console.warn("Failed persisting OTP to auth metadata, relying on memory fallback:", metaErr);

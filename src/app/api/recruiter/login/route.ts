@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { signInstitutionalToken, hashClientIp, INSTITUTIONAL_COOKIE_NAMES } from "@/app/lib/institutionalAuth";
+import { checkRateLimit } from "@/app/lib/rateLimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
@@ -36,6 +37,15 @@ const DEFAULT_RECRUITER_PINS = [
 
 export async function POST(req: NextRequest) {
   try {
+    const ipHash = await hashClientIp(req);
+    const rateLimit = checkRateLimit(`recruiter_login_${ipHash}`, 8, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { success: false, error: `Too many login attempts. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { pin, company } = body;
 
@@ -48,22 +58,21 @@ export async function POST(req: NextRequest) {
 
     const cleanPin = pin.trim();
     const cleanCompany = (company || "").trim().toLowerCase();
-    const ipHash = await hashClientIp(req);
 
     let authenticatedCompany: any = null;
 
     // 1. Check recruiter_keys table in Supabase
     try {
+      const enc = new TextEncoder();
+      const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode(cleanPin));
+      const computedHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
+
       const { data: dbKey, error } = await supabaseServer
         .from("recruiter_keys")
         .select("id, company_name, access_pin_hash, institute_id, expires_at, is_active, institutes(id, name)")
         .eq("is_active", true);
 
       if (!error && dbKey && dbKey.length > 0) {
-        const enc = new TextEncoder();
-        const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode(cleanPin));
-        const computedHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
-
         const matched = dbKey.find(k => {
           const pinMatch = k.access_pin_hash === computedHash || k.access_pin_hash === cleanPin;
           const companyMatch = !cleanCompany || k.company_name.toLowerCase().includes(cleanCompany);
@@ -83,22 +92,25 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    // 2. Check default dev recruiter fallback
+    // 2. Check default dev recruiter fallback strictly in development
     if (!authenticatedCompany) {
-      const matchedDev = DEFAULT_RECRUITER_PINS.find(p => {
-        const pinMatch = p.access_pin === cleanPin;
-        const compMatch = !cleanCompany || p.company_name.toLowerCase().includes(cleanCompany);
-        return pinMatch && compMatch;
-      });
+      const allowDevFallbacks = process.env.NODE_ENV !== "production" || process.env.ENABLE_DEV_DEMO_ACCOUNTS === "true";
+      if (allowDevFallbacks) {
+        const matchedDev = DEFAULT_RECRUITER_PINS.find(p => {
+          const pinMatch = p.access_pin === cleanPin;
+          const compMatch = !cleanCompany || p.company_name.toLowerCase().includes(cleanCompany);
+          return pinMatch && compMatch;
+        });
 
-      if (matchedDev) {
-        authenticatedCompany = {
-          id: matchedDev.id,
-          companyName: matchedDev.company_name,
-          instituteId: matchedDev.institute_id,
-          instituteName: matchedDev.institute_name,
-          expiresAt: matchedDev.expires_at
-        };
+        if (matchedDev) {
+          authenticatedCompany = {
+            id: matchedDev.id,
+            companyName: matchedDev.company_name,
+            instituteId: matchedDev.institute_id,
+            instituteName: matchedDev.institute_name,
+            expiresAt: matchedDev.expires_at
+          };
+        }
       }
     }
 

@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { isSafeExternalUrl } from "@/app/lib/sanitize";
+import { checkRateLimit } from "@/app/lib/rateLimit";
 
 export async function GET() {
   try {
@@ -93,38 +95,25 @@ export async function GET() {
   });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const clientIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous_scraper";
+    const rateLimit = checkRateLimit(`scrape_${clientIp}`, 20, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Scraping rate limit exceeded. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const { url } = await request.json();
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-    } catch {
-      return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
-    }
-
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      return NextResponse.json({ error: "Only HTTP and HTTPS protocols are allowed" }, { status: 400 });
-    }
-
-    const host = parsedUrl.hostname.toLowerCase();
-    if (
-      host === "localhost" ||
-      host.endsWith(".local") ||
-      host.endsWith(".internal") ||
-      /^127\./.test(host) ||
-      /^10\./.test(host) ||
-      /^192\.168\./.test(host) ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
-      host === "169.254.169.254" ||
-      host === "0.0.0.0" ||
-      host === "[::1]"
-    ) {
-      return NextResponse.json({ error: "Access to private or local network addresses is prohibited" }, { status: 403 });
+    const urlCheck = isSafeExternalUrl(url);
+    if (!urlCheck.safe) {
+      return NextResponse.json({ error: urlCheck.error || "Prohibited target URL" }, { status: 403 });
     }
 
     const isAdobeHackathonUrl = /adobe-university-hackathon-2026/i.test(url) || /1715333/.test(url);
@@ -141,6 +130,7 @@ export async function POST(request: Request) {
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
               "Accept": "application/json",
             },
+            signal: AbortSignal.timeout(6000),
             next: { revalidate: 60 },
           });
 
@@ -324,6 +314,7 @@ export async function POST(request: Request) {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept-Language": "en-US,en;q=0.9",
         },
+        signal: AbortSignal.timeout(6000),
         next: { revalidate: 60 },
       });
       if (response.ok) {

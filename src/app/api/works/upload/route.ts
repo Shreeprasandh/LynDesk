@@ -99,11 +99,11 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.warn("[POST /api/works/upload] Storage upload notice:", uploadError.message);
-      return NextResponse.json({
-        file_path: filePath,
-        public_url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/student-works/${filePath}`
-      });
+      console.error("[POST /api/works/upload] Storage upload failed:", uploadError.message);
+      return NextResponse.json(
+        { error: `Storage upload failed: ${uploadError.message}` },
+        { status: 400 }
+      );
     }
 
     const { data: urlData } = supabaseAdmin.storage

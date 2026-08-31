@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { signInstitutionalToken, hashClientIp, INSTITUTIONAL_COOKIE_NAMES } from "@/app/lib/institutionalAuth";
+import { checkRateLimit } from "@/app/lib/rateLimit";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
@@ -36,6 +37,15 @@ const DEFAULT_DEV_STAFF = [
 
 export async function POST(req: NextRequest) {
   try {
+    const ipHash = await hashClientIp(req);
+    const rateLimit = checkRateLimit(`coordinator_login_${ipHash}`, 10, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { success: false, error: `Too many login attempts. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const { email, passkey } = body;
 
@@ -48,7 +58,6 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.trim().toLowerCase();
     const cleanKey = passkey.trim();
-    const ipHash = await hashClientIp(req);
 
     let authenticatedStaff: any = null;
 

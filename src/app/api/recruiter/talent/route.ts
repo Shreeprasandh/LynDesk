@@ -42,11 +42,17 @@ export async function GET(req: NextRequest) {
 
     let candidates: any[] = [];
     try {
-      // Query profiles with placement_consent = true ONLY (Zero-PII Compliance)
-      const { data } = await supabaseServer
+      // Query profiles with placement_consent = true scoped strictly to recruiter's institute
+      let talentQuery = supabaseServer
         .from("profiles")
         .select("id, department, academic_year, leetcode_solved, codeforces_rating, codechef_rating, leetcode_verified")
         .eq("placement_consent", true);
+
+      if (recruiter.instituteId) {
+        talentQuery = talentQuery.eq("institute_id", recruiter.instituteId);
+      }
+
+      const { data } = await talentQuery;
 
       if (data && data.length > 0) {
         candidates = data.map((p, idx) => ({

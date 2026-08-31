@@ -3,12 +3,11 @@ import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   try {
-    // Optional cron secret verification
-    const authHeader = req.headers.get("Authorization");
+    // Cron secret verification
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      // In development or when no secret is configured, allow execution
-      if (process.env.NODE_ENV === "production" && cronSecret) {
+    if (process.env.NODE_ENV === "production") {
+      if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized cron execution." }, { status: 401 });
       }
     }

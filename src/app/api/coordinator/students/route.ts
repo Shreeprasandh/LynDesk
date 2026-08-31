@@ -45,6 +45,10 @@ export async function GET(req: NextRequest) {
         .select("id, full_name, username, roll_number, department, academic_year, section, leetcode_solved, codeforces_rating, codechef_rating, leetcode_verified, updated_at")
         .not("roll_number", "is", null);
 
+      if (staff.instituteId) {
+        query = query.eq("institute_id", staff.instituteId);
+      }
+
       if (staff.departmentScope && staff.departmentScope !== "ALL") {
         query = query.eq("department", staff.departmentScope);
       }

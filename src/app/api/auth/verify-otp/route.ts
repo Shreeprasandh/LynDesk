@@ -50,13 +50,15 @@ export async function POST(request: Request) {
     }
 
     if (!userId) {
-      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
-      const matched = authUsers?.users?.find(
-        (u) => u.email?.toLowerCase() === targetEmail || u.user_metadata?.username?.toLowerCase() === targetEmail.replace(/^@/, "")
-      );
-      if (matched) {
-        userId = matched.id;
-        if (matched.email) targetEmail = matched.email;
+      const { data: profByEmail } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email")
+        .ilike("email", targetEmail)
+        .maybeSingle();
+
+      if (profByEmail?.id) {
+        userId = profByEmail.id;
+        if (profByEmail.email) targetEmail = profByEmail.email;
       }
     }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import { checkRateLimit } from "@/app/lib/rateLimit";
 
 // Initialize Supabase Admin Client using the secure Service Role Key
 const getAdminClient = () => {
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     if (!authHeader) {
       return NextResponse.json({ error: "Authorization credentials required" }, { status: 401 });
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace("Bearer ", "").trim();
 
     const supabaseAdmin = getAdminClient();
     
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !user) {
       return NextResponse.json({ error: "Invalid authentication session" }, { status: 401 });
+    }
+
+    const rateLimit = checkRateLimit(`delete_acc_${user.id}`, 5, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many account deletion requests. Please wait ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
     }
 
     // 3. Handle Requesting Verification Code

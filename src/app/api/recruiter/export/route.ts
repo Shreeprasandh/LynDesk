@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyInstitutionalToken, hashClientIp, INSTITUTIONAL_COOKIE_NAMES } from "@/app/lib/institutionalAuth";
+import { sanitizeCsvCell } from "@/app/lib/sanitize";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
@@ -53,14 +54,14 @@ export async function POST(req: NextRequest) {
     ];
 
     const rows = candidates.map((c: any) => [
-      `"${c.candidateId || ""}"`,
-      `"${c.department || ""}"`,
-      `"${c.academicYear || ""}"`,
-      c.leetcodeSolved || 0,
-      c.codeforcesRating || 0,
-      c.codechefRating || 0,
-      `"${c.isVerified ? "Platform Verified" : "Self-Reported"}"`,
-      `"${(c.topSkills || []).join("; ")}"`
+      sanitizeCsvCell(c.candidateId || ""),
+      sanitizeCsvCell(c.department || ""),
+      sanitizeCsvCell(c.academicYear || ""),
+      Number(c.leetcodeSolved) || 0,
+      Number(c.codeforcesRating) || 0,
+      Number(c.codechefRating) || 0,
+      sanitizeCsvCell(c.isVerified ? "Platform Verified" : "Self-Reported"),
+      sanitizeCsvCell((c.topSkills || []).join("; "))
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r: any[]) => r.join(","))].join("\n");

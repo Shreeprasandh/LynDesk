@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
         const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode(cleanPass));
         const computedHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-        if (dbAdmin.password_hash === computedHash || dbAdmin.password_hash === cleanPass) {
+        const isHashValid = dbAdmin.password_hash === computedHash || 
+          (process.env.NODE_ENV !== "production" && dbAdmin.password_hash === cleanPass);
+
+        if (isHashValid) {
           const inst = (dbAdmin as any).institutes;
           authenticatedAdmin = {
             id: dbAdmin.id,

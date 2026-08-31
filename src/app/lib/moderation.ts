@@ -8,66 +8,8 @@
  * 4. Profanity & Malicious Pattern Filtering
  */
 
-// In-Memory Token Bucket / Sliding-Window Rate Limiting Store
-interface RateLimitRecord {
-  timestamps: number[];
-}
-
-const rateLimitStore = new Map<string, RateLimitRecord>();
-
-// Cleanup stale entries every 5 minutes to prevent memory leak
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of rateLimitStore.entries()) {
-      record.timestamps = record.timestamps.filter(ts => now - ts < 60000);
-      if (record.timestamps.length === 0) {
-        rateLimitStore.delete(key);
-      }
-    }
-  }, 300000);
-}
-
-/**
- * Check if a request exceeds rate limit.
- * @param identifier IP address or User ID
- * @param limit Maximum allowed requests in the time window
- * @param windowMs Time window in milliseconds (default 60,000ms = 1 minute)
- */
-export function checkRateLimit(
-  identifier: string,
-  limit: number = 20,
-  windowMs: number = 60000
-): { allowed: boolean; remaining: number; resetTime: number } {
-  const now = Date.now();
-  const cleanId = (identifier || "anonymous").trim().toLowerCase();
-
-  let record = rateLimitStore.get(cleanId);
-  if (!record) {
-    record = { timestamps: [] };
-    rateLimitStore.set(cleanId, record);
-  }
-
-  // Filter timestamps within current window
-  record.timestamps = record.timestamps.filter(ts => now - ts < windowMs);
-
-  if (record.timestamps.length >= limit) {
-    const oldest = record.timestamps[0];
-    const resetTime = oldest + windowMs;
-    return {
-      allowed: false,
-      remaining: 0,
-      resetTime
-    };
-  }
-
-  record.timestamps.push(now);
-  return {
-    allowed: true,
-    remaining: limit - record.timestamps.length,
-    resetTime: now + windowMs
-  };
-}
+import { checkRateLimit } from "./rateLimit";
+export { checkRateLimit };
 
 /**
  * Strips all unicode emojis, emoticons, pictographs, and decorative symbols.

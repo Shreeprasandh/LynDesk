@@ -39,13 +39,19 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    // 2. Fetch enrolled student profiles
+    // 2. Fetch enrolled student profiles for this institution
     let profiles: any[] = [];
     try {
-      const { data } = await supabaseServer
+      let profileQuery = supabaseServer
         .from("profiles")
         .select("id, full_name, username, roll_number, department, academic_year, section, leetcode_solved, codeforces_rating, updated_at")
         .not("roll_number", "is", null);
+
+      if (admin.instituteId) {
+        profileQuery = profileQuery.eq("institute_id", admin.instituteId);
+      }
+
+      const { data } = await profileQuery;
       if (data) profiles = data;
     } catch {}
 

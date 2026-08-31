@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createAdminClient } from "@/app/lib/supabaseServer";
 import { verifyInstitutionalToken, INSTITUTIONAL_COOKIE_NAMES } from "@/app/lib/institutionalAuth";
+import { isSafeExternalUrl } from "@/app/lib/sanitize";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -149,6 +150,12 @@ export async function POST(req: NextRequest) {
 
     if (!url) {
       return NextResponse.json({ error: "No external URL available to verify." }, { status: 400 });
+    }
+
+    // SSRF Protection Check
+    const ssrfCheck = isSafeExternalUrl(url);
+    if (!ssrfCheck.safe) {
+      return NextResponse.json({ error: ssrfCheck.error || "Prohibited URL target" }, { status: 400 });
     }
 
     // ── Check 1: URL validity (HEAD request, 5s timeout) ────────────────────

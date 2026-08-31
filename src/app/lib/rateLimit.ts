@@ -12,9 +12,11 @@ const rateLimitMap = new Map<string, RateLimitTracker>();
 
 export interface RateLimitResult {
   success: boolean;
+  allowed: boolean;
   limit: number;
   remaining: number;
   resetInSeconds: number;
+  resetTime: number;
 }
 
 /**
@@ -29,34 +31,41 @@ export function checkRateLimit(
   windowMs: number = 60000
 ): RateLimitResult {
   const now = Date.now();
-  const tracker = rateLimitMap.get(identifier);
+  const cleanId = (identifier || "anonymous").trim().toLowerCase();
+  const tracker = rateLimitMap.get(cleanId);
 
   if (!tracker || now > tracker.resetTime) {
     const resetTime = now + windowMs;
-    rateLimitMap.set(identifier, { count: 1, resetTime });
+    rateLimitMap.set(cleanId, { count: 1, resetTime });
     return {
       success: true,
+      allowed: true,
       limit,
       remaining: limit - 1,
-      resetInSeconds: Math.ceil(windowMs / 1000)
+      resetInSeconds: Math.ceil(windowMs / 1000),
+      resetTime
     };
   }
 
   if (tracker.count >= limit) {
     return {
       success: false,
+      allowed: false,
       limit,
       remaining: 0,
-      resetInSeconds: Math.ceil((tracker.resetTime - now) / 1000)
+      resetInSeconds: Math.ceil((tracker.resetTime - now) / 1000),
+      resetTime: tracker.resetTime
     };
   }
 
   tracker.count += 1;
   return {
     success: true,
+    allowed: true,
     limit,
     remaining: limit - tracker.count,
-    resetInSeconds: Math.ceil((tracker.resetTime - now) / 1000)
+    resetInSeconds: Math.ceil((tracker.resetTime - now) / 1000),
+    resetTime: tracker.resetTime
   };
 }
 
