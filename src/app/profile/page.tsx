@@ -2184,7 +2184,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {socialInputErrors.GitHub && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.GitHub}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{socialInputErrors.GitHub}</span>
                       )}
                     </div>
 
@@ -2214,7 +2214,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {socialInputErrors.LinkedIn && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.LinkedIn}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{socialInputErrors.LinkedIn}</span>
                       )}
                     </div>
                   </div>
@@ -2246,7 +2246,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {socialInputErrors.Discord && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.Discord}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{socialInputErrors.Discord}</span>
                       )}
                     </div>
 
@@ -2276,7 +2276,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {socialInputErrors.Portfolio && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {socialInputErrors.Portfolio}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{socialInputErrors.Portfolio}</span>
                       )}
                     </div>
                   </div>
@@ -2293,7 +2293,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">LeetCode</label>
                         {leetcodeUsername.trim() && (
                           (leetcodeVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2330,7 +2330,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.LeetCode && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.LeetCode}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.LeetCode}</span>
                       )}
                     </div>
 
@@ -2340,7 +2340,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">CodeChef</label>
                         {codechefUsername.trim() && (
                           (codechefVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2377,7 +2377,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.CodeChef && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.CodeChef}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.CodeChef}</span>
                       )}
                     </div>
 
@@ -2387,7 +2387,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">HackerRank</label>
                         {hackerrankUsername.trim() && (
                           (hackerrankVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2424,7 +2424,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.HackerRank && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.HackerRank}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.HackerRank}</span>
                       )}
                     </div>
 
@@ -2434,7 +2434,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">GeeksforGeeks</label>
                         {geeksforgeeksUsername.trim() && (
                           (geeksforgeeksVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2471,7 +2471,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.GeeksforGeeks && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.GeeksforGeeks}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.GeeksforGeeks}</span>
                       )}
                     </div>
 
@@ -2481,7 +2481,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">Codeforces</label>
                         {codeforcesUsername.trim() && (
                           (codeforcesVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2518,7 +2518,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.Codeforces && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Codeforces}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.Codeforces}</span>
                       )}
                     </div>
 
@@ -2528,7 +2528,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">Unstop</label>
                         {unstopUsername.trim() && (
                           (unstopVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2565,7 +2565,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.Unstop && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Unstop}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.Unstop}</span>
                       )}
                     </div>
 
@@ -2575,7 +2575,7 @@ export default function ProfilePage() {
                         <label className="text-xs text-txt-sub font-semibold">Devpost</label>
                         {devpostUsername.trim() && (
                           (devpostVerified || !collegeKey.trim()) ? (
-                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified ✓</span>
+                            <span className="text-[7.5px] font-mono text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/30 opacity-70">Verified</span>
                           ) : (
                             <button
                               type="button"
@@ -2612,7 +2612,7 @@ export default function ProfilePage() {
                         }`}
                       />
                       {platformInputErrors.Devpost && (
-                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">⚠️ {platformInputErrors.Devpost}</span>
+                        <span className="text-[10px] text-red-400 font-mono font-medium mt-0.5">{platformInputErrors.Devpost}</span>
                       )}
                     </div>
                   </div>

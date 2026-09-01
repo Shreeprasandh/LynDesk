@@ -939,7 +939,7 @@ useEffect(() => {
         const list = stored ? JSON.parse(stored) : [];
         list.unshift({
           id: generateNotificationId(),
-          title: "Handle Verified ✓",
+          title: "Handle Verified",
           message: `Coordinator approved verification for your ${platform} handle: @${handle}.`,
           type: "system" as const,
           category: "alerts" as const,
@@ -1022,7 +1022,7 @@ useEffect(() => {
       const notifList = notifStored ? JSON.parse(notifStored) : [];
       notifList.unshift({
         id: getCoordinatorId("notif_link"),
-        title: action === "approved" ? "College Link Approved ✓" : "College Link Declined ✗",
+        title: action === "approved" ? "College Link Approved" : "College Link Declined",
         message: action === "approved" 
           ? `Coordinator approved linking your profile to College using key: ${key}.`
           : `Coordinator declined your linking request for College key: ${key}.`,
@@ -1342,8 +1342,9 @@ useEffect(() => {
 
                 {/* AI Error Notification */}
                 {aiError && (
-                  <div className="text-[10px] text-red-500 font-mono mt-1 border border-red-500/30 bg-red-500/5 p-2.5 rounded-sm">
-                    ⚠️ {aiError}
+                  <div className="text-[10px] text-red-500 font-mono mt-1 border border-red-500/30 bg-red-500/5 p-2.5 rounded-sm flex items-center gap-1.5">
+                    <AlertTriangle size={11} className="text-red-500 shrink-0" />
+                    <span>{aiError}</span>
                   </div>
                 )}
                 
@@ -2771,9 +2772,9 @@ useEffect(() => {
                     <span className="text-[9px] font-mono text-accent-main font-bold">
                       @{selectedStudent.leetcode}
                       {isHandleVerified(selectedStudent.id, "LeetCode") ? (
-                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified</span>
                       ) : (
-                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified</span>
                       )}
                     </span>
                   </div>
@@ -2804,9 +2805,9 @@ useEffect(() => {
                     <span className="text-[10px] text-txt-sub font-mono">
                       @{selectedStudent.codeforces} ({selectedStudent.codeforcesRank})
                       {isHandleVerified(selectedStudent.id, "Codeforces") ? (
-                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified</span>
                       ) : (
-                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified</span>
                       )}
                     </span>
                   </div>
@@ -2820,9 +2821,9 @@ useEffect(() => {
                     <span className="text-[10px] text-txt-sub font-mono">
                       @{selectedStudent.codechef} ({selectedStudent.codechefStars})
                       {isHandleVerified(selectedStudent.id, "CodeChef") ? (
-                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified</span>
                       ) : (
-                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified</span>
                       )}
                     </span>
                   </div>
@@ -2836,9 +2837,9 @@ useEffect(() => {
                     <span className="font-mono">
                       @{selectedStudent.unstop}
                       {isHandleVerified(selectedStudent.id, "Unstop") ? (
-                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified ✓</span>
+                        <span className="text-[7.5px] text-emerald-500 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/25 ml-1.5 uppercase font-normal">Verified</span>
                       ) : (
-                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified ⚠️</span>
+                        <span className="text-[7.5px] text-yellow-500 bg-yellow-500/10 px-1 py-0.2 rounded border border-yellow-500/25 ml-1.5 uppercase font-normal animate-pulse">Unverified</span>
                       )}
                     </span>
                   </div>

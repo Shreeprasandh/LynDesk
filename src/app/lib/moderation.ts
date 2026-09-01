@@ -19,7 +19,7 @@ export function stripEmojis(text: string): string {
   
   return text
     // Strip standard unicode emoji presentation and extended pictographs
-    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}\u{1F000}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2B50}\u{2B55}\u{3030}\u{3297}\u{3299}]/gu, "")
     // Clean up any dangling double spaces left behind by stripped emojis
     .replace(/[ \t]{2,}/g, " ")
     .trim();

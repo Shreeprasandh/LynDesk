@@ -1302,7 +1302,7 @@ export default function CodingDeckPage() {
                   <div className="flex flex-col gap-6 pt-2">
                     {platformErrors.leetcode && (
                       <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span className="font-bold flex items-center gap-1">Profile Sync Error:</span>
                         <span>{platformErrors.leetcode}</span>
                         <span className="text-[10px] text-txt-muted font-sans">
                           Please verify that your LeetCode handle is spelled correctly and your profile is public. If it is private, change your privacy settings on LeetCode.
@@ -1403,7 +1403,7 @@ export default function CodingDeckPage() {
                   <div className="flex flex-col gap-4 w-full">
                     {platformErrors.codechef && (
                       <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span className="font-bold flex items-center gap-1">Profile Sync Error:</span>
                         <span>{platformErrors.codechef}</span>
                         <span className="text-[10px] text-txt-muted font-sans">
                           Verify that your CodeChef username is spelled correctly and the account exists.
@@ -1499,7 +1499,7 @@ export default function CodingDeckPage() {
                   <div className="flex flex-col gap-4 w-full">
                     {platformErrors.hackerrank && (
                       <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span className="font-bold flex items-center gap-1">Profile Sync Error:</span>
                         <span>{platformErrors.hackerrank}</span>
                         <span className="text-[10px] text-txt-muted font-sans">
                           Verify that your HackerRank username handle is correct and public.
@@ -1606,7 +1606,7 @@ export default function CodingDeckPage() {
                   <div className="flex flex-col gap-4 w-full">
                     {platformErrors.geeksforgeeks && (
                       <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span className="font-bold flex items-center gap-1">Profile Sync Error:</span>
                         <span>{platformErrors.geeksforgeeks}</span>
                         <span className="text-[10px] text-txt-muted font-sans">
                           Verify that your GeeksforGeeks username is spelled correctly and the account exists.
@@ -1698,7 +1698,7 @@ export default function CodingDeckPage() {
                   <div className="flex flex-col gap-4 w-full">
                     {platformErrors.codeforces && (
                       <div className="border border-red-500/30 bg-red-500/10 p-3.5 rounded text-xs font-mono text-red-400 flex flex-col gap-1.5">
-                        <span className="font-bold flex items-center gap-1">⚠️ Profile Sync Error:</span>
+                        <span className="font-bold flex items-center gap-1">Profile Sync Error:</span>
                         <span>{platformErrors.codeforces}</span>
                         <span className="text-[10px] text-txt-muted font-sans">
                           Verify that your Codeforces username handle is correct and exists on the platform.

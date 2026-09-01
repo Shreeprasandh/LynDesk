@@ -272,7 +272,7 @@ export default function ExplorePage() {
 
       if (res.ok) {
         setTrackedTitles(prev => new Set([...prev, item.title.toLowerCase().trim()]));
-        showToast(`✓ Tracked '${item.title}' in Applied Hackathons!`, "success");
+        showToast(`Tracked '${item.title}' in Applied Hackathons!`, "success");
       } else {
         showToast("Application logged or already tracked", "info");
       }

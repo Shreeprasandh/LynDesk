@@ -1801,7 +1801,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 📅 Weekly Schedule Horizon Agenda Card */}
+            {/* Weekly Schedule Horizon Agenda Card */}
             <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-3.5 relative">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

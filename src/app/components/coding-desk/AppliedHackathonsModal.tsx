@@ -60,9 +60,9 @@ function getDeadlineStatus(deadlineStr?: string) {
   const diffDays = Math.floor(diffHours / 24);
   const remHours = diffHours % 24;
   if (diffDays >= 3) {
-    return { label: `⏳ ${diffDays}d ${remHours}h remaining`, isUrgent: false, isClosed: false, isTBA: false };
+    return { label: `${diffDays}d ${remHours}h remaining`, isUrgent: false, isClosed: false, isTBA: false };
   }
-  return { label: `⚡ Closing in ${diffDays}d ${remHours}h!`, isUrgent: true, isClosed: false, isTBA: false };
+  return { label: `Closing in ${diffDays}d ${remHours}h!`, isUrgent: true, isClosed: false, isTBA: false };
 }
 
 export default function AppliedHackathonsModal({
@@ -551,7 +551,7 @@ export default function AppliedHackathonsModal({
                       </a>
                     ) : (
                       <span className="text-[10px] font-mono text-txt-sub flex items-center gap-1">
-                        🏫 On-Campus / In-Person
+                        On-Campus / In-Person
                       </span>
                     )}
 

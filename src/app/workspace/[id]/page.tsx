@@ -2918,7 +2918,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   const saveGitRepo = async () => {
     const rawInput = tempGit.trim();
     if (!rawInput) {
-      setGitUrlError("⚠️ Please enter a GitHub repository or profile URL");
+      setGitUrlError("Please enter a GitHub repository or profile URL");
       return;
     }
     const cleanGit = formatUrl(rawInput);
@@ -3016,7 +3016,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z0-9]{2,}(:\d+)?(\/.*)?$/i;
     const localhostPattern = /^(https?:\/\/)?localhost(:\d+)?(\/.*)?$/i;
     if (!urlPattern.test(rawInput) && !localhostPattern.test(rawInput)) {
-      setDemoUrlError("⚠️ Please enter a valid URL (e.g. https://my-app.vercel.app or localhost:3000)");
+      setDemoUrlError("Please enter a valid URL (e.g. https://my-app.vercel.app or localhost:3000)");
       return;
     }
 
@@ -3289,7 +3289,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           id: getUniqueId("sys_task"),
           sender_name: "LDK:BOT",
           sender_role: "SYSTEM",
-          content: `✅ ${myName} completed task: "${target.title}"`,
+          content: `${myName} completed task: "${target.title}"`,
           created_at: new Date().toISOString(),
           isSystem: true
         };

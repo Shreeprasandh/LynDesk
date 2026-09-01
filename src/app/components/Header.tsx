@@ -569,6 +569,29 @@ const POPULAR_LOCATIONS = [
       const stored = localStorage.getItem("ldk_global_notifications");
       let localList: NotificationItem[] = [];
 
+      const getDismissedSet = (userId?: string): Set<string> => {
+        if (typeof window === "undefined") return new Set();
+        try {
+          const keys = ["ldk_dismissed_notifications_global"];
+          if (userId) keys.push(`ldk_dismissed_notifications_${userId}`);
+          const set = new Set<string>();
+          for (const k of keys) {
+            const raw = localStorage.getItem(k);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                parsed.forEach(item => set.add(item));
+              }
+            }
+          }
+          return set;
+        } catch {
+          return new Set();
+        }
+      };
+
+      const dismissedSet = getDismissedSet(user?.id);
+
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
@@ -584,6 +607,14 @@ const POPULAR_LOCATIONS = [
               }
               return n;
             }).filter((n: any) => {
+              if (dismissedSet.has(n.id) || dismissedSet.has(`${n.title}_${n.message}`)) return false;
+
+              // Purge legacy mock broadcast items from storage
+              if (n.id === "broadcast_b1" || n.id === "broadcast_b2" || n.id === "b1" || n.id === "b2" || 
+                  n.title?.includes("Mandatory LeetCode") || n.title?.includes("Smart India Hackathon")) {
+                return false;
+              }
+
               // Purge stale streak risk notifications from previous days
               if (n.id?.startsWith("notif_streak_warning_")) {
                 if (!n.id.endsWith(todayStr)) return false;
@@ -625,6 +656,14 @@ const POPULAR_LOCATIONS = [
                 }
                 return n;
               }).filter((n: any) => {
+                if (dismissedSet.has(n.id) || dismissedSet.has(`${n.title}_${n.message}`)) return false;
+
+                // Purge legacy mock broadcast items from storage
+                if (n.id === "broadcast_b1" || n.id === "broadcast_b2" || n.id === "b1" || n.id === "b2" || 
+                    n.title?.includes("Mandatory LeetCode") || n.title?.includes("Smart India Hackathon")) {
+                  return false;
+                }
+
                 // Purge stale streak warnings from previous days
                 if (n.id?.startsWith("notif_streak_warning_") && !n.id.endsWith(todayStr)) {
                   return false;
@@ -666,7 +705,7 @@ const POPULAR_LOCATIONS = [
                   id: `notif_deadline_${evt.id}_${todayStr}`,
                   type: "deadline",
                   category: "alerts",
-                  title: isToday ? `⚠️ Deadline Today: ${evt.title}` : `⏳ Deadline Tomorrow: ${evt.title}`,
+                  title: isToday ? `Deadline Today: ${evt.title}` : `Deadline Tomorrow: ${evt.title}`,
                   message: isToday
                     ? `The scheduled milestone for "${evt.title}" is due today (${evt.date}). Ensure your project updates are in.`
                     : `The scheduled milestone for "${evt.title}" is due tomorrow (${evt.date}). Finalize your deliverables.`,
@@ -691,7 +730,9 @@ const POPULAR_LOCATIONS = [
           if (res.ok) {
             const json = await res.json();
             if (Array.isArray(json.notifications)) {
-              dbNotifs = json.notifications;
+              dbNotifs = json.notifications.filter((n: any) => 
+                !dismissedSet.has(n.id) && !dismissedSet.has(`${n.title}_${n.message}`)
+              );
             }
           }
         } catch {}
@@ -702,19 +743,31 @@ const POPULAR_LOCATIONS = [
           const yr = user?.user_metadata?.academic_year || "";
           const sec = user?.user_metadata?.section || "";
           const roll = user?.user_metadata?.roll_number || "";
-          const bRes = await fetch(`/api/user/broadcasts?department=${encodeURIComponent(dept)}&year=${encodeURIComponent(yr)}&section=${encodeURIComponent(sec)}&roll=${encodeURIComponent(roll)}`);
+          const bRes = await fetch(`/api/user/broadcasts?department=${encodeURIComponent(dept)}&year=${encodeURIComponent(yr)}&section=${encodeURIComponent(sec)}&roll=${encodeURIComponent(roll)}&studentId=${encodeURIComponent(user.id)}`);
           if (bRes.ok) {
             const bData = await bRes.json();
             if (Array.isArray(bData.broadcasts)) {
-              const staffNotifs: NotificationItem[] = bData.broadcasts.map((b: any) => ({
-                id: `broadcast_${b.id}`,
-                title: `🏫 Staff Message: ${b.title}`,
-                message: b.body,
-                time: new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                read: b.isRead || false,
-                type: b.priority === "urgent" ? "warning" : "info",
-                category: "alerts"
-              }));
+              const staffNotifs: NotificationItem[] = bData.broadcasts
+                .filter((b: any) => {
+                  const bId = `broadcast_${b.id}`;
+                  const title = `Staff Notice: ${b.title}`;
+                  if (dismissedSet.has(bId) || dismissedSet.has(b.id) || dismissedSet.has(`${title}_${b.body}`)) {
+                    return false;
+                  }
+                  if (b.id === "b1" || b.id === "b2" || b.title?.includes("Mandatory LeetCode") || b.title?.includes("Smart India Hackathon")) {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((b: any) => ({
+                  id: `broadcast_${b.id}`,
+                  title: `Staff Notice: ${b.title}`,
+                  message: b.body,
+                  time: new Date(b.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  read: b.isRead || false,
+                  type: b.priority === "urgent" ? "warning" : "info",
+                  category: "alerts"
+                }));
               dbNotifs = [...staffNotifs, ...dbNotifs];
             }
           }
@@ -729,6 +782,8 @@ const POPULAR_LOCATIONS = [
       const combined = [...dbNotifs, ...userLocalNotifs, ...localList];
       const uniqueSet = new Set<string>();
       const finalNotifs = combined.filter((n: any) => {
+        if (dismissedSet.has(n.id) || dismissedSet.has(`${n.title}_${n.message}`)) return false;
+
         // If it's an invite for a workspace the user is already in, skip it
         if (n.type === "invite" && n.actionUrl) {
           const wsId = n.actionUrl.split("?")[0].split("/").pop();
@@ -917,11 +972,52 @@ const POPULAR_LOCATIONS = [
     };
   }, [user]);
 
-  // Mark notifications as read and auto-clear seen informational alerts (e.g. Invitation Accepted/Declined) when closing drawer
+  // Auth Header helper for API route calls
+  const getAuthHeaders = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        return {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        };
+      }
+    } catch {}
+    return { "Content-Type": "application/json" };
+  };
+
+  const addDismissedItems = (items: Array<{ id?: string; title?: string; message?: string }>, userId?: string) => {
+    if (typeof window === "undefined" || items.length === 0) return;
+    try {
+      const globalKey = "ldk_dismissed_notifications_global";
+      const userKey = userId ? `ldk_dismissed_notifications_${userId}` : null;
+      
+      const currentGlobalRaw = localStorage.getItem(globalKey);
+      const currentGlobalList: string[] = currentGlobalRaw ? JSON.parse(currentGlobalRaw) : [];
+      const newItems: string[] = [];
+      
+      for (const it of items) {
+        if (it.id) newItems.push(it.id);
+        if (it.title && it.message) newItems.push(`${it.title}_${it.message}`);
+      }
+      
+      const mergedGlobal = Array.from(new Set([...currentGlobalList, ...newItems])).slice(-300);
+      localStorage.setItem(globalKey, JSON.stringify(mergedGlobal));
+      
+      if (userKey) {
+        const currentURaw = localStorage.getItem(userKey);
+        const currentUList: string[] = currentURaw ? JSON.parse(currentURaw) : [];
+        const mergedU = Array.from(new Set([...currentUList, ...newItems])).slice(-300);
+        localStorage.setItem(userKey, JSON.stringify(mergedU));
+      }
+    } catch {}
+  };
+
+  // Mark notifications as read and auto-clear seen informational alerts when closing drawer
   const handleCloseDrawer = () => {
     setIsOpen(false);
 
-    // Identify informational update alerts that have been seen (e.g. "Invitation Accepted", "Invitation Declined")
+    // Identify informational update alerts that have been seen
     const toAutoClear = notifications.filter(n => {
       const titleLower = (n.title || "").toLowerCase();
       const msgLower = (n.message || "").toLowerCase();
@@ -933,8 +1029,10 @@ const POPULAR_LOCATIONS = [
       return isInformational;
     });
 
-    // Delete auto-cleared informational notifications from DB
-    toAutoClear.forEach(n => deleteNotificationFromDB(n.id));
+    if (toAutoClear.length > 0) {
+      addDismissedItems(toAutoClear, user?.id);
+      toAutoClear.forEach(n => deleteNotificationFromDB(n.id, n.title, n.actionUrl));
+    }
 
     // Retain only actionable items or non-informational alerts, marked as read
     const updated = notifications
@@ -948,7 +1046,22 @@ const POPULAR_LOCATIONS = [
     }
   };
 
-  const handleClearTab = () => {
+  const handleClearTab = async () => {
+    const tabNotifs = notifications.filter(n => n.category === drawerTab);
+    addDismissedItems(tabNotifs, user?.id);
+
+    for (const n of tabNotifs) {
+      if (n.id?.startsWith("broadcast_") && user?.id) {
+        const bId = n.id.replace("broadcast_", "");
+        fetch("/api/user/broadcasts/read", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ broadcastId: bId, studentId: user.id })
+        }).catch(() => {});
+      }
+      deleteNotificationFromDB(n.id, n.title, n.actionUrl);
+    }
+
     const updated = notifications.filter(n => n.category !== drawerTab);
     setNotifications(updated);
     localStorage.setItem("ldk_global_notifications", JSON.stringify(updated));
@@ -961,7 +1074,7 @@ const POPULAR_LOCATIONS = [
   const deleteNotificationFromDB = async (id: string, title?: string, actionUrl?: string) => {
     if (!id) return;
     try {
-      if (!id.startsWith("n_cron_") && !id.startsWith("notif_local_")) {
+      if (!id.startsWith("n_cron_") && !id.startsWith("notif_local_") && !id.startsWith("broadcast_")) {
         await supabase.from("notifications").delete().eq("id", id);
       }
       if (user?.id) {
@@ -972,10 +1085,11 @@ const POPULAR_LOCATIONS = [
           await supabase.from("notifications").delete().eq("user_id", user.id).eq("link_url", actionUrl);
         }
       }
-      // Call server DELETE route handler with admin privileges to ensure permanent deletion
+      // Call server DELETE route handler with auth token
+      const headers = await getAuthHeaders();
       fetch("/api/user/notifications", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ id, userId: user?.id, title, actionUrl })
       }).catch(() => {});
     } catch {}
@@ -983,6 +1097,21 @@ const POPULAR_LOCATIONS = [
 
   const handleDismissNotification = async (id: string) => {
     const target = notifications.find(n => n.id === id);
+    if (target) {
+      addDismissedItems([target], user?.id);
+    } else {
+      addDismissedItems([{ id }], user?.id);
+    }
+
+    if (id.startsWith("broadcast_") && user?.id) {
+      const bId = id.replace("broadcast_", "");
+      fetch("/api/user/broadcasts/read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ broadcastId: bId, studentId: user.id })
+      }).catch(() => {});
+    }
+
     deleteNotificationFromDB(id, target?.title, target?.actionUrl);
 
     const updated = notifications.filter(n => n.id !== id && (target?.title ? n.title !== target.title : true));
@@ -1005,6 +1134,12 @@ const POPULAR_LOCATIONS = [
 
   const handleNotificationAction = async (id: string, actionUrl?: string) => {
     const targetNotif = notifications.find(n => n.id === id);
+    if (targetNotif) {
+      addDismissedItems([targetNotif], user?.id);
+    } else {
+      addDismissedItems([{ id }], user?.id);
+    }
+
     deleteNotificationFromDB(id, targetNotif?.title, actionUrl);
     const targetSenderId = targetNotif?.senderId;
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
@@ -1042,19 +1177,21 @@ const POPULAR_LOCATIONS = [
 
     // Send outcome notification back to the inviter
     if (targetSenderId && targetNotif?.type === "invite") {
-      fetch("/api/notifications/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipientId: targetSenderId,
-          senderId: user?.id || "guest",
-          title: "Invitation Accepted",
-          message: `${myName} accepted your workspace invitation.`,
-          type: "system",
-          category: "updates",
-          actionUrl: actionUrl || "/explore"
-        })
-      }).catch(() => {});
+      getAuthHeaders().then(headers => {
+        fetch("/api/notifications/send", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            recipientId: targetSenderId,
+            senderId: user?.id || "guest",
+            title: "Invitation Accepted",
+            message: `${myName} accepted your workspace invitation.`,
+            type: "system",
+            category: "updates",
+            actionUrl: actionUrl || "/explore"
+          })
+        }).catch(() => {});
+      });
     }
 
     // Dismiss accepted notification from drawer so it disappears permanently
@@ -1087,25 +1224,33 @@ const POPULAR_LOCATIONS = [
 
   const handleNotificationReject = async (id: string, actionUrl?: string) => {
     const targetNotif = notifications.find(n => n.id === id);
+    if (targetNotif) {
+      addDismissedItems([targetNotif], user?.id);
+    } else {
+      addDismissedItems([{ id }], user?.id);
+    }
+
     deleteNotificationFromDB(id, targetNotif?.title, actionUrl);
     const targetSenderId = targetNotif?.senderId;
     const myName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Teammate";
 
     // Send outcome notification back to the inviter
     if (targetSenderId) {
-      fetch("/api/notifications/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipientId: targetSenderId,
-          senderId: user?.id || "guest",
-          title: "Invitation Declined",
-          message: `${myName} declined your workspace invitation.`,
-          type: "warning",
-          category: "updates",
-          actionUrl: "/explore"
-        })
-      }).catch(() => {});
+      getAuthHeaders().then(headers => {
+        fetch("/api/notifications/send", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            recipientId: targetSenderId,
+            senderId: user?.id || "guest",
+            title: "Invitation Declined",
+            message: `${myName} declined your workspace invitation.`,
+            type: "warning",
+            category: "updates",
+            actionUrl: "/explore"
+          })
+        }).catch(() => {});
+      });
     }
 
     // Dismiss declined notification from drawer so it disappears permanently

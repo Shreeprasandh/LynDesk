@@ -6,11 +6,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
 const supabaseServer = createClient(supabaseUrl, serviceRoleKey);
 
-const DEFAULT_BROADCASTS = [
-  { id: "b1", title: "Mandatory LeetCode Biweekly Contest Registration", body: "All 3rd Year Section E students must register for this weekend's contest before Friday 6 PM.", priority: "urgent", target_type: "section", target_scope: { department: "Information Technology", year: "3rd Year", section: "Section E" }, created_at: new Date(Date.now() - 3600000).toISOString(), read_count: 54, delivered_count: 65 },
-  { id: "b2", title: "Smart India Hackathon 2026 Team Formation", body: "Submit internal team nominations via the Coding Deck before the deadline.", priority: "info", target_type: "department", target_scope: { department: "Information Technology" }, created_at: new Date(Date.now() - 86400000).toISOString(), read_count: 142, delivered_count: 195 }
-];
-
 async function authenticateStaff(req: NextRequest) {
   const token = req.cookies.get(INSTITUTIONAL_COOKIE_NAMES.STAFF)?.value;
   if (!token) return null;
@@ -36,10 +31,6 @@ export async function GET(req: NextRequest) {
 
       if (data && data.length > 0) broadcasts = data;
     } catch {}
-
-    if (broadcasts.length === 0) {
-      broadcasts = DEFAULT_BROADCASTS.map(b => ({ ...b, institute_id: staff.instituteId }));
-    }
 
     return NextResponse.json({ success: true, broadcasts });
   } catch (error: any) {

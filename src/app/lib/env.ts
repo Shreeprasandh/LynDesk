@@ -19,7 +19,7 @@ export const env = {
 export function validateEnv() {
   const result = envSchema.safeParse(env);
   if (!result.success) {
-    console.warn("⚠️ [Environment Warning]: Some non-critical environment keys are unparsed:", result.error.format());
+    console.warn("[Environment Warning]: Some non-critical environment keys are unparsed:", result.error.format());
   }
   return env;
 }

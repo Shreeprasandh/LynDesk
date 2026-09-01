@@ -1,30 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
-const supabaseServer = createClient(supabaseUrl, serviceRoleKey);
-
-const DEFAULT_BROADCASTS = [
-  {
-    id: "b1",
-    title: "Mandatory LeetCode Biweekly Contest Registration",
-    body: "All 3rd Year Section E students must register for this weekend's contest before Friday 6 PM.",
-    priority: "urgent",
-    staff_name: "Prof. R. Venkatesh",
-    created_at: new Date(Date.now() - 3600000).toISOString(),
-    isRead: false
-  },
-  {
-    id: "b2",
-    title: "Smart India Hackathon 2026 Team Formation",
-    body: "Submit internal team nominations via the Coding Deck before the deadline.",
-    priority: "info",
-    staff_name: "Dr. S. Malathi",
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    isRead: true
-  }
-];
+import { createAdminClient } from "@/app/lib/supabaseServer";
 
 export async function GET(req: NextRequest) {
   try {
@@ -35,24 +10,47 @@ export async function GET(req: NextRequest) {
     const year = searchParams.get("year");
     const section = searchParams.get("section");
     const rollNumber = searchParams.get("roll");
+    const studentId = searchParams.get("studentId") || searchParams.get("userId");
 
     let broadcasts: any[] = [];
+    const supabaseAdmin = createAdminClient();
+
     try {
-      const { data } = await supabaseServer
+      const { data, error } = await supabaseAdmin
         .from("staff_broadcasts")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(30);
 
-      if (data && data.length > 0) broadcasts = data;
+      if (!error && data) {
+        broadcasts = data;
+      }
     } catch {}
 
-    if (broadcasts.length === 0) {
-      broadcasts = DEFAULT_BROADCASTS;
+    // Check read receipts for the student if studentId is provided
+    let readBroadcastIds = new Set<string>();
+    if (studentId) {
+      try {
+        const { data: receipts } = await supabaseAdmin
+          .from("broadcast_receipts")
+          .select("broadcast_id")
+          .eq("student_id", studentId);
+
+        if (receipts && receipts.length > 0) {
+          receipts.forEach((r: any) => {
+            if (r.broadcast_id) readBroadcastIds.add(String(r.broadcast_id));
+          });
+        }
+      } catch {}
     }
 
-    // Match broadcast target_scope against student metadata
+    // Match broadcast target_scope against student metadata & exclude read ones
     const filtered = broadcasts.filter(b => {
+      // Exclude if already marked as read/dismissed by student in database
+      if (studentId && readBroadcastIds.has(String(b.id))) {
+        return false;
+      }
+
       const scope = b.target_scope || {};
       if (b.target_type === "all") return true;
       if (department && scope.department && scope.department !== "ALL" && scope.department !== department) return false;
