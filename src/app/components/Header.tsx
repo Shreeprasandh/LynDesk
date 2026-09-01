@@ -22,7 +22,9 @@ import {
   Check, 
   Sparkles,
   Menu,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import WallCalendarModal from "./WallCalendarModal";
 import { fetchWallCalendarEvents } from "../lib/wallCalendarSync";
@@ -94,6 +96,8 @@ export default function Header() {
   const [oUsername, setOUsername] = useState("");
   const [oPassword, setOPassword] = useState("");
   const [oConfirmPassword, setOConfirmPassword] = useState("");
+  const [showOPassword, setShowOPassword] = useState(false);
+  const [showOConfirmPassword, setShowOConfirmPassword] = useState(false);
   const [oRole] = useState<"student" | "employee" | "solo">("student");
   const [oDob, setODob] = useState("");
   const [oLocation, setOLocation] = useState("");
@@ -1225,7 +1229,6 @@ const POPULAR_LOCATIONS = [
               onClick={toggleTheme}
               className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none"
               aria-label="Toggle theme"
-              title="Toggle Theme"
             >
               {theme === "light" ? <Moon size={14} /> : <Sun size={14} />}
             </button>
@@ -1236,7 +1239,6 @@ const POPULAR_LOCATIONS = [
                 onClick={() => setIsCalendarOpen(true)}
                 className="relative p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
                 aria-label="Open WallCalendar"
-                title="WallCalendar"
               >
                 <CalendarIcon size={14} />
                 {hasTodayEvents && (
@@ -1254,8 +1256,7 @@ const POPULAR_LOCATIONS = [
                     ? "border border-red-500/40 text-txt-main shadow-[0_0_6px_rgba(239,68,68,0.12)] animate-pulse hover:bg-bg-card"
                     : "border border-border-main/80 hover:bg-bg-card text-txt-main"
                 }`}
-                aria-label="View notifications"
-                title={unreadCount > 0 ? `${unreadCount} new notification(s)` : "Notifications"}
+                aria-label={unreadCount > 0 ? `${unreadCount} new notifications` : "Notifications"}
               >
                 <Bell size={14} />
               </button>
@@ -1266,7 +1267,7 @@ const POPULAR_LOCATIONS = [
                 <Link 
                   href="/profile"
                   className="w-8 h-8 rounded-full border border-border-main/80 hover:border-txt-main/40 text-txt-main transition-colors duration-150 focus:outline-none flex items-center justify-center overflow-hidden shrink-0 relative p-0"
-                  title="View Profile"
+                  aria-label="View Profile"
                 >
                   {headerAvatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -1278,7 +1279,7 @@ const POPULAR_LOCATIONS = [
                 <button 
                   onClick={() => setShowLogoutConfirm(true)}
                   className="p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
-                  title="Sign Out"
+                  aria-label="Sign Out"
                 >
                   <LogOut size={14} />
                 </button>
@@ -1287,7 +1288,7 @@ const POPULAR_LOCATIONS = [
                 <button
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   className="lg:hidden p-2 rounded-full border border-border-main/80 hover:bg-bg-card text-txt-main transition-colors duration-150 focus:outline-none cursor-pointer"
-                  title="Toggle Menu"
+                  aria-label="Toggle Menu"
                 >
                   <Menu size={14} />
                 </button>
@@ -1494,7 +1495,7 @@ const POPULAR_LOCATIONS = [
                               type="button"
                               onClick={() => handleDismissNotification(item.id)}
                               className="p-1 rounded hover:bg-bg-surface text-txt-muted hover:text-red-400 transition-colors cursor-pointer"
-                              title="Dismiss notification"
+                              aria-label="Dismiss notification"
                             >
                               <X size={10} />
                             </button>
@@ -1621,26 +1622,46 @@ const POPULAR_LOCATIONS = [
                         <div className="flex flex-col gap-2">
                           <div className="flex flex-col gap-1">
                             <label className="text-[9px] text-txt-sub font-mono uppercase">Create Password *</label>
-                            <input 
-                              type="password" 
-                              required
-                              value={oPassword}
-                              onChange={(e) => setOPassword(e.target.value)}
-                              placeholder="Min 8 chars, A-Z, 0-9, special..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                            />
+                            <div className="relative">
+                              <input 
+                                type={showOPassword ? "text" : "password"} 
+                                required
+                                value={oPassword}
+                                onChange={(e) => setOPassword(e.target.value)}
+                                placeholder="Min 8 chars, A-Z, 0-9, special..."
+                                className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowOPassword(!showOPassword)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                                aria-label={showOPassword ? "Hide password" : "Show password"}
+                              >
+                                {showOPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
                           </div>
 
                           <div className="flex flex-col gap-1">
                             <label className="text-[9px] text-txt-sub font-mono uppercase">Confirm Password *</label>
-                            <input 
-                              type="password" 
-                              required
-                              value={oConfirmPassword}
-                              onChange={(e) => setOConfirmPassword(e.target.value)}
-                              placeholder="Re-enter password..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                            />
+                            <div className="relative">
+                              <input 
+                                type={showOConfirmPassword ? "text" : "password"} 
+                                required
+                                value={oConfirmPassword}
+                                onChange={(e) => setOConfirmPassword(e.target.value)}
+                                placeholder="Re-enter password..."
+                                className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowOConfirmPassword(!showOConfirmPassword)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                                aria-label={showOConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                              >
+                                {showOConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
                           </div>
                         </div>
 

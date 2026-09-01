@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { stripEmojis, checkRateLimit, isHarassmentOrOffensive } from "@/app/lib/moderation";
 
 // Natural, human-like offline conversational fallback engine
@@ -164,18 +165,18 @@ export async function POST(req: NextRequest) {
     const liveTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     const liveDate = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-    const contextPrompt = `You are LynAI, an intelligent, friendly, and human-like developer companion and co-pilot on the LynDesk platform.
+    const contextPrompt = `You are LynAI, an intelligent, human-like developer companion and engineering co-pilot on the LynDesk platform.
 
 CURRENT TEMPORAL CONTEXT: ${liveDate} at ${liveTime}.
 ${workspaceContext ? `ACTIVE WORKSPACE CONTEXT: ${JSON.stringify(workspaceContext)}` : ""}
 ${profileContext ? `STUDENT DEVELOPER CONTEXT: ${JSON.stringify(profileContext)}` : ""}
 
 YOUR PERSONA & COMMUNICATION STYLE:
-1. HUMAN-LIKE & CONVERSATIONAL: Speak naturally like a knowledgeable, encouraging peer or senior engineer. Be warm, approachable, and direct.
-2. PARAGRAPH STRUCTURE: Write clean, well-spaced paragraphs ("para by para"). Avoid rigid, robotic walls of bullets.
-3. BRIEF & CONCISE: Answer directly without unnecessary fluff or robotic disclaimers.
-4. ZERO EMOJIS: Never use any emojis or decorative icons in any response.
-5. ACCURACY & QUALITY: Provide 100% accurate, high-standard technical explanations and platform guidance.
+1. NATURAL & HUMAN-LIKE: Speak like a seasoned, sharp, yet warm senior developer and peer mentor. Avoid generic AI mannerisms, robotic introductions, or repetitive filler.
+2. CLEAN PARAGRAPH STRUCTURE: Write clean, well-aligned paragraphs ("para by para"). Avoid rigid walls of bullets unless a structured list is explicitly helpful.
+3. BRIEF, CONCISE & PRECISE: Answer directly, accurately, and thoughtfully. Eliminate robotic disclaimers.
+4. STRICT ZERO EMOJIS: Never use any emojis, emoticons, or decorative icons in any response.
+5. TECHNICAL EXCELLENCE: Provide accurate, high-standard computer science insights, code reviews, and platform navigation.
 
 LYNDESK PLATFORM KNOWLEDGE:
 - College & Institution Linking: Users connect to their college or university in Profile Settings (/profile) under the "Institutional Affiliation" section by entering their official "College Key" / Passcode provided by their campus administrator.
@@ -188,10 +189,10 @@ LYNDESK PLATFORM KNOWLEDGE:
 
     if (groqApiKey) {
       const modelCandidates = [
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-        "qwen/qwen3.8-27b",
-        "groq/compound-mini"
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it"
       ];
 
       const groqMessages: Array<{ role: string; content: string }> = [
@@ -243,6 +244,40 @@ LYNDESK PLATFORM KNOWLEDGE:
         } catch (modelErr) {
           console.warn(`Groq candidate model [${model}] failed, trying next candidate:`, modelErr);
         }
+      }
+    }
+
+    // If Groq is unconfigured or failed, try Google Gemini if available
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (geminiApiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiApiKey.trim());
+        const model = genAI.getGenerativeModel({ 
+          model: "gemini-2.5-flash",
+          systemInstruction: contextPrompt
+        });
+
+        const chat = model.startChat({
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.65,
+          }
+        });
+
+        const result = await chat.sendMessage(userPrompt);
+        const replyText = result.response.text();
+        if (replyText && replyText.trim().length > 0) {
+          const cleanReply = stripEmojis(replyText.trim());
+          return NextResponse.json({
+            response: cleanReply,
+            actionLink: detectActionLink(userPrompt, cleanReply),
+            isMock: false,
+            provider: "gemini",
+            model: "gemini-2.5-flash"
+          });
+        }
+      } catch (geminiErr) {
+        console.warn("Gemini model call notice:", geminiErr);
       }
     }
   } catch (error: any) {

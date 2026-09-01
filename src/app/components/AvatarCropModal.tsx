@@ -170,8 +170,8 @@ export default function AvatarCropModal({
             />
             <button
               onClick={handleReset}
-              title="Reset Position & Zoom"
-              className="p-1.5 rounded bg-bg-surface border border-border-main/60 text-txt-muted hover:text-txt-main transition-colors shrink-0"
+              aria-label="Reset Position & Zoom"
+              className="p-1.5 rounded bg-bg-surface border border-border-main/60 text-txt-muted hover:text-txt-main transition-colors shrink-0 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>

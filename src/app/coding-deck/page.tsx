@@ -1151,7 +1151,7 @@ export default function CodingDeckPage() {
             onClick={handleManualSync}
             disabled={isManualSyncing}
             className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit shrink-0 whitespace-nowrap"
-            title="Force immediate live sync with coding platforms"
+            aria-label="Force immediate live sync with coding platforms"
           >
             <RotateCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
             {isManualSyncing ? "Syncing Live..." : "Sync Live Stats"}

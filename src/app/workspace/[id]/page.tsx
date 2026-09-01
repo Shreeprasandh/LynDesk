@@ -3704,7 +3704,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             <div 
               onClick={() => setShowActiveMembersModal(true)}
               className="flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity bg-bg-card/40 border border-border-main/60 px-2.5 py-1 rounded"
-              title="Click to view all Active Workspace Members"
+              aria-label="Click to view all Active Workspace Members"
             >
               <span className="text-[9px] font-mono text-txt-muted uppercase tracking-wider hidden sm:inline">Online ({onlineMembers.length}):</span>
               <div className="flex -space-x-1.5 overflow-hidden">

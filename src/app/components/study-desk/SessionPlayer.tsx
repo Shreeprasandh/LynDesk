@@ -460,7 +460,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
         <button
           onClick={onExit}
           className="w-9 h-9 rounded-md bg-bg-surface hover:bg-bg-card border border-border-main/70 text-txt-sub flex items-center justify-center cursor-pointer transition-colors"
-          title="Exit Lesson"
+          aria-label="Exit Lesson"
         >
           <X size={18} />
         </button>
@@ -484,7 +484,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
                 ? "bg-accent-main text-bg-base border-accent-main font-semibold"
                 : "bg-bg-surface hover:bg-bg-card border-border-main/70 text-txt-sub"
             }`}
-            title="Listen Card Audio"
+            aria-label={isSpeaking ? "Mute Card Audio" : "Listen Card Audio"}
           >
             {isSpeaking ? <VolumeX size={14} /> : <Volume2 size={14} />}
             <span className="hidden sm:inline text-[10px] uppercase font-bold">{isSpeaking ? "Mute" : "Listen"}</span>
@@ -496,7 +496,7 @@ export default function SessionPlayer({ lesson, onComplete, onExit }: SessionPla
           <button
             onClick={() => setShowAICoach(!showAICoach)}
             className="h-8 px-2.5 rounded bg-accent-main/10 hover:bg-accent-main/20 border border-accent-main/30 text-accent-main font-mono text-[10px] font-bold uppercase flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="Ask LynAI Tutor"
+            aria-label="Ask LynAI Tutor"
           >
             <Bot size={14} />
             <span className="hidden sm:inline">Ask LynAI</span>

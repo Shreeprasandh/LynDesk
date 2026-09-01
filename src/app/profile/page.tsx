@@ -27,7 +27,9 @@ import {
   X,
   Code2,
   Sparkles,
-  MapPin
+  MapPin,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 // Local Custom Icons for missing/problematic lucide ones
@@ -305,6 +307,9 @@ export default function ProfilePage() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [securityPasswordInput, setSecurityPasswordInput] = useState("");
   const [securityConfirmPasswordInput, setSecurityConfirmPasswordInput] = useState("");
+  const [showCollegeKey, setShowCollegeKey] = useState(false);
+  const [showSecPassword, setShowSecPassword] = useState(false);
+  const [showSecConfirmPass, setShowSecConfirmPass] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [securityActionLoading, setSecurityActionLoading] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
@@ -1968,7 +1973,7 @@ export default function ProfilePage() {
                         onClick={() => avatarInputRef.current?.click()}
                         disabled={uploadingAvatar}
                         className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white text-[10px] uppercase font-mono font-bold cursor-pointer disabled:pointer-events-none"
-                        title="Upload Custom Profile Picture"
+                        aria-label="Upload Custom Profile Picture"
                       >
                         {uploadingAvatar ? "..." : "Edit"}
                       </button>
@@ -1986,7 +1991,7 @@ export default function ProfilePage() {
                       type="button"
                       onClick={handleRemoveAvatar}
                       className="flex items-center gap-1 text-[10px] text-red-400 hover:text-red-300 font-mono transition-colors cursor-pointer"
-                      title="Remove Profile Picture"
+                      aria-label="Remove Profile Picture"
                     >
                       <Trash2 size={11} />
                       <span>Remove</span>
@@ -2956,14 +2961,26 @@ export default function ProfilePage() {
                         {/* College Key */}
                         <div className="flex flex-col gap-1">
                           <label className="text-[10px] text-txt-sub font-semibold">College Registrar Key</label>
-                          <input 
-                            type="password"
-                            value={collegeKey}
-                            onChange={(e) => setCollegeKey(e.target.value)}
-                            disabled={!isEditing || collegeLinkedStatus === "linked"}
-                            placeholder="e.g. COLLEGE_SRM"
-                            className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
-                          />
+                          <div className="relative">
+                            <input 
+                              type={showCollegeKey ? "text" : "password"}
+                              value={collegeKey}
+                              onChange={(e) => setCollegeKey(e.target.value)}
+                              disabled={!isEditing || collegeLinkedStatus === "linked"}
+                              placeholder="e.g. COLLEGE_SRM"
+                              className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-txt-main transition-colors font-mono disabled:opacity-60"
+                            />
+                            {isEditing && collegeLinkedStatus !== "linked" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowCollegeKey(!showCollegeKey)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                                aria-label={showCollegeKey ? "Hide college key" : "Show college key"}
+                              >
+                                {showCollegeKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -3137,26 +3154,46 @@ export default function ProfilePage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] text-txt-sub">New Password *</label>
-                    <input
-                      type="password"
-                      required
-                      value={securityPasswordInput}
-                      onChange={(e) => setSecurityPasswordInput(e.target.value)}
-                      placeholder="Min 8 chars, A-Z, 0-9, special..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecPassword ? "text" : "password"}
+                        required
+                        value={securityPasswordInput}
+                        onChange={(e) => setSecurityPasswordInput(e.target.value)}
+                        placeholder="Min 8 chars, A-Z, 0-9, special..."
+                        className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSecPassword(!showSecPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                        aria-label={showSecPassword ? "Hide new password" : "Show new password"}
+                      >
+                        {showSecPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] text-txt-sub">Confirm New Password *</label>
-                    <input
-                      type="password"
-                      required
-                      value={securityConfirmPasswordInput}
-                      onChange={(e) => setSecurityConfirmPasswordInput(e.target.value)}
-                      placeholder="Re-enter new password..."
-                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showSecConfirmPass ? "text" : "password"}
+                        required
+                        value={securityConfirmPasswordInput}
+                        onChange={(e) => setSecurityConfirmPasswordInput(e.target.value)}
+                        placeholder="Re-enter new password..."
+                        className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSecConfirmPass(!showSecConfirmPass)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                        aria-label={showSecConfirmPass ? "Hide confirm password" : "Show confirm password"}
+                      >
+                        {showSecConfirmPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

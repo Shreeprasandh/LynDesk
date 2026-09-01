@@ -1943,7 +1943,7 @@ export default function Home() {
                         }
                       }}
                       className="p-0.5 hover:text-txt-main text-txt-muted/70 transition-colors cursor-pointer shrink-0"
-                      title="Copy UID"
+                      aria-label="Copy UID"
                     >
                       <Copy size={10} />
                     </button>
@@ -2446,7 +2446,7 @@ export default function Home() {
                       type="button"
                       onClick={() => setIsPresetModalOpen(true)}
                       className="h-5 px-2 bg-bg-card/70 hover:bg-bg-card border border-border-main/70 text-txt-muted hover:text-txt-main text-[8.5px] font-mono tracking-wider uppercase rounded inline-flex items-center gap-1 transition-all cursor-pointer opacity-80 hover:opacity-100 shrink-0 font-medium"
-                      title="Customize location, category, and travel preference presets"
+                      aria-label="Customize location, category, and travel preference presets"
                     >
                       <SlidersHorizontal size={9} className="text-accent-main" />
                       <span>Preference Preset</span>

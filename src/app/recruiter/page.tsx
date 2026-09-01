@@ -15,7 +15,9 @@ import {
   Sparkles, 
   ChevronRight, 
   TrendingUp,
-  CheckCircle2
+  CheckCircle2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 interface Candidate {
@@ -33,7 +35,9 @@ interface Candidate {
 export default function RecruiterConsole() {
   const [authorized, setAuthorized] = useState(false);
   const [activeCompany, setActiveCompany] = useState("");
+  const [instituteName, setInstituteName] = useState("");
   const [accessPin, setAccessPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
@@ -205,15 +209,23 @@ export default function RecruiterConsole() {
                 </label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showPin ? "text" : "password"}
                     maxLength={6}
                     value={accessPin}
                     onChange={(e) => setAccessPin(e.target.value)}
                     placeholder="••••••"
-                    className="w-full h-11 bg-bg-base border border-border-main px-4 font-mono text-center tracking-[0.5em] text-lg text-txt-main placeholder:text-txt-muted/30 focus:border-accent-main focus:outline-none rounded-sm"
+                    className="w-full h-11 bg-bg-base border border-border-main pl-10 pr-10 font-mono text-center tracking-[0.5em] text-lg text-txt-main placeholder:text-txt-muted/30 focus:border-accent-main focus:outline-none rounded-sm"
                     autoFocus
                   />
-                  <Lock size={14} className="absolute left-3.5 top-3.5 text-txt-muted" />
+                  <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-txt-muted" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                    aria-label={showPin ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showPin ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
               </div>
 

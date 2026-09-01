@@ -31,7 +31,9 @@ import {
   Target,
   ChevronRight,
   Calendar as CalendarIcon,
-  Clock
+  Clock,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import PreferencePresetModal from "./components/PreferencePresetModal";
 import { fetchWallCalendarEvents, WallEvent } from "./lib/wallCalendarSync";
@@ -206,6 +208,9 @@ export default function Home() {
   const [authStep, setAuthStep] = useState<"idle" | "login" | "signup" | "faculty_login" | "forgot">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showResetNewPass, setShowResetNewPass] = useState(false);
+  const [showResetConfirmPass, setShowResetConfirmPass] = useState(false);
   const [staffKey, setStaffKey] = useState("");
   const [authActionLoading, setAuthActionLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -1105,14 +1110,24 @@ export default function Home() {
                             </button>
                           )}
                         </div>
-                        <input 
-                          type="password" 
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out"
-                        />
+                        <div className="relative">
+                          <input 
+                            type={showPassword ? "text" : "password"} 
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1224,26 +1239,46 @@ export default function Home() {
 
                           <div className="flex flex-col gap-1">
                             <label className="text-[11px] text-txt-sub font-medium">New LynDesk Password *</label>
-                            <input 
-                              type="password" 
-                              required
-                              value={resetNewPassword}
-                              onChange={(e) => setResetNewPassword(e.target.value)}
-                              placeholder="Min 8 chars, A-Z, 0-9, special..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                            />
+                            <div className="relative">
+                              <input 
+                                type={showResetNewPass ? "text" : "password"} 
+                                required
+                                value={resetNewPassword}
+                                onChange={(e) => setResetNewPassword(e.target.value)}
+                                placeholder="Min 8 chars, A-Z, 0-9, special..."
+                                className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowResetNewPass(!showResetNewPass)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                                aria-label={showResetNewPass ? "Hide new password" : "Show new password"}
+                              >
+                                {showResetNewPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
                           </div>
 
                           <div className="flex flex-col gap-1">
                             <label className="text-[11px] text-txt-sub font-medium">Confirm New Password *</label>
-                            <input 
-                              type="password" 
-                              required
-                              value={resetConfirmPassword}
-                              onChange={(e) => setResetConfirmPassword(e.target.value)}
-                              placeholder="Re-enter new password..."
-                              className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
-                            />
+                            <div className="relative">
+                              <input 
+                                type={showResetConfirmPass ? "text" : "password"} 
+                                required
+                                value={resetConfirmPassword}
+                                onChange={(e) => setResetConfirmPassword(e.target.value)}
+                                placeholder="Re-enter new password..."
+                                className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs focus:outline-none focus:border-sky-400/80 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200 ease-out font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowResetConfirmPass(!showResetConfirmPass)}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                                aria-label={showResetConfirmPass ? "Hide confirm password" : "Show confirm password"}
+                              >
+                                {showResetConfirmPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
                           </div>
 
                           {/* Live Password Rules Checklist */}
@@ -1351,14 +1386,24 @@ export default function Home() {
                       
                       <div className="flex flex-col gap-1">
                         <label className="text-[11px] text-txt-sub font-medium">Portal Password</label>
-                        <input 
-                          type="password" 
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150"
-                        />
+                        <div className="relative">
+                          <input 
+                            type={showPassword ? "text" : "password"} 
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full h-9 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main focus:ring-1 focus:ring-ring-main transition-colors duration-150"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-1">

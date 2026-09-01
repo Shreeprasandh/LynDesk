@@ -1055,7 +1055,7 @@ export default function ExplorePage() {
                   type="button"
                   onClick={() => setIsPresetModalOpen(true)}
                   className="h-10 px-3 bg-bg-base hover:bg-bg-card border border-border-main/80 text-txt-sub hover:text-txt-main text-xs font-mono rounded-sm inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Customize location, category, and travel preference presets"
+                  aria-label="Customize location, category, and travel preference presets"
                 >
                   <SlidersHorizontal size={12} className="text-accent-main" />
                   <span>Presets</span>
@@ -1216,7 +1216,7 @@ export default function ExplorePage() {
                     showToast("UID copied to clipboard!");
                   }}
                   className="font-mono text-[10px] uppercase text-txt-muted bg-bg-base border border-border-main/80 px-3 py-1.5 rounded hover:text-txt-main hover:border-border-main transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Click to copy your UID"
+                  aria-label="Click to copy your UID"
                 >
                   <Copy size={11} className="text-accent-main" />
                   <span>My UID: {user.id ? `${user.id.slice(0, 8)}...${user.id.slice(-4)}` : ""}</span>

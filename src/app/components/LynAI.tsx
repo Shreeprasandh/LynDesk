@@ -151,6 +151,18 @@ export default function LynAI() {
     }
   }, [isOpen]);
 
+  // Keyboard shortcut listener (Ctrl + / or Cmd + /)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+        e.preventDefault();
+        setIsOpen(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Sync state with global cache
   useEffect(() => {
     cachedMessages = messages;
@@ -285,7 +297,7 @@ export default function LynAI() {
         onClick={() => setIsOpen(true)}
         className="fixed bottom-20 right-6 z-[9999] h-9 w-9 bg-accent-main opacity-45 hover:opacity-100 text-bg-base rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group border border-accent-main/40 cursor-pointer animate-bounce"
         style={{ animationDuration: '3s' }}
-        title="Ask LynAI Co-Pilot"
+        aria-label="Ask LynAI Co-Pilot"
       >
         <Sparkles size={15} className="animate-pulse stroke-[2]" />
       </button>
@@ -316,7 +328,7 @@ export default function LynAI() {
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => setShowClearConfirm(true)}
-                    title="Clear Chat History"
+                    aria-label="Clear Chat History"
                     className="px-2 py-1 rounded text-[9px] font-mono uppercase tracking-wider text-txt-muted hover:text-txt-main hover:bg-bg-card border border-border-main/50 cursor-pointer transition-colors flex items-center gap-1 font-bold"
                   >
                     <Trash2 size={11} />

@@ -469,14 +469,14 @@ export default function AppliedHackathonsModal({
                       <button
                         onClick={() => startEdit(item)}
                         className="text-txt-muted hover:text-accent-main p-1 transition-colors cursor-pointer"
-                        title="Edit event details, link or deadline"
+                        aria-label="Edit event details, link or deadline"
                       >
                         <Pencil size={12} />
                       </button>
                       <button
                         onClick={() => handleDeleteApplication(item.id)}
                         className="text-txt-muted hover:text-red-400 p-1 transition-colors cursor-pointer"
-                        title="Untrack event"
+                        aria-label="Untrack event"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -565,7 +565,7 @@ export default function AppliedHackathonsModal({
                       <button
                         onClick={() => handleDeleteApplication(item.id)}
                         className="text-[10px] font-mono text-txt-muted hover:text-red-400 flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Untrack this event"
+                        aria-label="Untrack this event"
                       >
                         <Trash2 size={9} /> Untrack
                       </button>

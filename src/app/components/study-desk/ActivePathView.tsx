@@ -390,7 +390,7 @@ export default function ActivePathView({ path, onStartLesson, onCreateNewPathCli
                                 return (
                                   <span
                                     className="px-2 py-0.5 bg-bg-card/30 border border-border-main/20 text-txt-muted/35 font-mono text-[9px] uppercase font-semibold rounded flex items-center gap-1 cursor-not-allowed select-none"
-                                    title="Complete previous lessons to unlock video tutorial"
+                                    aria-label="Complete previous lessons to unlock video tutorial"
                                   >
                                     <Video size={10} /> Learn
                                   </span>

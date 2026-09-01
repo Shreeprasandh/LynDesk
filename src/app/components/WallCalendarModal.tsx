@@ -382,7 +382,7 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                     <button
                       onClick={handlePrevMonth}
                       className="p-1 rounded border border-border-main/70 hover:bg-bg-card text-txt-main transition-colors cursor-pointer"
-                      title="Previous Month"
+                      aria-label="Previous Month"
                     >
                       <ChevronLeft size={16} />
                     </button>
@@ -392,7 +392,7 @@ export default function WallCalendarModal({ isOpen, onClose, userId }: WallCalen
                     <button
                       onClick={handleNextMonth}
                       className="p-1 rounded border border-border-main/70 hover:bg-bg-card text-txt-main transition-colors cursor-pointer"
-                      title="Next Month"
+                      aria-label="Next Month"
                     >
                       <ChevronRight size={16} />
                     </button>

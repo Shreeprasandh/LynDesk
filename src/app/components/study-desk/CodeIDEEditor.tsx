@@ -133,7 +133,7 @@ export default function CodeIDEEditor({
               type="button"
               onClick={() => onChange(initialCode)}
               className="px-2.5 py-1 rounded bg-bg-card hover:bg-border-main/40 text-[10px] text-txt-sub hover:text-txt-main flex items-center gap-1 cursor-pointer transition-colors"
-              title="Reset Code Template"
+              aria-label="Reset Code Template"
             >
               <RotateCcw size={11} /> Reset Template
             </button>

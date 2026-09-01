@@ -17,7 +17,9 @@ import {
   Sparkles,
   KeyRound,
   X,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -62,6 +64,7 @@ export default function ProgressDashboardView({
   const [isConnectModalOpen, setIsConnectModalOpen] = React.useState(false);
   const [vgUsername, setVgUsername] = React.useState("");
   const [vgPassword, setVgPassword] = React.useState("");
+  const [showVgPassword, setShowVgPassword] = React.useState(false);
   const [vgLoading, setVgLoading] = React.useState(false);
   const [vgError, setVgError] = React.useState<string | null>(null);
 
@@ -564,14 +567,14 @@ export default function ProgressDashboardView({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={handleRefreshVgStats}
-                      title="Refresh high score"
+                      aria-label="Refresh high score"
                       className="text-txt-muted hover:text-txt-main p-1 transition-colors cursor-pointer"
                     >
                       <RefreshCw size={12} />
                     </button>
                     <button
                       onClick={handleUnlinkVanguarDZ}
-                      title="Unlink VanguarDZ account"
+                      aria-label="Unlink VanguarDZ account"
                       className="text-txt-muted hover:text-rose-400 p-1 transition-colors cursor-pointer text-[10px] font-mono"
                     >
                       <X size={12} />
@@ -660,14 +663,24 @@ export default function ProgressDashboardView({
                 <label className="font-mono text-[10px] uppercase text-txt-muted font-bold block">
                   VanguarDZ Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  value={vgPassword}
-                  onChange={(e) => setVgPassword(e.target.value)}
-                  placeholder="Enter your VanguarDZ password"
-                  className="w-full px-3.5 py-2.5 bg-bg-base border border-border-main/80 rounded text-sm text-txt-main focus:border-accent-main focus:outline-hidden font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type={showVgPassword ? "text" : "password"}
+                    required
+                    value={vgPassword}
+                    onChange={(e) => setVgPassword(e.target.value)}
+                    placeholder="Enter your VanguarDZ password"
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-bg-base border border-border-main/80 rounded text-sm text-txt-main focus:border-accent-main focus:outline-hidden font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVgPassword(!showVgPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                    aria-label={showVgPassword ? "Hide password" : "Show password"}
+                  >
+                    {showVgPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">

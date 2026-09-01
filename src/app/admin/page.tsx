@@ -15,7 +15,9 @@ import {
   Clock, 
   Lock, 
   LogOut, 
-  ChevronRight
+  ChevronRight,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 interface AdminProfile {
@@ -33,6 +35,7 @@ export default function AdminConsolePage() {
   // Auth Form States
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -332,14 +335,24 @@ export default function AdminConsolePage() {
 
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Master Passkey</label>
-                <input 
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter Root Passkey"
-                  required
-                  className="h-10 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter Root Passkey"
+                    required
+                    className="w-full h-10 pl-3 pr-9 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-txt-main font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-txt-muted hover:text-txt-main transition-colors p-0.5 cursor-pointer"
+                    aria-label={showPassword ? "Hide passkey" : "Show passkey"}
+                  >
+                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
               </div>
 
               <button
