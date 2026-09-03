@@ -8,16 +8,13 @@ import {
   X, 
   Plus, 
   Trash2, 
-  Trophy,
-  Calendar,
-  Compass,
-  UserCheck,
-  ExternalLink,
-  Pencil,
-  Clock,
-  Sparkles,
-  Search,
-  Building2
+  Trophy, 
+  Calendar, 
+  Compass, 
+  UserCheck, 
+  ExternalLink, 
+  Pencil, 
+  Sparkles 
 } from "lucide-react";
 
 interface ApplicationItem {

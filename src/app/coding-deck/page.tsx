@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
-import LynDeskLoadingCard from "../components/LynDeskLoadingCard";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Link from "next/link";
@@ -14,7 +13,7 @@ import {
   ExternalLink, 
   CheckCircle2, 
   AlertCircle, 
-  TrendingUp,
+  TrendingUp, 
   Sparkles,
   RotateCw,
   Lock,
@@ -22,9 +21,12 @@ import {
   ChevronUp,
   Puzzle,
   BookOpen,
-  Star,
-  X
+  Star, 
+  X,
+  LayoutDashboard,
+  SlidersHorizontal
 } from "lucide-react";
+import CodingDeckDashboard from "../components/CodingDeckDashboard";
 
 interface PlatformStats {
   solved: number;
@@ -53,22 +55,7 @@ interface PlatformStats {
 }
 
 export default function CodingDeckPage() {
-  const { user, loading: authLoading } = useAuth();
-  // Smart cache-aware initial loading state: 0ms instant render if cached data exists
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const cached = localStorage.getItem("ldk_coding_desk_stats_cache");
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (parsed && (parsed.leetcode || parsed.codeforces || parsed.codechef || parsed.geeksforgeeks || parsed.hackerrank)) {
-            return false;
-          }
-        } catch {}
-      }
-    }
-    return true;
-  });
+  const { user } = useAuth();
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Auto-clear message notification after 4 seconds
@@ -128,14 +115,26 @@ export default function CodingDeckPage() {
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
   const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, devpost: 0 });
 
+  // View Mode: 'dashboard' (Bento Analytics) | 'integrations' (Link Forms)
+  const [viewMode, setViewMode] = useState<"integrations" | "dashboard">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("ldk_coding_view_mode") as "integrations" | "dashboard") || "dashboard";
+    }
+    return "dashboard";
+  });
+
+  const handleToggleViewMode = (mode: "integrations" | "dashboard") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ldk_coding_view_mode", mode);
+    }
+  };
+
   // Unified Quick Connect Platform Modal state
   const [connectModalPlatform, setConnectModalPlatform] = useState<CodingPlatform | null>(null);
   const [connectInputHandle, setConnectInputHandle] = useState("");
   const [connectError, setConnectError] = useState("");
   const [connectSaving, setConnectSaving] = useState(false);
-
-  // Inline handle input state for LeetCode empty state card
-  const [inputLcHandle, setInputLcHandle] = useState("");
 
   const handleOpenConnectModal = (platform: CodingPlatform) => {
     let currentVal = "";
@@ -279,47 +278,6 @@ export default function CodingDeckPage() {
     });
   };
 
-  const handleSaveInlineHandle = async () => {
-    if (!inputLcHandle.trim()) return;
-    const res = extractPlatformHandle(inputLcHandle, "LeetCode");
-    const cleanHandle = res.handle || inputLcHandle.trim().replace(/^@/, "");
-    
-    setLeetcodeUser(cleanHandle);
-    setInputLcHandle(cleanHandle);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("ldk_leetcode_handle", cleanHandle);
-      if (user?.id) localStorage.setItem(`ldk_leetcode_handle_${user.id}`, cleanHandle);
-    }
-
-    if (user) {
-      try {
-        await supabase.from("profiles").update({
-          leetcode_username: cleanHandle || null
-        }).eq("id", user.id);
-
-        await supabase.auth.updateUser({
-          data: { ...user.user_metadata, leetcode_username: cleanHandle }
-        });
-      } catch {}
-    }
-
-    try {
-      const statsRes = await fetch(`/api/coding-stats?platform=leetcode&username=${encodeURIComponent(cleanHandle)}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      if (statsRes.ok) {
-        const freshData = await statsRes.json();
-        setStats(prev => ({ ...prev, leetcode: freshData }));
-        setPlatformErrors(prev => ({ ...prev, leetcode: "" }));
-      }
-    } catch {}
-
-    setMessage({ text: `Successfully linked LeetCode handle @${cleanHandle}! Syncing live stats...`, type: "success" });
-  };
-
-
-
   // LeetCode year filter state
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
   const heatmapScrollRef = useRef<HTMLDivElement>(null);
@@ -438,6 +396,7 @@ export default function CodingDeckPage() {
       avatar?: string;
       participations?: number;
     } | null;
+    github?: any | null;
   }>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -452,7 +411,8 @@ export default function CodingDeckPage() {
       geeksforgeeks: null,
       codeforces: null,
       unstop: null,
-      devpost: null
+      devpost: null,
+      github: null
     };
   });
 
@@ -528,7 +488,6 @@ export default function CodingDeckPage() {
     const loadPlatformData = async () => {
       try {
         if (isFirstLoadRef.current) {
-          setLoading(true);
           isFirstLoadRef.current = false;
         }
         const meta = user?.user_metadata || {};
@@ -740,8 +699,6 @@ export default function CodingDeckPage() {
 
       } catch (err) {
         console.error("Error loading coding platform details:", err);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -806,8 +763,9 @@ export default function CodingDeckPage() {
         const hr = hackerrankUser;
         const gfg = geeksforgeeksUser;
         const un = unstopUser;
+        const gh = user?.user_metadata?.user_name || user?.user_metadata?.preferred_username || "";
         
-        if (!lc && !cf && !cc && !hr && !gfg && !un) return;
+        if (!lc && !cf && !cc && !hr && !gfg && !un && !gh) return;
         
         const fetchStats = async (platform: string, username: string, year?: number | null) => {
           if (!username) return null;
@@ -826,13 +784,14 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codeforcesStats, codechefStats, hackerrankStats, gfgStats, unstopStats] = await Promise.all([
+        const [leetcodeStats, codeforcesStats, codechefStats, hackerrankStats, gfgStats, unstopStats, githubStats] = await Promise.all([
           lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
           cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
           cc ? fetchStats("codechef", cc) : Promise.resolve(null),
           hr ? fetchStats("hackerrank", hr) : Promise.resolve(null),
           gfg ? fetchStats("geeksforgeeks", gfg) : Promise.resolve(null),
           un ? fetchStats("unstop", un) : Promise.resolve(null),
+          gh ? fetchStats("github", gh) : Promise.resolve(null),
         ]);
 
         setStats(prev => ({
@@ -843,6 +802,7 @@ export default function CodingDeckPage() {
           hackerrank: hackerrankStats || prev.hackerrank,
           geeksforgeeks: gfgStats || prev.geeksforgeeks,
           unstop: unstopStats || prev.unstop,
+          github: githubStats || prev.github,
         }));
       };
       
@@ -1175,24 +1135,6 @@ export default function CodingDeckPage() {
     ];
   }, []);
 
-  const hasCachedStats = typeof window !== "undefined" && !!localStorage.getItem("ldk_coding_desk_stats_cache");
-
-  if ((authLoading || loading) && !hasCachedStats) {
-    return (
-      <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans">
-        <Header />
-        <main className="flex-1 flex items-center justify-center p-6">
-          <LynDeskLoadingCard
-            message="Syncing Coding Desk Session..."
-            subtext="Authenticating developer credentials & platform integrations"
-            minHeight="min-h-[420px]"
-          />
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-bg-base text-txt-main flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
@@ -1215,17 +1157,55 @@ export default function CodingDeckPage() {
           <div className="flex flex-col gap-1 min-w-0">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations Center</span>
             <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">Code Desk &amp; Platforms</h1>
-            <p className="text-xs text-txt-sub">Link your developer profiles across competitive coding and hackathon platforms to sync stats.</p>
+            <p className="text-xs text-txt-sub">
+              {viewMode === "dashboard"
+                ? "Unified developer command center aggregating solves, contest ratings, and daily activity."
+                : "Link your developer profiles across competitive coding and hackathon platforms to sync stats."}
+            </p>
           </div>
-          <button
-            onClick={handleManualSync}
-            disabled={isManualSyncing}
-            className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit shrink-0 whitespace-nowrap"
-            aria-label="Force immediate live sync with coding platforms"
-          >
-            <RotateCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
-            {isManualSyncing ? "Syncing Live..." : "Sync Live Stats"}
-          </button>
+          
+          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto flex-wrap sm:flex-nowrap">
+            {/* View Mode Toggle Pill */}
+            <div className="flex items-center p-0.5 rounded-sm bg-bg-card border border-border-main/60">
+              <button
+                type="button"
+                onClick={() => handleToggleViewMode("dashboard")}
+                className={`h-7 px-2.5 rounded-xs text-[10px] font-mono tracking-wider uppercase flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === "dashboard"
+                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                    : "text-txt-muted hover:text-txt-main"
+                }`}
+                title="Switch to Dashboard View"
+              >
+                <LayoutDashboard size={11} />
+                <span>Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleToggleViewMode("integrations")}
+                className={`h-7 px-2.5 rounded-xs text-[10px] font-mono tracking-wider uppercase flex items-center gap-1.5 transition-all cursor-pointer ${
+                  viewMode === "integrations"
+                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                    : "text-txt-muted hover:text-txt-main"
+                }`}
+                title="Switch to Integrations & Setup View"
+              >
+                <SlidersHorizontal size={11} />
+                <span>Setup &amp; Links</span>
+              </button>
+            </div>
+
+            {/* Sync Live Stats Button */}
+            <button
+              onClick={handleManualSync}
+              disabled={isManualSyncing}
+              className="h-8 px-3 rounded-sm border border-accent-main/40 hover:bg-accent-main/10 text-accent-main text-[10px] font-mono uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer w-fit shrink-0 whitespace-nowrap"
+              aria-label="Force immediate live sync with coding platforms"
+            >
+              <RotateCw size={12} className={isManualSyncing ? "animate-spin" : ""} />
+              {isManualSyncing ? "Syncing..." : "Sync Live Stats"}
+            </button>
+          </div>
         </div>
 
         {/* Banner Alert for outstanding daily problem */}
@@ -1309,7 +1289,22 @@ export default function CodingDeckPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {viewMode === "dashboard" ? (
+          <CodingDeckDashboard
+            stats={stats}
+            handles={{
+              leetcode: leetcodeUser,
+              codeforces: codeforcesUser,
+              codechef: codechefUser,
+              geeksforgeeks: geeksforgeeksUser,
+              hackerrank: hackerrankUser,
+              github: user?.user_metadata?.user_name || ""
+            }}
+            onOpenConnectModal={handleOpenConnectModal}
+            onSwitchToIntegrations={() => handleToggleViewMode("integrations")}
+          />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* ================= LEFT COLUMN: CODING CARD STACKS (8 Columns) ================= */}
             <div className="lg:col-span-8 flex flex-col gap-6 min-w-0">
@@ -1363,48 +1358,16 @@ export default function CodingDeckPage() {
                 </div>
 
                 {!leetcodeUser ? (
-                  <div className="p-4 sm:p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 font-mono text-xs text-txt-muted flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-5 overflow-hidden">
-                    <div className="flex flex-col gap-1 text-left min-w-0 flex-1">
-                      <span className="font-semibold text-txt-main">LeetCode handle is not linked yet.</span>
-                      <span className="text-[10px] text-txt-sub">Enter your LeetCode username or profile link below to sync daily challenge streak & stats.</span>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 min-w-0">
-                      <input
-                        type="text"
-                        value={inputLcHandle}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val.includes("/") || val.includes(".") || val.startsWith("@") || val.startsWith("http")) {
-                            const res = extractPlatformHandle(val, "LeetCode");
-                            if (res.handle) {
-                              setInputLcHandle(res.handle);
-                              return;
-                            }
-                          }
-                          setInputLcHandle(val);
-                        }}
-                        onPaste={(e) => {
-                          const pasted = e.clipboardData.getData("text");
-                          if (pasted && (pasted.includes("/") || pasted.includes(".") || pasted.startsWith("@") || pasted.startsWith("http"))) {
-                            const res = extractPlatformHandle(pasted, "LeetCode");
-                            if (res.handle) {
-                              e.preventDefault();
-                              setInputLcHandle(res.handle);
-                            }
-                          }
-                        }}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveInlineHandle(); }}
-                        placeholder="e.g. username or profile link"
-                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main min-w-0 flex-1 sm:w-48"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSaveInlineHandle}
-                        className="h-8 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold rounded hover:opacity-90 transition-all shrink-0 cursor-pointer whitespace-nowrap"
-                      >
-                        Link & Sync
-                      </button>
-                    </div>
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-2 items-center py-6">
+                    <span className="font-semibold text-txt-main">LeetCode account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Connect your LeetCode handle or profile link to sync daily streak, solve tallies &amp; activity heatmap.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("LeetCode")}
+                      className="mt-1 h-7 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      + Connect LeetCode
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-6 pt-2">
@@ -2141,7 +2104,7 @@ export default function CodingDeckPage() {
                 </div>
 
                 {/* Devpost Row */}
-                <div className="flex flex-col gap-1.5 pt-0.5">
+                <div className="flex flex-col gap-2 pt-0.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Devpost</span>
                     {devpostUser ? (
@@ -2172,6 +2135,30 @@ export default function CodingDeckPage() {
                       </button>
                     )}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-0.5 font-mono text-[10px]">
+                    <div className="bg-bg-card border border-border-main/50 p-2 rounded flex flex-col">
+                      <span className="text-txt-muted text-[9px] uppercase">Hackathons</span>
+                      <span className="text-xs font-bold text-txt-main font-display">
+                        {(stats.devpost as any)?.hackathonsCount !== undefined 
+                          ? (stats.devpost as any).hackathonsCount 
+                          : realAppliedCounts.devpost}
+                      </span>
+                      <span className="text-[8px] text-txt-muted">Devpost profile</span>
+                    </div>
+                    <div className="bg-bg-card border border-border-main/50 p-2 rounded flex flex-col">
+                      <span className="text-txt-muted text-[9px] uppercase">Achievements</span>
+                      <span className="text-xs font-bold text-txt-main font-display">
+                        {(stats.devpost as any)?.achievementsCount !== undefined 
+                          ? (stats.devpost as any).achievementsCount 
+                          : "0"}
+                      </span>
+                      <span className="text-[8px] text-txt-muted">
+                        {(stats.devpost as any)?.projectsCount ? `${(stats.devpost as any).projectsCount} Projects` : "Devpost badges"}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between font-mono text-[9.5px] text-txt-muted px-0.5">
                     <span>LynDesk Tracked:</span>
                     <span className="font-semibold text-txt-main">
@@ -2287,6 +2274,7 @@ export default function CodingDeckPage() {
 
             </div>
           </div>
+        )}
 
       </main>
 

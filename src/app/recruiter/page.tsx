@@ -35,7 +35,6 @@ interface Candidate {
 export default function RecruiterConsole() {
   const [authorized, setAuthorized] = useState(false);
   const [activeCompany, setActiveCompany] = useState("");
-  const [instituteName, setInstituteName] = useState("");
   const [accessPin, setAccessPin] = useState("");
   const [showPin, setShowPin] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);

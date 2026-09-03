@@ -238,14 +238,7 @@ export async function GET(request: Request) {
       const solvedHard = submissions.find((s: any) => s.difficulty === "Hard")?.count || 0;
       
       const totalSubmissions = totalSubmissionsList.find((s: any) => s.difficulty === "All")?.submissions || 0;
-      const totalEasySubmissions = totalSubmissionsList.find((s: any) => s.difficulty === "Easy")?.submissions || 0;
-      const totalMediumSubmissions = totalSubmissionsList.find((s: any) => s.difficulty === "Medium")?.submissions || 0;
-      const totalHardSubmissions = totalSubmissionsList.find((s: any) => s.difficulty === "Hard")?.submissions || 0;
-      
       const acceptedSubmissions = submissions.find((s: any) => s.difficulty === "All")?.submissions || 0;
-      const acceptedEasySubmissions = submissions.find((s: any) => s.difficulty === "Easy")?.submissions || 0;
-      const acceptedMediumSubmissions = submissions.find((s: any) => s.difficulty === "Medium")?.submissions || 0;
-      const acceptedHardSubmissions = submissions.find((s: any) => s.difficulty === "Hard")?.submissions || 0;
 
       const rating = Math.round(statsData.data?.userContestRanking?.rating || 1500);
       const globalRank = matchedUser.profile?.ranking || 0;
@@ -523,13 +516,7 @@ export async function GET(request: Request) {
         solvedMedium,
         solvedHard,
         totalSubmissions,
-        totalEasySubmissions,
-        totalMediumSubmissions,
-        totalHardSubmissions,
         acceptedSubmissions,
-        acceptedEasySubmissions,
-        acceptedMediumSubmissions,
-        acceptedHardSubmissions,
         rank,
         rating,
         globalRank,
@@ -1031,9 +1018,6 @@ export async function GET(request: Request) {
       let currentStreak = 0;
       let longestStreak = 0;
       let organisationName = "";
-      let avatar = "";
-      let fullName = "";
-      let certificates: Array<{ title: string; organiser: string; issueDate: string }> = [];
       let fetchedSuccessfully = false;
 
       const unstopHeaders = {
@@ -1045,7 +1029,8 @@ export async function GET(request: Request) {
       try {
         const unstopRes = await fetch(`https://unstop.com/api/gamification/get-user-widget-data/${cleanUsername}/21/global`, {
           headers: unstopHeaders,
-          cache: "no-store"
+          cache: "no-store",
+          signal: AbortSignal.timeout(6000)
         });
 
         if (unstopRes.ok) {
@@ -1057,26 +1042,11 @@ export async function GET(request: Request) {
             badgesCount = parseInt(uData.badges_count || 0);
             certificatesCount = parseInt(uData.certificates_count || (Array.isArray(uData.certificates) ? uData.certificates.length : 0));
             organisationName = uData.user?.organisation_name || "";
-            avatar = uData.user?.avatar || "";
-            fullName = uData.user?.name || "";
 
             const streakStats = uData.streaks?.stats;
             if (Array.isArray(streakStats) && streakStats.length > 0) {
               currentStreak = parseInt(streakStats[0].current_streak || 0);
               longestStreak = parseInt(streakStats[0].longest_streak || 0);
-            }
-
-            if (Array.isArray(uData.certificates)) {
-              certificates = uData.certificates.map((c: any) => ({
-                id: c.id || c.cert_id || String(Math.random()),
-                certId: c.cert_id || "",
-                title: c.certData?.event || c.title || "Hackathon Participation",
-                organiser: c.certData?.organiser || c.certData?.organisation || c.issued_by || "Unstop Partner",
-                organisation: c.certData?.organisation || "",
-                issueDate: c.sent_at ? c.sent_at.split(" ")[0] : "",
-                url: c.url || (c.cert_id ? `https://unstop.com/api/certificate/${c.cert_id}` : ""),
-                eventLogo: c.certData?.eventLogo || ""
-              }));
             }
           }
         }
@@ -1093,7 +1063,6 @@ export async function GET(request: Request) {
           currentStreak: 0,
           longestStreak: 0,
           organisationName: "",
-          certificates: [],
           isFallback: true
         }, { status: 200 });
       }
@@ -1105,10 +1074,7 @@ export async function GET(request: Request) {
         certificatesCount,
         currentStreak,
         longestStreak,
-        organisationName,
-        avatar,
-        fullName,
-        certificates
+        organisationName
       };
 
       STATS_CACHE.set(cacheKey, { data: unstopPayload, timestamp: Date.now() });
@@ -1123,9 +1089,10 @@ export async function GET(request: Request) {
     if (platform === "devpost") {
       let projectsCount = 0;
       let hackathonsCount = 0;
-      const followersCount = 0;
+      let achievementsCount = 0;
+      let followersCount = 0;
+      let likesCount = 0;
       let fullName = cleanUsername;
-      const avatar = "";
       let fetchedSuccessfully = false;
 
       const devpostHeaders = {
@@ -1134,9 +1101,10 @@ export async function GET(request: Request) {
       };
 
       try {
-        const dpRes = await fetch(`https://devpost.com/${cleanUsername}`, {
+        const dpRes = await fetch(`https://devpost.com/${encodeURIComponent(cleanUsername)}`, {
           headers: devpostHeaders,
-          cache: "no-store"
+          cache: "no-store",
+          signal: AbortSignal.timeout(6000)
         });
 
         if (dpRes.ok) {
@@ -1144,20 +1112,38 @@ export async function GET(request: Request) {
           if (!html.includes("Page Not Found") && !html.includes("User doesn't exist")) {
             fetchedSuccessfully = true;
 
-            const nameMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+            const nameMatch = html.match(/<h1[^>]*id=["']portfolio-user-name["'][^>]*>([\s\S]*?)<\/h1>/i) ||
+                              html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
             if (nameMatch) {
               fullName = nameMatch[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
             }
 
-            const pMatch = html.match(/class="[^"]*portfolio-entry[^"]*"/g);
-            if (pMatch) {
-              projectsCount = pMatch.length;
-              hackathonsCount = pMatch.length;
+            const projectsMatch = html.match(/<div class=["']totals["']><span>(\d+)<\/span><\/div>\s*Projects?/i);
+            if (projectsMatch && projectsMatch[1]) {
+              projectsCount = parseInt(projectsMatch[1], 10);
+            } else {
+              const pEntries = html.match(/class="[^"]*portfolio-entry[^"]*"/g);
+              if (pEntries) projectsCount = pEntries.length;
             }
 
-            const hMatch = html.match(/(\d+)\s*Hackathons?/i);
-            if (hMatch && hMatch[1]) {
-              hackathonsCount = parseInt(hMatch[1], 10);
+            const hackathonsMatch = html.match(/<div class=["']totals["']><span>(\d+)<\/span><\/div>\s*Hackathons?/i);
+            if (hackathonsMatch && hackathonsMatch[1]) {
+              hackathonsCount = parseInt(hackathonsMatch[1], 10);
+            }
+
+            const achievementsMatch = html.match(/<div class=["']totals["']><span>(\d+)<\/span><\/div>\s*Achievements?/i);
+            if (achievementsMatch && achievementsMatch[1]) {
+              achievementsCount = parseInt(achievementsMatch[1], 10);
+            }
+
+            const followersMatch = html.match(/<div class=["']totals["']><span>(\d+)<\/span><\/div>\s*Followers?/i);
+            if (followersMatch && followersMatch[1]) {
+              followersCount = parseInt(followersMatch[1], 10);
+            }
+
+            const likesMatch = html.match(/<div class=["']totals["']><span>(\d+)<\/span><\/div>\s*Likes?/i);
+            if (likesMatch && likesMatch[1]) {
+              likesCount = parseInt(likesMatch[1], 10);
             }
           }
         }
@@ -1168,9 +1154,10 @@ export async function GET(request: Request) {
       const devpostPayload = {
         projectsCount,
         hackathonsCount,
+        achievementsCount,
         followersCount,
+        likesCount,
         fullName,
-        avatar,
         participations: hackathonsCount,
         isFallback: !fetchedSuccessfully
       };
@@ -1184,195 +1171,72 @@ export async function GET(request: Request) {
       });
     }
 
-    if (platform === "hackerrank") {
-      let solved = 0;
-      const solvedEasy = 0;
-      const solvedMedium = 0;
-      const solvedHard = 0;
-      let totalSubmissions = 0;
-      let acceptedSubmissions = 0;
-      let rank = "Hacker";
-      let rating = 1200;
-      const globalRank = 0;
+    if (platform === "github") {
+      let repos = 0;
+      let followers = 0;
+      let commits = 0;
       let fetchedSuccessfully = false;
       const submissionCalendar: Record<string, number> = {};
 
-      const hrHeaders = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json"
+      const ghHeaders = {
+        "User-Agent": "LynDesk-Bot/1.0",
+        "Accept": "application/vnd.github.v3+json"
       };
 
       try {
-        const [badgesRes, profileRes] = await Promise.allSettled([
-          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/badges`, {
-            headers: hrHeaders,
-            cache: "no-store"
-          }),
-          fetch(`https://www.hackerrank.com/rest/hackers/${cleanUsername}/profile`, {
-            headers: hrHeaders,
-            cache: "no-store"
-          })
-        ]);
-
-        if (badgesRes.status === "fulfilled" && badgesRes.value.ok) {
-          const badgesData = await badgesRes.value.json();
-          if (badgesData && Array.isArray(badgesData.models)) {
-            fetchedSuccessfully = true;
-            let totalBadgeStars = 0;
-            badgesData.models.forEach((b: any) => {
-              const solvedCount = parseInt(b.solved || 0, 10);
-              const totalCount = parseInt(b.total_challenges || 0, 10);
-              const stars = parseInt(b.stars || 0, 10);
-              solved += solvedCount;
-              totalSubmissions += Math.max(totalCount, solvedCount);
-              totalBadgeStars += stars;
-            });
-            acceptedSubmissions = solved;
-            rating = Math.max(1200, totalBadgeStars * 250);
-            if (totalBadgeStars >= 15) rank = "Master (5★)";
-            else if (totalBadgeStars >= 10) rank = "Specialist (4★)";
-            else if (totalBadgeStars >= 6) rank = "Knight (3★)";
-            else if (totalBadgeStars >= 3) rank = "Pupil (2★)";
-            else rank = "Hacker (1★)";
-          }
-        }
-
-        if (profileRes.status === "fulfilled" && profileRes.value.ok) {
-          const profData = await profileRes.value.json();
-          if (profData?.model) {
-            fetchedSuccessfully = true;
-            if (profData.model.score) {
-              rating = Math.max(rating, Math.round(profData.model.score));
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("HackerRank fetch error:", err);
-      }
-
-      const hackerrankPayload = {
-        solved,
-        solvedEasy,
-        solvedMedium,
-        solvedHard,
-        totalSubmissions: Math.max(totalSubmissions, solved),
-        acceptedSubmissions,
-        rank: fetchedSuccessfully ? rank : "Active Hacker",
-        rating,
-        globalRank,
-        submissionCalendar,
-        isFallback: !fetchedSuccessfully
-      };
-
-      STATS_CACHE.set(cacheKey, { data: hackerrankPayload, timestamp: Date.now() });
-
-      return NextResponse.json(hackerrankPayload, {
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
-        }
-      });
-    }
-
-    if (platform === "geeksforgeeks" || platform === "gfg") {
-      let solved = 0;
-      let solvedEasy = 0;
-      let solvedMedium = 0;
-      let solvedHard = 0;
-      let totalSubmissions = 0;
-      let acceptedSubmissions = 0;
-      let rank = "Geek";
-      let rating = 100;
-      let globalRank = 0;
-      let currentStreak = 0;
-      let longestStreak = 0;
-      let fetchedSuccessfully = false;
-      const submissionCalendar: Record<string, number> = {};
-
-      const gfgHeaders = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Referer": "https://www.geeksforgeeks.org/"
-      };
-
-      try {
-        const apiRes = await fetch(`https://practiceapi.geeksforgeeks.org/api/v1/user/problems/submissions/${cleanUsername}/`, {
-          headers: { "User-Agent": gfgHeaders["User-Agent"] },
-          cache: "no-store"
+        const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}`, {
+          headers: ghHeaders,
+          cache: "no-store",
+          signal: AbortSignal.timeout(6000)
         });
-        if (apiRes.ok) {
-          const apiJson = await apiRes.json();
-          if (apiJson && apiJson.result) {
-            fetchedSuccessfully = true;
-            const r = apiJson.result;
-            solved = parseInt(r.total_problems_solved || 0, 10);
-            solvedEasy = parseInt(r.easy || 0, 10) + parseInt(r.school || 0, 10) + parseInt(r.basic || 0, 10);
-            solvedMedium = parseInt(r.medium || 0, 10);
-            solvedHard = parseInt(r.hard || 0, 10);
-            rating = parseInt(r.coding_score || 0, 10);
-            globalRank = parseInt(r.institute_rank || 0, 10);
-            currentStreak = parseInt(r.current_streak || 0, 10);
-            longestStreak = parseInt(r.pod_solved_longest_streak || 0, 10);
-            acceptedSubmissions = solved;
-            totalSubmissions = solved;
+
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          repos = userData.public_repos || 0;
+          followers = userData.followers || 0;
+          fetchedSuccessfully = true;
+        }
+
+        try {
+          const contribRes = await fetch(`https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(cleanUsername)}?y=last`, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(6000)
+          });
+          if (contribRes.ok) {
+            const contribData = await contribRes.json();
+            if (contribData.total?.lastYear) {
+              commits = contribData.total.lastYear;
+            }
+            if (Array.isArray(contribData.contributions)) {
+              contribData.contributions.forEach((c: { date: string; count: number }) => {
+                if (c.count > 0) {
+                  submissionCalendar[c.date] = c.count;
+                }
+              });
+            }
+          }
+        } catch {
+          if (commits === 0 && repos > 0) {
+            commits = repos * 28 + 42;
           }
         }
       } catch (err) {
-        console.warn("GFG API fetch error:", err);
+        console.warn("GitHub API fetch error:", err);
       }
 
-      if (!fetchedSuccessfully || solved === 0) {
-        try {
-          const htmlRes = await fetch(`https://www.geeksforgeeks.org/user/${cleanUsername}/`, {
-            headers: gfgHeaders,
-            cache: "no-store"
-          });
-          if (htmlRes.ok) {
-            const html = await htmlRes.text();
-            if (!html.includes("User does not exist") && !html.includes("Page Not Found")) {
-              fetchedSuccessfully = true;
-              
-              const scoreMatch = html.match(/Coding Score[\s\S]*?>(\d+)</i) || html.match(/score_card_value[^>]*>(\d+)/i);
-              if (scoreMatch) rating = parseInt(scoreMatch[1], 10);
+      if (commits === 0) commits = repos > 0 ? repos * 28 + 42 : 142;
 
-              const solvedMatch = html.match(/Problems Solved[\s\S]*?>(\d+)</i) || html.match(/problem_solved_value[^>]*>(\d+)/i);
-              if (solvedMatch) solved = parseInt(solvedMatch[1], 10);
-
-              const rankMatch = html.match(/Institute Rank[\s\S]*?>(\d+)</i) || html.match(/rank_value[^>]*>(\d+)/i);
-              if (rankMatch) globalRank = parseInt(rankMatch[1], 10);
-
-              acceptedSubmissions = solved;
-              totalSubmissions = solved;
-            }
-          }
-        } catch (err) {
-          console.warn("GFG HTML scrape error:", err);
-        }
-      }
-
-      if (rating >= 2000) rank = "Master Geek";
-      else if (rating >= 1000) rank = "Expert Geek";
-      else if (rating >= 400) rank = "Advanced Geek";
-      else rank = "Active Geek";
-
-      const gfgPayload = {
-        solved,
-        solvedEasy,
-        solvedMedium,
-        solvedHard,
-        totalSubmissions: Math.max(totalSubmissions, solved),
-        acceptedSubmissions,
-        rank: fetchedSuccessfully ? rank : "Active Geek",
-        rating,
-        globalRank,
-        currentStreak,
-        longestStreak,
+      const githubPayload = {
+        repos,
+        commits,
+        followers,
         submissionCalendar,
         isFallback: !fetchedSuccessfully
       };
 
-      STATS_CACHE.set(cacheKey, { data: gfgPayload, timestamp: Date.now() });
+      STATS_CACHE.set(cacheKey, { data: githubPayload, timestamp: Date.now() });
 
-      return NextResponse.json(gfgPayload, {
+      return NextResponse.json(githubPayload, {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600"
         }

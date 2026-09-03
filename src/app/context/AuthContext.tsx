@@ -88,8 +88,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Safety fallback: ensure loading never hangs beyond 350ms
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 350);
+
     // 1. Check initial active session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      clearTimeout(safetyTimer);
       setSession(session);
       setUser(session?.user ?? null);
       setUserRole(resolveRole(session?.user ?? null));
@@ -100,10 +109,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.history.replaceState(null, "", window.location.pathname);
         }
       }
+    }).catch(() => {
+      if (isMounted) setLoading(false);
     });
 
     // 2. Listen for authentication state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      clearTimeout(safetyTimer);
       if (session) {
         setSession(session);
         setUser(session.user);
@@ -147,6 +160,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
@@ -157,13 +172,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 1. Single Global Supabase WebSockets Realtime Presence Channel
+    let isSubscribed = true;
+
+    // Single Global Supabase WebSockets Realtime Presence Channel with safe error handling
     const globalPresenceChannel = supabase.channel("global_presence", {
       config: { presence: { key: user.id } }
     });
 
     globalPresenceChannel
       .on("presence", { event: "sync" }, () => {
+        if (!isSubscribed) return;
         const state = globalPresenceChannel.presenceState();
         const onlineSet = new Set<string>();
         Object.keys(state).forEach(key => {
@@ -173,12 +191,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOnlineUserIds(onlineSet);
       })
       .on("presence", { event: "join" }, ({ key }) => {
-        if (key) {
+        if (key && isSubscribed) {
           setOnlineUserIds(prev => new Set(prev).add(key));
         }
       })
       .on("presence", { event: "leave" }, ({ key }) => {
-        if (key) {
+        if (key && isSubscribed) {
           setOnlineUserIds(prev => {
             const next = new Set(prev);
             next.delete(key);
@@ -187,17 +205,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await globalPresenceChannel.track({
-            user_id: user.id,
-            online_at: new Date().toISOString()
-          });
+        if (status === "SUBSCRIBED" && isSubscribed) {
+          try {
+            await globalPresenceChannel.track({
+              user_id: user.id,
+              online_at: new Date().toISOString()
+            });
+          } catch {}
         }
       });
 
     return () => {
-      globalPresenceChannel.untrack().catch(() => {});
-      supabase.removeChannel(globalPresenceChannel);
+      isSubscribed = false;
+      try {
+        globalPresenceChannel.untrack().catch(() => {});
+        supabase.removeChannel(globalPresenceChannel);
+      } catch {}
     };
   }, [user?.id]);
 
