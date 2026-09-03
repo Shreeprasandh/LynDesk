@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     } catch {}
 
     // Check read receipts for the student if studentId is provided
-    let readBroadcastIds = new Set<string>();
+    const readBroadcastIds = new Set<string>();
     if (studentId) {
       try {
         const { data: receipts } = await supabaseAdmin

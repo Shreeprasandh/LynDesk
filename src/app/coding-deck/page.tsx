@@ -8,6 +8,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Link from "next/link";
 import { normalizeTitleCase } from "../lib/textNormalization";
+import { extractPlatformHandle, type CodingPlatform } from "../lib/platformHandles";
 import { 
   ArrowLeft, 
   ExternalLink, 
@@ -15,15 +16,12 @@ import {
   AlertCircle, 
   TrendingUp,
   Sparkles,
-  Flame,
   RotateCw,
   Lock,
   ChevronDown,
   ChevronUp,
   Puzzle,
   BookOpen,
-  Award,
-  ShieldCheck,
   Star,
   X
 } from "lucide-react";
@@ -128,137 +126,164 @@ export default function CodingDeckPage() {
   });
   const [showAllContests, setShowAllContests] = useState(false);
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
-  const [showHandleModal, setShowHandleModal] = useState(false);
-  const [inputHackerrankHandle, setInputHackerrankHandle] = useState("");
-  const [inputGfgHandle, setInputGfgHandle] = useState("");
-  const [inputUnstopHandle, setInputUnstopHandle] = useState("");
-  const [inputDevpostHandle, setInputDevpostHandle] = useState("");
-  const [savingHandles, setSavingHandles] = useState(false);
   const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, devpost: 0 });
-  const [syncingCertId, setSyncingCertId] = useState<string | null>(null);
-  const [syncedCerts, setSyncedCerts] = useState<Record<string, boolean>>({});
 
-  // Inline handle input state
+  // Unified Quick Connect Platform Modal state
+  const [connectModalPlatform, setConnectModalPlatform] = useState<CodingPlatform | null>(null);
+  const [connectInputHandle, setConnectInputHandle] = useState("");
+  const [connectError, setConnectError] = useState("");
+  const [connectSaving, setConnectSaving] = useState(false);
+
+  // Inline handle input state for LeetCode empty state card
   const [inputLcHandle, setInputLcHandle] = useState("");
 
-  const handleOpenHandleModal = () => {
-    setInputUnstopHandle(unstopUser || "");
-    setInputDevpostHandle(devpostUser || "");
-    setShowHandleModal(true);
+  const handleOpenConnectModal = (platform: CodingPlatform) => {
+    let currentVal = "";
+    if (platform === "LeetCode") currentVal = leetcodeUser;
+    else if (platform === "CodeChef") currentVal = codechefUser;
+    else if (platform === "HackerRank") currentVal = hackerrankUser;
+    else if (platform === "GeeksforGeeks" || platform === "GFG") currentVal = geeksforgeeksUser;
+    else if (platform === "Codeforces") currentVal = codeforcesUser;
+    else if (platform === "Unstop") currentVal = unstopUser;
+    else if (platform === "Devpost") currentVal = devpostUser;
+
+    setConnectModalPlatform(platform);
+    setConnectInputHandle(currentVal);
+    setConnectError("");
   };
 
-  const handleSaveHackathonHandles = async () => {
-    if (!user) return;
-    setSavingHandles(true);
-    let cleanUnstop = inputUnstopHandle.trim().replace(/^@/, "");
-    let cleanDevpost = inputDevpostHandle.trim().replace(/^@/, "");
-
-    if (cleanUnstop.includes("/") || cleanUnstop.includes(".")) {
-      try {
-        const u = new URL(/^https?:\/\//i.test(cleanUnstop) ? cleanUnstop : `https://${cleanUnstop}`);
-        const segs = u.pathname.split("/").filter(Boolean);
-        cleanUnstop = segs[segs.length - 1] || cleanUnstop;
-      } catch {}
-    }
-    if (cleanDevpost.includes("/") || cleanDevpost.includes(".")) {
-      try {
-        const u = new URL(/^https?:\/\//i.test(cleanDevpost) ? cleanDevpost : `https://${cleanDevpost}`);
-        const segs = u.pathname.split("/").filter(Boolean);
-        cleanDevpost = segs[segs.length - 1] || cleanDevpost;
-      } catch {}
-    }
-
-    setUnstopUser(cleanUnstop);
-    setDevpostUser(cleanDevpost);
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem("ldk_unstop_handle", cleanUnstop);
-      localStorage.setItem("ldk_devpost_handle", cleanDevpost);
-      if (user.id) {
-        localStorage.setItem(`ldk_unstop_handle_${user.id}`, cleanUnstop);
-        localStorage.setItem(`ldk_devpost_handle_${user.id}`, cleanDevpost);
-      }
-    }
-
-    try {
-      await supabase.from("profiles").update({
-        unstop_username: cleanUnstop || null,
-        devpost_username: cleanDevpost || null
-      }).eq("id", user.id);
-    } catch (e) {
-      console.warn("Hackathon handle save error:", e);
-    } finally {
-      setSavingHandles(false);
-      setShowHandleModal(false);
-    }
-  };
-
-  const handleImportCertificate = async (cert: {
-    id: string;
-    certId?: string;
-    title: string;
-    organiser?: string;
-    organisation?: string;
-    issueDate?: string;
-    url?: string;
-  }) => {
-    if (!user) {
-      setMessage({ text: "Please sign in to sync certificates to your LynDesk portfolio.", type: "error" });
+  const handleConnectInputChange = (val: string) => {
+    setConnectError("");
+    if (!connectModalPlatform) {
+      setConnectInputHandle(val);
       return;
     }
-    const cKey = cert.id || cert.certId || cert.title;
-    setSyncingCertId(cKey);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch("/api/works", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          title: `${cert.title} - Hackathon Certification`,
-          category: "software",
-          description: `Official verified hackathon accreditation issued by ${cert.organiser || "Unstop"}${cert.issueDate ? ` on ${cert.issueDate}` : ""}. Certificate ID: ${cert.certId || "Verified"}.`,
-          external_url: cert.url || (cert.certId ? `https://unstop.com/api/certificate/${cert.certId}` : ""),
-          tags: ["hackathon", "unstop", "verified-credential", "competitive-programming"],
-          is_published: true,
-          status: "approved"
-        })
-      });
-
-      if (res.ok) {
-        setSyncedCerts(prev => ({ ...prev, [cKey]: true }));
-        setMessage({ text: `Successfully imported "${cert.title}" to your LynDesk Verified Portfolio!`, type: "success" });
-      } else {
-        const err = await res.json();
-        setMessage({ text: err.error || "Failed to sync certificate.", type: "error" });
+    // Auto-extract username if link is typed or pasted
+    if (val.includes("/") || val.includes(".") || val.startsWith("@") || val.startsWith("http")) {
+      const res = extractPlatformHandle(val, connectModalPlatform);
+      if (res.handle) {
+        setConnectInputHandle(res.handle);
+        return;
       }
-    } catch (e) {
-      console.warn("Cert sync error:", e);
-      setMessage({ text: "Network error while saving certificate.", type: "error" });
-    } finally {
-      setSyncingCertId(null);
     }
+    setConnectInputHandle(val);
+  };
+
+  const handleConnectInputPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!connectModalPlatform) return;
+    const pasted = e.clipboardData.getData("text");
+    if (pasted && (pasted.includes("/") || pasted.includes(".") || pasted.startsWith("@") || pasted.startsWith("http"))) {
+      const res = extractPlatformHandle(pasted, connectModalPlatform);
+      if (res.handle) {
+        e.preventDefault();
+        setConnectInputHandle(res.handle);
+        setConnectError("");
+      }
+    }
+  };
+
+  const handleSavePlatformHandle = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!connectModalPlatform) return;
+    setConnectSaving(true);
+    setConnectError("");
+
+    const platform = connectModalPlatform;
+    const raw = connectInputHandle.trim();
+    let cleanHandle = "";
+
+    if (raw) {
+      const res = extractPlatformHandle(raw, platform);
+      if (res.error) {
+        setConnectError(res.error);
+        setConnectSaving(false);
+        return;
+      }
+      cleanHandle = res.handle;
+    }
+
+    const pLower = platform.toLowerCase();
+    const storageKey = `ldk_${pLower === "gfg" ? "geeksforgeeks" : pLower}_handle`;
+    const userStorageKey = user?.id ? `${storageKey}_${user.id}` : storageKey;
+
+    if (typeof window !== "undefined") {
+      if (cleanHandle) {
+        localStorage.setItem(storageKey, cleanHandle);
+        if (user?.id) localStorage.setItem(userStorageKey, cleanHandle);
+      } else {
+        localStorage.removeItem(storageKey);
+        if (user?.id) localStorage.removeItem(userStorageKey);
+      }
+    }
+
+    if (platform === "LeetCode") setLeetcodeUser(cleanHandle);
+    else if (platform === "CodeChef") setCodechefUser(cleanHandle);
+    else if (platform === "HackerRank") setHackerrankUser(cleanHandle);
+    else if (platform === "GeeksforGeeks" || platform === "GFG") setGeeksforgeeksUser(cleanHandle);
+    else if (platform === "Codeforces") setCodeforcesUser(cleanHandle);
+    else if (platform === "Unstop") setUnstopUser(cleanHandle);
+    else if (platform === "Devpost") setDevpostUser(cleanHandle);
+
+    if (user?.id) {
+      try {
+        const colMap: Record<string, string> = {
+          LeetCode: "leetcode_username",
+          CodeChef: "codechef_username",
+          HackerRank: "hackerrank_username",
+          GeeksforGeeks: "geeksforgeeks_username",
+          GFG: "geeksforgeeks_username",
+          Codeforces: "codeforces_username",
+          Unstop: "unstop_username",
+          Devpost: "devpost_username",
+        };
+        const col = colMap[platform];
+        if (col) {
+          await supabase.from("profiles").update({
+            [col]: cleanHandle || null
+          }).eq("id", user.id);
+        }
+        await supabase.auth.updateUser({
+          data: { ...user.user_metadata, [col]: cleanHandle || null }
+        });
+      } catch (err) {
+        console.warn("Error saving platform handle:", err);
+      }
+    }
+
+    // Refresh live stats
+    if (cleanHandle) {
+      try {
+        const pParam = platform === "GFG" ? "geeksforgeeks" : platform.toLowerCase();
+        const res = await fetch(`/api/coding-stats?platform=${pParam}&username=${encodeURIComponent(cleanHandle)}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" }
+        });
+        if (res.ok) {
+          const freshData = await res.json();
+          setStats(prev => ({ ...prev, [pParam]: freshData }));
+          setPlatformErrors(prev => ({ ...prev, [pParam]: "" }));
+        }
+      } catch {}
+    } else {
+      const pParam = platform === "GFG" ? "geeksforgeeks" : platform.toLowerCase();
+      setStats(prev => ({ ...prev, [pParam]: null }));
+    }
+
+    setConnectSaving(false);
+    setConnectModalPlatform(null);
+    setMessage({
+      text: cleanHandle 
+        ? `Successfully connected ${platform} handle @${cleanHandle}! Syncing live stats...` 
+        : `Unlinked ${platform} account.`,
+      type: "success"
+    });
   };
 
   const handleSaveInlineHandle = async () => {
     if (!inputLcHandle.trim()) return;
-    let cleanHandle = inputLcHandle.trim().replace(/^@/, "");
-    if (cleanHandle.includes("/") || cleanHandle.includes(".")) {
-      try {
-        const urlString = /^https?:\/\//i.test(cleanHandle) ? cleanHandle : `https://${cleanHandle}`;
-        const url = new URL(urlString);
-        const pathSegments = url.pathname.split("/").filter(Boolean);
-        if (pathSegments[0] === "u" && pathSegments[1]) {
-          cleanHandle = pathSegments[1];
-        } else if (pathSegments[0] && pathSegments[0] !== "u" && pathSegments[0] !== "problems" && pathSegments[0] !== "contest") {
-          cleanHandle = pathSegments[0];
-        }
-      } catch {}
-    }
+    const res = extractPlatformHandle(inputLcHandle, "LeetCode");
+    const cleanHandle = res.handle || inputLcHandle.trim().replace(/^@/, "");
+    
     setLeetcodeUser(cleanHandle);
     setInputLcHandle(cleanHandle);
     if (typeof window !== "undefined") {
@@ -268,11 +293,27 @@ export default function CodingDeckPage() {
 
     if (user) {
       try {
+        await supabase.from("profiles").update({
+          leetcode_username: cleanHandle || null
+        }).eq("id", user.id);
+
         await supabase.auth.updateUser({
           data: { ...user.user_metadata, leetcode_username: cleanHandle }
         });
       } catch {}
     }
+
+    try {
+      const statsRes = await fetch(`/api/coding-stats?platform=leetcode&username=${encodeURIComponent(cleanHandle)}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      if (statsRes.ok) {
+        const freshData = await statsRes.json();
+        setStats(prev => ({ ...prev, leetcode: freshData }));
+        setPlatformErrors(prev => ({ ...prev, leetcode: "" }));
+      }
+    } catch {}
 
     setMessage({ text: `Successfully linked LeetCode handle @${cleanHandle}! Syncing live stats...`, type: "success" });
   };
@@ -386,6 +427,7 @@ export default function CodingDeckPage() {
         issueDate: string;
         url?: string;
         eventLogo?: string;
+        isCustom?: boolean;
       }>;
     } | null;
     devpost: {
@@ -507,13 +549,41 @@ export default function CodingDeckPage() {
         const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
         const localDp = typeof window !== "undefined" ? (localStorage.getItem(userDpKey) || localStorage.getItem("ldk_devpost_handle") || "") : "";
 
-        const lc = meta.leetcode_username || localLc;
-        const cc = meta.codechef_username || localCc;
-        const hr = meta.hackerrank_username || localHr;
-        const gfg = meta.geeksforgeeks_username || localGfg;
-        const cf = meta.codeforces_username || localCf;
-        const un = meta.unstop_username || localUn;
-        const dp = meta.devpost_username || localDp;
+        let dbLc = "";
+        let dbCc = "";
+        let dbHr = "";
+        let dbGfg = "";
+        let dbCf = "";
+        let dbUn = "";
+        let dbDp = "";
+
+        if (user?.id) {
+          try {
+            const { data: dbProfile } = await supabase
+              .from("profiles")
+              .select("leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, devpost_username")
+              .eq("id", user.id)
+              .single();
+
+            if (dbProfile) {
+              dbLc = dbProfile.leetcode_username || "";
+              dbCc = dbProfile.codechef_username || "";
+              dbHr = dbProfile.hackerrank_username || "";
+              dbGfg = dbProfile.geeksforgeeks_username || "";
+              dbCf = dbProfile.codeforces_username || "";
+              dbUn = dbProfile.unstop_username || "";
+              dbDp = dbProfile.devpost_username || "";
+            }
+          } catch {}
+        }
+
+        const lc = dbLc || meta.leetcode_username || localLc;
+        const cc = dbCc || meta.codechef_username || localCc;
+        const hr = dbHr || meta.hackerrank_username || localHr;
+        const gfg = dbGfg || meta.geeksforgeeks_username || localGfg;
+        const cf = dbCf || meta.codeforces_username || localCf;
+        const un = dbUn || meta.unstop_username || localUn;
+        const dp = dbDp || meta.devpost_username || localDp;
 
         setLeetcodeUser(lc);
         setCodechefUser(cc);
@@ -527,7 +597,7 @@ export default function CodingDeckPage() {
           if (!username) return null;
           try {
             const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
-            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}&t=${Date.now()}`, {
+            const res = await fetch(`/api/coding-stats?platform=${platform}&username=${encodeURIComponent(username)}${yearQuery}`, {
               cache: "no-store",
               headers: { "Cache-Control": "no-cache" }
             });
@@ -1261,16 +1331,34 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {leetcodeUser && (
-                    <a 
-                      href={`https://leetcode.com/${leetcodeUser}/`}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                  {leetcodeUser ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`https://leetcode.com/${leetcodeUser}/`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                      >
+                        <span className="truncate max-w-[140px]">@{leetcodeUser}</span>
+                        <ExternalLink size={10} className="shrink-0" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConnectModal("LeetCode")}
+                        className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-1 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                        title="Edit LeetCode handle"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("LeetCode")}
+                      className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 shrink-0"
                     >
-                      <span className="truncate max-w-[140px]">@{leetcodeUser}</span>
-                      <ExternalLink size={10} className="shrink-0" />
-                    </a>
+                      + Connect
+                    </button>
                   )}
                 </div>
 
@@ -1278,16 +1366,36 @@ export default function CodingDeckPage() {
                   <div className="p-4 sm:p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 font-mono text-xs text-txt-muted flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-5 overflow-hidden">
                     <div className="flex flex-col gap-1 text-left min-w-0 flex-1">
                       <span className="font-semibold text-txt-main">LeetCode handle is not linked yet.</span>
-                      <span className="text-[10px] text-txt-sub">Enter your LeetCode username below to sync daily challenge streak & stats.</span>
+                      <span className="text-[10px] text-txt-sub">Enter your LeetCode username or profile link below to sync daily challenge streak & stats.</span>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 min-w-0">
                       <input
                         type="text"
                         value={inputLcHandle}
-                        onChange={(e) => setInputLcHandle(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val.includes("/") || val.includes(".") || val.startsWith("@") || val.startsWith("http")) {
+                            const res = extractPlatformHandle(val, "LeetCode");
+                            if (res.handle) {
+                              setInputLcHandle(res.handle);
+                              return;
+                            }
+                          }
+                          setInputLcHandle(val);
+                        }}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData("text");
+                          if (pasted && (pasted.includes("/") || pasted.includes(".") || pasted.startsWith("@") || pasted.startsWith("http"))) {
+                            const res = extractPlatformHandle(pasted, "LeetCode");
+                            if (res.handle) {
+                              e.preventDefault();
+                              setInputLcHandle(res.handle);
+                            }
+                          }
+                        }}
                         onKeyDown={(e) => { if (e.key === "Enter") handleSaveInlineHandle(); }}
-                        placeholder="e.g. your_leetcode_id"
-                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main min-w-0 flex-1 sm:w-44"
+                        placeholder="e.g. username or profile link"
+                        className="h-8 px-2.5 bg-bg-base border border-border-main/70 text-txt-main text-xs font-mono rounded focus:outline-none focus:border-accent-main min-w-0 flex-1 sm:w-48"
                       />
                       <button
                         type="button"
@@ -1381,23 +1489,48 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {codechefUser && (
-                    <a 
-                      href={`https://www.codechef.com/users/${codechefUser}`}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                  {codechefUser ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`https://www.codechef.com/users/${codechefUser}`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                      >
+                        <span className="truncate max-w-[140px]">@{codechefUser}</span>
+                        <ExternalLink size={10} className="shrink-0" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConnectModal("CodeChef")}
+                        className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-1 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                        title="Edit CodeChef handle"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("CodeChef")}
+                      className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 shrink-0"
                     >
-                      <span className="truncate max-w-[140px]">@{codechefUser}</span>
-                      <ExternalLink size={10} className="shrink-0" />
-                    </a>
+                      + Connect
+                    </button>
                   )}
                 </div>
 
                 {!codechefUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
-                    <span>CodeChef account is not linked.</span>
-                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-2 items-center py-6">
+                    <span className="font-semibold text-txt-main">CodeChef account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Connect your CodeChef handle or profile link to sync stars, divisions &amp; problems solved.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("CodeChef")}
+                      className="mt-1 h-7 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      + Connect CodeChef
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1465,35 +1598,47 @@ export default function CodingDeckPage() {
                   </div>
 
                   {hackerrankUser ? (
-                    <a 
-                      href={`https://www.hackerrank.com/profile/${hackerrankUser}`}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
-                    >
-                      <span className="truncate max-w-[140px]">@{hackerrankUser}</span>
-                      <ExternalLink size={10} className="shrink-0" />
-                    </a>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`https://www.hackerrank.com/profile/${hackerrankUser}`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                      >
+                        <span className="truncate max-w-[140px]">@{hackerrankUser}</span>
+                        <ExternalLink size={10} className="shrink-0" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConnectModal("HackerRank")}
+                        className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-1 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                        title="Edit HackerRank handle"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   ) : (
-                    <Link
-                      href="/profile"
-                      className="text-[9px] font-mono text-txt-muted hover:text-accent-main transition-colors cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("HackerRank")}
+                      className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 shrink-0"
                     >
                       + Connect
-                    </Link>
+                    </button>
                   )}
                 </div>
 
                 {!hackerrankUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1.5 items-center py-6">
-                    <span>HackerRank account is not linked.</span>
-                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync badges &amp; stars.</span>
-                    <Link
-                      href="/profile"
-                      className="mt-1 text-[10px] font-mono uppercase tracking-wider text-accent-main hover:underline flex items-center gap-1 font-semibold"
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-2 items-center py-6">
+                    <span className="font-semibold text-txt-main">HackerRank account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Connect your HackerRank handle or profile link to sync badges, stars &amp; domain mastery.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("HackerRank")}
+                      className="mt-1 h-7 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
                     >
-                      Go to Profile Settings &rarr;
-                    </Link>
+                      + Connect HackerRank
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1572,35 +1717,47 @@ export default function CodingDeckPage() {
                   </div>
 
                   {geeksforgeeksUser ? (
-                    <a 
-                      href={`https://www.geeksforgeeks.org/user/${geeksforgeeksUser}/`}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
-                    >
-                      <span className="truncate max-w-[140px]">@{geeksforgeeksUser}</span>
-                      <ExternalLink size={10} className="shrink-0" />
-                    </a>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`https://www.geeksforgeeks.org/user/${geeksforgeeksUser}/`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                      >
+                        <span className="truncate max-w-[140px]">@{geeksforgeeksUser}</span>
+                        <ExternalLink size={10} className="shrink-0" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConnectModal("GeeksforGeeks")}
+                        className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-1 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                        title="Edit GeeksforGeeks handle"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   ) : (
-                    <Link
-                      href="/profile"
-                      className="text-[9px] font-mono text-txt-muted hover:text-accent-main transition-colors cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("GeeksforGeeks")}
+                      className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 shrink-0"
                     >
                       + Connect
-                    </Link>
+                    </button>
                   )}
                 </div>
 
                 {!geeksforgeeksUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1.5 items-center py-6">
-                    <span>GeeksforGeeks account is not linked.</span>
-                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync solved problems &amp; coding score.</span>
-                    <Link
-                      href="/profile"
-                      className="mt-1 text-[10px] font-mono uppercase tracking-wider text-accent-main hover:underline flex items-center gap-1 font-semibold"
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-2 items-center py-6">
+                    <span className="font-semibold text-txt-main">GeeksforGeeks account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Connect your GeeksforGeeks handle or profile link to sync POTD streaks, solves &amp; coding score.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("GeeksforGeeks")}
+                      className="mt-1 h-7 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
                     >
-                      Go to Profile Settings &rarr;
-                    </Link>
+                      + Connect GeeksforGeeks
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1676,23 +1833,48 @@ export default function CodingDeckPage() {
                     </div>
                   </div>
 
-                  {codeforcesUser && (
-                    <a 
-                      href={`https://codeforces.com/profile/${codeforcesUser}`}
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                  {codeforcesUser ? (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a 
+                        href={`https://codeforces.com/profile/${codeforcesUser}`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-[10px] font-mono text-accent-main hover:bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded flex items-center gap-1 shrink-0 font-medium transition-colors max-w-full overflow-hidden"
+                      >
+                        <span className="truncate max-w-[140px]">@{codeforcesUser}</span>
+                        <ExternalLink size={10} className="shrink-0" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenConnectModal("Codeforces")}
+                        className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-1 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                        title="Edit Codeforces handle"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("Codeforces")}
+                      className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2.5 py-1 rounded transition-all cursor-pointer flex items-center gap-1 shrink-0"
                     >
-                      <span className="truncate max-w-[140px]">@{codeforcesUser}</span>
-                      <ExternalLink size={10} className="shrink-0" />
-                    </a>
+                      + Connect
+                    </button>
                   )}
                 </div>
 
                 {!codeforcesUser ? (
-                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-1 items-center py-6">
-                    <span>Codeforces account is not linked.</span>
-                    <span className="text-[10px] text-txt-sub">Link your handle in your Profile Settings to sync metrics.</span>
+                  <div className="p-5 border border-dashed border-border-main/80 rounded bg-bg-base/20 text-center font-mono text-xs text-txt-muted flex flex-col gap-2 items-center py-6">
+                    <span className="font-semibold text-txt-main">Codeforces account is not linked.</span>
+                    <span className="text-[10px] text-txt-sub">Connect your Codeforces handle or profile link to sync division ratings &amp; solve metrics.</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenConnectModal("Codeforces")}
+                      className="mt-1 h-7 px-3 bg-accent-main text-bg-base font-mono text-[10px] uppercase font-bold tracking-wider rounded hover:opacity-90 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      + Connect Codeforces
+                    </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4 w-full">
@@ -1887,10 +2069,10 @@ export default function CodingDeckPage() {
                     <h3 className="text-xs font-semibold text-txt-main">Hackathon Hub</h3>
                   </div>
                   <button
-                    onClick={handleOpenHandleModal}
+                    onClick={() => handleOpenConnectModal("Unstop")}
                     className="text-[9px] font-mono text-txt-muted hover:text-txt-main transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    Edit Handles
+                    Manage Portals
                   </button>
                 </div>
                 
@@ -1899,18 +2081,28 @@ export default function CodingDeckPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Unstop</span>
                     {unstopUser ? (
-                      <a
-                        href={`https://unstop.com/u/${unstopUser}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
-                      >
-                        @{unstopUser} <ExternalLink size={9} />
-                      </a>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://unstop.com/u/${unstopUser}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
+                        >
+                          @{unstopUser} <ExternalLink size={9} />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenConnectModal("Unstop")}
+                          className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-0.5 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                          title="Edit Unstop handle"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     ) : (
                       <button
-                        onClick={handleOpenHandleModal}
-                        className="text-[9px] font-mono text-txt-muted hover:text-accent-main cursor-pointer"
+                        onClick={() => handleOpenConnectModal("Unstop")}
+                        className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2 py-0.5 rounded cursor-pointer"
                       >
                         + Connect
                       </button>
@@ -1953,18 +2145,28 @@ export default function CodingDeckPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-txt-main">Devpost</span>
                     {devpostUser ? (
-                      <a
-                        href={`https://devpost.com/${devpostUser}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
-                      >
-                        @{devpostUser} <ExternalLink size={9} />
-                      </a>
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={`https://devpost.com/${devpostUser}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] font-mono text-accent-main hover:underline flex items-center gap-1"
+                        >
+                          @{devpostUser} <ExternalLink size={9} />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenConnectModal("Devpost")}
+                          className="text-[9px] font-mono text-txt-muted hover:text-txt-main px-1.5 py-0.5 rounded bg-bg-card border border-border-main/50 transition-colors cursor-pointer"
+                          title="Edit Devpost handle"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     ) : (
                       <button
-                        onClick={handleOpenHandleModal}
-                        className="text-[9px] font-mono text-txt-muted hover:text-accent-main cursor-pointer"
+                        onClick={() => handleOpenConnectModal("Devpost")}
+                        className="text-[9px] font-mono font-bold text-accent-main hover:underline bg-accent-main/10 border border-accent-main/30 px-2 py-0.5 rounded cursor-pointer"
                       >
                         + Connect
                       </button>
@@ -2014,95 +2216,6 @@ export default function CodingDeckPage() {
                     <span>{showAllContests ? "Show Less" : `Show More (${contests.length - 3} more)`}</span>
                     {showAllContests ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
-                )}
-              </div>
-
-              {/* Dedicated Verified Accreditations & Hackathon Certifications Card (Moved Below Active Contest Feed) */}
-              <div className="border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Award size={14} className="text-accent-main" />
-                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-                      Accreditations & Certificates
-                    </span>
-                  </div>
-                </div>
-
-                {stats.unstop?.certificates && stats.unstop.certificates.length > 0 ? (
-                  <div className="flex flex-col gap-2.5">
-                    {stats.unstop.certificates.map((cert) => {
-                      const cKey = cert.id || cert.certId || cert.title;
-                      const isSynced = syncedCerts[cKey];
-                      const isSyncing = syncingCertId === cKey;
-
-                      return (
-                        <div
-                          key={cKey}
-                          className="border border-border-main/50 bg-bg-card/30 p-3 rounded flex flex-col gap-2 hover:border-border-main transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 space-y-0.5">
-                              <h4 className="text-xs font-semibold text-txt-main truncate">{cert.title}</h4>
-                              <p className="text-[10px] font-mono text-txt-muted truncate">
-                                Issued by {cert.organiser || "Chennai Institute of Technology"}
-                              </p>
-                            </div>
-                            {cert.issueDate && (
-                              <span className="text-[9px] font-mono text-txt-sub shrink-0">
-                                {cert.issueDate}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-border-main/30">
-                            {cert.url ? (
-                              <a
-                                href={cert.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[9px] font-mono text-txt-muted hover:text-accent-main flex items-center gap-1 transition-colors"
-                              >
-                                View Official Certificate <ExternalLink size={8} />
-                              </a>
-                            ) : (
-                              <span className="text-[9px] font-mono text-txt-sub">Verified Credential</span>
-                            )}
-
-                            <button
-                              onClick={() => handleImportCertificate(cert)}
-                              disabled={isSynced || isSyncing}
-                              className={`h-6 px-2.5 font-mono text-[9px] uppercase tracking-wider font-semibold rounded-xs flex items-center gap-1 cursor-pointer transition-all ${
-                                isSynced
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 cursor-default"
-                                  : "bg-accent-main hover:opacity-90 text-bg-base"
-                              }`}
-                            >
-                              {isSynced ? (
-                                <>
-                                  <CheckCircle2 size={9} /> Synced
-                                </>
-                              ) : isSyncing ? (
-                                "Syncing..."
-                              ) : (
-                                <>
-                                  <ShieldCheck size={9} /> 1-Click Import
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="border border-dashed border-border-main/50 rounded-md p-4 text-center space-y-2 bg-bg-card/20">
-                    <div className="w-8 h-8 rounded-full bg-accent-main/10 border border-accent-main/20 flex items-center justify-center mx-auto text-accent-main">
-                      <Award size={16} />
-                    </div>
-                    <p className="text-[11px] font-mono text-txt-muted leading-relaxed">
-                      Connect your <strong className="text-txt-main font-semibold">Unstop</strong> handle to automatically sync and verify hackathon credentials.
-                    </p>
-                  </div>
                 )}
               </div>
 
@@ -2177,71 +2290,120 @@ export default function CodingDeckPage() {
 
       </main>
 
-      {showHandleModal && (
+      {/* Unified Quick Connect Platform Modal */}
+      {connectModalPlatform && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-bg-surface border border-border-main rounded-md max-w-md w-full p-6 shadow-2xl space-y-4 font-sans text-txt-main">
+          <div className="bg-bg-surface border border-border-main rounded-md max-w-lg w-full p-6 shadow-2xl space-y-5 font-sans text-txt-main animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
-              <div>
-                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted">Integrations</span>
-                <h3 className="font-display text-lg font-light text-txt-main">Manage Hackathon Portals</h3>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-accent-main font-bold">Coding Platform Integrations</span>
+                <h3 className="font-display text-lg font-light text-txt-main flex items-center gap-2">
+                  Connect {connectModalPlatform} Account
+                </h3>
               </div>
               <button
-                onClick={() => setShowHandleModal(false)}
+                type="button"
+                onClick={() => setConnectModalPlatform(null)}
                 className="w-7 h-7 rounded-sm bg-bg-card text-txt-muted hover:text-txt-main flex items-center justify-center cursor-pointer"
               >
                 <X size={14} />
               </button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
-                  Unstop Handle / Profile Link
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. shreek64346 or https://unstop.com/u/..."
-                  value={inputUnstopHandle}
-                  onChange={e => setInputUnstopHandle(e.target.value)}
-                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
-                />
-              </div>
-
-              <div>
-                <label className="block font-mono text-[10px] uppercase text-txt-muted mb-1">
-                  Devpost Handle / Profile Link
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. your_devpost_id or https://devpost.com/..."
-                  value={inputDevpostHandle}
-                  onChange={e => setInputDevpostHandle(e.target.value)}
-                  className="w-full h-9 px-3 bg-bg-card border border-border-main rounded-sm text-xs text-txt-main font-mono focus:outline-hidden focus:border-accent-main"
-                />
-              </div>
-
-              <p className="font-mono text-[10px] text-txt-muted">
-                Tip: Leave blank and save to unlink any handle.
-              </p>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-main/30">
-                <button
-                  type="button"
-                  onClick={() => setShowHandleModal(false)}
-                  className="h-8 px-3 bg-bg-card border border-border-main text-txt-muted hover:text-txt-main font-mono text-[10px] uppercase rounded-sm cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveHackathonHandles}
-                  disabled={savingHandles}
-                  className="h-8 px-4 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  {savingHandles ? "Saving..." : "Save Handles"}
-                </button>
-              </div>
+            {/* Platform Quick-Switch Tabs */}
+            <div className="flex flex-wrap gap-1.5 pb-1">
+              {(["LeetCode", "CodeChef", "HackerRank", "GeeksforGeeks", "Codeforces", "Unstop", "Devpost"] as CodingPlatform[]).map((p) => {
+                const isActive = connectModalPlatform === p;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handleOpenConnectModal(p)}
+                    className={`px-2.5 py-1 text-[10px] font-mono rounded-xs border transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-accent-main text-bg-base border-accent-main font-bold shadow-xs"
+                        : "bg-bg-card text-txt-muted border-border-main/60 hover:text-txt-main hover:border-txt-muted"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
             </div>
+
+            <form onSubmit={handleSavePlatformHandle} className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-baseline">
+                  <label className="block font-mono text-[10px] uppercase text-txt-muted font-semibold">
+                    {connectModalPlatform} Handle or Profile URL
+                  </label>
+                  {connectInputHandle && (
+                    <span className="font-mono text-[9px] text-accent-main bg-accent-main/10 px-1.5 py-0.5 rounded border border-accent-main/30">
+                      Clean Handle: @{connectInputHandle}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={`Paste link or enter handle (e.g. ${
+                    connectModalPlatform === "LeetCode" ? "https://leetcode.com/u/id" :
+                    connectModalPlatform === "CodeChef" ? "https://codechef.com/users/id" :
+                    connectModalPlatform === "HackerRank" ? "https://hackerrank.com/profile/id" :
+                    connectModalPlatform === "GeeksforGeeks" ? "https://geeksforgeeks.org/user/id" :
+                    connectModalPlatform === "Codeforces" ? "https://codeforces.com/profile/id" :
+                    connectModalPlatform === "Unstop" ? "https://unstop.com/u/id" :
+                    "https://devpost.com/username"
+                  })`}
+                  value={connectInputHandle}
+                  onChange={e => handleConnectInputChange(e.target.value)}
+                  onPaste={handleConnectInputPaste}
+                  className={`w-full h-10 px-3 bg-bg-card border rounded-sm text-xs text-txt-main font-mono focus:outline-hidden transition-colors ${
+                    connectError ? "border-red-500 focus:border-red-500" : "border-border-main focus:border-accent-main"
+                  }`}
+                />
+                {connectError ? (
+                  <p className="font-mono text-[10px] text-red-400 font-medium">{connectError}</p>
+                ) : (
+                  <p className="font-mono text-[10px] text-txt-muted">
+                    Tip: You can paste your complete profile URL or just your username. Links are automatically parsed.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-border-main/30">
+                <div>
+                  {connectInputHandle && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConnectInputHandle("");
+                        setConnectError("");
+                      }}
+                      className="text-[10px] font-mono text-red-400 hover:underline cursor-pointer"
+                    >
+                      Clear / Unlink
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConnectModalPlatform(null)}
+                    className="h-8 px-3 bg-bg-card border border-border-main text-txt-muted hover:text-txt-main font-mono text-[10px] uppercase rounded-sm cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={connectSaving}
+                    className="h-8 px-4 bg-accent-main hover:opacity-90 disabled:opacity-50 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {connectSaving ? "Syncing..." : "Save & Sync"}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

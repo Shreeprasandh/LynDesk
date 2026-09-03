@@ -1759,46 +1759,54 @@ export default function Home() {
                 Problem Breakdown
               </span>
 
-              <div className="flex flex-col gap-3 text-xs font-mono">
-                <div>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-txt-sub font-medium">Easy</span>
-                    <span className="text-txt-muted">{stats?.easySolved || 0} Solved</span>
-                  </div>
-                  <div className="w-full h-1 bg-bg-card rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-txt-main rounded-full"
-                      style={{ width: `${Math.min(100, ((stats?.easySolved || 0) / 200) * 100)}%` }}
-                    />
-                  </div>
-                </div>
+              {(() => {
+                const totalSolved = (stats?.solvedTotal && stats.solvedTotal > 0)
+                  ? stats.solvedTotal
+                  : ((stats?.easySolved || 0) + (stats?.mediumSolved || 0) + (stats?.hardSolved || 0));
 
-                <div>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-txt-sub font-medium">Medium</span>
-                    <span className="text-txt-muted">{stats?.mediumSolved || 0} Solved</span>
-                  </div>
-                  <div className="w-full h-1 bg-bg-card rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-txt-main/80 rounded-full"
-                      style={{ width: `${Math.min(100, ((stats?.mediumSolved || 0) / 150) * 100)}%` }}
-                    />
-                  </div>
-                </div>
+                return (
+                  <div className="flex flex-col gap-3 text-xs font-mono">
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-txt-sub font-medium">Easy</span>
+                        <span className="text-txt-muted">{stats?.easySolved || 0} Solved</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-bg-base border border-border-main/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-txt-main rounded-full transition-all duration-300"
+                          style={{ width: totalSolved > 0 ? `${Math.min(100, ((stats?.easySolved || 0) / totalSolved) * 100)}%` : "0%" }}
+                        />
+                      </div>
+                    </div>
 
-                <div>
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-txt-sub font-medium">Hard</span>
-                    <span className="text-txt-muted">{stats?.hardSolved || 0} Solved</span>
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-txt-sub font-medium">Medium</span>
+                        <span className="text-txt-muted">{stats?.mediumSolved || 0} Solved</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-bg-base border border-border-main/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-txt-main/80 rounded-full transition-all duration-300"
+                          style={{ width: totalSolved > 0 ? `${Math.min(100, ((stats?.mediumSolved || 0) / totalSolved) * 100)}%` : "0%" }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-txt-sub font-medium">Hard</span>
+                        <span className="text-txt-muted">{stats?.hardSolved || 0} Solved</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-bg-base border border-border-main/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-txt-main/60 rounded-full transition-all duration-300"
+                          style={{ width: totalSolved > 0 ? `${Math.min(100, ((stats?.hardSolved || 0) / totalSolved) * 100)}%` : "0%" }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full h-1 bg-bg-card rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-txt-main/60 rounded-full"
-                      style={{ width: `${Math.min(100, ((stats?.hardSolved || 0) / 50) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Weekly Schedule Horizon Agenda Card */}

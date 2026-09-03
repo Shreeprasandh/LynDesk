@@ -77,139 +77,8 @@ interface BackupProfileData {
   instituteId?: string;
 }
 
-export function extractPlatformHandle(input: string, platform: string): { handle: string; error?: string } {
-  const raw = (input || "").trim();
-  if (!raw) return { handle: "" };
-
-  const clean = raw.startsWith("@") ? raw.slice(1).trim() : raw;
-
-  if (clean.includes("/") || clean.includes(".")) {
-    try {
-      const urlString = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
-      const urlObj = new URL(urlString);
-      const host = urlObj?.hostname ? urlObj.hostname.toLowerCase() : "";
-      const pathSegments = urlObj?.pathname ? urlObj.pathname.split("/").filter(Boolean) : [];
-
-      if (platform === "LeetCode") {
-        if (!host.includes("leetcode")) {
-          return { handle: "", error: "Invalid LeetCode URL. Must be a leetcode.com profile link." };
-        }
-        let username = "";
-        if (pathSegments[0] === "u" && pathSegments[1]) {
-          username = pathSegments[1];
-        } else if (pathSegments[0] && pathSegments[0] !== "u" && pathSegments[0] !== "problems" && pathSegments[0] !== "contest") {
-          username = pathSegments[0];
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract LeetCode username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "Codeforces") {
-        if (!host.includes("codeforces")) {
-          return { handle: "", error: "Invalid Codeforces URL. Must be a codeforces.com profile link." };
-        }
-        let username = "";
-        if (pathSegments[0] === "profile" && pathSegments[1]) {
-          username = pathSegments[1];
-        } else if (pathSegments[0] && pathSegments[0] !== "profile") {
-          username = pathSegments[0];
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract Codeforces username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "CodeChef") {
-        if (!host.includes("codechef")) {
-          return { handle: "", error: "Invalid CodeChef URL. Must be a codechef.com profile link." };
-        }
-        let username = "";
-        if (pathSegments[0] === "users" && pathSegments[1]) {
-          username = pathSegments[1];
-        } else if (pathSegments[0] && pathSegments[0] !== "users") {
-          username = pathSegments[0];
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract CodeChef username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "HackerRank") {
-        if (!host.includes("hackerrank")) {
-          return { handle: "", error: "Invalid HackerRank URL. Must be a hackerrank.com profile link." };
-        }
-        let username = "";
-        if (pathSegments[0] === "profile" && pathSegments[1]) {
-          username = pathSegments[1];
-        } else if (pathSegments[0]) {
-          username = pathSegments[0];
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract HackerRank username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "GeeksforGeeks" || platform === "GFG") {
-        if (!host.includes("geeksforgeeks")) {
-          return { handle: "", error: "Invalid GeeksforGeeks URL. Must be a geeksforgeeks.org profile link." };
-        }
-        let username = "";
-        if (pathSegments[0] === "user" && pathSegments[1]) {
-          username = pathSegments[1];
-        } else if (pathSegments[0] && pathSegments[0] !== "user" && pathSegments[0] !== "practice") {
-          username = pathSegments[0];
-        } else if (pathSegments[pathSegments.length - 1]) {
-          username = pathSegments[pathSegments.length - 1];
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract GeeksforGeeks username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "Unstop") {
-        if (!host.includes("unstop")) {
-          return { handle: "", error: "Invalid Unstop URL. Must be an unstop.com profile link." };
-        }
-        let username = pathSegments[pathSegments.length - 1] || "";
-        if (pathSegments[0] === "user" || pathSegments[0] === "u") {
-          username = pathSegments[1] || username;
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract Unstop username from URL." };
-        }
-        return { handle: username };
-      }
-
-      if (platform === "Devpost") {
-        if (!host.includes("devpost")) {
-          return { handle: "", error: "Invalid Devpost URL. Must be a devpost.com profile link." };
-        }
-        let username = pathSegments[pathSegments.length - 1] || "";
-        if (pathSegments[0] === "user" || pathSegments[0] === "u") {
-          username = pathSegments[1] || username;
-        }
-        if (!username) {
-          return { handle: "", error: "Could not extract Devpost username from URL." };
-        }
-        return { handle: username };
-      }
-    } catch {
-      return { handle: "", error: `Invalid ${platform} profile URL format.` };
-    }
-  }
-
-  if (!/^[a-zA-Z0-9_.-]+$/.test(clean)) {
-    return { handle: "", error: `Invalid ${platform} handle format. Handle contains invalid characters.` };
-  }
-
-  return { handle: clean };
-}
+import { extractPlatformHandle, type CodingPlatform } from "../lib/platformHandles";
+export { extractPlatformHandle, type CodingPlatform };
 
 export function normalizeSocialUrl(input: string, platform: "github" | "linkedin" | "discord" | "portfolio"): { url: string; error?: string } {
   const raw = (input || "").trim();
@@ -1234,6 +1103,44 @@ export default function ProfilePage() {
     }
 
     setMessage({ text: "Institution unlinked successfully.", type: "success" });
+  };
+
+  const handlePlatformInputChange = (val: string, platform: CodingPlatform, setFn: (v: string) => void) => {
+    setPlatformInputErrors(prev => ({ ...prev, [platform]: "" }));
+    if (val.includes("/") || val.includes(".") || val.startsWith("@") || val.startsWith("http")) {
+      const res = extractPlatformHandle(val, platform);
+      if (res.handle) {
+        setFn(res.handle);
+        return;
+      }
+    }
+    setFn(val);
+  };
+
+  const handlePlatformInputBlur = (val: string, platform: CodingPlatform, setFn: (v: string) => void) => {
+    if (!val.trim()) {
+      setPlatformInputErrors(prev => ({ ...prev, [platform]: "" }));
+      return;
+    }
+    const res = extractPlatformHandle(val, platform);
+    if (res.handle) {
+      setFn(res.handle);
+      setPlatformInputErrors(prev => ({ ...prev, [platform]: "" }));
+    } else if (res.error) {
+      setPlatformInputErrors(prev => ({ ...prev, [platform]: res.error || "" }));
+    }
+  };
+
+  const handlePlatformPaste = (e: React.ClipboardEvent<HTMLInputElement>, platform: CodingPlatform, setFn: (v: string) => void) => {
+    const pasted = e.clipboardData.getData("text");
+    if (pasted && (pasted.includes("/") || pasted.includes(".") || pasted.startsWith("@") || pasted.startsWith("http"))) {
+      const res = extractPlatformHandle(pasted, platform);
+      if (res.handle) {
+        e.preventDefault();
+        setFn(res.handle);
+        setPlatformInputErrors(prev => ({ ...prev, [platform]: "" }));
+      }
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -2311,18 +2218,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={leetcodeUsername}
-                        onChange={(e) => {
-                          setLeetcodeUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, LeetCode: "" }));
-                        }}
-                        onBlur={() => {
-                          if (leetcodeUsername.trim()) {
-                            const res = extractPlatformHandle(leetcodeUsername, "LeetCode");
-                            if (res.handle) setLeetcodeUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, LeetCode: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, LeetCode: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "LeetCode", setLeetcodeUsername)}
+                        onBlur={() => handlePlatformInputBlur(leetcodeUsername, "LeetCode", setLeetcodeUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "LeetCode", setLeetcodeUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://leetcode.com/u/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2358,18 +2256,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={codechefUsername}
-                        onChange={(e) => {
-                          setCodechefUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, CodeChef: "" }));
-                        }}
-                        onBlur={() => {
-                          if (codechefUsername.trim()) {
-                            const res = extractPlatformHandle(codechefUsername, "CodeChef");
-                            if (res.handle) setCodechefUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, CodeChef: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, CodeChef: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "CodeChef", setCodechefUsername)}
+                        onBlur={() => handlePlatformInputBlur(codechefUsername, "CodeChef", setCodechefUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "CodeChef", setCodechefUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://codechef.com/users/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2405,18 +2294,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={hackerrankUsername}
-                        onChange={(e) => {
-                          setHackerrankUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, HackerRank: "" }));
-                        }}
-                        onBlur={() => {
-                          if (hackerrankUsername.trim()) {
-                            const res = extractPlatformHandle(hackerrankUsername, "HackerRank");
-                            if (res.handle) setHackerrankUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, HackerRank: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, HackerRank: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "HackerRank", setHackerrankUsername)}
+                        onBlur={() => handlePlatformInputBlur(hackerrankUsername, "HackerRank", setHackerrankUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "HackerRank", setHackerrankUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://hackerrank.com/profile/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2452,18 +2332,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={geeksforgeeksUsername}
-                        onChange={(e) => {
-                          setGeeksforgeeksUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: "" }));
-                        }}
-                        onBlur={() => {
-                          if (geeksforgeeksUsername.trim()) {
-                            const res = extractPlatformHandle(geeksforgeeksUsername, "GeeksforGeeks");
-                            if (res.handle) setGeeksforgeeksUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, GeeksforGeeks: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "GeeksforGeeks", setGeeksforgeeksUsername)}
+                        onBlur={() => handlePlatformInputBlur(geeksforgeeksUsername, "GeeksforGeeks", setGeeksforgeeksUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "GeeksforGeeks", setGeeksforgeeksUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://geeksforgeeks.org/user/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2499,18 +2370,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={codeforcesUsername}
-                        onChange={(e) => {
-                          setCodeforcesUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
-                        }}
-                        onBlur={() => {
-                          if (codeforcesUsername.trim()) {
-                            const res = extractPlatformHandle(codeforcesUsername, "Codeforces");
-                            if (res.handle) setCodeforcesUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Codeforces: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, Codeforces: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "Codeforces", setCodeforcesUsername)}
+                        onBlur={() => handlePlatformInputBlur(codeforcesUsername, "Codeforces", setCodeforcesUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "Codeforces", setCodeforcesUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://codeforces.com/profile/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2546,18 +2408,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={unstopUsername}
-                        onChange={(e) => {
-                          setUnstopUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, Unstop: "" }));
-                        }}
-                        onBlur={() => {
-                          if (unstopUsername.trim()) {
-                            const res = extractPlatformHandle(unstopUsername, "Unstop");
-                            if (res.handle) setUnstopUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Unstop: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, Unstop: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "Unstop", setUnstopUsername)}
+                        onBlur={() => handlePlatformInputBlur(unstopUsername, "Unstop", setUnstopUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "Unstop", setUnstopUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://unstop.com/user/id)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${
@@ -2593,18 +2446,9 @@ export default function ProfilePage() {
                       <input 
                         type="text" 
                         value={devpostUsername}
-                        onChange={(e) => {
-                          setDevpostUsername(e.target.value);
-                          setPlatformInputErrors(prev => ({ ...prev, Devpost: "" }));
-                        }}
-                        onBlur={() => {
-                          if (devpostUsername.trim()) {
-                            const res = extractPlatformHandle(devpostUsername, "Devpost");
-                            if (res.handle) setDevpostUsername(res.handle);
-                            if (res.error) setPlatformInputErrors(prev => ({ ...prev, Devpost: res.error || "" }));
-                            else setPlatformInputErrors(prev => ({ ...prev, Devpost: "" }));
-                          }
-                        }}
+                        onChange={(e) => handlePlatformInputChange(e.target.value, "Devpost", setDevpostUsername)}
+                        onBlur={() => handlePlatformInputBlur(devpostUsername, "Devpost", setDevpostUsername)}
+                        onPaste={(e) => handlePlatformPaste(e, "Devpost", setDevpostUsername)}
                         disabled={!isEditing}
                         placeholder="Enter handle or profile link (e.g. https://devpost.com/username)"
                         className={`h-10 px-3 border bg-bg-base text-txt-main rounded-sm text-xs placeholder:text-txt-muted/50 focus:outline-none transition-colors font-mono disabled:opacity-60 ${

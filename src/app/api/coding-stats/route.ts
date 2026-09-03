@@ -794,10 +794,10 @@ export async function GET(request: Request) {
     if (platform === "hackerrank") {
       let solved = 0;
       let rating = 0;
-      let rank = "Bronze";
+      const rank = "Bronze";
       let globalRank = 0;
       const badges: Array<{ name: string; stars: number; points: number }> = [];
-      let languages: string[] = [];
+      const languages: string[] = [];
       let fetchedSuccessfully = false;
 
       const hrHeaders = {
@@ -911,10 +911,10 @@ export async function GET(request: Request) {
       let solvedMedium = 0;
       let solvedHard = 0;
       let codingScore = 0;
-      let rating = 0;
-      let highestRating = 0;
+      const rating = 0;
+      const highestRating = 0;
       let rank = "Practitioner";
-      let globalRank = 0;
+      const globalRank = 0;
       let instituteRank = 0;
       let streak = 0;
       let fetchedSuccessfully = false;
@@ -1123,9 +1123,9 @@ export async function GET(request: Request) {
     if (platform === "devpost") {
       let projectsCount = 0;
       let hackathonsCount = 0;
-      let followersCount = 0;
+      const followersCount = 0;
       let fullName = cleanUsername;
-      let avatar = "";
+      const avatar = "";
       let fetchedSuccessfully = false;
 
       const devpostHeaders = {
@@ -1186,14 +1186,14 @@ export async function GET(request: Request) {
 
     if (platform === "hackerrank") {
       let solved = 0;
-      let solvedEasy = 0;
-      let solvedMedium = 0;
-      let solvedHard = 0;
+      const solvedEasy = 0;
+      const solvedMedium = 0;
+      const solvedHard = 0;
       let totalSubmissions = 0;
       let acceptedSubmissions = 0;
       let rank = "Hacker";
       let rating = 1200;
-      let globalRank = 0;
+      const globalRank = 0;
       let fetchedSuccessfully = false;
       const submissionCalendar: Record<string, number> = {};
 

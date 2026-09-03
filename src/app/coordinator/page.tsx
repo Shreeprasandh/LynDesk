@@ -19,7 +19,8 @@ import {
   Download,
   Sparkles,
   HelpCircle,
-  Palette
+  Palette,
+  AlertTriangle
 } from "lucide-react";
 
 interface CreditClaim {

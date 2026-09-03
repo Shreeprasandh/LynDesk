@@ -973,7 +973,7 @@ const POPULAR_LOCATIONS = [
   }, [user]);
 
   // Auth Header helper for API route calls
-  const getAuthHeaders = async () => {
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
