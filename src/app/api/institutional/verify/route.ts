@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
+
+const verifySchema = z.object({
+  rollNumber: z.string().min(1, { message: "Please provide a valid Register / Roll Number." }),
+  collegeKey: z.string().min(1, { message: "Please provide a valid College Registrar Key." })
+});
 
 // Initialize Server-Side Admin Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
@@ -119,22 +125,15 @@ function resolveStudentPosition(rollNumber: string, defaultDept: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { rollNumber, collegeKey } = body;
-
-    if (!rollNumber || typeof rollNumber !== "string" || !rollNumber.trim()) {
+    const parseResult = verifySchema.safeParse(body);
+    if (!parseResult.success) {
       return NextResponse.json(
-        { success: false, error: "Please provide a valid Institutional Roll Number." },
+        { success: false, error: parseResult.error.issues[0]?.message || "Invalid institutional verification payload." },
         { status: 400 }
       );
     }
 
-    if (!collegeKey || typeof collegeKey !== "string" || !collegeKey.trim()) {
-      return NextResponse.json(
-        { success: false, error: "Please provide a valid College Registrar Key." },
-        { status: 400 }
-      );
-    }
-
+    const { rollNumber, collegeKey } = parseResult.data;
     const cleanKey = collegeKey.trim().toUpperCase();
     const cleanRoll = rollNumber.trim().toUpperCase();
 

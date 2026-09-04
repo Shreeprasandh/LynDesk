@@ -1,19 +1,26 @@
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { storeOtp } from "../../../lib/otpStore";
 import { validateEmail } from "../../../lib/emailValidation";
 import { checkRateLimit } from "../../../lib/rateLimit";
+
+const sendOtpSchema = z.object({
+  input: z.string().min(1, { message: "Email or username is required." })
+});
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export async function POST(request: Request) {
   try {
-    const { input } = await request.json();
-    if (!input || typeof input !== "string") {
-      return NextResponse.json({ error: "Email or username is required." }, { status: 400 });
+    const rawBody = await request.json();
+    const parseResult = sendOtpSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ error: parseResult.error.issues[0]?.message || "Invalid input." }, { status: 400 });
     }
+    const { input } = parseResult.data;
 
     const trimmed = input.trim();
     let targetEmail = trimmed.toLowerCase();

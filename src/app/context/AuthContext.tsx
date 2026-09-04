@@ -32,6 +32,8 @@ export interface UserProfileData {
   graduation_year?: string;
   roll_number?: string;
   batch_code?: string;
+  college_linked_status?: string;
+  institute_id?: string;
 }
 
 type AuthContextType = {
@@ -77,13 +79,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const metaRole = u?.user_metadata?.role;
     if (metaRole === "recruiter" || metaRole === "employee" || u?.user_metadata?.company_key) return "recruiter";
     if (metaRole === "coordinator" || metaRole === "faculty" || u?.user_metadata?.registered_staff) return "coordinator";
-
-    if (typeof window !== "undefined") {
-      const rec = localStorage.getItem("company_recruiter_member");
-      if (rec && rec !== "false") return "recruiter";
-      const fac = localStorage.getItem("faculty_staff_member");
-      if (fac && fac !== "false") return "coordinator";
-    }
     return "student";
   };
 
@@ -340,7 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabase
           .from("profiles")
-          .select("id, full_name, username, avatar_url, academic_credits, department, college_key, bio, skills, github_url, linkedin_url, portfolio_url, leetcode_username")
+          .select("id, full_name, username, avatar_url, academic_credits, department, college_key, bio, skills, github_url, linkedin_url, portfolio_url, leetcode_username, college_linked_status, institute_id, roll_number, college_name, graduation_year, batch_code")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -352,13 +347,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatar_url: data.avatar_url || user.user_metadata?.avatar_url || "",
             academic_credits: data.academic_credits || 0,
             department: data.department || "Computer Science",
-            college_key: data.college_key || "COLLEGE_SRM",
+            college_key: data.college_key || "",
             bio: data.bio || "",
             skills: data.skills || "",
             github_url: data.github_url,
             linkedin_url: data.linkedin_url,
             portfolio_url: data.portfolio_url,
-            leetcode_username: data.leetcode_username
+            leetcode_username: data.leetcode_username,
+            college_linked_status: data.college_linked_status || "none",
+            institute_id: data.institute_id || undefined,
+            college_name: data.college_name,
+            roll_number: data.roll_number,
+            graduation_year: data.graduation_year,
+            batch_code: data.batch_code
           };
           setUserProfile(profData);
 
@@ -383,9 +384,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatar_url: defaultAvatar,
             academic_credits: 0,
             department: "Computer Science",
-            college_key: "COLLEGE_SRM",
+            college_key: "",
             bio: "",
             skills: "",
+            college_linked_status: "none",
+            institute_id: undefined
           };
 
           setUserProfile(newProfileData);
@@ -398,7 +401,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               username: defaultUsername,
               avatar_url: defaultAvatar,
               department: "Computer Science",
-              college_key: "COLLEGE_SRM",
+              college_key: "",
+              college_linked_status: "none",
               academic_credits: 0,
             });
           } catch (err) {

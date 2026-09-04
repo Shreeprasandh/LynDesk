@@ -48,6 +48,7 @@ import {
   AlertCircle,
   Clock,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
 
@@ -182,8 +183,10 @@ const DEFAULT_EVENTS: OpportunityItem[] = [
 ];
 
 export default function ExplorePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+
+  const isCollegeLinked = userProfile?.college_linked_status === "linked" && !!userProfile?.institute_id;
 
   // Two Main Sub-Tabs: "events" | "friends"
   const [activeTab, setActiveTab] = useState<"events" | "friends" | "works">("events");
@@ -219,7 +222,7 @@ export default function ExplorePage() {
       const urlParams = new URLSearchParams(window.location.search);
       const tab = urlParams.get("tab");
       queueMicrotask(() => {
-        if (tab === "friends" || tab === "network" || tab === "classmates" || tab === "teammates") {
+        if (tab === "friends" || tab === "network" || tab === "classmates" || tab === "teammates" || tab === "members" || tab === "leaderboard") {
           setActiveTab("friends");
         } else if (tab === "events" || tab === "contests" || tab === "news" || tab === "hackathons") {
           setActiveTab("events");
@@ -770,6 +773,7 @@ export default function ExplorePage() {
   // ── WORKS HUB FUNCTIONS ──────────────────────────────────────────────
   const loadWorks = useCallback(async (page = 1) => {
     if (!user) return;
+    setWorksLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -786,11 +790,18 @@ export default function ExplorePage() {
         setWorks(data.works || []);
         setWorksTotal(data.total || 0);
         setWorksPage(page);
+        setWorksError('');
       } else if (res.status === 403) {
+        setWorks([]);
+        setWorksTotal(0);
         setWorksError('college_not_linked');
+      } else {
+        setWorksError('Failed to load works.');
       }
     } catch {
       setWorksError('Failed to load works.');
+    } finally {
+      setWorksLoading(false);
     }
   }, [user, worksSort, worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter]);
 
@@ -917,9 +928,10 @@ export default function ExplorePage() {
   // Load works when tab is activated or filters change
   useEffect(() => {
     let isMounted = true;
-    if (activeTab === 'works' && user) {
+    if (activeTab === 'works' && user && isCollegeLinked) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session || !isMounted) return;
+        setWorksLoading(true);
         const workQueryParams = new URLSearchParams({ page: '1', sort: worksSort });
         if (worksSearch) workQueryParams.set('search', worksSearch);
         if (worksCategoryFilter) workQueryParams.set('category', worksCategoryFilter);
@@ -929,15 +941,28 @@ export default function ExplorePage() {
         fetch(`/api/works?${workQueryParams}`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (isMounted && data?.works) {
-              setWorks(data.works);
-              setWorksTotal(data.total || 0);
-              setWorksPage(1);
+          .then(async res => {
+            if (res.ok) {
+              const data = await res.json();
+              if (isMounted) {
+                setWorks(data.works || []);
+                setWorksTotal(data.total || 0);
+                setWorksPage(1);
+                setWorksError('');
+              }
+            } else if (res.status === 403) {
+              if (isMounted) {
+                setWorks([]);
+                setWorksTotal(0);
+                setWorksError('college_not_linked');
+              }
+            } else {
+              if (isMounted) setWorksError('Failed to load works.');
             }
           })
-          .catch(() => {})
+          .catch(() => {
+            if (isMounted) setWorksError('Failed to load works.');
+          })
           .finally(() => {
             if (isMounted) setWorksLoading(false);
           });
@@ -945,17 +970,17 @@ export default function ExplorePage() {
         fetch('/api/works/my', {
           headers: { Authorization: `Bearer ${session.access_token}` }
         })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (isMounted && data?.works) {
-              setMyWorks(data.works);
+          .then(async res => {
+            if (res.ok) {
+              const data = await res.json();
+              if (isMounted) setMyWorks(data.works || []);
             }
           })
           .catch(() => {});
       });
     }
     return () => { isMounted = false; };
-  }, [activeTab, user, worksSort, worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter]);
+  }, [activeTab, user, userProfile, isCollegeLinked, worksSort, worksSearch, worksCategoryFilter, worksDeptFilter, worksYearFilter]);
 
   if (authLoading) {
     return (
@@ -1771,8 +1796,22 @@ export default function ExplorePage() {
         {/* ─────────────────────────────────────────────────────────────────── */}
         {activeTab === "works" && (
           <div className="flex flex-col gap-6 pb-12">
-            {worksError === "college_not_linked" ? (
-              /* ── A. College gate ── */
+            {!user ? (
+              /* ── Authentication Required Gate ── */
+              <div className="border border-border-main/60 bg-bg-surface rounded-md p-10 flex flex-col items-center gap-4 text-center">
+                <div className="w-12 h-12 rounded-sm bg-accent-main/10 border border-accent-main/20 flex items-center justify-center text-accent-main">
+                  <Lock size={24} />
+                </div>
+                <h3 className="font-display text-base font-light text-txt-main">Authentication Required</h3>
+                <p className="text-xs text-txt-sub max-w-sm font-light leading-relaxed">
+                  Please log in to your student account to access the Works Hub and explore institutional creations.
+                </p>
+                <a href="/login" className="mt-1 px-4 py-2 bg-accent-main text-bg-base rounded-sm text-xs font-mono uppercase tracking-wider font-semibold hover:opacity-90 transition-opacity">
+                  Log In →
+                </a>
+              </div>
+            ) : (!isCollegeLinked || worksError === "college_not_linked") ? (
+              /* ── A. College gate (Default Deny - Instant Synchronous Lock) ── */
               <div className="border border-border-main/60 bg-bg-surface rounded-md p-10 flex flex-col items-center gap-4 text-center">
                 <div className="w-12 h-12 rounded-sm bg-accent-main/10 border border-accent-main/20 flex items-center justify-center text-accent-main">
                   <GraduationCap size={24} />
@@ -1784,6 +1823,11 @@ export default function ExplorePage() {
                 <a href="/profile" className="mt-1 px-4 py-2 bg-accent-main text-bg-base rounded-sm text-xs font-mono uppercase tracking-wider font-semibold hover:opacity-90 transition-opacity">
                   Connect College in Profile →
                 </a>
+              </div>
+            ) : worksLoading && works.length === 0 ? (
+              <div className="border border-border-main/60 bg-bg-surface rounded-md p-10 flex flex-col items-center justify-center gap-3 text-center">
+                <div className="w-5 h-5 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+                <span className="font-mono text-xs text-txt-muted">Loading works...</span>
               </div>
             ) : (
               <>
@@ -1856,7 +1900,14 @@ export default function ExplorePage() {
                     </button>
                     {/* Add Work */}
                     <button
-                      onClick={() => { setAddWorkStep(1); setShowAddWork(true); }}
+                      onClick={() => {
+                        if (worksError === "college_not_linked") {
+                          showToast("Institutional verification required to publish works. Link your college in Profile.", "error");
+                          return;
+                        }
+                        setAddWorkStep(1);
+                        setShowAddWork(true);
+                      }}
                       className="h-9 px-3.5 bg-accent-main hover:opacity-90 text-bg-base font-mono text-[10px] uppercase tracking-wider font-bold rounded-sm cursor-pointer transition-opacity flex items-center gap-1.5"
                     >
                       <Plus size={12} />

@@ -2791,7 +2791,7 @@ export default function ProfilePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {/* Roll Number */}
                         <div className="flex flex-col gap-1">
-                          <label className="text-[10px] text-txt-sub font-semibold">Institutional Roll / Reg Number</label>
+                          <label className="text-[10px] text-txt-sub font-semibold">Register Number</label>
                           <input 
                             type="text"
                             value={rollNumber}

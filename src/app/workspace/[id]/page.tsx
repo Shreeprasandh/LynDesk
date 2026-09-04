@@ -816,10 +816,23 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
   // Invite Classmates Modal States
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
+
+  const broadcastLocalEvent = useCallback((type: string, payload: any) => {
+    try {
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.postMessage({ type, payload });
+      }
+    } catch {
+      // Safe fallback
+    }
+  }, []);
+
   // Browser BroadcastChannel for instant multi-tab sync on same origin
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
     const bc = new BroadcastChannel(`ldk_bus_${id}`);
+    broadcastChannelRef.current = bc;
     bc.onmessage = (event) => {
       const { type, payload } = event.data || {};
       if (type === "chat_message" && payload) {
@@ -869,9 +882,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       }
     };
     return () => {
+      broadcastChannelRef.current = null;
       bc.close();
     };
-  }, [id]);
+  }, [id, userUsername]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
@@ -2141,15 +2155,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
     }
 
     // 3. Broadcast message over browser BroadcastChannel for instant same-origin tab sync
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-        bc.postMessage({ type: "chat_message", payload: localMsg });
-        bc.close();
-      } catch (err) {
-        console.warn("BroadcastChannel error: ", err);
-      }
-    }
+    broadcastLocalEvent("chat_message", localMsg);
 
     // 4. Send to Supabase DB if user session exists and valid UUID workspace
     if (user && workspaceUuid) {
@@ -2328,13 +2334,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "call_presence", payload: { active: true, callerName: myName } });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("call_presence", { active: true, callerName: myName });
 
       // Post system notice to chat section & broadcast to all teammates
       const callNotice: ChatMsg = {
@@ -2361,13 +2361,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "chat_message", payload: callNotice });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("chat_message", callNotice);
       
       setRoomMembers(prev => [
         ...prev,
@@ -2541,13 +2535,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "call_presence", payload: { active: false } });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("call_presence", { active: false });
 
       if (signalingChannelRef.current) {
         try {
@@ -2585,13 +2573,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "chat_message", payload: leaveNotice });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("chat_message", leaveNotice);
 
       setRoomMembers(prev => prev.filter(member => member.id !== "user-session"));
       setIsMuted(false);
@@ -2716,13 +2698,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "artifacts_update", payload: updated });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("artifacts_update", updated);
 
       return updated;
     });
@@ -2780,13 +2756,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-        bc.postMessage({ type: "credits_update", payload: "pending" });
-        bc.close();
-      } catch {}
-    }
+    broadcastLocalEvent("credits_update", "pending");
     
     // Default fallback mock response
     if (!user || id === "e1" || id === "e2") {
@@ -2938,13 +2908,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
       } catch {}
     }
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-        bc.postMessage({ type: "links_update", payload: { githubRepo: cleanGit, liveDemo } });
-        bc.close();
-      } catch {}
-    }
+    broadcastLocalEvent("links_update", { githubRepo: cleanGit, liveDemo });
 
     if (user && workspaceUuid) {
       try {
@@ -2993,13 +2957,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "links_update", payload: { githubRepo, liveDemo: "" } });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("links_update", { githubRepo, liveDemo: "" });
       if (user && workspaceUuid) {
         try {
           await supabase
@@ -3037,13 +2995,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         });
       } catch {}
     }
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-        bc.postMessage({ type: "links_update", payload: { githubRepo, liveDemo: cleanDemo } });
-        bc.close();
-      } catch {}
-    }
+    broadcastLocalEvent("links_update", { githubRepo, liveDemo: cleanDemo });
 
     if (user && workspaceUuid) {
       try {
@@ -3117,13 +3069,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
       } catch {}
     }
 
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        const bc = new BroadcastChannel(`ldk_bus_${id}`);
-        bc.postMessage({ type: "name_update", payload: cleanName });
-        bc.close();
-      } catch {}
-    }
+    broadcastLocalEvent("name_update", cleanName);
 
     if (workspaceUuid) {
       try {
@@ -3244,13 +3190,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
             });
           } catch {}
         }
-        if (typeof BroadcastChannel !== "undefined") {
-          try {
-            const bc = new BroadcastChannel(`ldk_bus_${id}`);
-            bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
-            bc.close();
-          } catch {}
-        }
+        broadcastLocalEvent("tasks_update", teamTasksOnly);
       }
       if (workspaceUuid) {
         (async () => {
@@ -3311,13 +3251,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("tasks_update", teamTasksOnly);
       if (workspaceUuid) {
         (async () => {
           try {
@@ -3346,13 +3280,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
           });
         } catch {}
       }
-      if (typeof BroadcastChannel !== "undefined") {
-        try {
-          const bc = new BroadcastChannel(`ldk_bus_${id}`);
-          bc.postMessage({ type: "tasks_update", payload: teamTasksOnly });
-          bc.close();
-        } catch {}
-      }
+      broadcastLocalEvent("tasks_update", teamTasksOnly);
       if (workspaceUuid) {
         (async () => {
           try {
@@ -4729,13 +4657,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                       });
                     } catch {}
                   }
-                  if (typeof BroadcastChannel !== "undefined") {
-                    try {
-                      const bc = new BroadcastChannel(`ldk_bus_${id}`);
-                      bc.postMessage({ type: "notes_update", payload: val });
-                      bc.close();
-                    } catch {}
-                  }
+                  broadcastLocalEvent("notes_update", val);
                   if (workspaceUuid) {
                     (async () => {
                       try {

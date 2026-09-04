@@ -152,6 +152,11 @@ export async function POST(request: Request) {
 
       // Pre-emptively clean user records across child tables to guarantee cascade integrity
       await Promise.allSettled([
+        supabaseAdmin.from("student_work_ratings").delete().eq("student_id", user.id),
+        supabaseAdmin.from("student_work_views").delete().eq("viewer_id", user.id),
+        supabaseAdmin.from("student_works").delete().eq("student_id", user.id),
+        supabaseAdmin.from("user_hackathon_applications").delete().eq("user_id", user.id),
+        supabaseAdmin.from("workspace_presence").delete().eq("user_id", user.id),
         supabaseAdmin.from("friendships").delete().or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`),
         supabaseAdmin.from("project_members").delete().eq("profile_id", user.id),
         supabaseAdmin.from("credit_applications").delete().eq("student_id", user.id),

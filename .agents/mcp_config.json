@@ -10,6 +10,11 @@
       "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
       "description": "Headless Chrome browser for live UI visual verification, DOM inspection, and responsive layout testing."
     },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-playwright"],
+      "description": "Cross-browser automation (Chromium, Firefox, WebKit) for end-to-end testing, visual verification, and accessibility audit workflows."
+    },
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],

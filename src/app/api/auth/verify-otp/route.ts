@@ -1,19 +1,28 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { verifyOtpCode } from "../../../lib/otpStore";
 import { validatePassword } from "../../../lib/passwordValidation";
 import { checkRateLimit } from "../../../lib/rateLimit";
+
+const verifyOtpSchema = z.object({
+  input: z.string().min(1, { message: "Email or username is required." }),
+  otp: z.string().min(6, { message: "Valid 6-digit OTP is required." }),
+  newPassword: z.string().min(8, { message: "New password must be at least 8 characters." }),
+  confirmPassword: z.string().optional()
+});
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export async function POST(request: Request) {
   try {
-    const { input, otp, newPassword, confirmPassword } = await request.json();
-
-    if (!input || !otp || !newPassword) {
-      return NextResponse.json({ error: "Email, OTP code, and new password are required." }, { status: 400 });
+    const rawBody = await request.json();
+    const parseResult = verifyOtpSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ error: parseResult.error.issues[0]?.message || "Invalid payload." }, { status: 400 });
     }
+    const { input, otp, newPassword, confirmPassword } = parseResult.data;
 
     const passRules = validatePassword(newPassword, confirmPassword);
     if (!passRules.isValid) {
