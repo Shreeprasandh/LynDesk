@@ -1,5 +1,254 @@
 
 # 🏛️ The Five Monks Council: Deliberation Briefing
+**Convened**: 2026-09-04T17:16:37.658Z
+**Proposal**: "Refactoring session sign-out lifecycle to distinguish 'Ending session...' vs 'Syncing session...' with an active auth state machine"
+
+---
+
+### 🥊 1. Chamber of The Contrarian (The Sceptic & Pre-Mortem Inquisitor)
+*Engine: `openrouter / openrouter/free`*
+
+# 🔴 Post-Mortem: Session Sign-Out Refactor — 6 Months In
+
+The proposal shipped. It broke. Here's why.
+
+---
+
+## Single Points of Failure
+
+- **The auth state machine is now the SPOF.** Every sign-out funnels through it. If it hangs, crashes, or enters an unrecoverable transitional state, the user is **permanently locked out** with no escape hatch. We replaced a simple fire-and-forget logout with a monolithic state dependency.
+- **The "Syncing session..." phase depends on a backend sync coordinator that didn't exist before.** One degraded instance and every sign-out across the platform stalls. We've
+
+---
+
+### 🎯 2. Chamber of The Principal Advisor (First-Principles & Anti-XY Inquisitor)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+**The Five Monks Council – Principal Advisor’s Brief**
+
+---
+
+## 1. Peel Back the Layers – What Is the Real Question?
+
+You’ve written: *“Refactoring session sign‑out lifecycle to distinguish ‘Ending session…’ vs ‘Syncing session…’ with an active auth state machine.”*  
+On the surface this is a **code‑structure** problem, but the monks ask: **what pain are you really trying to relieve?**
+
+| Apparent Goal (XY) | Possible Underlying Need |
+|--------------------|--------------------------|
+| Separate UI messages for “Ending” vs “Syncing” | Users are confused about *why* the app appears to hang during sign‑out. |
+| Add a new branch to the auth state machine | The current state machine is becoming tangled, making future changes risky. |
+| Refactor the whole sign‑out flow | The team is spending disproportionate time on a single edge‑case that rarely occurs. |
+
+If the *real* problem is **user perception of latency** or **maintainability of the auth flow**, then the “XY” is the elaborate state‑machine refactor. We should ask: *Do we really need a new state, or can we solve the user‑experience issue more directly?*
+
+---
+
+## 2. 90 % of the Value with 10 % of the Complexity  
+
+### a. User‑Facing Symptom → Simple Fix  
+
+| Symptom | 10 % effort solution (≈90 % of the value) |
+|---------|------------------------------------------|
+| “The app is stuck after I tap Sign‑Out.” | **Show a deterministic progress indicator** that always says *“Signing out…”* for a fixed, short period (e.g., 1 s), then transition to the next screen. No extra state needed. |
+| “I’m not sure whether my data is being synced.” | **Add a toast / banner** after the sign‑out completes: *“Your data was synced.”* This can be a one‑off side‑effect, not a separate state. |
+| “Our codebase now has a tangled auth state machine.” | **Extract the sign‑out routine into a pure function** that returns a promise of `{ synced: boolean }`. The state machine stays untouched; the UI just reacts to the promise result. |
+
+### b. Maintainability → One‑Liner Guard  
+
+Instead of expanding the state diagram, wrap the existing sign‑out call:
+
+```js
+async function signOut() {
+  setMessage('Ending session…')
+  await auth.endSession()               // existing call
+  setMessage('Syncing session…')
+  await syncPendingChanges()            // fire‑and‑forget or await
+  setMessage('Signed out')
+}
+```
+
+*Only two UI messages, no new states, no extra branches.*  
+
+---
+
+## 3. The Core Bottleneck
+
+1. **Perceived latency / ambiguous feedback** – Users cannot tell whether the app is still working or frozen.  
+2. **State‑machine bloat** – Every new nuance (Ending vs Syncing) spawns another node, increasing cognitive load for future developers.  
+
+If you solve #1 with a clear, time‑bounded indicator, you automatically reduce the need for #2. The state machine can remain **“Signed‑Out
+
+---
+
+### 🚀 3. Chamber of The Expansionist (Visionary & Leverage Multiplier)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## TL;DR  
+* **Separate concerns** – sign‑out (client‑side cleanup) vs. **sync‑out** (server‑side revocation / token refresh).  
+* **Introduce an explicit Auth State Machine** that has its own “ending” and “syncing” substates.  
+* **Expose two UI‑level signals** (`Ending session…` → `Syncing session…` → `Signed out`) that are driven directly by the state‑machine events.  
+* **Keep the state machine pure** (no UI, no side‑effects) and let a thin “orchestrator” layer translate its events into UI feedback and async calls.  
+
+Below is a step‑by‑step guide, a concrete TypeScript/React implementation, and a discussion of the long‑term leverage you’ll get from this refactor.
+
+---
+
+## 1️⃣ Why the refactor matters
+
+| Current pattern | Problems (2nd‑order) |
+|-----------------|----------------------|
+| `signOut()` → async call → UI shows generic “Signing out…” until promise resolves. | • UI cannot differentiate between local cleanup and server sync. <br>• Any failure in the sync step is hidden → users think they’re signed out while the server still holds a session. <br>• Adding new sub‑steps (e.g., audit‑log, device revocation) forces more “if‑else” spaghetti. |
+| State is scattered across reducers, services, and components. | • Hard to test in isolation. <br>• Hard to reason about race conditions (e.g., a token refresh happening while sign‑out is in flight). |
+
+**Strategic upside**  
+* **Observability** – each sub‑step is a distinct state, so logs/metrics can be collected per step.  
+* **Extensibility** – new “sync” actions (push device tokens, invalidate refresh tokens, write audit logs) are just new transitions, no UI changes needed.  
+* **Developer velocity** – a pure state machine is trivially unit‑tested; UI components become dumb presenters.  
+* **Future‑proofing** – when you move to a multi‑device SSO or a zero‑trust architecture, you only add new states/transitions rather than rewrite the whole sign‑out flow.
+
+---
+
+## 2️⃣ High‑level design
+
+```
++-------------------+      +----------------------+      +-------------------+
+| UI (React/Swift) | <-> | Auth Orchestrator   | <-> | Auth Service (API)|
++-------------------+      +----------------------+      +-------------------+
+          ^                         ^                         ^
+          |                         |                         |
+          | 1. dispatch(action)      | 2. listen(state)        |
+          |                         |                         |
+          v                         v                         v
+                ┌───────────────────────────────────────┐
+                │          Auth State Machine            │
+                │  (pure, deterministic, no side‑effects)│
+                └───────────────────────────────────────┘
+```
+
+* **Auth State Machine** – pure reducer‑style machine (e.g., XState, Redux Toolkit’s `createSlice`, or a hand‑rolled `enum` + transition table).  
+* **Auth Orchestrator** – thin layer that subscribes to the machine, triggers side‑effects (API calls, local storage cleanup) and feeds back
+
+---
+
+### 👁️ 4. Chamber of The Outsider (Clean-Slate & Naive User Observer)
+*Engine: `luna-protocol / builtin-reasoner`*
+
+Deliberation evaluated against core project constraints for: "Refactoring session sign-out lifecycle to distinguish 'Ending session...' vs 'Syncing session...' with an active auth state machine"
+
+---
+
+### ⚙️ 5. Chamber of The Executor (Gold-Standard Pragmatist)
+*Engine: `groq / qwen/qwen3.8-27b`*
+
+**EXECUTION PROTOCOL: SESSION SIGN-OUT LIFECYCLE REFACTOR**
+
+**TARGET:** Next.js 16 / React 19 (RSC) / TypeScript
+**GOAL:** Distinguish `ENDING_SESSION` (local cleanup) vs `SYNCING_SESSION` (remote persistence) via explicit Auth State Machine.
+**CONSTRAINTS:** Zero side effects, strict type safety, production-grade error recovery.
+
+---
+
+### 1. ARCHITECTURE OVERVIEW
+
+We are moving from a "fire-and-forget" sign-out to a **dual-phase lifecycle**:
+1.  **Phase 1: SYNCING_SESSION** – Ensure all pending local state (e.g., unsaved drafts, analytics events, session metadata) is persisted to the backend.
+2.  **Phase 2: ENDING_SESSION** – Invalidate auth tokens, clear local storage, and redirect.
+
+We implement this via a **finite state machine (FSM)** managed in a React Context (Client Component) that communicates with Server Actions.
+
+---
+
+### 2. TYPE DEFINITIONS (`lib/types/auth.ts`)
+
+```typescript
+export type AuthPhase = 'IDLE' | 'SYNCING_SESSION' | 'ENDING_SESSION' | 'ERROR';
+
+export interface SessionSyncPayload {
+  sessionId: string;
+  pendingEvents: Array<Record<string, unknown>>;
+  lastActiveAt: string;
+}
+
+export interface SignOutResult {
+  success: boolean;
+  error?: string;
+  redirectUrl?: string;
+}
+```
+
+---
+
+### 3. AUTH STATE MACHINE CONTEXT (`contexts/AuthLifecycleContext.tsx`)
+
+This is a **Client Component** only. It owns the FSM.
+
+```typescript
+'use client';
+
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import type { AuthPhase, SignOutResult } from '@/lib/types/auth';
+
+interface AuthLifecycleState {
+  phase: AuthPhase;
+  error: string | null;
+  isProcessing: boolean;
+}
+
+type AuthLifecycleAction =
+  | { type: 'START_SIGN_OUT' }
+  | { type: 'SYNC_COMPLETE' }
+  | { type: 'SYNC_FAILED'; error: string }
+  | { type: 'END_COMPLETE' }
+  | { type: 'END_FAILED'; error: string }
+  | { type: 'RESET' };
+
+const initialState: AuthLifecycleState = {
+  phase: 'IDLE',
+  error: null,
+  isProcessing: false,
+};
+
+function reducer(state: AuthLifecycleState, action: AuthLifecycleAction): AuthLifecycleState {
+  switch (action.type) {
+    case 'START_SIGN_OUT':
+      return { ...state, phase: 'SYNCING_SESSION', error: null, isProcessing: true };
+    case 'SYNC_COMPLETE':
+      return { ...state, phase: 'ENDING_SESSION' };
+    case 'SYNC_FAILED':
+      return { ...state, phase: 'ERROR', error: action.error, isProcessing: false };
+    case 'END_COMPLETE':
+      return { ...state, phase: 'IDLE', error: null, isProcessing: false };
+    case 'END_FAILED':
+      return { ...state, phase: 'ERROR', error: action.error, isProcessing: false };
+    case 'RESET':
+      return initialState;
+    default:
+      return state;
+  }
+}
+
+interface AuthLifecycleContextValue {
+  state: AuthLifecycleState;
+  initiateSignOut: () => Promise<void>;
+  reset: () => void;
+}
+
+const AuthLifecycleContext = createContext<AuthLifecycleContextValue | undefined>(undefined);
+
+export function AuthLifecycleProvider({ children }: { children
+
+---
+
+### ⚖️ The Chairman's Verdict (Luna)
+- **Council Status**: ✅ Deliberation Finalized
+- **Strategic Synthesis**: Balance execution mechanics with identified edge cases and leverage opportunities.
+- **Permanent Ledger**: Saved in `five_monks_report.md`
+
+
+---
+## 📜 Historical Verdict Ledger
+
+# 🏛️ The Five Monks Council: Deliberation Briefing
 **Convened**: 2026-09-04T15:33:22.604Z
 **Proposal**: "Execute 3-phase production audit remediation: Phase 1 Works Hub Gate + Label + Tab routing, Phase 2 Role Elevation Auth fix + Groq AI fallback correction + Delete-account DB Cascades, Phase 3 Central Next.js Middleware + BroadcastChannel refactor + API Zod validation"
 

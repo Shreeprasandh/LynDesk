@@ -183,7 +183,7 @@ const DEFAULT_EVENTS: OpportunityItem[] = [
 ];
 
 export default function ExplorePage() {
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, userProfile, loading: authLoading, authStatusMessage } = useAuth();
   const { showToast } = useToast();
 
   const isCollegeLinked = userProfile?.college_linked_status === "linked" && !!userProfile?.institute_id;
@@ -986,7 +986,7 @@ export default function ExplorePage() {
     return (
       <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
         <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
-        <span>Syncing session...</span>
+        <span>{authStatusMessage || "Syncing session..."}</span>
       </div>
     );
   }

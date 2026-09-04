@@ -36,6 +36,8 @@ export interface UserProfileData {
   institute_id?: string;
 }
 
+export type AuthStatus = "idle" | "syncing" | "ending";
+
 type AuthContextType = {
   user: User | null;
   session: Session | null;
@@ -43,6 +45,8 @@ type AuthContextType = {
   profileAvatar: string;
   userProfile: UserProfileData | null;
   loading: boolean;
+  authStatus: AuthStatus;
+  authStatusMessage: string;
   onlineUserIds: Set<string>;
   isUserOnline: (userId: string) => boolean;
   refreshUser: () => Promise<void>;
@@ -73,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return "";
   });
   const [loading, setLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("syncing");
+  const [authStatusMessage, setAuthStatusMessage] = useState<string>("Syncing session...");
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
 
   const resolveRole = (u: User | null): UserRole => {
@@ -87,7 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Safety fallback: ensure loading never hangs beyond 350ms
     const safetyTimer = setTimeout(() => {
-      if (isMounted) setLoading(false);
+      if (isMounted) {
+        setAuthStatus("idle");
+        setAuthStatusMessage("");
+        setLoading(false);
+      }
     }, 350);
 
     // 1. Check initial active session
@@ -97,6 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setUserRole(resolveRole(session?.user ?? null));
+      setAuthStatus("idle");
+      setAuthStatusMessage("");
       setLoading(false);
 
       if (session && typeof window !== "undefined") {
@@ -105,7 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }).catch(() => {
-      if (isMounted) setLoading(false);
+      if (isMounted) {
+        setAuthStatus("idle");
+        setAuthStatusMessage("");
+        setLoading(false);
+      }
     });
 
     // 2. Listen for authentication state changes
@@ -116,6 +132,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session.user);
         setUserRole(resolveRole(session.user));
+        setAuthStatus("idle");
+        setAuthStatusMessage("");
         setLoading(false);
         if (typeof window !== "undefined") {
           const isFirstTime = localStorage.getItem("ldk_first_time_signup");
@@ -134,6 +152,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserProfile(null);
         setProfileAvatar("");
         setUserRole("student");
+        setAuthStatus("idle");
+        setAuthStatusMessage("");
         setLoading(false);
         if (typeof window !== "undefined") {
           try {
@@ -150,6 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } else {
+        setAuthStatus("idle");
+        setAuthStatusMessage("");
         setLoading(false);
       }
     });
@@ -226,10 +248,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    setAuthStatus("ending");
+    setAuthStatusMessage("Ending session...");
     setLoading(true);
+
     if (user?.id) {
       try {
-        await fetch("/api/workspace/presence", {
+        const presencePromise = fetch("/api/workspace/presence", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -239,10 +264,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isOnline: false
           })
         });
-        await supabase
+        const profileUpdatePromise = supabase
           .from("profiles")
           .update({ updated_at: new Date().toISOString() })
           .eq("id", user.id);
+
+        // Fail-safe 1500ms timeout guard: network cleanup must NEVER block or hang logout
+        await Promise.race([
+          Promise.allSettled([presencePromise, profileUpdatePromise]),
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
       } catch {}
     }
 
@@ -260,17 +291,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.clear();
       }
     }
+
     try {
-      await supabase.auth.signOut();
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
     } catch (err) {
       console.error("Sign out error:", err);
     }
+
     setUser(null);
     setSession(null);
     setUserProfile(null);
     setProfileAvatar("");
     setUserRole("student");
     setOnlineUserIds(new Set());
+    setAuthStatus("idle");
+    setAuthStatusMessage("");
     setLoading(false);
   };
 
@@ -485,6 +523,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileAvatar, 
       userProfile, 
       loading, 
+      authStatus,
+      authStatusMessage,
       onlineUserIds, 
       isUserOnline, 
       refreshUser, 

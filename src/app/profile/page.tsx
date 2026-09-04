@@ -169,7 +169,7 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, requestPasswordResetOtp, updateUserPassword } = useAuth();
+  const { user, loading: authLoading, authStatusMessage, requestPasswordResetOtp, updateUserPassword } = useAuth();
   const { showToast } = useToast();
 
   // Security & Password Management States
@@ -1711,7 +1711,7 @@ export default function ProfilePage() {
     return (
       <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
         <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
-        <span>Syncing session...</span>
+        <span>{authStatusMessage || "Syncing session..."}</span>
       </div>
     );
   }
