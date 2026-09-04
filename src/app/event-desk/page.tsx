@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { supabase } from "../lib/supabase";
 import { extractAvatarFromUser } from "../lib/avatar";
-import { syncEventDeskWithCalendar } from "../lib/wallCalendarSync";
+import { syncEventDeskWithCalendar, deleteWallCalendarEvent } from "../lib/wallCalendarSync";
 import Link from "next/link";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -92,7 +92,10 @@ function LandingSkeleton() {
 function isDatePassed(dateStr?: string | null): boolean {
   if (!dateStr) return false;
   const clean = dateStr.trim().toLowerCase();
-  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none") || clean.includes("not specified") || clean.includes("tbd") || clean.includes("date not") || clean.includes("to be announced")) {
+  if (clean.startsWith("completed") || clean.includes("(completed)")) {
+    return true;
+  }
+  if (clean.includes("ongoing") || clean.includes("none") || clean.includes("not specified") || clean.includes("tbd") || clean.includes("date not") || clean.includes("to be announced")) {
     return false;
   }
 
@@ -275,6 +278,19 @@ export default function Home() {
         const d5 = new Date(now.getTime() + 8 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
         const d6 = new Date(now.getTime() + 40 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 
+        const isContestItem = (o: any) => {
+          const title = (o.title || "").toLowerCase();
+          const url = (o.url || "").toLowerCase();
+          const cat = (o.category || "").toLowerCase();
+          return cat === "contest" || 
+                 url.includes("codeforces.com") || 
+                 url.includes("leetcode.com/contest") || 
+                 url.includes("codechef.com") || 
+                 title.includes("codeforces round") || 
+                 title.includes("leetcode weekly") || 
+                 title.includes("codechef rated");
+        };
+
         const defaultOpps = [
           {
             id: "opp_1",
@@ -290,13 +306,13 @@ export default function Home() {
           },
           {
             id: "opp_2",
-            title: "Google Summer of Code 2026",
-            category: "contest",
+            title: "Flipkart GRiD 6.0 - Software Development Challenge",
+            category: "hackathon",
             deadline: d2,
             location: "online",
-            level: "global",
-            url: "https://summerofcode.withgoogle.com",
-            description: "Global open-source software development mentorship program sponsored by Google Open Source.",
+            level: "national",
+            url: "https://unstop.com/competitions/flipkart-grid-6",
+            description: "Premier corporate engineering challenge featuring Robotics, Information Security, and GenAI problem statements.",
             facultyRecommended: true,
             createdDate: "Today"
           },
@@ -314,26 +330,26 @@ export default function Home() {
           },
           {
             id: "opp_4",
-            title: "Codeforces Rated Rounds (Div. 2 / Div. 3)",
-            category: "contest",
+            title: "Tata Crucible Campus Hackathon 2026",
+            category: "hackathon",
             deadline: d4,
             location: "online",
-            level: "global",
-            url: "https://codeforces.com/contests",
-            description: "Official competitive programming challenge with live global rating updates.",
-            facultyRecommended: false,
+            level: "national",
+            url: "https://unstop.com/competitions/tata-crucible-campus-2026",
+            description: "Prestigious national campus case and software hackathon by the Tata Group.",
+            facultyRecommended: true,
             createdDate: "Today"
           },
           {
             id: "opp_5",
-            title: "LeetCode Weekly & Biweekly Contests",
-            category: "contest",
+            title: "MIT HackHarvard 2026 Hackathon",
+            category: "hackathon",
             deadline: d5,
             location: "online",
             level: "global",
-            url: "https://leetcode.com/contest",
-            description: "Live 90-minute algorithmic competition with global rank leaderboard and prizes.",
-            facultyRecommended: false,
+            url: "https://hackharvard.org",
+            description: "Global collegiate hackathon uniting student builders to create impactful hardware and software solutions.",
+            facultyRecommended: true,
             createdDate: "Today"
           },
           {
@@ -354,7 +370,7 @@ export default function Home() {
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
-            const activeOnly = parsed.filter((o: any) => !isDatePassed(o.deadline) && !o.url?.includes("uber-hacktag"));
+            const activeOnly = parsed.filter((o: any) => !isDatePassed(o.deadline) && !o.url?.includes("uber-hacktag") && !isContestItem(o));
             setOpportunities(activeOnly.length > 0 ? activeOnly : defaultOpps);
           } catch {
             setOpportunities(defaultOpps);
@@ -369,22 +385,24 @@ export default function Home() {
           .then(res => res.json())
           .then(data => {
             if (data.events && Array.isArray(data.events) && data.events.length > 0) {
-              const liveMapped = data.events.map((ev: any, idx: number) => ({
-                id: ev.id || `live_opp_${idx}`,
-                title: ev.title,
-                category: ev.category || "hackathon",
-                deadline: ev.deadline,
-                location: ev.location || "online",
-                level: ev.level || "national",
-                url: ev.url || "https://unstop.com",
-                description: ev.description || `${ev.title}. Verified event opportunity.`,
-                facultyRecommended: ev.facultyRecommended ?? true,
-                createdDate: "Live"
-              }));
+              const liveMapped = data.events
+                .filter((ev: any) => !isContestItem(ev))
+                .map((ev: any, idx: number) => ({
+                  id: ev.id || `live_opp_${idx}`,
+                  title: ev.title,
+                  category: ev.category || "hackathon",
+                  deadline: ev.deadline,
+                  location: ev.location || "online",
+                  level: ev.level || "national",
+                  url: ev.url || "https://unstop.com",
+                  description: ev.description || `${ev.title}. Verified event opportunity.`,
+                  facultyRecommended: ev.facultyRecommended ?? true,
+                  createdDate: "Live"
+                }));
               setOpportunities(prev => {
                 const existingTitles = new Set(prev.map(p => p.title.toLowerCase()));
                 const filteredNew = liveMapped.filter((lm: any) => !existingTitles.has(lm.title.toLowerCase()));
-                const merged = [...filteredNew, ...prev];
+                const merged = [...filteredNew, ...prev.filter(p => !isContestItem(p))];
                 return merged;
               });
             }
@@ -399,7 +417,7 @@ export default function Home() {
               setOpportunities(prev => {
                 const existingUrls = new Set(prev.map(p => p.url));
                 const newRecs = data.recommendations
-                  .filter((r: any) => !existingUrls.has(r.url))
+                  .filter((r: any) => !existingUrls.has(r.url) && !isContestItem(r))
                   .map((r: any) => ({
                     ...r,
                     facultyRecommended: true,
@@ -1014,8 +1032,10 @@ export default function Home() {
       try {
         const targetUuid = getWorkspaceUuid(idToRemove);
         await Promise.allSettled([
-          supabase.from("project_members").delete().eq("project_space_id", idToRemove).eq("profile_id", user.id),
-          supabase.from("project_members").delete().eq("project_space_id", targetUuid).eq("profile_id", user.id)
+          deleteWallCalendarEvent(idToRemove, user.id),
+          deleteWallCalendarEvent(targetUuid, user.id),
+          supabase.from("project_members").delete().or(`project_space_id.eq.${idToRemove},project_space_id.eq.${targetUuid}`).eq("profile_id", user.id),
+          supabase.from("wall_calendar_events").delete().or(`source_id.eq.${idToRemove},source_id.eq.${targetUuid}`).eq("user_id", user.id)
         ]);
       } catch (e) {
         console.error("Failed removing workspace in DB:", e);
@@ -2170,13 +2190,8 @@ export default function Home() {
                             });
                           }
 
-                          // Sort strictly chronologically by calendar date
-                          return list.slice().sort((a, b) => {
-                            const timeA = new Date(a.deadline).getTime();
-                            const timeB = new Date(b.deadline).getTime();
-                            if (isNaN(timeA) || isNaN(timeB)) return 0;
-                            return timeA - timeB;
-                          });
+                          // Keep natural round sequence
+                          return list;
                         })();
 
                         const lastStageDeadline = stageObjects[stageObjects.length - 1]?.deadline || ev.deadline;
@@ -2311,7 +2326,10 @@ export default function Home() {
                                   </span>
                                   <span className="text-xs text-txt-main font-medium font-mono flex items-center gap-1">
                                     <Calendar size={11} className="text-accent-main" />
-                                    {activeStageObj?.deadline || ev.deadline || "Ongoing"}
+                                    {(() => {
+                                      const d = activeStageObj?.deadline || ev.deadline || "Ongoing";
+                                      return d.replace(/^(Completed\s*\(?|Target\s*)/i, "").replace(/\)$/, "").trim() || "Ongoing";
+                                    })()}
                                   </span>
                                 </div>
                               </div>
@@ -2376,11 +2394,20 @@ export default function Home() {
                                           ? "text-accent-main/90 font-medium"
                                           : "text-txt-muted/60"
                                       }`}>
-                                        {stgObj.deadline === "Date not specified" || stgObj.deadline === "TBD"
-                                          ? "Date not specified"
-                                          : isCompleted
-                                          ? `Completed (${stgObj.deadline})`
-                                          : `Target ${stgObj.deadline}`}
+                                        {(() => {
+                                          const rawDeadline = stgObj.deadline || "Target Active";
+                                          const clean = rawDeadline
+                                            .replace(/^(Completed\s*\(?|Target\s*)/i, "")
+                                            .replace(/\)$/, "")
+                                            .trim();
+                                          if (!clean || clean === "Date not specified" || clean === "TBD") {
+                                            return "Date not specified";
+                                          }
+                                          if (isLastStageCompleted || isCompleted) {
+                                            return clean === "Active" || clean === "Ongoing" ? "Completed" : `Completed (${clean})`;
+                                          }
+                                          return clean === "Active" ? "Target Active" : `Target ${clean}`;
+                                        })()}
                                       </span>
                                     </div>
                                   );

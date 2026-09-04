@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "../../components/Header";
 import LynDeskLoadingCard from "../../components/LynDeskLoadingCard";
+import { deleteWallCalendarEvent } from "../../lib/wallCalendarSync";
 import { 
   ArrowLeft, 
   Paperclip, 
@@ -19,40 +20,38 @@ import {
   MicOff, 
   Video, 
   VideoOff, 
-  Phone,
-  PhoneOff,
-  UserPlus,
+  Phone, 
+  PhoneOff, 
+  UserPlus, 
   FolderDown, 
   ExternalLink, 
   CheckCircle2, 
   Clock, 
-  CloudUpload,
-  Terminal,
-  Award,
-  Plus,
-  X,
-  LogOut,
-  AlertCircle,
-  Edit2,
-  Sparkles,
-  Eye,
-  Edit3,
-  Check,
-  FileText,
-  Download,
-  Monitor,
-  Tablet,
-  Smartphone,
-  RefreshCw,
-  Trash2,
-  User,
-  Users,
-  Layers,
-  Lock,
-  Unlock
+  CloudUpload, 
+  Terminal, 
+  Award, 
+  Plus, 
+  X, 
+  LogOut, 
+  AlertCircle, 
+  Edit2, 
+  Sparkles, 
+  Eye, 
+  Edit3, 
+  Check, 
+  FileText, 
+  Download, 
+  Monitor, 
+  Tablet, 
+  Smartphone, 
+  RefreshCw, 
+  Trash2, 
+  User, 
+  Users, 
+  Layers, 
+  Lock, 
+  Unlock 
 } from "lucide-react";
-
-
 
 const getUniqueId = (prefix: string = "id") => {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -147,7 +146,10 @@ const generateSessionId = () => Math.random().toString(36).substring(2, 11);
 function isDatePassed(dateStr?: string | null): boolean {
   if (!dateStr) return false;
   const clean = dateStr.trim().toLowerCase();
-  if (clean.includes("target") || clean.includes("ongoing") || clean.includes("active") || clean.includes("none") || clean.includes("not specified") || clean.includes("tbd") || clean.includes("date not") || clean.includes("to be announced")) {
+  if (clean.startsWith("completed") || clean.includes("(completed)")) {
+    return true;
+  }
+  if (clean.includes("ongoing") || clean.includes("none") || clean.includes("not specified") || clean.includes("tbd") || clean.includes("date not") || clean.includes("to be announced")) {
     return false;
   }
 
@@ -2915,18 +2917,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
         const { data: existing } = await supabase
           .from("project_spaces")
           .select("id")
-          .eq("id", workspaceUuid)
+          .or(`id.eq.${workspaceUuid},id.eq.${id}`)
           .maybeSingle();
 
         if (existing) {
           await supabase
             .from("project_spaces")
             .update({ github_repo: cleanGit })
-            .eq("id", workspaceUuid);
+            .eq("id", existing.id);
         } else {
           await supabase
             .from("project_spaces")
-            .insert({
+            .upsert({
               id: workspaceUuid,
               github_repo: cleanGit,
               project_name: projectName || "Shared Workspace",
@@ -3466,9 +3468,10 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 const isCompleted = isPassed || idx < activeIdx;
                 const isActive = !isCompleted && idx === activeIdx;
 
+                let cleanDisplayDate = liveDate.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
                 const displayDate = isCompleted
-                  ? `Completed (${liveDate})`
-                  : `Target ${liveDate}`;
+                  ? `Completed (${cleanDisplayDate || liveDate})`
+                  : `Target ${cleanDisplayDate || liveDate}`;
 
                 return (
                   <div 
@@ -3484,7 +3487,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                         <div className="absolute -inset-0.5 rounded-full bg-emerald-500/15 blur-[2px] pointer-events-none" />
                       )}
 
-                      <div className={`relative z-10 h-4 w-4 rounded-full border-[1.5px] bg-bg-surface flex items-center justify-center transition-all duration-300 ${
+                      <div className={`relative z-10 h-4 w-4 rounded-full border-[1.5px] flex items-center justify-center transition-all duration-300 ${
                         isCompleted
                           ? "border-emerald-500 bg-emerald-500/20 shadow-[0_0_5px_rgba(16,185,129,0.18)]"
                           : isActive
@@ -3492,8 +3495,8 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                           : "border-border-main/60 bg-bg-base/60"
                       }`}>
                         {isCompleted ? (
-                          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                            <CheckCircle2 size={10} className="text-emerald-400 fill-emerald-500/30" />
+                          <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex items-center justify-center">
+                            <Check size={9} strokeWidth={3} className="text-emerald-400" />
                           </motion.div>
                         ) : isActive ? (
                           <span className="w-1.5 h-1.5 rounded-full bg-accent-main animate-pulse shrink-0" />
@@ -4921,6 +4924,16 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                   setShowLeaveConfirmModal(false);
                   try {
                     if (user) {
+                      await Promise.allSettled([
+                        deleteWallCalendarEvent(id, user.id),
+                        deleteWallCalendarEvent(workspaceUuid, user.id),
+                        supabase
+                          .from("wall_calendar_events")
+                          .delete()
+                          .or(`source_id.eq.${id},source_id.eq.${workspaceUuid}`)
+                          .eq("user_id", user.id)
+                      ]);
+
                       fetch("/api/workspace/leave", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

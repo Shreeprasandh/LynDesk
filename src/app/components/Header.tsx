@@ -61,6 +61,9 @@ export default function Header() {
 
   const isNavActive = (targetPath: string) => {
     if (targetPath === "/") return pathname === "/";
+    if (targetPath === "/coding-desk" || targetPath === "/coding-deck") {
+      return pathname === "/coding-desk" || pathname.startsWith("/coding-desk/") || pathname === "/coding-deck" || pathname.startsWith("/coding-deck/");
+    }
     return pathname === targetPath || pathname.startsWith(`${targetPath}/`);
   };
 

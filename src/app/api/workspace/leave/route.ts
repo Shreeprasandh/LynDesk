@@ -40,13 +40,19 @@ export async function POST(req: Request) {
 
     const targetSpaceIds = [workspaceId, workspaceUuid].filter(Boolean);
 
-    // 1. Delete member from project_members table for all target space IDs
+    // 1. Delete member from project_members and wall_calendar_events tables for all target space IDs
     for (const spaceId of targetSpaceIds) {
       await supabaseAdmin
         .from("project_members")
         .delete()
         .eq("project_space_id", spaceId)
         .eq("profile_id", userId);
+
+      await supabaseAdmin
+        .from("wall_calendar_events")
+        .delete()
+        .eq("source_id", spaceId)
+        .eq("user_id", userId);
     }
 
     // 2. Broadcast member_left event via WebSockets Realtime bus
