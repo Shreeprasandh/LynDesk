@@ -1,6 +1,6 @@
 # 🌑 THE SEVEN SHADOWS: Master Security & Architecture Report
 
-**Last Scan**: 4/9/2026, 8:57:45 pm
+**Last Scan**: 4/9/2026, 10:06:58 pm
 **Files Inspected**: 235
 **Active Target**: ALL 7 SHADOWS (Full Grid)
 
@@ -9,7 +9,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | 🕵️‍♂️ **Alpha** | 🔐 Secure Authentication & Logic | Next.js 16 Async, Auth Secrets & Sessions | **1** | ⚠️ Action Required |
 | 🛡️ **Beta** | 🔑 Secret & Credential Sentinel | API Keys, DB Secrets & Client Leaks | **2** | 🚨 Critical Risk |
-| 🎯 **Gamma** | 🧹 Input Validation & Schema Parity | Zod Runtime Validation, XSS & SQLi Defense | **23** | ⚠️ Check Payloads |
+| 🎯 **Gamma** | 🧹 Input Validation & Schema Parity | Zod Runtime Validation, XSS & SQLi Defense | **22** | ⚠️ Check Payloads |
 | ♿ **Delta** | ♿ UI & Accessibility Inspector | WCAG Standards, ARIA & Image Alt Tags | **1** | ♿ Check A11y |
 | 🧪 **Epsilon** | 🚀 Deployment, Headers & Tests | Security Headers, CSP & Route Test Suites | **0** | ✅ Covered |
 | ⚡ **Zeta** | 🤖 Rate-Limiting & Anti-Abuse | Bot Throttling, DoS Defense & Log Cleanliness | **3** | 💡 User Review |
@@ -33,7 +33,7 @@
 - **Leak**: Hardcoded API key or private secret detected in source code
 - **Risk**: CRITICAL - Secrets must reside strictly in server-only process.env or .env.mcp
 
-## 🎯 3. Gamma (Schema & Input Validation Sentinel) Findings (23)
+## 🎯 3. Gamma (Schema & Input Validation Sentinel) Findings (22)
 
 ### 1. `scripts/mob_audit.js:209`
 - **Issue**: `dangerouslySetInnerHTML` usage detected
@@ -87,49 +87,45 @@
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 14. `src/app/api/institutional/verify/route.ts:1`
+### 14. `src/app/api/notifications/send/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 15. `src/app/api/notifications/send/route.ts:1`
+### 15. `src/app/api/recruiter/export/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 16. `src/app/api/recruiter/export/route.ts:1`
+### 16. `src/app/api/recruiter/login/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 17. `src/app/api/recruiter/login/route.ts:1`
+### 17. `src/app/api/user/applied-hackathons/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 18. `src/app/api/user/applied-hackathons/route.ts:1`
+### 18. `src/app/api/user/broadcasts/read/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 19. `src/app/api/user/broadcasts/read/route.ts:1`
+### 19. `src/app/api/user/notifications/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 20. `src/app/api/user/notifications/route.ts:1`
+### 20. `src/app/api/vanguardz/connect/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 21. `src/app/api/vanguardz/connect/route.ts:1`
+### 21. `src/app/api/workspace/leave/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
-### 22. `src/app/api/workspace/leave/route.ts:1`
-- **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
-- **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
-
-### 23. `src/app/api/workspace/presence/route.ts:1`
+### 22. `src/app/api/workspace/presence/route.ts:1`
 - **Issue**: API Route Handler parses JSON body without runtime Zod schema validation
 - **Impact**: Vulnerable to malformed payloads, type-confusion bugs, and unvalidated parameter injection.
 
 ## ♿ 4. Delta (UI & Accessibility Inspector) Findings (1)
 
-### 1. `src/app/workspace/[id]/page.tsx:4565`
+### 1. `src/app/workspace/[id]/page.tsx:4493`
 - **Issue**: Icon button missing `aria-label` attribute
 - **Impact**: Screen readers cannot announce button action to assistive technology users.
 
