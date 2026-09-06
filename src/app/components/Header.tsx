@@ -47,7 +47,7 @@ interface NotificationItem {
 
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
-  const { user, userRole, profileAvatar, loading, signOut } = useAuth();
+  const { user, userRole, profileAvatar, loading, signOut, userProfile } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,6 +55,7 @@ export default function Header() {
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
   const isFaculty = userRole === "coordinator";
   const isRecruiter = userRole === "recruiter";
+  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer";
 
   const pathname = usePathname();
   const router = useRouter();
@@ -1341,11 +1342,20 @@ const POPULAR_LOCATIONS = [
         {/* Right Controls Area containing Navigation & Icons */}
         <div className="flex items-center gap-6">
           {/* Navigation Links */}
-          {user && (
+          {loading && !user ? (
+            <div className="hidden lg:flex items-center gap-6">
+              <div className="w-14 h-3 bg-border-main/40 rounded-full animate-pulse" />
+              <div className="w-16 h-3 bg-border-main/40 rounded-full animate-pulse" />
+              <div className="w-14 h-3 bg-border-main/40 rounded-full animate-pulse" />
+              <div className="w-12 h-3 bg-border-main/40 rounded-full animate-pulse" />
+            </div>
+          ) : user ? (
             <nav className="hidden lg:flex items-center gap-6 font-mono text-[10px] uppercase tracking-wider">
               {isFaculty ? (
                 <>
                   <Link href="/coordinator?tab=overview" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Overview</Link>
+                  <Link href="/coordinator?tab=attendance_marker" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Attendance</Link>
+                  <Link href="/coordinator?tab=marks_entry" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Marks Entry</Link>
                   <Link href="/coordinator?tab=talent_registry" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Talent Registry</Link>
                   <Link href="/coordinator?tab=broadcasts" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Broadcasts</Link>
                   <Link href="/coordinator?tab=verifications" className={`pb-0.5 transition-opacity ${isNavActive("/coordinator") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Claims Queue</Link>
@@ -1359,6 +1369,9 @@ const POPULAR_LOCATIONS = [
               ) : (
                 <>
                   <Link href="/" className={`pb-0.5 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
+                  {!isDeveloper && (
+                    <Link href="/college-desk" className={`pb-0.5 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
+                  )}
                   <Link href="/event-desk" className={`pb-0.5 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                   <Link href="/coding-desk" className={`pb-0.5 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                   <Link href="/study-desk" className={`pb-0.5 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
@@ -1366,7 +1379,7 @@ const POPULAR_LOCATIONS = [
                 </>
               )}
             </nav>
-          )}
+          ) : null}
 
           {/* Separator Line */}
           <div className="hidden lg:block w-[1px] h-4 bg-border-main/60" />
@@ -1410,7 +1423,9 @@ const POPULAR_LOCATIONS = [
               </button>
             )}
             
-            {user && (
+            {loading && !user ? (
+              <div className="w-8 h-8 rounded-full bg-border-main/40 animate-pulse shrink-0" />
+            ) : user ? (
               <>
                 <Link 
                   href="/profile"
@@ -1441,7 +1456,7 @@ const POPULAR_LOCATIONS = [
                   <Menu size={14} />
                 </button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </header>
@@ -1476,6 +1491,8 @@ const POPULAR_LOCATIONS = [
                 {isFaculty ? (
                   <>
                     <Link href="/coordinator?tab=overview" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Overview</Link>
+                    <Link href="/coordinator?tab=attendance_marker" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Attendance</Link>
+                    <Link href="/coordinator?tab=marks_entry" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Marks Entry</Link>
                     <Link href="/coordinator?tab=talent_registry" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Talent Registry</Link>
                     <Link href="/coordinator?tab=broadcasts" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Broadcasts</Link>
                     <Link href="/coordinator?tab=verifications" onClick={() => setMobileMenuOpen(false)} className="text-txt-sub hover:text-txt-main transition-colors py-1 border-b border-border-main/30">Claims Queue</Link>
@@ -1489,6 +1506,9 @@ const POPULAR_LOCATIONS = [
                 ) : (
                   <>
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
+                    {!isDeveloper && (
+                      <Link href="/college-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
+                    )}
                     <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                     <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                     <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>

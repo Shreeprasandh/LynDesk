@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
-export type UserRole = "student" | "recruiter" | "coordinator";
+export type UserRole = "student" | "developer" | "recruiter" | "coordinator";
 
 export interface UserProfileData {
   id: string;
@@ -32,8 +32,11 @@ export interface UserProfileData {
   graduation_year?: string;
   roll_number?: string;
   batch_code?: string;
+  academic_year?: string;
+  section?: string;
   college_linked_status?: string;
   institute_id?: string;
+  persona?: "developer" | "student";
 }
 
 export type AuthStatus = "idle" | "syncing" | "ending";
@@ -60,10 +63,65 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const resolveRole = (u: User | null): UserRole => {
+  const metaRole = u?.user_metadata?.role || u?.user_metadata?.persona;
+  if (metaRole === "recruiter" || metaRole === "employee" || u?.user_metadata?.company_key) return "recruiter";
+  if (metaRole === "coordinator" || metaRole === "faculty" || u?.user_metadata?.registered_staff) return "coordinator";
+  if (metaRole === "developer" || metaRole === "solo") return "developer";
+  return "student";
+};
+
+// 🏛️ Industry Gold-Standard: Synchronous Fast-Boot Pre-Hydration
+function getFastBootAuth(): { user: User | null; session: Session | null; role: UserRole; hasFastBoot: boolean } {
+  if (typeof window === "undefined") {
+    return { user: null, session: null, role: "student", hasFastBoot: false };
+  }
+  try {
+    // 1. Direct LynDesk fast-boot cache
+    const direct = localStorage.getItem("ldk_cached_auth_session");
+    if (direct) {
+      const parsed = JSON.parse(direct);
+      if (parsed?.user?.id) {
+        return {
+          user: parsed.user as User,
+          session: parsed.session as Session,
+          role: resolveRole(parsed.user),
+          hasFastBoot: true
+        };
+      }
+    }
+
+    // 2. Scan Supabase internal storage tokens (sb-*-auth-token)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && ((key.startsWith("sb-") && key.endsWith("-auth-token")) || key === "supabase.auth.token")) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const sessionObj = parsed?.currentSession || parsed;
+          const userObj = sessionObj?.user || parsed?.user;
+          if (userObj && userObj.id) {
+            return {
+              user: userObj as User,
+              session: sessionObj as Session,
+              role: resolveRole(userObj),
+              hasFastBoot: true
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Graceful fallback on restricted browsing environments / storage quota exceptions
+  }
+  return { user: null, session: null, role: "student", hasFastBoot: false };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>("student");
+  const initialAuth = getFastBootAuth();
+  const [user, setUser] = useState<User | null>(initialAuth.user);
+  const [session, setSession] = useState<Session | null>(initialAuth.session);
+  const [userRole, setUserRole] = useState<UserRole>(initialAuth.role);
   const [userProfile, setUserProfile] = useState<UserProfileData | null>(null);
   const [profileAvatar, setProfileAvatar] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -76,40 +134,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return "";
   });
-  const [loading, setLoading] = useState(true);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>("syncing");
-  const [authStatusMessage, setAuthStatusMessage] = useState<string>("Syncing session...");
+  const [loading, setLoading] = useState<boolean>(!initialAuth.hasFastBoot);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(initialAuth.hasFastBoot ? "idle" : "syncing");
+  const [authStatusMessage, setAuthStatusMessage] = useState<string>(initialAuth.hasFastBoot ? "" : "Syncing session...");
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-
-  const resolveRole = (u: User | null): UserRole => {
-    const metaRole = u?.user_metadata?.role;
-    if (metaRole === "recruiter" || metaRole === "employee" || u?.user_metadata?.company_key) return "recruiter";
-    if (metaRole === "coordinator" || metaRole === "faculty" || u?.user_metadata?.registered_staff) return "coordinator";
-    return "student";
-  };
 
   useEffect(() => {
     let isMounted = true;
 
-    // Safety fallback: ensure loading never hangs beyond 350ms
-    const safetyTimer = setTimeout(() => {
-      if (isMounted) {
-        setAuthStatus("idle");
-        setAuthStatusMessage("");
-        setLoading(false);
-      }
-    }, 350);
-
-    // 1. Check initial active session
+    // 1. Authoritative background session validation (SWR pattern) without brittle timeouts
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
-      clearTimeout(safetyTimer);
       setSession(session);
       setUser(session?.user ?? null);
       setUserRole(resolveRole(session?.user ?? null));
       setAuthStatus("idle");
       setAuthStatusMessage("");
       setLoading(false);
+
+      if (session?.user) {
+        try {
+          localStorage.setItem("ldk_cached_auth_session", JSON.stringify({ user: session.user, session }));
+        } catch {}
+      } else {
+        try {
+          localStorage.removeItem("ldk_cached_auth_session");
+        } catch {}
+      }
 
       if (session && typeof window !== "undefined") {
         if (window.location.search.includes("code=") || window.location.hash.includes("access_token=")) {
@@ -124,10 +175,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // 2. Listen for authentication state changes
+    // 2. Listen for authentication state changes (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
-      clearTimeout(safetyTimer);
       if (session) {
         setSession(session);
         setUser(session.user);
@@ -135,6 +185,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthStatus("idle");
         setAuthStatusMessage("");
         setLoading(false);
+        try {
+          localStorage.setItem("ldk_cached_auth_session", JSON.stringify({ user: session.user, session }));
+        } catch {}
+
         if (typeof window !== "undefined") {
           const isFirstTime = localStorage.getItem("ldk_first_time_signup");
           if (isFirstTime === "true") {
@@ -178,7 +232,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
@@ -373,7 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await supabase
           .from("profiles")
-          .select("id, full_name, username, avatar_url, academic_credits, department, college_key, bio, skills, github_url, linkedin_url, portfolio_url, leetcode_username, college_linked_status, institute_id, roll_number, college_name, graduation_year, batch_code")
+          .select("id, full_name, username, avatar_url, academic_credits, department, college_key, bio, skills, github_url, linkedin_url, portfolio_url, leetcode_username, college_linked_status, institute_id, roll_number, college_name, graduation_year, batch_code, academic_year, section, persona")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -397,7 +450,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             college_name: data.college_name,
             roll_number: data.roll_number,
             graduation_year: data.graduation_year,
-            batch_code: data.batch_code
+            batch_code: data.batch_code,
+            academic_year: data.academic_year,
+            section: data.section,
+            persona: (data.persona as "developer" | "student") || (user.user_metadata?.role === "developer" ? "developer" : "student")
           };
           setUserProfile(profData);
 

@@ -4490,10 +4490,18 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                               placeholder="Enter slot name..."
                               autoFocus
                             />
-                            <button onClick={() => saveSlotName(slotIdx)} className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer shrink-0">
+                            <button 
+                              onClick={() => saveSlotName(slotIdx)} 
+                              aria-label="Save slot name"
+                              className="p-1 text-emerald-400 hover:bg-emerald-500/10 rounded cursor-pointer shrink-0"
+                            >
                               <Check size={14} />
                             </button>
-                            <button onClick={() => setEditingSlotIndex(null)} className="p-1 text-txt-muted hover:bg-bg-card rounded cursor-pointer shrink-0">
+                            <button 
+                              onClick={() => setEditingSlotIndex(null)} 
+                              aria-label="Cancel editing slot name"
+                              className="p-1 text-txt-muted hover:bg-bg-card rounded cursor-pointer shrink-0"
+                            >
                               <X size={14} />
                             </button>
                           </div>
@@ -4508,6 +4516,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                                 setEditingSlotIndex(slotIdx);
                                 setTempSlotName(defaultSlotTitle);
                               }}
+                              aria-label="Edit slot name"
                               className="opacity-80 lg:opacity-0 group-hover:opacity-100 transition-opacity text-txt-muted hover:text-txt-main p-1 cursor-pointer shrink-0"
                             >
                               <Edit3 size={12} />

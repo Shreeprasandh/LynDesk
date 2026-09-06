@@ -183,12 +183,13 @@ const DEFAULT_EVENTS: OpportunityItem[] = [
 ];
 
 export default function ExplorePage() {
-  const { user, userProfile, loading: authLoading, authStatusMessage } = useAuth();
+  const { user, userProfile, userRole, loading: authLoading, authStatusMessage } = useAuth();
   const { showToast } = useToast();
 
+  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer";
   const isCollegeLinked = userProfile?.college_linked_status === "linked" && !!userProfile?.institute_id;
 
-  // Two Main Sub-Tabs: "events" | "friends"
+  // Two Main Sub-Tabs: "events" | "friends" | "works"
   const [activeTab, setActiveTab] = useState<"events" | "friends" | "works">("events");
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [hasActivePreset, setHasActivePreset] = useState(false);
@@ -1041,17 +1042,19 @@ export default function ExplorePage() {
                   <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse ml-0.5" />
                 )}
               </button>
-              <button
-                onClick={() => setActiveTab("works")}
-                className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === "works"
-                    ? "bg-accent-main text-bg-base font-semibold shadow-xs"
-                    : "text-txt-sub hover:text-txt-main"
-                }`}
-              >
-                <Palette size={13} />
-                Works Hub
-              </button>
+              {!isDeveloper && (
+                <button
+                  onClick={() => setActiveTab("works")}
+                  className={`px-4 py-2 rounded-sm transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === "works"
+                      ? "bg-accent-main text-bg-base font-semibold shadow-xs"
+                      : "text-txt-sub hover:text-txt-main"
+                  }`}
+                >
+                  <Palette size={13} />
+                  Works Hub
+                </button>
+              )}
             </div>
           </div>
         </div>

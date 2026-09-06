@@ -1,5 +1,24 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { checkRateLimit } from "@/app/lib/rateLimit";
+import { z } from "zod";
+
+const SourceFileSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional().default("Document"),
+  type: z.string().optional().default("text"),
+  rawTextPreview: z.string().optional().default("")
+});
+
+const GenerateLessonsSchema = z.object({
+  pathTitle: z.string().optional().default(""),
+  pathDescription: z.string().optional().default(""),
+  subtopics: z.string().optional().default(""),
+  depthMode: z.enum(["sprint", "standard", "deep"]).optional().default("standard"),
+  learningStyle: z.string().optional().default("balanced"),
+  creationMode: z.string().optional().default("prompt"),
+  files: z.array(SourceFileSchema).optional().default([])
+});
 
 interface SourceFileInput {
   id?: string;
@@ -222,16 +241,33 @@ function generateFallbackSections(
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "study_student";
+    const rateLimit = checkRateLimit(`gen_lessons_${clientIp}`, 10, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Generation rate limit exceeded (10 calls/min). Please retry in ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
+    const rawBody = await req.json();
+    const parsed = GenerateLessonsSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request payload", details: parsed.error.format() },
+        { status: 400 }
+      );
+    }
+
     const { 
       pathTitle, 
       pathDescription, 
-      subtopics = "", 
-      depthMode = "standard", 
-      learningStyle = "balanced",
-      creationMode = "prompt",
-      files = [] 
-    } = body;
+      subtopics, 
+      depthMode, 
+      learningStyle, 
+      creationMode, 
+      files 
+    } = parsed.data;
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
     const groqApiKey = process.env.GROQ_API_KEY;

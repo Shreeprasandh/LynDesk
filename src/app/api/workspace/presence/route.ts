@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/app/lib/supabaseServer";
 import { getWorkspaceUuid } from "@/app/lib/workspaceUtils";
+import { z } from "zod";
+
+const PresenceQuerySchema = z.object({
+  workspaceId: z.string().min(1, "workspaceId is required")
+});
+
+const PresencePostSchema = z.object({
+  workspaceId: z.string().min(1, "workspaceId is required"),
+  userId: z.string().min(1, "userId is required"),
+  statusText: z.string().max(100).optional(),
+  isOnline: z.boolean().optional()
+});
 
 export async function GET(req: NextRequest) {
   const urlParams = req.nextUrl.searchParams;
-  const workspaceId = urlParams.get("workspaceId");
+  const parsed = PresenceQuerySchema.safeParse({
+    workspaceId: urlParams.get("workspaceId")
+  });
 
-  if (!workspaceId) {
-    return NextResponse.json({ error: "Missing workspaceId" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Missing or invalid workspaceId" }, { status: 400 });
   }
+
+  const { workspaceId } = parsed.data;
 
   const targetUuid = getWorkspaceUuid(workspaceId);
   const supabaseAdmin = createAdminClient();
@@ -84,11 +100,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { workspaceId, userId, statusText, isOnline } = body;
-
-    if (!workspaceId || !userId) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    const parsed = PresencePostSchema.safeParse(body);
+    
+    if (!parsed.success) {
+      return NextResponse.json({ 
+        error: "Invalid request payload", 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
+
+    const { workspaceId, userId, statusText, isOnline } = parsed.data;
 
     const supabaseAdmin = createAdminClient();
     const targetUuid = getWorkspaceUuid(workspaceId);

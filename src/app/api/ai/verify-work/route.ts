@@ -3,6 +3,17 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createAdminClient } from "@/app/lib/supabaseServer";
 import { verifyInstitutionalToken, INSTITUTIONAL_COOKIE_NAMES } from "@/app/lib/institutionalAuth";
 import { isSafeExternalUrl } from "@/app/lib/sanitize";
+import { checkRateLimit } from "@/app/lib/rateLimit";
+import { z } from "zod";
+
+const VerifyWorkSchema = z.object({
+  work_id: z.string().min(1, "work_id is required"),
+  url: z.string().optional(),
+  claimed_title: z.string().optional(),
+  claimed_description: z.string().optional(),
+  student_name: z.string().optional(),
+  student_enrollment_year: z.number().optional()
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -10,11 +21,11 @@ import { isSafeExternalUrl } from "@/app/lib/sanitize";
 
 interface VerifyWorkBody {
   work_id: string;
-  url: string;
-  claimed_title: string;
-  claimed_description: string;
-  student_name: string;
-  student_enrollment_year: number;
+  url?: string;
+  claimed_title?: string;
+  claimed_description?: string;
+  student_name?: string;
+  student_enrollment_year?: number;
 }
 
 interface GeminiVerdict {
@@ -99,16 +110,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    // ── Parse body ──────────────────────────────────────────────────────────
-    const body = (await req.json()) as Partial<VerifyWorkBody>;
-    const { work_id } = body;
-
-    if (!work_id) {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "staff_auditor";
+    const rateLimit = checkRateLimit(`verify_work_${clientIp}`, 10, 60000);
+    if (!rateLimit.success) {
       return NextResponse.json(
-        { error: "Missing required field: work_id." },
+        { error: `Rate limit exceeded (10 calls/min). Please retry in ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
+    // ── Parse body ──────────────────────────────────────────────────────────
+    const rawBody = await req.json();
+    const parsed = VerifyWorkSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid request payload", details: parsed.error.format() },
         { status: 400 }
       );
     }
+
+    const body = parsed.data;
+    const { work_id } = body;
 
     const admin = createAdminClient();
 

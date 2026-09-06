@@ -21,7 +21,8 @@ async function fetchCodeforcesEvents(): Promise<IngestedEvent[]> {
   try {
     const res = await fetch("https://codeforces.com/api/contest.list", {
       next: { revalidate: 3600 },
-      headers: { "User-Agent": "LynDesk-Ingest/1.0" }
+      headers: { "User-Agent": "LynDesk-Ingest/1.0" },
+      signal: AbortSignal.timeout(1500)
     });
     if (!res.ok) return [];
     const data = await res.json();
@@ -41,8 +42,7 @@ async function fetchCodeforcesEvents(): Promise<IngestedEvent[]> {
         faculty_recommended: false
       };
     });
-  } catch (err) {
-    console.warn("[Sync] Codeforces fetch error:", err);
+  } catch {
     return [];
   }
 }
@@ -58,7 +58,8 @@ async function fetchLeetCodeEvents(): Promise<IngestedEvent[]> {
       },
       body: JSON.stringify({
         query: "query { upcomingContests { title titleSlug startTime duration } }"
-      })
+      }),
+      signal: AbortSignal.timeout(1500)
     });
     if (!res.ok) return [];
     const data = await res.json();

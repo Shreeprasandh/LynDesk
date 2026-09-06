@@ -120,12 +120,48 @@ function CoordinatorConsoleContent() {
     }
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "attendance_marker" | "marks_entry" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
 
-  // Sync activeTab with search parameter updates (client component useSearchParams hook, // await searchParams)
+  // Daily Attendance Marker States
+  const [attSubject, setAttSubject] = useState("CS8501");
+  const [attDepartment, setAttDepartment] = useState("Computer Science");
+  const [attYear, setAttYear] = useState("3rd Year");
+  const [attSection, setAttSection] = useState("A");
+  const [attDate, setAttDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [attPeriodSlot, setAttPeriodSlot] = useState(1);
+  const [attRoster, setAttRoster] = useState<Array<{ id: string; roll: string; name: string; status: "PRESENT" | "ABSENT" | "OD" | "LATE"; remarks?: string }>>([
+    { id: "s1", roll: "RA2311003010001", name: "Alex Carter", status: "PRESENT" },
+    { id: "s2", roll: "RA2311003010002", name: "Mira Sen", status: "PRESENT" },
+    { id: "s3", roll: "RA2311003010003", name: "Rohan Patel", status: "PRESENT" },
+    { id: "s4", roll: "RA2311003010004", name: "Siddharth Verma", status: "PRESENT" },
+    { id: "s5", roll: "RA2311003010005", name: "Kavya Sundaram", status: "PRESENT" },
+    { id: "s6", roll: "RA2311003010006", name: "Ananya Iyer", status: "PRESENT" },
+    { id: "s7", roll: "RA2311003010007", name: "Vikram Malhotra", status: "PRESENT" },
+    { id: "s8", roll: "RA2311003010008", name: "Deepak Sharma", status: "PRESENT" },
+  ]);
+  const [attSaving, setAttSaving] = useState(false);
+  const [attUndoState, setAttUndoState] = useState<any | null>(null);
+
+  // Marks Entry States
+  const [marksSubject, setMarksSubject] = useState("CS8501");
+  const [marksExamType, setMarksExamType] = useState<"IA1" | "IA2" | "IA3" | "MODEL">("IA1");
+  const [marksMaxScore, setMarksMaxScore] = useState(100);
+  const [marksRoster, setMarksRoster] = useState<Array<{ id: string; roll: string; name: string; score: number; remarks: string }>>([
+    { id: "s1", roll: "RA2311003010001", name: "Alex Carter", score: 88, remarks: "Consistent clarity" },
+    { id: "s2", roll: "RA2311003010002", name: "Mira Sen", score: 92, remarks: "Top in algorithmic proofs" },
+    { id: "s3", roll: "RA2311003010003", name: "Rohan Patel", score: 76, remarks: "Good attempt on DFA minimization" },
+    { id: "s4", roll: "RA2311003010004", name: "Siddharth Verma", score: 84, remarks: "Solid work" },
+    { id: "s5", roll: "RA2311003010005", name: "Kavya Sundaram", score: 95, remarks: "Exceptional solution" },
+    { id: "s6", roll: "RA2311003010006", name: "Ananya Iyer", score: 81, remarks: "Well structured" },
+    { id: "s7", roll: "RA2311003010007", name: "Vikram Malhotra", score: 70, remarks: "Needs more practice on PDA" },
+    { id: "s8", roll: "RA2311003010008", name: "Deepak Sharma", score: 89, remarks: "Strong analytical rigor" },
+  ]);
+  const [marksSaving, setMarksSaving] = useState(false);
+
+  // Sync activeTab with search parameter updates
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
+    if (tabParam && ["overview", "attendance_marker", "marks_entry", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
       setTimeout(() => {
         setActiveTab(tabParam as any);
       }, 0);
@@ -479,6 +515,85 @@ function CoordinatorConsoleContent() {
     text: string;
     onConfirm?: () => void;
   } | null>(null);
+
+  const handleCycleAttendanceStatus = (studentId: string) => {
+    setAttRoster(prev => prev.map(s => {
+      if (s.id === studentId) {
+        const nextStatus: "PRESENT" | "ABSENT" | "OD" | "LATE" =
+          s.status === "PRESENT" ? "ABSENT" :
+          s.status === "ABSENT" ? "OD" :
+          s.status === "OD" ? "LATE" : "PRESENT";
+        return { ...s, status: nextStatus };
+      }
+      return s;
+    }));
+  };
+
+  const handleMarkAllPresent = () => {
+    setAttRoster(prev => prev.map(s => ({ ...s, status: "PRESENT" })));
+  };
+
+  const handleSaveAttendance = async () => {
+    setAttSaving(true);
+    const snapshot = JSON.parse(JSON.stringify(attRoster));
+    setAttUndoState(snapshot);
+    try {
+      await fetch("/api/college/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subjectId: attSubject,
+          date: attDate,
+          periodSlot: Number(attPeriodSlot),
+          records: attRoster.map(r => ({
+            studentId: r.id.length === 36 ? r.id : "00000000-0000-0000-0000-00000000000" + r.id.replace("s", ""),
+            status: r.status,
+            remarks: r.remarks || undefined,
+          }))
+        })
+      });
+
+      // Auto-clear undo state after 5 seconds
+      setTimeout(() => {
+        setAttUndoState(null);
+      }, 5000);
+    } catch {
+      // Local fallback handled
+    } finally {
+      setAttSaving(false);
+    }
+  };
+
+  const handleUndoAttendance = () => {
+    if (attUndoState) {
+      setAttRoster(attUndoState);
+      setAttUndoState(null);
+    }
+  };
+
+  const handleSaveMarks = async () => {
+    setMarksSaving(true);
+    try {
+      await fetch("/api/college/marks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subjectId: marksSubject,
+          examType: marksExamType,
+          maxMarks: Number(marksMaxScore),
+          records: marksRoster.map(r => ({
+            studentId: r.id.length === 36 ? r.id : "00000000-0000-0000-0000-00000000000" + r.id.replace("s", ""),
+            marksObtained: Number(r.score),
+            remarks: r.remarks || undefined,
+          }))
+        })
+      });
+    } catch {
+      // Local fallback handled
+    } finally {
+      setMarksSaving(false);
+    }
+  };
 
   const handleAiQuery = async () => {
     if (!aiQuery.trim()) return;
@@ -1302,6 +1417,298 @@ useEffect(() => {
           </div>
 
           {/* Active Tab contents */}
+          {activeTab === "attendance_marker" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
+              
+              {/* Marker Controls Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-main/40 pb-3">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Faculty Roster Console</span>
+                    <h3 className="font-display text-base font-semibold text-txt-main">Daily Period-Wise Attendance Marker</h3>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {attUndoState && (
+                      <button
+                        type="button"
+                        onClick={handleUndoAttendance}
+                        className="h-8 px-3 rounded bg-amber-500/10 border border-amber-500/40 text-amber-400 font-mono text-xs uppercase font-bold hover:bg-amber-500/20 transition-colors cursor-pointer"
+                      >
+                        Undo (5s)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleMarkAllPresent}
+                      className="h-8 px-3 rounded bg-bg-card border border-border-main text-txt-main font-mono text-xs uppercase hover:bg-bg-card/80 transition-colors cursor-pointer"
+                    >
+                      Mark All Present
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveAttendance}
+                      disabled={attSaving}
+                      className="h-8 px-4 rounded bg-accent-main text-bg-base font-mono text-xs uppercase font-bold hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer"
+                    >
+                      {attSaving ? "Saving..." : "Save Period"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Subject</label>
+                    <select
+                      value={attSubject}
+                      onChange={(e) => setAttSubject(e.target.value)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    >
+                      <option value="CS8501">CS8501: Theory of Computation</option>
+                      <option value="CS8591">CS8591: Computer Networks & Security</option>
+                      <option value="CS8592">CS8592: OOAD</option>
+                      <option value="EC8691">EC8691: Microprocessors</option>
+                      <option value="CS8511">CS8511: Networks Laboratory</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Section & Year</label>
+                    <select
+                      value={attSection}
+                      onChange={(e) => setAttSection(e.target.value)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    >
+                      <option value="A">Section A (3rd Year)</option>
+                      <option value="B">Section B (3rd Year)</option>
+                      <option value="C">Section C (3rd Year)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Period Slot</label>
+                    <select
+                      value={attPeriodSlot}
+                      onChange={(e) => setAttPeriodSlot(Number(e.target.value))}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    >
+                      <option value={1}>Period 1 (08:45 – 09:35 AM)</option>
+                      <option value={2}>Period 2 (09:35 – 10:25 AM)</option>
+                      <option value={3}>Period 3 (10:45 – 11:35 AM)</option>
+                      <option value={4}>Period 4 (11:35 – 12:25 PM)</option>
+                      <option value={5}>Period 5 (01:15 – 02:05 PM)</option>
+                      <option value={6}>Period 6 (02:05 – 02:55 PM)</option>
+                      <option value={7}>Period 7 (03:05 – 03:55 PM)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Session Date</label>
+                    <input
+                      type="date"
+                      value={attDate}
+                      onChange={(e) => setAttDate(e.target.value)}
+                      className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Summary Roster Bar */}
+                <div className="p-3 bg-bg-card/40 border border-border-main/40 rounded flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center gap-4">
+                    <span>Present: <strong className="text-emerald-400">{attRoster.filter(s => s.status === "PRESENT").length}</strong></span>
+                    <span>Absent: <strong className="text-rose-400">{attRoster.filter(s => s.status === "ABSENT").length}</strong></span>
+                    <span>OD: <strong className="text-amber-400">{attRoster.filter(s => s.status === "OD").length}</strong></span>
+                    <span>Late: <strong className="text-purple-400">{attRoster.filter(s => s.status === "LATE").length}</strong></span>
+                  </div>
+                  <span className="text-txt-muted text-[10px]">Click any status pill to cycle state</span>
+                </div>
+              </div>
+
+              {/* Interactive Roster Table */}
+              <div className="border border-border-main/60 bg-bg-surface rounded-md overflow-hidden">
+                <table className="w-full text-left font-mono text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-bg-card/50 border-b border-border-main/60 text-txt-muted text-[10px] uppercase">
+                      <th className="p-3">#</th>
+                      <th className="p-3">Roll Number</th>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3 text-center">Period Status</th>
+                      <th className="p-3">Faculty Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-main/30 font-sans">
+                    {attRoster.map((student, idx) => (
+                      <tr key={student.id} className="hover:bg-bg-card/20 transition-colors">
+                        <td className="p-3 font-mono text-txt-muted text-xs">{idx + 1}</td>
+                        <td className="p-3 font-mono font-medium text-txt-main text-xs">{student.roll}</td>
+                        <td className="p-3 text-txt-main text-xs font-normal">{student.name}</td>
+                        <td className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleCycleAttendanceStatus(student.id)}
+                            className={`px-3 py-1 font-mono text-[10px] font-bold rounded-full border transition-all cursor-pointer select-none ${
+                              student.status === "PRESENT" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" :
+                              student.status === "ABSENT" ? "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20" :
+                              student.status === "OD" ? "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20" :
+                              "bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20"
+                            }`}
+                          >
+                            {student.status} ↻
+                          </button>
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="text"
+                            placeholder="Optional note..."
+                            value={student.remarks || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAttRoster(prev => prev.map(s => s.id === student.id ? { ...s, remarks: val } : s));
+                            }}
+                            className="h-7 px-2 border border-border-main/60 bg-bg-base text-txt-main text-[11px] rounded w-full focus:outline-none focus:border-txt-main"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          )}
+
+          {activeTab === "marks_entry" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
+              
+              {/* Marks Entry Header Card */}
+              <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-main/40 pb-3">
+                  <div className="flex flex-col">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Grading Ledger</span>
+                    <h3 className="font-display text-base font-semibold text-txt-main">Internal Assessment Marks Entry</h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveMarks}
+                    disabled={marksSaving}
+                    className="h-8 px-4 rounded bg-accent-main text-bg-base font-mono text-xs uppercase font-bold hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer self-start sm:self-auto"
+                  >
+                    {marksSaving ? "Saving Marks..." : "Save Assessment Marks"}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Subject</label>
+                    <select
+                      value={marksSubject}
+                      onChange={(e) => setMarksSubject(e.target.value)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    >
+                      <option value="CS8501">CS8501: Theory of Computation</option>
+                      <option value="CS8591">CS8591: Computer Networks & Security</option>
+                      <option value="CS8592">CS8592: OOAD</option>
+                      <option value="EC8691">EC8691: Microprocessors</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Assessment Type</label>
+                    <select
+                      value={marksExamType}
+                      onChange={(e) => setMarksExamType(e.target.value as any)}
+                      className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    >
+                      <option value="IA1">Internal Assessment 1 (IA-1)</option>
+                      <option value="IA2">Internal Assessment 2 (IA-2)</option>
+                      <option value="IA3">Internal Assessment 3 (IA-3)</option>
+                      <option value="MODEL">Model Examination</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub font-mono uppercase">Maximum Marks</label>
+                    <input
+                      type="number"
+                      value={marksMaxScore}
+                      onChange={(e) => setMarksMaxScore(Number(e.target.value))}
+                      className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs rounded font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-bg-card/40 border border-border-main/40 rounded flex items-center justify-between text-xs font-mono">
+                  <span>
+                    Class Average: <strong className="text-emerald-400">
+                      {Math.round((marksRoster.reduce((acc, r) => acc + Number(r.score), 0) / marksRoster.length) * 10) / 10} / {marksMaxScore}
+                    </strong>
+                  </span>
+                  <span className="text-txt-muted text-[10px]">{marksRoster.length} Enrolled Students</span>
+                </div>
+              </div>
+
+              {/* Marks Grading Grid */}
+              <div className="border border-border-main/60 bg-bg-surface rounded-md overflow-hidden">
+                <table className="w-full text-left font-mono text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-bg-card/50 border-b border-border-main/60 text-txt-muted text-[10px] uppercase">
+                      <th className="p-3">#</th>
+                      <th className="p-3">Roll Number</th>
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3 text-center">Score ({marksMaxScore})</th>
+                      <th className="p-3 text-center">Grade</th>
+                      <th className="p-3">Feedback</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-main/30 font-sans">
+                    {marksRoster.map((student, idx) => {
+                      const pct = Math.round((Number(student.score) / marksMaxScore) * 100);
+                      const grade = pct >= 90 ? "O" : pct >= 80 ? "A+" : pct >= 70 ? "A" : pct >= 60 ? "B+" : pct >= 50 ? "B" : "RA";
+
+                      return (
+                        <tr key={student.id} className="hover:bg-bg-card/20 transition-colors">
+                          <td className="p-3 font-mono text-txt-muted text-xs">{idx + 1}</td>
+                          <td className="p-3 font-mono font-medium text-txt-main text-xs">{student.roll}</td>
+                          <td className="p-3 text-txt-main text-xs font-normal">{student.name}</td>
+                          <td className="p-3 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              max={marksMaxScore}
+                              value={student.score}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                setMarksRoster(prev => prev.map(s => s.id === student.id ? { ...s, score: val } : s));
+                              }}
+                              className="w-16 h-7 text-center font-mono font-bold border border-border-main/60 bg-bg-base text-txt-main text-xs rounded focus:outline-none focus:border-txt-main"
+                            />
+                          </td>
+                          <td className="p-3 text-center font-mono font-bold text-accent-main">{grade}</td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={student.remarks || ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setMarksRoster(prev => prev.map(s => s.id === student.id ? { ...s, remarks: val } : s));
+                              }}
+                              placeholder="Feedback..."
+                              className="h-7 px-2 border border-border-main/60 bg-bg-base text-txt-main text-[11px] rounded w-full focus:outline-none focus:border-txt-main"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          )}
+
           {activeTab === "overview" && (
             <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
               

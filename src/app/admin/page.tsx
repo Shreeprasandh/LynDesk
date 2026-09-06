@@ -17,7 +17,8 @@ import {
   LogOut, 
   ChevronRight,
   Eye,
-  EyeOff
+  EyeOff,
+  BookOpen
 } from "lucide-react";
 
 interface AdminProfile {
@@ -40,7 +41,7 @@ export default function AdminConsolePage() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"overview" | "structure" | "radar" | "staff" | "recruiters" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "structure" | "curriculum" | "radar" | "staff" | "recruiters" | "audit">("overview");
 
   // Data States
   const [structures, setStructures] = useState<any[]>([]);
@@ -48,9 +49,23 @@ export default function AdminConsolePage() {
   const [staffList, setStaffList] = useState<any[]>([]);
   const [recruiterList, setRecruiterList] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([
+    { id: "sub-1", code: "CS8501", name: "Theory of Computation", department: "Computer Science", semester: 5, credits: 4, faculty: "Dr. K. Raman" },
+    { id: "sub-2", code: "CS8591", name: "Computer Networks & Security", department: "Computer Science", semester: 5, credits: 3, faculty: "Prof. S. Divya" },
+    { id: "sub-3", code: "CS8592", name: "Object Oriented Analysis & Design", department: "Computer Science", semester: 5, credits: 3, faculty: "Dr. M. Arvind" },
+    { id: "sub-4", code: "EC8691", name: "Microprocessors & Microcontrollers", department: "Computer Science", semester: 5, credits: 3, faculty: "Prof. V. Rajesh" },
+    { id: "sub-5", code: "CS8511", name: "Networks & Security Laboratory", department: "Computer Science", semester: 5, credits: 2, faculty: "Prof. S. Divya" },
+  ]);
 
   // Modals & Form States
   const [isAddStructOpen, setIsAddStructOpen] = useState(false);
+  const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
+  const [newSubCode, setNewSubCode] = useState("");
+  const [newSubName, setNewSubName] = useState("");
+  const [newSubDept, setNewSubDept] = useState("Computer Science");
+  const [newSubSem, setNewSubSem] = useState(5);
+  const [newSubCredits, setNewSubCredits] = useState(3);
+  const [newSubFaculty, setNewSubFaculty] = useState("");
   const [newYear, setNewYear] = useState("3rd Year");
   const [newDept, setNewDept] = useState("Information Technology");
   const [newSec, setNewSec] = useState("Section E");
@@ -260,6 +275,27 @@ export default function AdminConsolePage() {
     }
   };
 
+  // Add Subject handler
+  const handleAddSubject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubCode || !newSubName) return;
+    const newSub = {
+      id: `sub-${Date.now()}`,
+      code: newSubCode.trim().toUpperCase(),
+      name: newSubName.trim(),
+      department: newSubDept,
+      semester: Number(newSubSem),
+      credits: Number(newSubCredits),
+      faculty: newSubFaculty.trim() || "Unassigned"
+    };
+    setSubjectsList(prev => [newSub, ...prev]);
+    showToast(`Subject ${newSub.code} added to curriculum.`);
+    setNewSubCode("");
+    setNewSubName("");
+    setNewSubFaculty("");
+    setIsAddSubjectOpen(false);
+  };
+
   // Dispatch invite to missing students
   const handleInviteMissing = async (sectionItem: any) => {
     try {
@@ -434,6 +470,7 @@ export default function AdminConsolePage() {
             { id: "overview", label: "Executive Overview", icon: ShieldCheck },
             { id: "radar", label: "Missing Student Radar", icon: Radio },
             { id: "structure", label: "Campus Architecture", icon: Building2 },
+            { id: "curriculum", label: "Curriculum & Subjects", icon: BookOpen },
             { id: "staff", label: "Staff Passkeys", icon: KeyRound },
             { id: "recruiters", label: "Recruiter PINs", icon: Briefcase },
             { id: "audit", label: "Activity Ledger", icon: Clock },
@@ -693,6 +730,180 @@ export default function AdminConsolePage() {
                         <td className="p-3 text-txt-main font-bold">{s.section}</td>
                         <td className="p-3 text-txt-muted">{s.roll_start} → {s.roll_end}</td>
                         <td className="p-3 text-right font-semibold text-txt-main">{s.expected_students}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 3.5: CURRICULUM & SUBJECTS --- */}
+        {activeTab === "curriculum" && (
+          <div className="flex flex-col gap-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-display text-base font-bold text-txt-main">Curriculum & Subject Catalog</h2>
+                <p className="text-xs text-txt-muted font-light leading-relaxed">
+                  Configure department syllabi, subject codes, credit weightages, and assigned instructors.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setIsAddSubjectOpen(true)}
+                className="h-9 px-4 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider font-semibold rounded transition-opacity flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Plus size={14} /> Add New Subject
+              </button>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 border border-border-main/70 bg-bg-surface rounded-md flex flex-col gap-1">
+                <span className="text-[9.5px] font-mono uppercase tracking-widest text-txt-muted">Total Configured Subjects</span>
+                <span className="font-display text-2xl font-bold text-txt-main">{subjectsList.length} Courses</span>
+              </div>
+              <div className="p-4 border border-border-main/70 bg-bg-surface rounded-md flex flex-col gap-1">
+                <span className="text-[9.5px] font-mono uppercase tracking-widest text-txt-muted">Total Credit Weightage</span>
+                <span className="font-display text-2xl font-bold text-accent-main">{subjectsList.reduce((acc, s) => acc + (s.credits || 0), 0)} Credits</span>
+              </div>
+              <div className="p-4 border border-border-main/70 bg-bg-surface rounded-md flex flex-col gap-1">
+                <span className="text-[9.5px] font-mono uppercase tracking-widest text-txt-muted">Department Allocations</span>
+                <span className="font-display text-2xl font-bold text-emerald-400">100% Assigned</span>
+              </div>
+            </div>
+
+            {/* Add Subject Modal */}
+            {isAddSubjectOpen && (
+              <div className="p-5 border border-accent-main/40 bg-bg-surface rounded-md flex flex-col gap-4 animate-fade-in shadow-xl">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <h3 className="font-display text-sm font-semibold text-txt-main">Register New Course / Subject</h3>
+                  <span className="text-[9px] font-mono uppercase text-accent-main px-2 py-0.5 rounded bg-accent-main/10 border border-accent-main/30">Catalog Update</span>
+                </div>
+                <form onSubmit={handleAddSubject} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Subject Code</label>
+                    <input 
+                      type="text" 
+                      value={newSubCode} 
+                      onChange={(e) => setNewSubCode(e.target.value)} 
+                      placeholder="e.g. CS8501" 
+                      required 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono uppercase focus:outline-none focus:border-accent-main" 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Course Title</label>
+                    <input 
+                      type="text" 
+                      value={newSubName} 
+                      onChange={(e) => setNewSubName(e.target.value)} 
+                      placeholder="e.g. Distributed Cloud Computing" 
+                      required 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-accent-main" 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Department</label>
+                    <input 
+                      type="text" 
+                      value={newSubDept} 
+                      onChange={(e) => setNewSubDept(e.target.value)} 
+                      required 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-accent-main" 
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Semester</label>
+                    <select 
+                      value={newSubSem} 
+                      onChange={(e) => setNewSubSem(Number(e.target.value))} 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-accent-main"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                        <option key={sem} value={sem}>Semester {sem}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Credits Weight</label>
+                    <select 
+                      value={newSubCredits} 
+                      onChange={(e) => setNewSubCredits(Number(e.target.value))} 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-accent-main"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map(cr => (
+                        <option key={cr} value={cr}>{cr} Credits</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-mono text-txt-sub font-semibold">Assigned Faculty / Instructor</label>
+                    <input 
+                      type="text" 
+                      value={newSubFaculty} 
+                      onChange={(e) => setNewSubFaculty(e.target.value)} 
+                      placeholder="e.g. Dr. S. Malathi" 
+                      className="h-9 px-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs focus:outline-none focus:border-accent-main" 
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 lg:col-span-3 flex justify-end gap-2 pt-2 border-t border-border-main/30">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsAddSubjectOpen(false)} 
+                      className="h-8 px-4 border border-border-main text-xs font-mono uppercase rounded text-txt-muted hover:text-txt-main transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="h-8 px-4 bg-accent-main text-bg-base text-xs font-mono uppercase rounded font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      Save Course Subject
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Subjects Catalog Table */}
+            <div className="border border-border-main/70 bg-bg-surface rounded-md overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead className="border-b border-border-main/60 bg-bg-card/40 text-[9px] uppercase tracking-wider text-txt-muted">
+                    <tr>
+                      <th className="p-3.5">Subject Code</th>
+                      <th className="p-3.5">Course Title</th>
+                      <th className="p-3.5">Department</th>
+                      <th className="p-3.5">Semester</th>
+                      <th className="p-3.5">Credits</th>
+                      <th className="p-3.5">Assigned Instructor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-main/40">
+                    {subjectsList.map((sub) => (
+                      <tr key={sub.id} className="hover:bg-bg-card/20 transition-colors">
+                        <td className="p-3.5 font-bold text-accent-main">{sub.code}</td>
+                        <td className="p-3.5 font-sans font-medium text-txt-main">{sub.name}</td>
+                        <td className="p-3.5 text-txt-sub">{sub.department}</td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded text-[9.5px] bg-bg-card border border-border-main text-txt-main">
+                            Sem {sub.semester}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded text-[9.5px] bg-accent-main/10 text-accent-main border border-accent-main/30 font-semibold">
+                            {sub.credits} Credits
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-txt-muted font-sans text-[11px]">{sub.faculty || "Unassigned"}</td>
                       </tr>
                     ))}
                   </tbody>

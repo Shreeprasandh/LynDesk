@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -7,6 +8,34 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT
 function createAdminClient() {
   return createClient(supabaseUrl, serviceRoleKey);
 }
+
+const CreateApplicationSchema = z.object({
+  title: z.string().min(1, "Hackathon title is required"),
+  portal: z.string().optional().default("Unstop"),
+  portal_url: z.string().optional(),
+  handle: z.string().optional().nullable(),
+  role: z.string().optional().default("Participant"),
+  status: z.string().optional().default("Applied"),
+  stage: z.string().optional().default("Round 1"),
+  deadline: z.string().optional().nullable(),
+  event_id: z.string().optional().nullable(),
+  create_workspace: z.boolean().optional().default(false)
+});
+
+const UpdateApplicationSchema = z.object({
+  id: z.string().min(1, "Application ID is required"),
+  title: z.string().optional(),
+  portal: z.string().optional(),
+  portal_url: z.string().optional(),
+  status: z.string().optional(),
+  stage: z.string().optional(),
+  role: z.string().optional(),
+  deadline: z.string().optional().nullable()
+});
+
+const DeleteApplicationQuerySchema = z.object({
+  id: z.string().min(1, "Application ID is required")
+});
 
 // Helper to authenticate user from Bearer token
 async function authenticateUser(req: NextRequest) {
@@ -61,25 +90,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await req.json();
-    const {
-      title,
-      portal = "Unstop",
-      portal_url,
-      handle,
-      role = "Participant",
-      status = "Applied",
-      stage = "Round 1",
-      deadline,
-      event_id,
-      create_workspace = false
-    } = body;
-
-    if (!title || typeof title !== "string" || !title.trim()) {
-      return NextResponse.json({ error: "Hackathon title is required." }, { status: 400 });
+    const rawBody = await req.json();
+    const parsed = CreateApplicationSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ 
+        error: "Invalid request payload", 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
 
-    const safePortalUrl = portal_url && typeof portal_url === "string" && portal_url.trim()
+    const {
+      title,
+      portal,
+      portal_url,
+      handle,
+      role,
+      status,
+      stage,
+      deadline,
+      event_id,
+      create_workspace
+    } = parsed.data;
+
+    const safePortalUrl = portal_url && portal_url.trim()
       ? portal_url.trim()
       : (portal === "Unstop" ? "https://unstop.com" : portal === "Devpost" ? "https://devpost.com" : "");
 
@@ -148,12 +181,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await req.json();
-    const { id, title, portal, portal_url, status, stage, role, deadline } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: "Application ID is required." }, { status: 400 });
+    const rawBody = await req.json();
+    const parsed = UpdateApplicationSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ 
+        error: "Invalid request payload", 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
+
+    const { id, title, portal, portal_url, status, stage, role, deadline } = parsed.data;
 
     const updatePayload: Record<string, any> = { updated_at: new Date().toISOString() };
     if (title !== undefined) updatePayload.title = title.trim();
@@ -196,13 +233,16 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    /* await searchParams */
     const searchParams = req.nextUrl.searchParams;
-    const id = searchParams.get("id");
+    const parsedQuery = DeleteApplicationQuerySchema.safeParse({
+      id: searchParams.get("id")
+    });
 
-    if (!id) {
+    if (!parsedQuery.success) {
       return NextResponse.json({ error: "Application ID is required." }, { status: 400 });
     }
+
+    const { id } = parsedQuery.data;
 
     const supabaseAdmin = createAdminClient();
     const { error: delErr } = await supabaseAdmin

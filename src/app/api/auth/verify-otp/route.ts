@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const rawBody = await request.json();
     const parseResult = verifyOtpSchema.safeParse(rawBody);
     if (!parseResult.success) {
-      return NextResponse.json({ error: parseResult.error.issues[0]?.message || "Invalid payload." }, { status: 400 });
+      return NextResponse.json({ error: "Email, OTP code, and new password are required." }, { status: 400 });
     }
     const { input, otp, newPassword, confirmPassword } = parseResult.data;
 

@@ -1,9 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/app/lib/rateLimit";
+import { z } from "zod";
+
+const VerifyCertificateSchema = z.object({
+  studentName: z.string().optional().default(""),
+  eventTitle: z.string().optional().default(""),
+  artifactName: z.string().optional().default(""),
+  points: z.union([z.number(), z.string()]).optional().default(0)
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { studentName, eventTitle, artifactName, points } = body;
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+    const rateLimit = checkRateLimit(`verify_cert_${clientIp}`, 10, 60000);
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Rate limit exceeded (10 calls/min). Please retry in ${rateLimit.resetInSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
+    const rawBody = await req.json();
+    const parsed = VerifyCertificateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid payload", details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { studentName, eventTitle, artifactName, points } = parsed.data;
 
     const groqApiKey = process.env.GROQ_API_KEY;
 

@@ -173,16 +173,24 @@ export async function POST(request: NextRequest) {
 
               if (stageBriefs.length === 0) {
                 const now = new Date();
-                const dAug = new Date(now.getTime() + 7 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-                const dSep = new Date(now.getTime() + 21 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-                const dOct = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-                const dNov = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+                let targetEndTs = Date.parse(nextActiveDeadlineStr);
+                if (isNaN(targetEndTs) || targetEndTs <= now.getTime()) {
+                  targetEndTs = now.getTime() + 45 * 86400000;
+                }
+
+                const totalDuration = Math.max(7 * 86400000, targetEndTs - now.getTime());
+                const d1 = new Date(now.getTime() + totalDuration * 0.25).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+                const d2 = new Date(now.getTime() + totalDuration * 0.50).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+                const d3 = new Date(now.getTime() + totalDuration * 0.75).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+                const d4 = nextActiveDeadlineStr && nextActiveDeadlineStr !== "TBD" 
+                  ? nextActiveDeadlineStr 
+                  : new Date(targetEndTs).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 
                 stageBriefs = [
-                  { stage: "Round 1 - Online Assessment", deadline: dAug, brief: "15 MCQs (Algorithms & Coding Logic), 1 Coding Challenge, and 1 Case Study (90 mins total)." },
-                  { stage: "Round 2 - Development Round", deadline: dSep, brief: "Build software solution according to the official problem brief." },
-                  { stage: "Round 3 - Prototype Showcase", deadline: dOct, brief: "Build interactive working prototype highlighting core UX and practical value." },
-                  { stage: "Round 4 - Grand Finale", deadline: dNov, brief: "Top finalist teams present to leadership with fully covered travel & stay." }
+                  { stage: "Round 1 - Online Assessment", deadline: d1, brief: "15 MCQs (Algorithms & Coding Logic), 1 Coding Challenge, and 1 Case Study (90 mins total)." },
+                  { stage: "Round 2 - Development Round", deadline: d2, brief: "Build software solution according to the official problem brief." },
+                  { stage: "Round 3 - Prototype Showcase", deadline: d3, brief: "Build interactive working prototype highlighting core UX and practical value." },
+                  { stage: "Round 4 - Grand Finale", deadline: d4, brief: "Top finalist teams present to leadership with fully covered travel & stay." }
                 ];
               }
 
@@ -328,16 +336,24 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date();
-    const dAug = new Date(now.getTime() + 7 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-    const dSep = new Date(now.getTime() + 21 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-    const dOct = new Date(now.getTime() + 35 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-    const dNov = new Date(now.getTime() + 50 * 86400000).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+    let targetEndTs = Date.parse(deadline);
+    if (isNaN(targetEndTs) || targetEndTs <= now.getTime()) {
+      targetEndTs = now.getTime() + 45 * 86400000;
+    }
+
+    const totalDuration = Math.max(7 * 86400000, targetEndTs - now.getTime());
+    const d1 = new Date(now.getTime() + totalDuration * 0.25).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+    const d2 = new Date(now.getTime() + totalDuration * 0.50).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+    const d3 = new Date(now.getTime() + totalDuration * 0.75).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+    const d4 = deadline !== "Date not specified" && deadline !== "TBD" 
+      ? deadline 
+      : new Date(targetEndTs).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
 
     const stageBriefs = [
-      { stage: "Ideation & Proposal", deadline: dAug, brief: "Problem statement selection, team role assignment, technical architecture deck draft submission." },
-      { stage: "Prototype Development", deadline: dSep, brief: "Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync." },
-      { stage: "QA & User Testing", deadline: dOct, brief: "Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations." },
-      { stage: "Final Submission", deadline: dNov, brief: "Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry." }
+      { stage: "Ideation & Proposal", deadline: d1, brief: "Problem statement selection, team role assignment, technical architecture deck draft submission." },
+      { stage: "Prototype Development", deadline: d2, brief: "Implement core MVP components, API route handlers, database schemas, and live WebSockets data sync." },
+      { stage: "QA & User Testing", deadline: d3, brief: "Execute unit tests, audit accessibility & responsiveness across viewports, and refine UI micro-animations." },
+      { stage: "Final Submission", deadline: d4, brief: "Publish live production Vercel URL, verify public GitHub repository link, record video demonstration, and submit final entry." }
     ];
 
     return NextResponse.json({

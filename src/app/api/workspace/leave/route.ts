@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
+
+const LeaveWorkspaceSchema = z.object({
+  workspaceId: z.string().optional(),
+  workspaceUuid: z.string().optional(),
+  userId: z.string().min(1, "User ID is required")
+}).refine(data => data.workspaceId || data.workspaceUuid, {
+  message: "Either workspaceId or workspaceUuid must be provided"
+});
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { workspaceId, workspaceUuid, userId } = body;
-
-    if (!userId || (!workspaceId && !workspaceUuid)) {
-      return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+    const rawBody = await req.json();
+    const parsed = LeaveWorkspaceSchema.safeParse(rawBody);
+    
+    if (!parsed.success) {
+      return NextResponse.json({ 
+        error: "Missing required parameters", 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
+
+    const { workspaceId, workspaceUuid, userId } = parsed.data;
 
     // Validate Auth Token
     const authHeader = req.headers.get("Authorization");

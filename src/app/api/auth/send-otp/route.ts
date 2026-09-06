@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const rawBody = await request.json();
     const parseResult = sendOtpSchema.safeParse(rawBody);
     if (!parseResult.success) {
-      return NextResponse.json({ error: parseResult.error.issues[0]?.message || "Invalid input." }, { status: 400 });
+      return NextResponse.json({ error: "Email or username is required." }, { status: 400 });
     }
     const { input } = parseResult.data;
 
