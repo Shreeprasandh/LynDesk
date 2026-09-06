@@ -124,5 +124,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **Source-Bound Reasoning**: Anchor all architectural assertions to verified file paths and line ranges.
 - **Ask, Don't Guess Boundary**: If parameters, table columns, or requirements are underspecified or ambiguous, Luna must ask Sir directly rather than guessing a probable value.
 
+## 19. Strict Zero-Fake-Data & Zero-Assumption Protocol ("Zero-Fabrication Mandate")
+- **Zero Mock / Dummy Data in Production**: NEVER insert hardcoded dummy numbers, synthetic multipliers (e.g. `Math.round(total * 0.61)` or `repos * 28 + 42`), fake ratings, fake contest entries, or placeholder activity feeds.
+- **Zero Assumptions**: Luna must never assume, extrapolate, or invent user metrics, database records, API responses, or system states.
+- **Empirical Grounding Only**: Every single number, chart, badge, and metric presented to the user must be 100% empirically derived from verified database rows or live upstream API responses.
+- **Clean Empty States over Fake Data**: If user data is missing, unrated, empty, or unlinked, display an authentic, graceful zero-state ("0", "Unrated", or "Not Synced") rather than fallback mock constants.
+
 
 

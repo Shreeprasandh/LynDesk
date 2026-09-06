@@ -691,8 +691,20 @@ const POPULAR_LOCATIONS = [
         // Urgent Workspace & Round Deadline Warnings (Today or Tomorrow)
         try {
           const events = await fetchWallCalendarEvents(user.id);
+          const activeEventIds = new Set(events.map((e) => e.id));
           const tomorrow = new Date(Date.now() + 86400000);
           const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+          // 1. Purge any stored deadline notifications whose event was deleted / no longer active
+          userLocalNotifs = userLocalNotifs.filter((n) => {
+            if (n.type === "deadline" && n.id?.startsWith("notif_deadline_")) {
+              const eventIdPart = n.id.replace("notif_deadline_", "").replace(/_\d{4}-\d{2}-\d{2}$/, "");
+              if (eventIdPart && !activeEventIds.has(eventIdPart) && !events.some((e) => e.id.includes(eventIdPart) || (e.source_id && e.source_id.includes(eventIdPart)))) {
+                return false;
+              }
+            }
+            return true;
+          });
 
           events.forEach((evt) => {
             if (!evt || !evt.date) return;
@@ -702,6 +714,11 @@ const POPULAR_LOCATIONS = [
             if (isToday || isTomorrow) {
               const alertKey = `ldk_deadline_alert_${user.id}_${todayStr}_${evt.id}`;
               const alreadyFired = localStorage.getItem(alertKey);
+
+              // If it's today, purge yesterday's "Deadline Tomorrow" alert for this exact event to prevent stacking
+              if (isToday) {
+                userLocalNotifs = userLocalNotifs.filter((n) => !(n.type === "deadline" && n.title?.includes("Deadline Tomorrow") && n.title?.includes(evt.title)));
+              }
 
               if (!alreadyFired) {
                 localStorage.setItem(alertKey, "true");
@@ -1369,12 +1386,12 @@ const POPULAR_LOCATIONS = [
               ) : (
                 <>
                   <Link href="/" className={`pb-0.5 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
-                  {!isDeveloper && (
-                    <Link href="/college-desk" className={`pb-0.5 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
-                  )}
                   <Link href="/event-desk" className={`pb-0.5 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                   <Link href="/coding-desk" className={`pb-0.5 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                   <Link href="/study-desk" className={`pb-0.5 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
+                  {!isDeveloper && (
+                    <Link href="/college-desk" className={`pb-0.5 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
+                  )}
                   <Link href="/explore" className={`pb-0.5 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>
                 </>
               )}
@@ -1506,12 +1523,12 @@ const POPULAR_LOCATIONS = [
                 ) : (
                   <>
                     <Link href="/" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Dashboard</Link>
-                    {!isDeveloper && (
-                      <Link href="/college-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
-                    )}
                     <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                     <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                     <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
+                    {!isDeveloper && (
+                      <Link href="/college-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
+                    )}
                     <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>
                   </>
                 )}

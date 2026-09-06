@@ -78,11 +78,48 @@ export async function GET(request: Request) {
                   profile {
                     ranking
                   }
+                  languageProblemCount {
+                    languageName
+                    problemsSolved
+                  }
+                  tagProblemCounts {
+                    advanced {
+                      tagName
+                      tagSlug
+                      problemsSolved
+                    }
+                    intermediate {
+                      tagName
+                      tagSlug
+                      problemsSolved
+                    }
+                    fundamental {
+                      tagName
+                      tagSlug
+                      problemsSolved
+                    }
+                  }
                 }
                 userContestRanking(username: $username) {
+                  attendedContestsCount
                   rating
+                  globalRanking
+                  totalParticipants
+                  topPercentage
+                  badge {
+                    name
+                  }
                 }
-                recentAcSubmissionList(username: $username, limit: 100) {
+                userContestRankingHistory(username: $username) {
+                  attended
+                  rating
+                  ranking
+                  contest {
+                    title
+                    startTime
+                  }
+                }
+                recentAcSubmissionList(username: $username, limit: 20) {
                   title
                   titleSlug
                   timestamp
@@ -240,8 +277,9 @@ export async function GET(request: Request) {
       const totalSubmissions = totalSubmissionsList.find((s: any) => s.difficulty === "All")?.submissions || 0;
       const acceptedSubmissions = submissions.find((s: any) => s.difficulty === "All")?.submissions || 0;
 
-      const rating = Math.round(statsData.data?.userContestRanking?.rating || 1500);
-      const globalRank = matchedUser.profile?.ranking || 0;
+      const rawLcRating = statsData.data?.userContestRanking?.rating;
+      const rating = rawLcRating ? Math.round(rawLcRating) : 0;
+      const globalRank = statsData.data?.userContestRanking?.globalRanking || matchedUser.profile?.ranking || 0;
 
       let rank = "Top 25%";
       if (globalRank > 0) {
@@ -510,6 +548,47 @@ export async function GET(request: Request) {
         console.warn("Failed to parse LeetCode calendar (permission restricted or private calendar)", e);
       }
 
+      const rawContestHistory = statsData?.data?.userContestRankingHistory || [];
+      const contestHistory = Array.isArray(rawContestHistory)
+        ? rawContestHistory
+            .filter((c: any) => c.attended && c.rating)
+            .map((c: any) => ({
+              name: c.contest?.title || "LeetCode Contest",
+              date: c.contest?.startTime ? new Date(c.contest.startTime * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent",
+              timestamp: c.contest?.startTime ? c.contest.startTime * 1000 : 0,
+              rating: Math.round(c.rating),
+              rank: c.ranking || 0,
+              platform: "LeetCode"
+            }))
+            .slice(-10)
+        : [];
+
+      const recentSubmissionsList = (statsData?.data?.recentAcSubmissionList || []).slice(0, 10).map((s: any) => ({
+        id: s.titleSlug || s.title,
+        title: s.title,
+        platform: "LeetCode",
+        difficulty: "Medium",
+        time: s.timestamp ? new Date(parseInt(s.timestamp) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recent",
+        link: `https://leetcode.com/problems/${s.titleSlug}/`
+      }));
+
+      const languageList = (matchedUser.languageProblemCount || []).map((l: any) => ({
+        name: l.languageName,
+        solved: l.problemsSolved || 0
+      }));
+
+      const rawTags = matchedUser.tagProblemCounts || {};
+      const combinedTags: Record<string, number> = {};
+      [...(rawTags.fundamental || []), ...(rawTags.intermediate || []), ...(rawTags.advanced || [])].forEach((t: any) => {
+        if (t.tagName && t.problemsSolved) {
+          combinedTags[t.tagName] = (combinedTags[t.tagName] || 0) + t.problemsSolved;
+        }
+      });
+      const topicList = Object.entries(combinedTags)
+        .map(([name, solved]) => ({ name, solved }))
+        .sort((a, b) => b.solved - a.solved)
+        .slice(0, 8);
+
       return NextResponse.json({
         solved,
         solvedEasy,
@@ -526,7 +605,11 @@ export async function GET(request: Request) {
         submissionCalendarPrivate,
         hasSolvedToday: Boolean(dailyChallengeInfo?.hasSolvedToday),
         isStreakMaintained: Boolean(dailyChallengeInfo?.isStreakMaintained),
-        dailyChallenge: dailyChallengeInfo
+        dailyChallenge: dailyChallengeInfo,
+        contestHistory,
+        recentSubmissions: recentSubmissionsList,
+        languages: languageList,
+        topics: topicList
       });
     }
 
@@ -623,8 +706,30 @@ export async function GET(request: Request) {
         console.warn("CF submissions load failed", e);
       }
 
-      const rating = userInfo.rating || 1200;
-      const rank = userInfo.rank ? userInfo.rank.charAt(0).toUpperCase() + userInfo.rank.slice(1) : "Newbie";
+      let contestHistory: any[] = [];
+      try {
+        const ratingRes = await fetch(`https://codeforces.com/api/user.rating?handle=${cleanUsername}&t=${Date.now()}`, {
+          cache: "no-store"
+        });
+        if (ratingRes.ok) {
+          const ratingData = await ratingRes.json();
+          if (ratingData.status === "OK" && Array.isArray(ratingData.result)) {
+            contestHistory = ratingData.result.map((r: any) => ({
+              name: r.contestName || `Codeforces Round #${r.contestId}`,
+              date: r.ratingUpdateTimeSeconds ? new Date(r.ratingUpdateTimeSeconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent",
+              timestamp: r.ratingUpdateTimeSeconds ? r.ratingUpdateTimeSeconds * 1000 : 0,
+              rating: r.newRating,
+              rank: r.rank,
+              platform: "Codeforces"
+            })).slice(-10);
+          }
+        }
+      } catch (e) {
+        console.warn("CF rating history load failed", e);
+      }
+
+      const rating = userInfo.rating || 0;
+      const rank = userInfo.rank ? userInfo.rank.charAt(0).toUpperCase() + userInfo.rank.slice(1) : (rating > 0 ? "Newbie" : "Unrated");
 
       return NextResponse.json({
         solved,
@@ -635,8 +740,9 @@ export async function GET(request: Request) {
         acceptedSubmissions: acceptedSubmissionsCount,
         rank,
         rating,
-        globalRank: userInfo.maxRating || 1200,
-        submissionCalendar
+        globalRank: userInfo.maxRating || 0,
+        submissionCalendar,
+        contestHistory
       });
     }
 
@@ -648,6 +754,7 @@ export async function GET(request: Request) {
       let globalRank = 0;
       let countryRank = 0;
       let fetchedSuccessfully = false;
+      let contestHistory: any[] = [];
 
       // Method 1: Try public CodeChef API endpoint first
       try {
@@ -664,6 +771,16 @@ export async function GET(request: Request) {
             highestRating = parseInt(apiData.highestRating || rating);
             globalRank = parseInt(apiData.globalRank || 0);
             countryRank = parseInt(apiData.countryRank || 0);
+            if (Array.isArray(apiData.ratingData)) {
+              contestHistory = apiData.ratingData.map((c: any) => ({
+                name: c.name || c.code || "CodeChef Starters",
+                date: c.end_date ? new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : (c.getyear && c.getmonth && c.getday ? `${c.getday} ${c.getmonth} ${c.getyear}` : "Recent"),
+                timestamp: c.end_date ? new Date(c.end_date).getTime() : 0,
+                rating: parseInt(c.rating || 0),
+                rank: parseInt(c.rank || 0),
+                platform: "CodeChef"
+              })).slice(-10);
+            }
             if (rating > 0) fetchedSuccessfully = true;
           }
         }
@@ -701,6 +818,14 @@ export async function GET(request: Request) {
                   if (Array.isArray(contestList) && contestList.length > 0) {
                     const latest = contestList[contestList.length - 1];
                     if (latest?.rating) rating = parseInt(latest.rating);
+                    contestHistory = contestList.map((c: any) => ({
+                      name: c.name || c.code || "CodeChef Starters",
+                      date: c.end_date ? new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : (c.getyear && c.getmonth && c.getday ? `${c.getday} ${c.getmonth} ${c.getyear}` : "Recent"),
+                      timestamp: c.end_date ? new Date(c.end_date).getTime() : 0,
+                      rating: parseInt(c.rating || 0),
+                      rank: parseInt(c.rank || 0),
+                      platform: "CodeChef"
+                    })).slice(-10);
                   }
                 } catch {}
               }
@@ -758,6 +883,7 @@ export async function GET(request: Request) {
           globalRank: 0,
           countryRank: 0,
           submissionCalendar: {},
+          contestHistory: [],
           isFallback: true
         }, { status: 200 });
       }
@@ -774,7 +900,8 @@ export async function GET(request: Request) {
         highestRating: highestRating || rating || 0,
         globalRank: globalRank || 0,
         countryRank: countryRank || 0,
-        submissionCalendar: {}
+        submissionCalendar: {},
+        contestHistory
       });
     }
 
@@ -1175,8 +1302,10 @@ export async function GET(request: Request) {
       let repos = 0;
       let followers = 0;
       let commits = 0;
+      let stars = 0;
       let fetchedSuccessfully = false;
       const submissionCalendar: Record<string, number> = {};
+      const languagesMap: Record<string, number> = {};
 
       const ghHeaders = {
         "User-Agent": "LynDesk-Bot/1.0",
@@ -1184,17 +1313,38 @@ export async function GET(request: Request) {
       };
 
       try {
-        const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}`, {
-          headers: ghHeaders,
-          cache: "no-store",
-          signal: AbortSignal.timeout(6000)
-        });
+        const [userRes, reposRes] = await Promise.allSettled([
+          fetch(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}`, {
+            headers: ghHeaders,
+            cache: "no-store",
+            signal: AbortSignal.timeout(6000)
+          }),
+          fetch(`https://api.github.com/users/${encodeURIComponent(cleanUsername)}/repos?per_page=100&sort=updated`, {
+            headers: ghHeaders,
+            cache: "no-store",
+            signal: AbortSignal.timeout(6000)
+          })
+        ]);
 
-        if (userRes.ok) {
-          const userData = await userRes.json();
+        if (userRes.status === "fulfilled" && userRes.value.ok) {
+          const userData = await userRes.value.json();
           repos = userData.public_repos || 0;
           followers = userData.followers || 0;
           fetchedSuccessfully = true;
+        }
+
+        if (reposRes.status === "fulfilled" && reposRes.value.ok) {
+          try {
+            const reposData = await reposRes.value.json();
+            if (Array.isArray(reposData)) {
+              reposData.forEach((r: any) => {
+                stars += (r.stargazers_count || 0);
+                if (r.language) {
+                  languagesMap[r.language] = (languagesMap[r.language] || 0) + 1;
+                }
+              });
+            }
+          } catch {}
         }
 
         try {
@@ -1215,21 +1365,21 @@ export async function GET(request: Request) {
               });
             }
           }
-        } catch {
-          if (commits === 0 && repos > 0) {
-            commits = repos * 28 + 42;
-          }
-        }
+        } catch {}
       } catch (err) {
         console.warn("GitHub API fetch error:", err);
       }
 
-      if (commits === 0) commits = repos > 0 ? repos * 28 + 42 : 142;
+      const languagesList = Object.entries(languagesMap)
+        .map(([name, count]) => ({ name, solved: count }))
+        .sort((a, b) => b.solved - a.solved);
 
       const githubPayload = {
         repos,
         commits,
         followers,
+        stars,
+        languages: languagesList,
         submissionCalendar,
         isFallback: !fetchedSuccessfully
       };

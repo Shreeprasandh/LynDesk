@@ -172,13 +172,48 @@ export async function addWallCalendarEvent(evt: Omit<WallEvent, "id"> & { id?: s
 }
 
 /**
- * Remove an event from WallCalendar by ID or source_id
+ * Remove an event from WallCalendar by ID or source_id (Deep Prefix Cascade)
  */
 export async function deleteWallCalendarEvent(idOrSourceId: string, userId?: string): Promise<void> {
-  // 1. Update Local Storage
+  if (!idOrSourceId) return;
+
+  // 1. Update Local Storage (Deep Prefix Matching for multi-stage/workspace IDs)
   const existing = getLocalEvents(userId);
-  const updated = existing.filter((e) => e.id !== idOrSourceId && e.source_id !== idOrSourceId);
+  const updated = existing.filter((e) => 
+    e.id !== idOrSourceId && 
+    e.source_id !== idOrSourceId &&
+    !e.id.startsWith(`${idOrSourceId}_`) &&
+    !e.id.startsWith(`ws_${idOrSourceId}_`) &&
+    !(e.source_id && e.source_id.includes(idOrSourceId))
+  );
   saveLocalEvents(updated, userId);
+
+  // 1.1 Purge related stale deadline notifications from storage immediately
+  if (typeof window !== "undefined") {
+    try {
+      const purgeFromList = (storedJson: string | null) => {
+        if (!storedJson) return null;
+        const list = JSON.parse(storedJson);
+        if (!Array.isArray(list)) return null;
+        return list.filter((n: any) => 
+          !n.id?.includes(idOrSourceId) &&
+          !n.actionUrl?.includes(idOrSourceId)
+        );
+      };
+
+      if (userId) {
+        const uKey = `ldk_user_notifications_${userId}`;
+        const cleanedUser = purgeFromList(localStorage.getItem(uKey));
+        if (cleanedUser) localStorage.setItem(uKey, JSON.stringify(cleanedUser));
+      }
+
+      const gKey = "ldk_global_notifications";
+      const cleanedGlobal = purgeFromList(localStorage.getItem(gKey));
+      if (cleanedGlobal) localStorage.setItem(gKey, JSON.stringify(cleanedGlobal));
+
+      window.dispatchEvent(new CustomEvent("ldk_notifications_update"));
+    } catch {}
+  }
 
   // 2. Delete from Supabase DB
   if (userId) {
@@ -194,7 +229,7 @@ export async function deleteWallCalendarEvent(idOrSourceId: string, userId?: str
         await supabase
           .from("wall_calendar_events")
           .delete()
-          .eq("source_id", idOrSourceId)
+          .or(`source_id.eq.${idOrSourceId},id.eq.${idOrSourceId}`)
           .eq("user_id", userId);
       }
     } catch {}

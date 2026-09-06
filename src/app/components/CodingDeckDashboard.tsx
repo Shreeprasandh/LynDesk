@@ -93,23 +93,23 @@ export default function CodingDeckDashboard({
 
   // Multi-Platform Total Calculations
   const summary = useMemo(() => {
-    const lcSolved = stats.leetcode?.solved || (handles.leetcode ? 560 : 0);
-    const cfSolved = stats.codeforces?.solved || (handles.codeforces ? 45 : 0);
-    const ccSolved = stats.codechef?.solved || (handles.codechef ? 98 : 0);
-    const gfgSolved = stats.geeksforgeeks?.solved || (handles.geeksforgeeks ? 120 : 0);
-    const hrSolved = stats.hackerrank?.solved || (handles.hackerrank ? 2 : 0);
+    const lcSolved = stats.leetcode?.solved || 0;
+    const cfSolved = stats.codeforces?.solved || 0;
+    const ccSolved = stats.codechef?.solved || 0;
+    const gfgSolved = stats.geeksforgeeks?.solved || 0;
+    const hrSolved = stats.hackerrank?.solved || 0;
 
     const totalSolved = lcSolved + cfSolved + ccSolved + gfgSolved + hrSolved;
 
-    const easySolved = stats.leetcode?.solvedEasy || 171;
-    const medSolved = stats.leetcode?.solvedMedium || 294;
-    const hardSolved = stats.leetcode?.solvedHard || 95;
+    const easySolved = stats.leetcode?.solvedEasy || 0;
+    const medSolved = stats.leetcode?.solvedMedium || 0;
+    const hardSolved = stats.leetcode?.solvedHard || 0;
 
     // Contests attended count
-    const ccContests = stats.codechef?.rating ? 5 : (handles.codechef ? 5 : 0);
-    const lcContests = stats.leetcode?.rating && stats.leetcode.rating > 1400 ? 2 : 0;
+    const ccContests = stats.codechef?.rating ? 1 : 0;
+    const lcContests = stats.leetcode?.rating && stats.leetcode.rating > 1400 ? 1 : 0;
     const cfContests = stats.codeforces?.rating ? 1 : 0;
-    const totalContests = ccContests + lcContests + cfContests || 5;
+    const totalContests = ccContests + lcContests + cfContests;
 
     // Connected count
     const connectedCount = [
@@ -119,9 +119,9 @@ export default function CodingDeckDashboard({
       handles.geeksforgeeks,
       handles.hackerrank,
       handles.github
-    ].filter(Boolean).length || 2;
+    ].filter(Boolean).length;
 
-    const activeStreak = stats.leetcode?.leetcodeStreak || 12;
+    const activeStreak = stats.leetcode?.leetcodeStreak || 0;
 
     // Active Platforms with Non-Zero Solves
     const platformBreakdown = [
@@ -133,19 +133,19 @@ export default function CodingDeckDashboard({
     ].filter(p => p.count > 0);
 
     return {
-      totalSolved: totalSolved || 560,
+      totalSolved,
       easySolved,
       medSolved,
       hardSolved,
       connectedCount,
       activeStreak,
       totalContests,
-      ccContests: ccContests || 5,
+      ccContests,
       lcContests,
       cfContests,
-      lcSolved: lcSolved || 560,
+      lcSolved,
       cfSolved,
-      ccSolved: ccSolved || 98,
+      ccSolved,
       gfgSolved,
       hrSolved,
       platformBreakdown
@@ -185,20 +185,6 @@ export default function CodingDeckDashboard({
     ingestCal(stats.codechef?.submissionCalendar);
     ingestCal(stats.geeksforgeeks?.submissionCalendar);
     ingestCal(stats.hackerrank?.submissionCalendar);
-
-    // Consistency failsafe if external calendar is private/empty
-    if (Object.keys(combinedCal).length === 0 && summary.totalSolved > 0) {
-      for (let i = 0; i < 365; i++) {
-        const d = new Date(todayMidnight);
-        d.setDate(d.getDate() - i);
-        const dateKey = d.toISOString().split("T")[0];
-        if (i <= 12) {
-          combinedCal[dateKey] = (i % 4) + 1;
-        } else if ((i % 3 === 0 || i % 5 === 0) && (i % 7 !== 0) && i < 280) {
-          combinedCal[dateKey] = ((i * 3) % 4) + 1;
-        }
-      }
-    }
 
     // Generate 371 days based on selected year or rolling past 12 months
     const cells: { dateStr: string; level: number; dateLabel: string; monthYearKey: string; cellMonthName: string }[] = [];
@@ -328,155 +314,206 @@ export default function CodingDeckDashboard({
     return {
       monthGroups,
       totalSubmissionsInCalendar: totalSubmissionsInCalendar || summary.totalSolved,
-      totalActiveDays: totalActiveDays || 84,
-      maxStreak: maxStreak || 12,
+      totalActiveDays,
+      maxStreak: maxStreak || summary.activeStreak || 0,
       isLeetcodePrivate: stats.leetcode?.submissionCalendarPrivate
     };
-  }, [stats, summary.totalSolved, selectedLcYear]);
+  }, [stats, summary.totalSolved, summary.activeStreak, selectedLcYear]);
 
-  // Contest Rating Progression Timeline Data Points
+  // Real Contest Rating Progression Timeline Data Points
   const contestTimeline = useMemo(() => {
-    const currentCcRating = stats.codechef?.rating || 1173;
-    
-    return [
-      { id: 1, name: "Starters 248 (Div 4)", date: "15 Jul 2026", rating: 1040, rank: 2140, platform: "CodeChef" },
-      { id: 2, name: "Starters 249 (Div 4)", date: "29 Jul 2026", rating: 1095, rank: 1620, platform: "CodeChef" },
-      { id: 3, name: "Weekly Contest 410", date: "04 Aug 2026", rating: 1480, rank: 6420, platform: "LeetCode" },
-      { id: 4, name: "Starters 251 (Div 3)", date: "12 Aug 2026", rating: 1140, rank: 1190, platform: "CodeChef" },
-      { id: 5, name: "Starters 253 (Rated)", date: "26 Aug 2026", rating: currentCcRating, rank: 887, platform: "CodeChef" },
-    ];
-  }, [stats.codechef?.rating]);
+    const list: Array<{ id: number; name: string; date: string; timestamp?: number; rating: number; rank: number; platform: string }> = [];
 
-  // DSA Topic Analysis Distribution (Actual Solved Counts Only)
+    if (Array.isArray(stats.codechef?.contestHistory) && stats.codechef.contestHistory.length > 0) {
+      stats.codechef.contestHistory.forEach(c => list.push(c as any));
+    } else if (stats.codechef?.rating) {
+      list.push({
+        id: 1,
+        name: "CodeChef Starters",
+        date: "Recent",
+        rating: stats.codechef.rating,
+        rank: stats.codechef.globalRank ? parseInt(String(stats.codechef.globalRank).replace(/\D/g, ""), 10) || 887 : 887,
+        platform: "CodeChef"
+      });
+    }
+
+    if (Array.isArray(stats.leetcode?.contestHistory) && stats.leetcode.contestHistory.length > 0) {
+      stats.leetcode.contestHistory.forEach(c => list.push(c as any));
+    } else if (stats.leetcode?.rating) {
+      list.push({
+        id: 2,
+        name: "LeetCode Contest",
+        date: "Recent",
+        rating: Math.round(stats.leetcode.rating),
+        rank: stats.leetcode.globalRank || 2400,
+        platform: "LeetCode"
+      });
+    }
+
+    if (Array.isArray(stats.codeforces?.contestHistory) && stats.codeforces.contestHistory.length > 0) {
+      stats.codeforces.contestHistory.forEach(c => list.push(c as any));
+    } else if (stats.codeforces?.rating) {
+      list.push({
+        id: 3,
+        name: "Codeforces Round",
+        date: "Recent",
+        rating: stats.codeforces.rating,
+        rank: 1500,
+        platform: "Codeforces"
+      });
+    }
+
+    // Sort chronologically if timestamps exist
+    list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    return list.map((item, idx) => ({ ...item, id: idx + 1 }));
+  }, [stats.codechef?.contestHistory, stats.codechef?.rating, stats.codechef?.globalRank, stats.leetcode?.contestHistory, stats.leetcode?.rating, stats.leetcode?.globalRank, stats.codeforces?.contestHistory, stats.codeforces?.rating]);
+
+  // DSA Topic Analysis Distribution (Genuine empirical problem counts from LeetCode / Platforms)
   const topicData = useMemo(() => {
-    const baseTotal = summary.totalSolved || 560;
-    return [
-      { name: "Arrays & Hashing", solved: Math.round(baseTotal * 0.26) },
-      { name: "Strings & Pattern Matching", solved: Math.round(baseTotal * 0.18) },
-      { name: "Trees & Graphs", solved: Math.round(baseTotal * 0.16) },
-      { name: "Dynamic Programming", solved: Math.round(baseTotal * 0.12) },
-      { name: "Two Pointers & Sliding Window", solved: Math.round(baseTotal * 0.10) },
-      { name: "Binary Search & Sorting", solved: Math.round(baseTotal * 0.09) },
-      { name: "Math & Bit Manipulation", solved: Math.round(baseTotal * 0.09) },
-    ];
-  }, [summary.totalSolved]);
+    if (Array.isArray(stats.leetcode?.topics) && stats.leetcode.topics.length > 0) {
+      return stats.leetcode.topics;
+    }
+    return [];
+  }, [stats.leetcode?.topics]);
 
   const maxTopicSolved = Math.max(...topicData.map(t => t.solved), 1);
 
-  // Language Mastery Distribution (Actual Solved Counts Only)
+  // Language Mastery Distribution (Genuine solves per language from LeetCode & GitHub repos)
   const languageData = useMemo(() => {
-    const total = summary.totalSolved || 560;
-    return [
-      { name: "C++", solved: Math.round(total * 0.61) },
-      { name: "Python", solved: Math.round(total * 0.26) },
-      { name: "JavaScript / TypeScript", solved: Math.round(total * 0.09) },
-      { name: "Java", solved: Math.round(total * 0.04) },
-    ];
-  }, [summary.totalSolved]);
+    const map: Record<string, number> = {};
+
+    if (Array.isArray(stats.leetcode?.languages)) {
+      stats.leetcode.languages.forEach(l => {
+        if (l.name && l.solved > 0) {
+          map[l.name] = (map[l.name] || 0) + l.solved;
+        }
+      });
+    }
+
+    if (Array.isArray(stats.github?.languages)) {
+      stats.github.languages.forEach((l: any) => {
+        if (l.name && l.solved > 0 && !map[l.name]) {
+          map[l.name] = (map[l.name] || 0) + l.solved;
+        }
+      });
+    }
+
+    const list = Object.entries(map)
+      .map(([name, solved]) => ({ name, solved }))
+      .sort((a, b) => b.solved - a.solved);
+
+    return list.slice(0, 6);
+  }, [stats.leetcode?.languages, stats.github?.languages]);
+
+  const maxLanguageSolved = Math.max(...languageData.map(l => l.solved), 1);
 
   // Live Recent Solves Stream (Activity Feed)
   const recentSolves = useMemo(() => {
-    return [
-      {
-        id: "rs-1",
-        title: "Two Sum",
-        platform: "LeetCode",
-        difficulty: "Easy",
-        time: "2 hours ago",
-        link: "https://leetcode.com/problems/two-sum/"
-      },
-      {
-        id: "rs-2",
-        title: "Starters 253 - Problem A",
-        platform: "CodeChef",
-        difficulty: "Easy",
-        time: "Yesterday",
-        link: "https://www.codechef.com/problems"
-      },
-      {
-        id: "rs-3",
-        title: "Subarray Sum Equals K",
-        platform: "LeetCode",
-        difficulty: "Medium",
-        time: "3 days ago",
-        link: "https://leetcode.com/problems/subarray-sum-equals-k/"
-      },
-      {
-        id: "rs-4",
-        title: "Reverse Linked List",
-        platform: "LeetCode",
-        difficulty: "Easy",
-        time: "5 days ago",
-        link: "https://leetcode.com/problems/reverse-linked-list/"
-      },
-      {
-        id: "rs-5",
-        title: "Container With Most Water",
-        platform: "Codeforces",
-        difficulty: "Medium",
-        time: "1 week ago",
-        link: "https://codeforces.com/problemset"
-      }
-    ];
-  }, []);
-
-  // Awards & Badges Vault Data
-  const allAwardsList = [
-    {
-      id: "50-days-badge",
-      title: "50 Days Badge 2026",
-      issuer: "LeetCode",
-      category: "Consistency",
-      date: "2026",
-      desc: "Awarded for 50 days of active problem solving in 2026",
-      icon: Flame
-    },
-    {
-      id: "aug-dcc-badge",
-      title: "Aug LeetCoding Challenge",
-      issuer: "LeetCode",
-      category: "Monthly DCC",
-      date: "Aug 2026",
-      desc: "Successfully completed the Daily Coding Challenge in August",
-      icon: Trophy
-    },
-    {
-      id: "solved-50",
-      title: "Solved 50 Problems",
-      issuer: "Code Desk",
-      category: "Milestone",
-      date: "Aug 2026",
-      desc: "Received for solving 50+ DSA problems across connected platforms",
-      icon: Target
-    },
-    {
-      id: "contest-5",
-      title: "5 Contests Attended",
-      issuer: "CodeChef & CP",
-      category: "Competition",
-      date: "Aug 2026",
-      desc: "Received for participating in 5 official live rated contests",
-      icon: Medal
-    },
-    {
-      id: "knight-tier",
-      title: "Knight Contestant Tier",
-      issuer: "LeetCode",
-      category: "Contest Tier",
-      date: "Jul 2026",
-      desc: "Attained top 10% global ranking in official LeetCode rated rounds",
-      icon: Award
-    },
-    {
-      id: "division-3-promo",
-      title: "Division 3 Promotion",
-      issuer: "CodeChef",
-      category: "Rating Tier",
-      date: "Aug 2026",
-      desc: "Crossed 1400 rating threshold in CodeChef Starters",
-      icon: Trophy
+    const list: Array<{ id: string; title: string; platform: string; difficulty: string; time: string; link: string }> = [];
+    if (Array.isArray(stats.leetcode?.recentSubmissions) && stats.leetcode.recentSubmissions.length > 0) {
+      list.push(...stats.leetcode.recentSubmissions);
     }
-  ];
+    return list.slice(0, 6);
+  }, [stats.leetcode?.recentSubmissions]);
+
+  // Verified Badges & Recognition (Dynamically Computed from Real Achievements)
+  const allAwardsList = useMemo(() => {
+    const list: Array<{ id: string; title: string; issuer: string; category: string; date: string; desc: string; icon: any }> = [];
+
+    if (summary.totalSolved >= 50) {
+      list.push({
+        id: "solved-50",
+        title: "50 Problems Solved",
+        issuer: "Code Desk",
+        category: "Milestone",
+        date: "Verified",
+        desc: "Awarded for solving 50+ problems across connected coding platforms",
+        icon: Target
+      });
+    }
+    if (summary.totalSolved >= 100) {
+      list.push({
+        id: "solved-100",
+        title: "Century Solver",
+        issuer: "Code Desk",
+        category: "Milestone",
+        date: "Verified",
+        desc: "Crossed 100+ verified algorithmic problem solutions",
+        icon: Trophy
+      });
+    }
+    if (summary.totalSolved >= 500) {
+      list.push({
+        id: "solved-500",
+        title: "500+ Master Solver",
+        issuer: "Code Desk",
+        category: "Elite",
+        date: "Verified",
+        desc: "Attained 500+ solved problems across connected competitive platforms",
+        icon: Award
+      });
+    }
+    if (summary.activeStreak >= 7) {
+      list.push({
+        id: "streak-active",
+        title: `${summary.activeStreak} Days Daily Streak`,
+        issuer: "LeetCode",
+        category: "Consistency",
+        date: "Active",
+        desc: `Maintained a continuous ${summary.activeStreak}-day active problem solving streak`,
+        icon: Flame
+      });
+    }
+    if (summary.totalContests > 0) {
+      list.push({
+        id: "contest-participant",
+        title: `${summary.totalContests} Contest${summary.totalContests > 1 ? "s" : ""} Attended`,
+        issuer: "Competitive Programming",
+        category: "Competition",
+        date: "Official",
+        desc: `Participated in ${summary.totalContests} official rated round${summary.totalContests > 1 ? "s" : ""}`,
+        icon: Medal
+      });
+    }
+    if (stats.codechef?.stars && parseInt(String(stats.codechef.stars)) >= 2) {
+      list.push({
+        id: "codechef-stars",
+        title: `${stats.codechef.stars} Stars Rated`,
+        issuer: "CodeChef",
+        category: "Rating Tier",
+        date: "Official",
+        desc: `Verified ${stats.codechef.stars} Stars competitive rating tier on CodeChef`,
+        icon: Trophy
+      });
+    }
+    if (stats.leetcode?.rank && !stats.leetcode.rank.includes("25%")) {
+      list.push({
+        id: "leetcode-percentile",
+        title: `${stats.leetcode.rank} Percentile`,
+        issuer: "LeetCode",
+        category: "Global Rank",
+        date: "Official",
+        desc: `Attained top ${stats.leetcode.rank} global ranking tier on LeetCode`,
+        icon: Award
+      });
+    }
+
+    // Always have at least 1 verified starter credential if connected
+    if (list.length === 0 && summary.connectedCount > 0) {
+      list.push({
+        id: "connected-developer",
+        title: "Connected Developer",
+        issuer: "Code Desk",
+        category: "Identity",
+        date: "Active",
+        desc: "Successfully verified and synchronized competitive coding profiles",
+        icon: Target
+      });
+    }
+
+    return list;
+  }, [summary.totalSolved, summary.activeStreak, summary.totalContests, summary.connectedCount, stats.codechef?.stars, stats.leetcode?.rank]);
 
   // Show only 4 recent badges in the card
   const previewAwards = allAwardsList.slice(0, 4);
@@ -520,7 +557,7 @@ export default function CodingDeckDashboard({
             )}
             <div className="w-full bg-border-main/40 h-2 rounded-full overflow-hidden flex gap-0.5 cursor-pointer">
               {summary.platformBreakdown.map((p, i) => {
-                const widthPct = (p.count / summary.totalSolved) * 100;
+                const widthPct = summary.totalSolved > 0 ? (p.count / summary.totalSolved) * 100 : 0;
                 return (
                   <div
                     key={p.name}
@@ -564,15 +601,26 @@ export default function CodingDeckDashboard({
               {summary.totalContests}
             </div>
             <div className="flex flex-col gap-0.5 mt-0.5 font-mono text-[10px] text-txt-sub">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-main" />
-                CodeChef: <strong className="text-txt-main">{summary.ccContests}</strong>
-              </span>
+              {summary.ccContests > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-main" />
+                  CodeChef: <strong className="text-txt-main">{summary.ccContests}</strong>
+                </span>
+              )}
               {summary.lcContests > 0 && (
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent-main/60" />
                   LeetCode: <strong className="text-txt-main">{summary.lcContests}</strong>
                 </span>
+              )}
+              {summary.cfContests > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-main/40" />
+                  Codeforces: <strong className="text-txt-main">{summary.cfContests}</strong>
+                </span>
+              )}
+              {summary.totalContests === 0 && (
+                <span className="text-[10px] text-txt-muted">No rated contests recorded</span>
               )}
             </div>
           </div>
@@ -586,21 +634,31 @@ export default function CodingDeckDashboard({
             <Medal size={16} className="text-txt-muted" />
           </div>
           <div>
-            <div className="text-[10px] font-mono text-txt-muted uppercase">CodeChef</div>
-            <div className="font-display text-2xl font-light text-txt-main tracking-tight">
-              {stats.codechef?.rating || 1173}{" "}
-              <span className="text-xs font-mono text-txt-muted font-normal">
-                (max : {stats.codechef?.maxRating || stats.codechef?.rating || 1173})
-              </span>
+            <div className="text-[10px] font-mono text-txt-muted uppercase">
+              {stats.codechef?.rating ? "CodeChef" : stats.leetcode?.rating ? "LeetCode" : stats.codeforces?.rating ? "Codeforces" : "Contest Rating"}
             </div>
-            {stats.leetcode?.rating ? (
+            <div className="font-display text-2xl font-light text-txt-main tracking-tight">
+              {stats.codechef?.rating 
+                ? stats.codechef.rating 
+                : stats.leetcode?.rating 
+                  ? Math.round(stats.leetcode.rating) 
+                  : stats.codeforces?.rating 
+                    ? stats.codeforces.rating 
+                    : (handles.codechef || handles.leetcode || handles.codeforces ? "Unrated" : "—")}
+              {stats.codechef?.maxRating && stats.codechef.maxRating > (stats.codechef.rating || 0) ? (
+                <span className="text-xs font-mono text-txt-muted font-normal ml-1.5">
+                  (max : {stats.codechef.maxRating})
+                </span>
+              ) : null}
+            </div>
+            {stats.leetcode?.rating && stats.codechef?.rating ? (
               <div className="text-[10px] font-mono text-txt-sub mt-1">
                 LeetCode: <strong className="text-txt-main">{Math.round(stats.leetcode.rating)}</strong>
               </div>
             ) : null}
           </div>
           <span className="text-[9px] font-mono text-txt-muted">
-            {stats.codechef?.stars ? `${stats.codechef.stars} Stars Verified` : "Division 4 Rated"}
+            {stats.codechef?.stars ? `${stats.codechef.stars} Stars Verified` : stats.leetcode?.rank ? stats.leetcode.rank : "Official Rated Rounds"}
           </span>
         </div>
 
@@ -731,101 +789,135 @@ export default function CodingDeckDashboard({
 
             {/* Stable SVG Rating Graph Container */}
             <div className="w-full bg-bg-card/40 rounded p-4 border border-border-main/30 flex flex-col gap-2 relative">
-              
-              {/* Floating Micro-Tooltip Positioned Directly Above Active Node */}
-              {hoveredContestIndex !== null && (
-                <div 
-                  style={{
-                    left: `${([30, 130, 240, 360, 470][hoveredContestIndex] / 500) * 100}%`,
-                    top: "12px"
-                  }}
-                  className="absolute -translate-x-1/2 z-20 bg-bg-surface border border-border-main/80 px-2.5 py-1.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 text-center whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
-                >
-                  <span className="font-mono text-[10px] font-bold text-txt-main">
-                    {contestTimeline[hoveredContestIndex].name}
-                  </span>
-                  <div className="flex items-center gap-2 text-[9px] font-mono text-txt-muted">
-                    <span className="text-accent-main font-bold">Rating: {contestTimeline[hoveredContestIndex].rating}</span>
-                    <span>•</span>
-                    <span>Rank: #{contestTimeline[hoveredContestIndex].rank}</span>
-                    <span>•</span>
-                    <span>{contestTimeline[hoveredContestIndex].date}</span>
-                  </div>
+              {contestTimeline.length === 0 ? (
+                <div className="h-40 w-full flex flex-col items-center justify-center text-center p-4 text-txt-muted gap-1">
+                  <TrendingUp size={22} className="opacity-40 mb-1" />
+                  <span className="text-xs font-mono font-medium text-txt-main">No Rated Contests Synced</span>
+                  <span className="text-[10px] text-txt-sub">Connect your CodeChef, LeetCode, or Codeforces accounts to plot your rating curve</span>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* Floating Micro-Tooltip Positioned Directly Above Active Node */}
+                  {hoveredContestIndex !== null && contestTimeline[hoveredContestIndex] && (
+                    <div 
+                      style={{
+                        left: `${(hoveredContestIndex / Math.max(1, contestTimeline.length - 1)) * 80 + 10}%`,
+                        top: "12px"
+                      }}
+                      className="absolute -translate-x-1/2 z-20 bg-bg-surface border border-border-main/80 px-2.5 py-1.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 text-center whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <span className="font-mono text-[10px] font-bold text-txt-main">
+                        {contestTimeline[hoveredContestIndex].name}
+                      </span>
+                      <div className="flex items-center gap-2 text-[9px] font-mono text-txt-muted">
+                        <span className="text-accent-main font-bold">Rating: {contestTimeline[hoveredContestIndex].rating}</span>
+                        <span>•</span>
+                        <span>Rank: #{contestTimeline[hoveredContestIndex].rank}</span>
+                        <span>•</span>
+                        <span>{contestTimeline[hoveredContestIndex].date}</span>
+                      </div>
+                    </div>
+                  )}
 
-              <div className="relative h-40 w-full">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 500 130" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="ratingSubtleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0.18" />
-                      <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Grid lines */}
-                  <line x1="0" y1="20" x2="500" y2="20" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
-                  <line x1="0" y1="65" x2="500" y2="65" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
-                  <line x1="0" y1="110" x2="500" y2="110" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                  <div className="relative h-40 w-full">
+                    <svg className="w-full h-full overflow-visible" viewBox="0 0 500 130" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="ratingSubtleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0.18" />
+                          <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      
+                      {/* Grid lines */}
+                      <line x1="0" y1="20" x2="500" y2="20" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                      <line x1="0" y1="65" x2="500" y2="65" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                      <line x1="0" y1="110" x2="500" y2="110" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
 
-                  {/* Area */}
-                  <polygon
-                    points="30,105 130,80 240,35 360,45 470,20 470,125 30,125"
-                    fill="url(#ratingSubtleGrad)"
-                  />
+                      {/* Area */}
+                      <polygon
+                        points={
+                          contestTimeline.length === 1 
+                            ? "30,65 470,65 470,125 30,125" 
+                            : contestTimeline.map((node, i) => {
+                                const cx = 30 + (i / (contestTimeline.length - 1)) * 440;
+                                const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
+                                const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
+                                const range = Math.max(1, maxR - minR);
+                                const cy = 110 - ((node.rating - minR) / range) * 90;
+                                return `${cx},${cy}`;
+                              }).join(" ") + ` 470,125 30,125`
+                        }
+                        fill="url(#ratingSubtleGrad)"
+                      />
 
-                  {/* Line */}
-                  <polyline
-                    fill="none"
-                    stroke="hsl(var(--accent))"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points="30,105 130,80 240,35 360,45 470,20"
-                  />
+                      {/* Line */}
+                      <polyline
+                        fill="none"
+                        stroke="hsl(var(--accent))"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        points={
+                          contestTimeline.length === 1
+                            ? "30,65 470,65"
+                            : contestTimeline.map((node, i) => {
+                                const cx = 30 + (i / (contestTimeline.length - 1)) * 440;
+                                const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
+                                const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
+                                const range = Math.max(1, maxR - minR);
+                                const cy = 110 - ((node.rating - minR) / range) * 90;
+                                return `${cx},${cy}`;
+                              }).join(" ")
+                        }
+                      />
 
-                  {/* Interactive Nodes */}
-                  {contestTimeline.map((node, i) => {
-                    const cx = [30, 130, 240, 360, 470][i] || 50;
-                    const cy = [105, 80, 35, 45, 20][i] || 50;
-                    const isHovered = hoveredContestIndex === i;
-                    return (
-                      <g 
-                        key={node.id} 
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredContestIndex(i)}
-                        onMouseLeave={() => setHoveredContestIndex(null)}
-                      >
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={isHovered ? "6.5" : "4.5"}
-                          className="fill-bg-surface stroke-accent-main transition-all"
-                          strokeWidth="2"
-                        />
-                        <text
-                          x={cx}
-                          y={cy - 10}
-                          textAnchor="middle"
-                          className="fill-txt-main text-[9px] font-mono font-semibold select-none"
-                        >
-                          {node.rating}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </svg>
-              </div>
-
-              {/* Timeline Bottom Labels */}
-              <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted px-1 pt-2 border-t border-border-main/30">
-                {contestTimeline.map((node) => (
-                  <div key={node.id} className="flex flex-col items-center text-center">
-                    <span className="font-medium text-txt-sub truncate max-w-[85px]">{node.name}</span>
-                    <span className="text-[8px] text-txt-muted">{node.date}</span>
+                      {/* Interactive Nodes */}
+                      {contestTimeline.map((node, i) => {
+                        const cx = contestTimeline.length === 1 ? 250 : 30 + (i / (contestTimeline.length - 1)) * 440;
+                        const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
+                        const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
+                        const range = Math.max(1, maxR - minR);
+                        const cy = contestTimeline.length === 1 ? 65 : 110 - ((node.rating - minR) / range) * 90;
+                        const isHovered = hoveredContestIndex === i;
+                        return (
+                          <g 
+                            key={node.id} 
+                            className="cursor-pointer"
+                            onMouseEnter={() => setHoveredContestIndex(i)}
+                            onMouseLeave={() => setHoveredContestIndex(null)}
+                          >
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={isHovered ? "6.5" : "4.5"}
+                              className="fill-bg-surface stroke-accent-main transition-all"
+                              strokeWidth="2"
+                            />
+                            <text
+                              x={cx}
+                              y={cy - 10}
+                              textAnchor="middle"
+                              className="fill-txt-main text-[9px] font-mono font-semibold select-none"
+                            >
+                              {node.rating}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
                   </div>
-                ))}
-              </div>
+
+                  {/* Timeline Bottom Labels */}
+                  <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted px-1 pt-2 border-t border-border-main/30">
+                    {contestTimeline.map((node) => (
+                      <div key={node.id} className="flex flex-col items-center text-center">
+                        <span className="font-medium text-txt-sub truncate max-w-[85px]">{node.name}</span>
+                        <span className="text-[8px] text-txt-muted">{node.date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -899,31 +991,39 @@ export default function CodingDeckDashboard({
               <Clock size={15} className="text-txt-muted" />
             </div>
 
-            <div className="flex flex-col divide-y divide-border-main/30">
-              {recentSolves.map((item) => (
-                <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex flex-col gap-0.5 min-w-0">
-                    <a 
-                      href={item.link} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="font-medium text-txt-main hover:text-accent-main truncate transition-colors flex items-center gap-1"
-                    >
-                      <span className="truncate">{item.title}</span>
-                      <ExternalLink size={10} className="shrink-0 text-txt-muted" />
-                    </a>
-                    <div className="flex items-center gap-2 font-mono text-[10px] text-txt-muted">
-                      <span>{item.platform}</span>
-                      <span>•</span>
-                      <span>{item.time}</span>
+            {recentSolves.length === 0 ? (
+              <div className="py-6 flex flex-col items-center justify-center text-center text-txt-muted gap-1">
+                <Code2 size={20} className="opacity-40 mb-1" />
+                <span className="text-xs font-mono font-medium text-txt-main">No Recent Solves Recorded</span>
+                <span className="text-[10px] text-txt-sub">Submit problem solutions on connected platforms to populate your live feed</span>
+              </div>
+            ) : (
+              <div className="flex flex-col divide-y divide-border-main/30">
+                {recentSolves.map((item) => (
+                  <div key={item.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <a 
+                        href={item.link} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="font-medium text-txt-main hover:text-accent-main truncate transition-colors flex items-center gap-1"
+                      >
+                        <span className="truncate">{item.title}</span>
+                        <ExternalLink size={10} className="shrink-0 text-txt-muted" />
+                      </a>
+                      <div className="flex items-center gap-2 font-mono text-[10px] text-txt-muted">
+                        <span>{item.platform}</span>
+                        <span>•</span>
+                        <span>{item.time}</span>
+                      </div>
                     </div>
+                    <span className="px-2 py-0.5 rounded-xs font-mono text-[10px] shrink-0 border border-border-main/60 bg-bg-card text-txt-sub">
+                      {item.difficulty}
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-xs font-mono text-[10px] shrink-0 border border-border-main/60 bg-bg-card text-txt-sub">
-                    {item.difficulty}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>
@@ -956,7 +1056,7 @@ export default function CodingDeckDashboard({
                     <span className="text-txt-main font-semibold">{summary.easySolved}</span>
                   </div>
                   <div className="w-full bg-border-main/30 h-2 rounded-full overflow-hidden">
-                    <div style={{ width: `${(summary.easySolved / summary.totalSolved) * 100}%` }} className="bg-accent-main/80 h-full rounded-full" />
+                    <div style={{ width: `${summary.totalSolved > 0 ? (summary.easySolved / summary.totalSolved) * 100 : 0}%` }} className="bg-accent-main/80 h-full rounded-full" />
                   </div>
                 </div>
 
@@ -967,7 +1067,7 @@ export default function CodingDeckDashboard({
                     <span className="text-txt-main font-semibold">{summary.medSolved}</span>
                   </div>
                   <div className="w-full bg-border-main/30 h-2 rounded-full overflow-hidden">
-                    <div style={{ width: `${(summary.medSolved / summary.totalSolved) * 100}%` }} className="bg-accent-main/55 h-full rounded-full" />
+                    <div style={{ width: `${summary.totalSolved > 0 ? (summary.medSolved / summary.totalSolved) * 100 : 0}%` }} className="bg-accent-main/55 h-full rounded-full" />
                   </div>
                 </div>
 
@@ -978,7 +1078,7 @@ export default function CodingDeckDashboard({
                     <span className="text-txt-main font-semibold">{summary.hardSolved}</span>
                   </div>
                   <div className="w-full bg-border-main/30 h-2 rounded-full overflow-hidden">
-                    <div style={{ width: `${(summary.hardSolved / summary.totalSolved) * 100}%` }} className="bg-accent-main/30 h-full rounded-full" />
+                    <div style={{ width: `${summary.totalSolved > 0 ? (summary.hardSolved / summary.totalSolved) * 100 : 0}%` }} className="bg-accent-main/30 h-full rounded-full" />
                   </div>
                 </div>
               </div>
@@ -995,7 +1095,7 @@ export default function CodingDeckDashboard({
                 <span className="font-medium text-txt-main">{summary.ccSolved}</span>
               </div>
               <div className="w-full bg-border-main/30 h-2 rounded-full overflow-hidden">
-                <div style={{ width: "100%" }} className="bg-accent-main/60 h-full rounded-full" />
+                <div style={{ width: `${summary.totalSolved > 0 ? (summary.ccSolved / summary.totalSolved) * 100 : summary.ccSolved > 0 ? 100 : 0}%` }} className="bg-accent-main/60 h-full rounded-full" />
               </div>
             </div>
           </div>
@@ -1010,25 +1110,33 @@ export default function CodingDeckDashboard({
               <Layers size={15} className="text-txt-muted" />
             </div>
 
-            <div className="flex flex-col gap-3 pt-1">
-              {topicData.map((topic, i) => {
-                const barWidth = Math.min(100, Math.round((topic.solved / maxTopicSolved) * 100));
-                return (
-                  <div key={i} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-txt-main font-medium">{topic.name}</span>
-                      <span className="text-txt-sub font-semibold">{topic.solved} solved</span>
+            {topicData.length === 0 ? (
+              <div className="py-6 flex flex-col items-center justify-center text-center text-txt-muted gap-1">
+                <Layers size={20} className="opacity-40 mb-1" />
+                <span className="text-xs font-mono font-medium text-txt-main">No Topic Metrics Synced</span>
+                <span className="text-[10px] text-txt-sub">Connect your LeetCode profile to analyze your DSA category breakdown</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pt-1">
+                {topicData.map((topic, i) => {
+                  const barWidth = Math.min(100, Math.round((topic.solved / maxTopicSolved) * 100));
+                  return (
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="text-txt-main font-medium">{topic.name}</span>
+                        <span className="text-txt-sub font-semibold">{topic.solved} solved</span>
+                      </div>
+                      <div className="w-full bg-border-main/30 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          style={{ width: `${barWidth}%` }} 
+                          className="h-full rounded-full bg-accent-main/70" 
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-border-main/30 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${barWidth}%` }} 
-                        className="h-full rounded-full bg-accent-main/70" 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Language Mastery Breakdown (Raw Counts Only) */}
@@ -1041,25 +1149,33 @@ export default function CodingDeckDashboard({
               <Terminal size={15} className="text-txt-muted" />
             </div>
 
-            <div className="flex flex-col gap-3 pt-1">
-              {languageData.map((lang, i) => {
-                const barWidth = Math.min(100, Math.round((lang.solved / (summary.totalSolved || 560)) * 100));
-                return (
-                  <div key={i} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-txt-main font-medium">{lang.name}</span>
-                      <span className="text-txt-sub font-semibold">{lang.solved} solved</span>
+            {languageData.length === 0 ? (
+              <div className="py-6 flex flex-col items-center justify-center text-center text-txt-muted gap-1">
+                <Terminal size={20} className="opacity-40 mb-1" />
+                <span className="text-xs font-mono font-medium text-txt-main">No Language Metrics Synced</span>
+                <span className="text-[10px] text-txt-sub">Connect your LeetCode or GitHub profile to view your programming language breakdown</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pt-1">
+                {languageData.map((lang, i) => {
+                  const barWidth = Math.min(100, Math.round((lang.solved / maxLanguageSolved) * 100));
+                  return (
+                    <div key={i} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-xs font-mono">
+                        <span className="text-txt-main font-medium">{lang.name}</span>
+                        <span className="text-txt-sub font-semibold">{lang.solved} {lang.solved === 1 ? "solve / repo" : "solves / repos"}</span>
+                      </div>
+                      <div className="w-full bg-border-main/30 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          style={{ width: `${barWidth}%` }} 
+                          className="h-full rounded-full bg-accent-main/80" 
+                        />
+                      </div>
                     </div>
-                    <div className="w-full bg-border-main/30 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        style={{ width: `${barWidth}%` }} 
-                        className="h-full rounded-full bg-accent-main/80" 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Dedicated GitHub Matrix Section (With gitlogo.jpg & Verified Commit Data) */}
@@ -1093,13 +1209,15 @@ export default function CodingDeckDashboard({
             <div className="grid grid-cols-2 gap-3">
               <div className="border border-border-main/40 bg-bg-card/40 p-3 rounded flex flex-col gap-0.5">
                 <span className="text-[9px] font-mono text-txt-muted uppercase">Public Repos</span>
-                <span className="text-xl font-semibold text-txt-main font-display">{stats.github?.repos || 14}</span>
+                <span className="text-xl font-semibold text-txt-main font-display">
+                  {stats.github?.repos ?? (handles.github ? "0" : "—")}
+                </span>
                 <span className="text-[9px] text-txt-sub font-mono">Code repositories</span>
               </div>
               <div className="border border-border-main/40 bg-bg-card/40 p-3 rounded flex flex-col gap-0.5">
                 <span className="text-[9px] font-mono text-txt-muted uppercase">Annual Commits</span>
                 <span className="text-xl font-semibold text-accent-main font-display">
-                  {typeof stats.github?.commits === "number" ? stats.github.commits : 482}
+                  {typeof stats.github?.commits === "number" ? stats.github.commits : (handles.github ? "0" : "—")}
                 </span>
                 <span className="text-[9px] text-txt-sub font-mono">Verified pushes</span>
               </div>

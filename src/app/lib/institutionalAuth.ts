@@ -160,6 +160,18 @@ export async function verifyInstitutionalToken(
 }
 
 /**
+ * Extracts and verifies institutional session payload directly from NextRequest cookies
+ */
+export async function getInstitutionalSession(req: NextRequest): Promise<InstitutionalSessionPayload | null> {
+  const token = 
+    req.cookies.get(INSTITUTIONAL_COOKIE_NAMES.STAFF)?.value ||
+    req.cookies.get(INSTITUTIONAL_COOKIE_NAMES.ADMIN)?.value ||
+    req.cookies.get(INSTITUTIONAL_COOKIE_NAMES.RECRUITER)?.value;
+  if (!token) return null;
+  return await verifyInstitutionalToken(token);
+}
+
+/**
  * Hashes a client IP using SHA-256 for GDPR-compliant audit logs
  */
 export async function hashClientIp(req: NextRequest): Promise<string> {

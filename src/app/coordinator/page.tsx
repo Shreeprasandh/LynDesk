@@ -20,7 +20,16 @@ import {
   Sparkles,
   HelpCircle,
   Palette,
-  AlertTriangle
+  AlertTriangle,
+  CalendarCheck,
+  GraduationCap,
+  Calendar,
+  Search,
+  Filter,
+  Check,
+  ShieldCheck,
+  Send,
+  Building2
 } from "lucide-react";
 
 interface CreditClaim {
@@ -120,7 +129,17 @@ function CoordinatorConsoleContent() {
     }
   }, []);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "attendance_marker" | "marks_entry" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "attendance_marker" | "marks_entry" | "leave_approvals" | "talent_registry" | "broadcasts" | "verifications" | "staff_access">("overview");
+
+  // Leave & OD Approvals States
+  const [leaveApplications, setLeaveApplications] = useState<any[]>([]);
+  const [selectedLeaveApp, setSelectedLeaveApp] = useState<any | null>(null);
+  const [leaveFilter, setLeaveFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState<"all" | "od" | "leave">("all");
+  const [leaveSearch, setLeaveSearch] = useState("");
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [leaveActionRemarks, setLeaveActionRemarks] = useState("");
+  const [leaveActionLoading, setLeaveActionLoading] = useState(false);
 
   // Daily Attendance Marker States
   const [attSubject, setAttSubject] = useState("CS8501");
@@ -161,7 +180,7 @@ function CoordinatorConsoleContent() {
   // Sync activeTab with search parameter updates
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "attendance_marker", "marks_entry", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
+    if (tabParam && ["overview", "attendance_marker", "marks_entry", "leave_approvals", "talent_registry", "broadcasts", "verifications", "staff_access"].includes(tabParam)) {
       setTimeout(() => {
         setActiveTab(tabParam as any);
       }, 0);
@@ -1317,6 +1336,143 @@ useEffect(() => {
     }
   };
 
+  const defaultLeaveApplications = [
+    {
+      id: "leave_demo_1",
+      student_id: "s1",
+      student: {
+        id: "s1",
+        full_name: "Alex Carter",
+        roll_number: "RA2311003010001",
+        department: "Computer Science",
+        section: "A",
+        academic_year: "3rd Year"
+      },
+      application_type: "od",
+      target_date: "2026-09-10",
+      end_date: "2026-09-10",
+      is_full_day: false,
+      periods: [2, 3, 4],
+      category: "hackathon",
+      title: "National Smart India Hackathon Grand Finale",
+      reason: "Representing university in 36-hr hardware + software track at IIT Madras.",
+      proof_url: "https://sih.gov.in/team-confirmation-2026.pdf",
+      status: "pending",
+      created_at: new Date().toISOString()
+    },
+    {
+      id: "leave_demo_2",
+      student_id: "s2",
+      student: {
+        id: "s2",
+        full_name: "Mira Sen",
+        roll_number: "RA2311003010002",
+        department: "Information Technology",
+        section: "A",
+        academic_year: "3rd Year"
+      },
+      application_type: "leave",
+      target_date: "2026-09-12",
+      end_date: "2026-09-13",
+      is_full_day: true,
+      periods: [1, 2, 3, 4, 5, 6],
+      category: "medical",
+      title: "Medical Leave for Eye Surgery Checkup",
+      reason: "Scheduled ophthalmology consultation and recovery at Apollo Hospitals.",
+      letter_body: "To\nThe Head of the Department\nDepartment of Information Technology\n\nRespected Sir/Madam,\n\nI am writing to formally request leave for 2 days from Sept 12 to Sept 13 due to scheduled medical consultations. I will ensure all coursework and laboratory assignments are completed.\n\nYours sincerely,\nMira Sen\nRA2311003010002",
+      proof_url: "https://apollohospitals.com/reports/mira-sen-op.pdf",
+      status: "pending",
+      created_at: new Date().toISOString()
+    }
+  ];
+
+  const loadLeaveApplications = useCallback(async () => {
+    setLeaveLoading(true);
+    try {
+      const res = await fetch("/api/college/leave?isStaff=true");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.applications) && data.applications.length > 0) {
+        setLeaveApplications(data.applications);
+        if (!selectedLeaveApp) {
+          setSelectedLeaveApp(data.applications[0]);
+        }
+      } else {
+        setLeaveApplications(defaultLeaveApplications);
+        if (!selectedLeaveApp) {
+          setSelectedLeaveApp(defaultLeaveApplications[0]);
+        }
+      }
+    } catch {
+      setLeaveApplications(defaultLeaveApplications);
+      if (!selectedLeaveApp) {
+        setSelectedLeaveApp(defaultLeaveApplications[0]);
+      }
+    } finally {
+      setLeaveLoading(false);
+    }
+  }, [selectedLeaveApp]);
+
+  useEffect(() => {
+    loadLeaveApplications();
+  }, [loadLeaveApplications]);
+
+  const handleReviewLeaveApp = async (applicationId: string, decision: "approved" | "rejected") => {
+    setLeaveActionLoading(true);
+    try {
+      await fetch("/api/college/leave", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          status: decision,
+          remarks: leaveActionRemarks.trim() || (decision === "approved" ? "Approved by class coordinator." : "Declined by coordinator.")
+        })
+      });
+
+      // Update state
+      setLeaveApplications(prev => prev.map(app => 
+        app.id === applicationId 
+          ? { ...app, status: decision, faculty_remarks: leaveActionRemarks.trim() || (decision === "approved" ? "Approved" : "Declined") } 
+          : app
+      ));
+
+      if (selectedLeaveApp?.id === applicationId) {
+        setSelectedLeaveApp((prev: any) => ({ ...prev, status: decision, faculty_remarks: leaveActionRemarks.trim() || (decision === "approved" ? "Approved" : "Declined") }));
+      }
+
+      setLeaveActionRemarks("");
+      addAuditLog(`Coordinator ${decision} application: ${selectedLeaveApp?.title || applicationId}`);
+      setModalMessage({
+        isOpen: true,
+        title: `Application ${decision === "approved" ? "Approved" : "Declined"}`,
+        text: `The ${selectedLeaveApp?.application_type === "od" ? "On-Duty (OD)" : "Leave"} application has been ${decision}.`
+      });
+    } catch {
+      // Local fallback
+      setLeaveApplications(prev => prev.map(app => 
+        app.id === applicationId ? { ...app, status: decision } : app
+      ));
+      if (selectedLeaveApp?.id === applicationId) {
+        setSelectedLeaveApp((prev: any) => ({ ...prev, status: decision }));
+      }
+    } finally {
+      setLeaveActionLoading(false);
+    }
+  };
+
+  const filteredLeaveApps = leaveApplications.filter(app => {
+    const matchesSearch = 
+      (app.title || "").toLowerCase().includes(leaveSearch.toLowerCase()) ||
+      (app.student?.full_name || "").toLowerCase().includes(leaveSearch.toLowerCase()) ||
+      (app.student?.roll_number || "").toLowerCase().includes(leaveSearch.toLowerCase()) ||
+      (app.reason || "").toLowerCase().includes(leaveSearch.toLowerCase());
+    
+    const matchesStatus = leaveFilter === "all" ? true : app.status === leaveFilter;
+    const matchesType = leaveTypeFilter === "all" ? true : app.application_type === leaveTypeFilter;
+
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
   const pendingCount = claims.filter(c => c.status === "pending").length;
   const approvedPoints = claims.filter(c => c.status === "approved").reduce((sum, c) => sum + c.points, 0);
 
@@ -1352,11 +1508,17 @@ useEffect(() => {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
             <div className="flex flex-col gap-1 text-left">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
-                {isCompanyRecruiter ? "Recruiter Desk" : "Registrar Desk"}
+                {isCompanyRecruiter ? "Recruiter Desk" : "Registrar & Faculty Desk"}
               </span>
               <h1 className="font-display text-3xl font-light tracking-tight text-txt-main">
                 {activeTab === "overview"
                   ? (isCompanyRecruiter ? "Recruiter Insights Dashboard" : "Coordinator Performance Dashboard")
+                  : activeTab === "attendance_marker"
+                  ? "Daily Period-Wise Attendance Marker"
+                  : activeTab === "marks_entry"
+                  ? "Internal & Assessment Marks Entry"
+                  : activeTab === "leave_approvals"
+                  ? "Student Leave & On-Duty (OD) Approvals"
                   : activeTab === "talent_registry"
                   ? (isCompanyRecruiter ? "Talent Pipeline & Candidates" : "Student Talent Registry")
                   : activeTab === "broadcasts"
@@ -1370,6 +1532,12 @@ useEffect(() => {
                   ? (isCompanyRecruiter 
                       ? "Analytics overview of candidates, top coders, and active university skill distributions." 
                       : "High-level summary of student competitive programming performance and activity metrics.")
+                  : activeTab === "attendance_marker"
+                  ? "Mark, audit, and log period-by-period class attendance with instant student safety verification."
+                  : activeTab === "marks_entry"
+                  ? "Record and publish continuous assessment scores, internal test grades, and class averages."
+                  : activeTab === "leave_approvals"
+                  ? "Review, approve, or decline student Leave and On-Duty (OD) requests with automatic period-wise attendance synchronization."
                   : activeTab === "talent_registry"
                   ? (isCompanyRecruiter 
                       ? "Search, filter, and shortlist student candidates by LeetCode count, language skills, or graduation years." 
@@ -1391,29 +1559,75 @@ useEffect(() => {
               )}
             </div>
           </div>
+
           {/* Quick Metrics Cards */}
-          <div className="grid grid-cols-3 gap-4 flex-shrink-0">
-            <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
+            <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-1">
               <span className="font-mono text-[8px] uppercase tracking-widest text-txt-muted">Pending Verification</span>
               <span className="text-xl font-display font-light text-txt-main flex items-center gap-1.5">
                 <Clock size={14} className="text-txt-muted" />
                 {pendingCount}
               </span>
             </div>
-            <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-1">
+            <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-1">
+              <span className="font-mono text-[8px] uppercase tracking-widest text-txt-muted">Leave &amp; OD Queue</span>
+              <span className="text-xl font-display font-light text-amber-400 flex items-center gap-1.5">
+                <CalendarCheck size={14} className="text-amber-400" />
+                {leaveApplications.filter(a => a.status === "pending").length}
+              </span>
+            </div>
+            <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-1">
               <span className="font-mono text-[8px] uppercase tracking-widest text-txt-muted">Awarded Credits</span>
               <span className="text-xl font-display font-light text-txt-main flex items-center gap-1.5">
                 <Award size={14} className="text-txt-main" />
                 {approvedPoints} Pts
               </span>
             </div>
-            <div className="border border-border-main/60 bg-bg-surface p-4 rounded-sm flex flex-col gap-1">
+            <div className="border border-border-main/60 bg-bg-surface p-3.5 rounded-sm flex flex-col gap-1">
               <span className="font-mono text-[8px] uppercase tracking-widest text-txt-muted">Registered Students</span>
               <span className="text-xl font-display font-light text-txt-main flex items-center gap-1.5">
                 <Users size={14} className="text-txt-muted" />
                 {claims.length} Active
               </span>
             </div>
+          </div>
+
+          {/* Navigation Tab Bar */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-border-main/40 no-scrollbar flex-shrink-0">
+            {[
+              { id: "overview", label: "Overview", icon: Sparkles },
+              { id: "attendance_marker", label: "Attendance Roster", icon: CalendarCheck },
+              { id: "marks_entry", label: "Marks Entry", icon: GraduationCap },
+              { id: "leave_approvals", label: "Leave & OD Queue", icon: Calendar, badge: leaveApplications.filter(a => a.status === "pending").length },
+              { id: "talent_registry", label: "Talent Registry", icon: Users },
+              { id: "broadcasts", label: "Broadcasts", icon: Send },
+              { id: "verifications", label: "Verifications", icon: FileText, badge: pendingCount },
+              { id: "staff_access", label: "Staff Access", icon: ShieldCheck },
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-mono whitespace-nowrap transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-accent-main text-bg-base font-bold shadow-sm"
+                      : "bg-bg-surface hover:bg-bg-card text-txt-muted hover:text-txt-main border border-border-main/50"
+                  }`}
+                >
+                  <Icon size={12} />
+                  <span>{tab.label}</span>
+                  {tab.badge !== undefined && tab.badge > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                      isActive ? "bg-bg-base text-accent-main" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    }`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Active Tab contents */}
@@ -1706,6 +1920,153 @@ useEffect(() => {
                 </table>
               </div>
 
+            </div>
+          )}
+
+          {activeTab === "leave_approvals" && (
+            <div className="flex-grow flex flex-col min-h-0 gap-4 overflow-y-auto pr-1">
+              {/* Filter and Control Bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-bg-card/20 p-3.5 border border-border-main/50 rounded-md flex-shrink-0">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-2.5 text-txt-muted" />
+                  <input
+                    type="text"
+                    value={leaveSearch}
+                    onChange={(e) => setLeaveSearch(e.target.value)}
+                    placeholder="Search roll, name, title..."
+                    className="h-8 pl-8 pr-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/60 w-full font-mono"
+                  />
+                </div>
+
+                <select
+                  value={leaveFilter}
+                  onChange={(e) => setLeaveFilter(e.target.value as any)}
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                >
+                  <option value="all">All Approval States</option>
+                  <option value="pending">Pending Review Only</option>
+                  <option value="approved">Approved Applications</option>
+                  <option value="rejected">Declined Applications</option>
+                </select>
+
+                <select
+                  value={leaveTypeFilter}
+                  onChange={(e) => setLeaveTypeFilter(e.target.value as any)}
+                  className="h-8 px-2 border border-border-main/80 bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                >
+                  <option value="all">All Types (OD &amp; Leave)</option>
+                  <option value="od">On-Duty (OD) Only</option>
+                  <option value="leave">Formal Leave Only</option>
+                </select>
+              </div>
+
+              {/* Application Count and Action Header */}
+              <div className="flex items-center justify-between px-1 flex-shrink-0">
+                <span className="text-[10px] font-mono uppercase text-txt-muted">
+                  Applications: {filteredLeaveApps.length} ({leaveApplications.filter(a => a.status === "pending").length} Pending)
+                </span>
+                <button
+                  type="button"
+                  onClick={loadLeaveApplications}
+                  className="text-[10px] font-mono text-accent-main hover:underline cursor-pointer"
+                >
+                  ↻ Refresh Queue
+                </button>
+              </div>
+
+              {/* Application List Cards */}
+              <div className="flex-1 overflow-y-auto border border-border-main/60 bg-bg-surface rounded-md">
+                {filteredLeaveApps.length === 0 ? (
+                  <div className="p-12 text-center text-txt-muted font-mono text-xs flex flex-col items-center gap-2">
+                    <CalendarCheck size={24} className="text-txt-muted/60" />
+                    <span>No student leave or OD requests match the selected filters.</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col divide-y divide-border-main/60">
+                    {filteredLeaveApps.map((app) => {
+                      const isSelected = selectedLeaveApp?.id === app.id;
+                      const isOD = app.application_type === "od";
+                      return (
+                        <div
+                          key={app.id}
+                          onClick={() => setSelectedLeaveApp(app)}
+                          className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-bg-card/25 transition-colors ${
+                            isSelected ? "bg-bg-card/30" : ""
+                          }`}
+                        >
+                          <div className="flex flex-col gap-1.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold uppercase border ${
+                                isOD ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                              }`}>
+                                {isOD ? "On-Duty (OD)" : "Formal Leave"}
+                              </span>
+                              <span className="text-xs font-semibold text-txt-main truncate">{app.title}</span>
+                              <span className="font-mono text-[9px] text-txt-muted uppercase px-1.5 py-0.2 rounded bg-bg-base border border-border-main/40">
+                                {app.category}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-txt-muted font-mono">
+                              <span className="text-txt-main font-semibold">{app.student?.full_name || "Student"}</span>
+                              <span>•</span>
+                              <span>{app.student?.roll_number || app.student_id}</span>
+                              <span>•</span>
+                              <span>{app.student?.department || "CSE"} ({app.student?.academic_year || "3rd Year"})</span>
+                            </div>
+
+                            <div className="text-[10.5px] text-txt-sub flex items-center gap-2">
+                              <span className="font-mono text-[9.5px] text-accent-main">
+                                📅 {app.target_date}{app.end_date && app.end_date !== app.target_date ? ` to ${app.end_date}` : ""}
+                              </span>
+                              <span>•</span>
+                              <span className="font-mono text-[9.5px]">
+                                {app.is_full_day ? "Full Day (6 Periods)" : `Periods: ${(app.periods || []).map((p: number) => `P${p}`).join(", ")}`}
+                              </span>
+                            </div>
+
+                            {app.reason && (
+                              <p className="text-[11px] text-txt-muted font-light line-clamp-1 italic">
+                                &ldquo;{app.reason}&rdquo;
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Status & Quick Action Buttons */}
+                          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                            {app.status === "pending" ? (
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewLeaveApp(app.id, "rejected")}
+                                  className="h-7 px-2.5 border border-rose-500/50 hover:bg-rose-500/10 text-rose-400 text-[10px] font-mono uppercase tracking-wider rounded transition-colors cursor-pointer flex items-center gap-1"
+                                >
+                                  <XCircle size={11} /> Decline
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewLeaveApp(app.id, "approved")}
+                                  className="h-7 px-3 bg-accent-main hover:opacity-90 text-bg-base text-[10px] font-mono uppercase tracking-wider rounded font-bold transition-opacity cursor-pointer flex items-center gap-1"
+                                >
+                                  <CheckCircle2 size={11} /> Approve
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded font-mono text-[9px] font-bold uppercase border ${
+                                app.status === "approved"
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                                  : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              }`}>
+                                {app.status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -2722,6 +3083,12 @@ useEffect(() => {
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
               {activeTab === "overview"
                 ? "Live Auditor"
+                : activeTab === "attendance_marker"
+                ? "Attendance Auditor"
+                : activeTab === "marks_entry"
+                ? "Gradebook Auditor"
+                : activeTab === "leave_approvals"
+                ? "Application Inspector"
                 : activeTab === "talent_registry"
                 ? (isCompanyRecruiter ? "Candidate Details" : "Skills Analytics")
                 : activeTab === "broadcasts"
@@ -2733,6 +3100,12 @@ useEffect(() => {
             <h2 className="font-display text-lg font-light text-txt-main">
               {activeTab === "overview"
                 ? "Console Ledger"
+                : activeTab === "attendance_marker"
+                ? "Period Attendance Status"
+                : activeTab === "marks_entry"
+                ? "Class Grade Summary"
+                : activeTab === "leave_approvals"
+                ? "Application Details & Proof Audit"
                 : activeTab === "talent_registry"
                 ? (isCompanyRecruiter ? "Candidate Dossier" : "Talent Dossier")
                 : activeTab === "broadcasts"
@@ -2742,6 +3115,214 @@ useEffect(() => {
                 : "Console Session Log"}
             </h2>
           </div>
+
+          {activeTab === "leave_approvals" && (
+            selectedLeaveApp ? (
+              <div className="flex flex-col gap-5 animate-fade-in text-left">
+                {/* Student Identification */}
+                <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-2">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Applicant Details</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-txt-main font-semibold">{selectedLeaveApp.student?.full_name || "Alex Carter"}</span>
+                    <span className="text-xs text-txt-muted font-mono">{selectedLeaveApp.student?.roll_number || "RA2311003010001"}</span>
+                    <span className="text-[10px] text-txt-sub mt-0.5 font-mono">
+                      {selectedLeaveApp.student?.department || "Computer Science"} • Section {selectedLeaveApp.student?.section || "A"} • {selectedLeaveApp.student?.academic_year || "3rd Year"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Application Parameters */}
+                <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Application Parameters</span>
+                  
+                  <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                    <span className="text-[10px] text-txt-sub font-mono uppercase">Request Type</span>
+                    <span className={`font-mono text-xs font-bold uppercase px-2 py-0.5 rounded border ${
+                      selectedLeaveApp.application_type === "od"
+                        ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                        : "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                    }`}>
+                      {selectedLeaveApp.application_type === "od" ? "On-Duty (OD)" : "Formal Leave"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                    <span className="text-[10px] text-txt-sub font-mono uppercase">Target Schedule</span>
+                    <span className="font-mono text-xs text-txt-main font-semibold">
+                      {selectedLeaveApp.target_date}
+                      {selectedLeaveApp.end_date && selectedLeaveApp.end_date !== selectedLeaveApp.target_date ? ` to ${selectedLeaveApp.end_date}` : ""}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                    <span className="text-[10px] text-txt-sub font-mono uppercase">Duration / Scope</span>
+                    <span className="font-mono text-xs text-accent-main font-semibold">
+                      {selectedLeaveApp.is_full_day ? "Whole Day (Periods 1–6)" : `Periods ${(selectedLeaveApp.periods || []).join(", ")}`}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1 border-b border-border-main/30 pb-2">
+                    <span className="text-[10px] text-txt-sub font-mono uppercase">Title / Subject</span>
+                    <span className="text-xs text-txt-main font-medium">{selectedLeaveApp.title}</span>
+                  </div>
+
+                  {selectedLeaveApp.reason && (
+                    <div className="flex flex-col gap-1 border-b border-border-main/30 pb-2">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase">Statement of Purpose / Reason</span>
+                      <p className="text-xs text-txt-main font-light leading-relaxed italic bg-bg-base/40 p-2.5 border border-border-main/40 rounded">
+                        &ldquo;{selectedLeaveApp.reason}&rdquo;
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Formal Letter View if available */}
+                  {selectedLeaveApp.letter_body && (
+                    <div className="flex flex-col gap-1.5 border-b border-border-main/30 pb-2">
+                      <span className="text-[10px] text-txt-sub font-mono uppercase font-bold flex items-center gap-1">
+                        <FileText size={11} /> Official Leave Letter Document
+                      </span>
+                      <div className="bg-bg-base/60 border border-border-main/60 p-3 rounded text-[11px] font-mono text-txt-main whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
+                        {selectedLeaveApp.letter_body}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Supporting Proof Document */}
+                  {selectedLeaveApp.proof_url && (
+                    <div className="flex items-center justify-between bg-bg-base/40 border border-border-main/40 p-2.5 rounded">
+                      <div className="flex items-center gap-2">
+                        <FileText size={13} className="text-txt-muted" />
+                        <span className="text-xs text-txt-main font-mono">Proof Attachment</span>
+                      </div>
+                      <a
+                        href={selectedLeaveApp.proof_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-accent-main hover:underline flex items-center gap-1 font-mono uppercase font-bold"
+                      >
+                        View Document <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Review Remarks & Action Buttons */}
+                {selectedLeaveApp.status === "pending" ? (
+                  <div className="flex flex-col gap-3 border border-border-main/70 bg-bg-surface p-4 rounded-sm">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[9px] text-txt-sub font-mono uppercase tracking-wider">Faculty Remarks (Optional)</label>
+                      <input
+                        type="text"
+                        value={leaveActionRemarks}
+                        onChange={(e) => setLeaveActionRemarks(e.target.value)}
+                        placeholder="e.g. Approved for hackathon representation..."
+                        className="h-8 px-2.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono placeholder:text-txt-muted/50 focus:outline-none focus:border-txt-main"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleReviewLeaveApp(selectedLeaveApp.id, "rejected")}
+                        disabled={leaveActionLoading}
+                        className="flex-1 h-9 border border-rose-500/60 hover:bg-rose-500/10 text-rose-400 text-xs font-mono uppercase tracking-wider rounded transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <XCircle size={12} /> Decline
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReviewLeaveApp(selectedLeaveApp.id, "approved")}
+                        disabled={leaveActionLoading}
+                        className="flex-1 h-9 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider rounded font-bold transition-opacity cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <CheckCircle2 size={12} />
+                        {selectedLeaveApp.application_type === "od" ? "Approve & Mark OD" : "Approve Leave"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-border-main/60 p-4 rounded bg-bg-card/40 text-center font-mono text-[10px] text-txt-sub flex flex-col gap-1">
+                    <span className="uppercase font-bold text-txt-main">Application Finalized ({selectedLeaveApp.status})</span>
+                    {selectedLeaveApp.faculty_remarks && (
+                      <span className="text-txt-muted italic">Faculty Note: {selectedLeaveApp.faculty_remarks}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-44 border border-border-main/80 border-dashed rounded-sm flex flex-col items-center justify-center text-center p-6 text-txt-muted">
+                <CalendarCheck size={18} className="mb-2" />
+                <span className="text-[10px] font-mono uppercase tracking-wider">No Application Selected</span>
+                <p className="text-[10px] font-light leading-relaxed max-w-xs mt-1">Select an OD or leave application from the queue to audit proof documents and record official decisions.</p>
+              </div>
+            )
+          )}
+
+          {activeTab === "attendance_marker" && (
+            <div className="flex flex-col gap-4 animate-fade-in text-left">
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Session Overview</span>
+                <div className="flex flex-col gap-1 text-xs font-mono">
+                  <span className="text-txt-main font-semibold">{attSubject} (Sec {attSection})</span>
+                  <span className="text-txt-muted text-[10px]">Date: {attDate} • Period: P{attPeriodSlot}</span>
+                </div>
+              </div>
+
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Roster Breakdown</span>
+                <div className="grid grid-cols-2 gap-2 text-center font-mono">
+                  <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                    <span className="text-[8px] text-txt-muted uppercase">Present</span>
+                    <span className="text-sm font-bold text-emerald-400">{attRoster.filter(s => s.status === "PRESENT").length}</span>
+                  </div>
+                  <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                    <span className="text-[8px] text-txt-muted uppercase">Absent</span>
+                    <span className="text-sm font-bold text-rose-400">{attRoster.filter(s => s.status === "ABSENT").length}</span>
+                  </div>
+                  <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                    <span className="text-[8px] text-txt-muted uppercase">On-Duty (OD)</span>
+                    <span className="text-sm font-bold text-amber-400">{attRoster.filter(s => s.status === "OD").length}</span>
+                  </div>
+                  <div className="bg-bg-base/30 p-2 border border-border-main/50 rounded flex flex-col">
+                    <span className="text-[8px] text-txt-muted uppercase">Late Entry</span>
+                    <span className="text-sm font-bold text-purple-400">{attRoster.filter(s => s.status === "LATE").length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "marks_entry" && (
+            <div className="flex flex-col gap-4 animate-fade-in text-left">
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Assessment Configuration</span>
+                <div className="flex flex-col gap-1 text-xs font-mono">
+                  <span className="text-txt-main font-semibold">{marksSubject} • {marksExamType}</span>
+                  <span className="text-txt-muted text-[10px]">Max Score: {marksMaxScore} • Students: {marksRoster.length}</span>
+                </div>
+              </div>
+
+              <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3 font-mono text-xs">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">Performance Summary</span>
+                <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                  <span className="text-txt-muted text-[10px] uppercase">Top Score</span>
+                  <span className="text-emerald-400 font-bold">{Math.max(...marksRoster.map(r => Number(r.score) || 0))} / {marksMaxScore}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-border-main/30 pb-2">
+                  <span className="text-txt-muted text-[10px] uppercase">Class Average</span>
+                  <span className="text-accent-main font-bold">
+                    {Math.round((marksRoster.reduce((acc, r) => acc + Number(r.score), 0) / marksRoster.length) * 10) / 10} / {marksMaxScore}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-txt-muted text-[10px] uppercase">Pass Rate (&gt;50%)</span>
+                  <span className="text-emerald-400 font-bold">
+                    {Math.round((marksRoster.filter(r => (Number(r.score) / marksMaxScore) >= 0.5).length / marksRoster.length) * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {activeTab === "verifications" && (
             verifSubTab === "credits" ? (

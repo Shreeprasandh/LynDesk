@@ -52,6 +52,30 @@ interface PlatformStats {
   isStreakMaintained?: boolean;
   leetcodeStreak?: number;
   activeYears?: number[];
+  contestHistory?: Array<{
+    name: string;
+    date: string;
+    timestamp?: number;
+    rating: number;
+    rank: number;
+    platform: string;
+  }>;
+  recentSubmissions?: Array<{
+    id: string;
+    title: string;
+    platform: string;
+    difficulty: string;
+    time: string;
+    link: string;
+  }>;
+  languages?: Array<{
+    name: string;
+    solved: number;
+  }>;
+  topics?: Array<{
+    name: string;
+    solved: number;
+  }>;
 }
 
 export default function CodingDeckPage() {
