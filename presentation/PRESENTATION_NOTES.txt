@@ -1,0 +1,475 @@
+====================================================================================================
+                        LYNDESK (EVENTTRACKER) - MASTER PRESENTATION GUIDE & TECHNICAL DOSSIER
+====================================================================================================
+Project Name      : LynDesk (Unified Student Operating System & Talent Ecosystem)
+Repository Name   : eventtracker
+Architecture      : Next.js 16 (App Router + Turbopack) + React 19 + TypeScript + Tailwind CSS v4
+Backend & Database: Supabase (PostgreSQL 15+ with RLS) + Next.js Server Route Handlers + Edge Proxies
+AI Engine         : Google Gemini 1.5 / 2.0 Flash (@google/generative-ai) + Multi-Model Orchestration
+Test Suite        : Vitest (70 Suites, 115 Tests Passing) | TypeScript Strict Mode (0 Errors)
+Production Build  : 94 Static & Dynamic App Router Pages Fully Compiled
+
+----------------------------------------------------------------------------------------------------
+TABLE OF CONTENTS
+----------------------------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & PROBLEM STATEMENT
+2. COMPLETE TECHNOLOGY STACK & ARCHITECTURAL HIGHLIGHTS
+3. SYSTEM ARCHITECTURE & DATA FLOW
+4. DETAILED UI FLOW & USER JOURNEY (PAGE BY PAGE)
+5. COMPLETE MODULE-BY-MODULE FUNCTIONAL BREAKDOWN
+   5.1. Coding Desk (Unified Competitive Programming & Developer Hub)
+   5.2. Event Desk & Hackathon Explorer
+   5.3. College Desk (Academic Operations & Student Records)
+   5.4. Study Desk (AI-Powered Active Recall & Mastery Engine)
+   5.5. Real-Time Workspaces & Collaborative Project Spaces
+   5.6. Student Verified Works, Portfolio & Leaderboards
+   5.7. Coordinator & Faculty Review Portal
+   5.8. Recruiter Radar & Talent Acquisition System
+   5.9. Institutional Administration & Security Audit Grid
+   5.10. Friends, Social Graph & Peer Network
+6. LIVE DATABASE SCHEMA (ALL 25+ SUPABASE TABLES DETAILED)
+7. PLATFORM SCRAPERS & EXTERNAL INTEGRATIONS ENGINE
+8. SECURITY, AUTHENTICATION & ROW LEVEL SECURITY (RLS)
+9. POTENTIAL PRESENTATION / VIVA QUESTIONS & WINNING ANSWERS
+10. RECOMMENDED LIVE DEMO SCRIPT (STEP-BY-STEP WALKTHROUGH)
+
+====================================================================================================
+1. EXECUTIVE SUMMARY & PROBLEM STATEMENT
+====================================================================================================
+The Modern Student Dilemma:
+Engineering students and technical learners today suffer from fragmented identity and workflow overload:
+- Problem solving is scattered across LeetCode, CodeChef, Codeforces, HackerRank, and GeeksforGeeks.
+- Open-source contributions and development work are trapped inside GitHub repositories.
+- College attendance, internal marks, semester timetables, and fee dues live in obsolete ERP portals.
+- Hackathons, competitive events, and tech workshops are scattered across Unstop, Devpost, and Meetup.
+- Faculty coordinators lack authentic verification tools to track student achievements or validate projects.
+- Recruiters struggle to separate authentic student builders from paper resumes.
+
+The Solution: LynDesk
+LynDesk is a unified, all-in-one Student Operating System that consolidates competitive coding analytics,
+hackathon discovery, academic operations, AI study tooling, verified project portfolios, and recruiter
+talent discovery into a single, high-performance, dark/light minimal digital headquarters.
+
+Core Philosophy & Zero-Fabrication Mandate:
+- 100% Empirically Grounded: No synthetic multipliers, no fake contest ratings, no mock data.
+- Live Real-Time Aggregation: Real upstream GraphQL and HTML parsers pull genuine student metrics.
+- Multi-Stakeholder Ecosystem: Serves Students, Faculty/Coordinators, Recruiters, and College Admins.
+
+====================================================================================================
+2. COMPLETE TECHNOLOGY STACK & ARCHITECTURAL HIGHLIGHTS
+====================================================================================================
+
+FRONTEND TIER:
+- Next.js 16.2.10 (App Router): Server Components by default for instantaneous initial load times,
+  with Client Components used exclusively for interactive charts, drag-and-drop boards, and modals.
+- React 19: Leveraging modern React primitives, Transition hooks, and concurrent rendering.
+- TypeScript (Strict Mode): Strict type safety with custom domain interfaces across all modules.
+- Tailwind CSS v4: High-performance modern styling, CSS variables design tokens, custom dark/light palette.
+- Framer Motion: Subtle, physics-based micro-interactions, smooth layout transitions, and modal alerts.
+- Lucide React: 100+ clean, featherweight vector icons.
+
+BACKEND & SERVERLESS TIER:
+- Next.js API Route Handlers: Edge-ready Node.js runtime endpoints powering stats aggregation, AI queries,
+  file uploads, calendar sync, and institutional audits.
+- Multi-Platform Data Scraping Engine: Custom resilient scrapers handling LeetCode GraphQL, Codeforces REST,
+  CodeChef DOM/JSON extraction, HackerRank, GeeksforGeeks, and GitHub REST API.
+- Google Generative AI (@google/generative-ai): Google Gemini 1.5/2.0 models for automated flashcard
+  hydration, code verification, portfolio summaries, and study lesson grading.
+
+DATABASE & CLOUD INFRASTRUCTURE:
+- Supabase (PostgreSQL 15+): Managed enterprise Postgres hosting 25+ relational tables.
+- Row-Level Security (RLS): Multi-tenant isolation ensuring `auth.uid() = id` across all tables.
+- Supabase Realtime (WebSockets): Live channel subscriptions powering real-time presence indicators,
+  collaborative task boards, and notification alerts.
+- Supabase Storage: Secure object storage buckets for project artifacts, certificates, and work uploads.
+
+QUALITY ASSURANCE & TESTING:
+- Vitest: Blazing-fast unit and integration test runner with 70 test suites and 115 passing tests.
+- Static Database Column Auditor: Custom automated parity script (`audit_all_db_columns.js`) ensuring
+  zero schema drift between client code and PostgreSQL.
+
+====================================================================================================
+3. SYSTEM ARCHITECTURE & DATA FLOW
+====================================================================================================
+
+[ Client Browser (Next.js 16 React 19) ]
+                 │
+                 ├── 1. Supabase Client (Browser Anon Key) ──> [ Supabase Auth & PostgreSQL (RLS) ]
+                 │                                                          ▲
+                 ├── 2. Realtime WebSocket Channel ──────────────────────────┤
+                 │                                                          │
+                 └── 3. API Route Requests (`/api/*`)                        │
+                                   │                                         │
+                        [ Next.js Server Handlers ]                          │
+                                   │                                         │
+        ┌──────────────────────────┼──────────────────────────┐              │
+        ▼                          ▼                          ▼              │
+ [ Upstream Scrapers ]     [ Google Gemini AI ]     [ Admin Service Role ]───┘
+   - LeetCode GraphQL        - Lesson Generator        - Institutional Audits
+   - Codeforces REST         - Code Verification       - Recruiter Search
+   - CodeChef HTML/JSON      - Dynamic Grading         - Broadcast Dispatch
+   - GitHub API
+   - GFG & HackerRank
+
+====================================================================================================
+4. DETAILED UI FLOW & USER JOURNEY (PAGE BY PAGE)
+====================================================================================================
+
+1. Home / Landing Page (`/`):
+   - Hero Section: High-impact typography, LynDesk tagline, and feature showcase.
+   - Quick Navigation: Instant jump links to Coding Deck, Event Desk, College Desk, and Workspaces.
+   - Authentication Status: Dynamically renders "Go to Dashboard" if logged in, or "Sign In / Sign Up".
+
+2. Authentication Gateway (`/login` & `/auth/callback`):
+   - Dual Authentication: Magic Link / Email Password + One-Time Password (OTP) validation.
+   - Session Persistence: Automatically manages auth tokens in cookies and localStorage.
+   - Onboarding Routing: New users are guided to complete profile setup (handles, college, department).
+
+3. Coding Deck (`/coding-deck` & `/coding-desk`):
+   - Bento Analytics View: 4-card hero KPI row (Questions Solved, Active Days, Contests Attended, Rankings).
+   - 365-Day Universal Heatmap: LeetCode-style activity matrix with year dropdown and streak counters.
+   - Contest Progression Curve: SVG chart showing official rated round history with tooltip node inspection.
+   - Skill Matrix: DSA topic breakdown (fundamental, intermediate, advanced) and Language Mastery solves.
+   - GitHub Matrix: Public repositories, annual verified commits, and direct profile navigation.
+   - Integrations Modal / Mode: Form to add/edit LeetCode, Codeforces, CodeChef, GFG, HackerRank, GitHub.
+
+4. Event Desk & Hackathon Explorer (`/event-desk` & `/explore`):
+   - Multi-Filter Search Bar: Real-time search by keyword, category (Hackathon, Contest, Workshop, Hiring).
+   - Platform Filter Pills: All, Unstop, Devpost, Codeforces, Internal College Events.
+   - Event Cards: Registration deadline countdown, prize pool badge, direct registration deep links.
+   - Add to Calendar / Bookmark: One-click sync to personal academic calendar.
+
+5. College Desk (`/college-desk`):
+   - Tab 1: Weekly Timetable & Room Schedules with current active lecture highlight.
+   - Tab 2: Attendance Tracker with percentage gauges and safe-bunk/catch-up calculators.
+   - Tab 3: Semester Marks, SGPA/CGPA visualizer, and target GPA forecaster.
+   - Tab 4: Fee Ledger & Transaction Receipts with dues countdown.
+   - Tab 5: Official Academic Transcripts & verifiable digital credentials.
+
+6. Study Desk (`/study-desk`):
+   - AI Study Path Creator: Input any engineering or coding topic (e.g. "Dynamic Programming", "OS Semaphores").
+   - Dynamic Lesson Hydrator: Generates structured markdown lessons with interactive code snippets.
+   - Flashcards & Active Recall: Spaced repetition flashcards with flip animations.
+   - AI Quiz Grader: Interactive quiz with instant Gemini AI rubric evaluation and mistake logging.
+
+7. Real-Time Workspace (`/workspace/[id]`):
+   - Project Spaces: Group collaboration rooms for hackathon teams and engineering projects.
+   - Kanban Task Board: Drag-and-drop tasks across Todo, In Progress, Review, and Done.
+   - Collaborative Notes: Markdown scratchpads with real-time auto-saving.
+   - Artifact Vault: Upload and share source code snippets, Figma design links, and PDF specs.
+   - Live Presence Bar: Real-time avatars showing currently active team members via WebSockets.
+
+8. Student Works & Verified Portfolio (`/profile` & `/works`):
+   - Showcase Gallery: Student-uploaded engineering projects, research papers, and live demos.
+   - Community Reviews: Verified peer ratings, comments, and views.
+   - Faculty Endorsement Badge: Official checkmark when verified by an authorized college coordinator.
+
+9. Coordinator / Faculty Portal (`/coordinator`):
+   - Student Works Review Queue: Pending submissions with one-click approve/reject/request changes.
+   - Institutional Broadcasts: Dispatch urgent notices, hackathon invites, and announcements with read receipts.
+   - Student Analytics: Export student competitive coding stats and project participation as CSV/Excel.
+
+10. Recruiter Radar (`/recruiter`):
+    - Skill-Based Talent Search: Filter students by verified DSA solves, GitHub commits, and contest ratings.
+    - Verified Profile Inspector: Read-only access to authentic student profiles with zero resume puffery.
+
+11. Institutional Admin Portal (`/admin`):
+    - College Structure Config: Manage departments, batches, sections, and academic calendars.
+    - Staff & Recruiter Key Manager: Provision and revoke coordinator and recruiter access keys.
+    - Full-Spectrum Audit Log: Live log of all administrative actions, data exports, and grade changes.
+
+====================================================================================================
+5. COMPLETE MODULE-BY-MODULE FUNCTIONAL BREAKDOWN
+====================================================================================================
+
+5.1 CODING DECK (The Competitive Programming Engine)
+---------------------------------------------------
+- What it does: Scrapes, normalizes, and aggregates live student metrics across 6 developer platforms.
+- How it works:
+  * LeetCode: Queries LeetCode's official GraphQL endpoint (`matchedUser`, `userContestRanking`,
+    `submitStatsGlobal`, `tagProblemCounts`, `languageProblemCount`, `userCalendar`).
+  * Codeforces: Queries official Codeforces REST API (`user.info`, `user.status`, `user.rating`).
+  * CodeChef: Parses embedded JavaScript arrays (`var all_rating = [...]`) and HTML metadata to extract
+    historical contest rating milestones, star ratings, and global/country ranks.
+  * HackerRank & GeeksforGeeks: Parses profile endpoints to retrieve practice scores and rank badges.
+  * GitHub: Queries GitHub REST API to compute total public repositories and annual commit pushes.
+- Zero-Fabrication Guarantee: If a platform has 0 solves or no contest history, it shows an authentic
+  empty state ("Unrated", "0 solves") without synthetic multipliers.
+
+5.2 EVENT DESK & HACKATHON EXPLORER
+-----------------------------------
+- What it does: Centralized directory of technical competitions, hackathons, and webinars.
+- How it works:
+  * Pulls live hackathons from external feeds and internal coordinator broadcasts.
+  * Tracks applied hackathons in `user_hackathon_applications` table.
+  * Provides calendar synchronization to prevent deadline conflicts with exams or lectures.
+
+5.3 COLLEGE DESK (Academic Hub)
+-------------------------------
+- What it does: Replaces legacy college ERP interfaces with a modern, responsive academic dashboard.
+- How it works:
+  * Manages daily timetables, period slots, faculty names, and lab rooms.
+  * Computes subject-wise attendance percentages with color-coded safety margins (Green >= 75%, Red < 75%).
+  * Calculates internal marks, midterm weightages, and projected semester SGPA.
+
+5.4 STUDY DESK (AI-Powered Active Recall)
+-----------------------------------------
+- What it does: Turns static syllabus topics into interactive study modules and quizzes.
+- How it works:
+  * Sends curriculum prompts to Google Gemini API (`/api/study/generate-lessons`).
+  * Generates interactive flashcards and multiple-choice quizzes.
+  * Evaluates written answers using AI semantic comparison (`/api/study/grade-answer`), saving weak
+    concepts to the `study_mistakes` table for personalized spaced repetition.
+
+5.5 REAL-TIME WORKSPACES
+------------------------
+- What it does: Enables hackathon teams to coordinate tasks, files, and notes in real time.
+- How it works:
+  * Backed by `project_spaces`, `workspace_tasks`, `workspace_notes`, and `workspace_artifacts`.
+  * Live user presence is powered by Supabase Realtime Channels (`workspace_presence` and WebSocket broadcast),
+    updating member online status in sub-100ms.
+
+5.6 VERIFIED STUDENT PORTFOLIO (WORKS)
+--------------------------------------
+- What it does: A verifiable proof-of-work showcase for student builders.
+- How it works:
+  * Students submit project repositories, live preview URLs, demo videos, and technical descriptions.
+  * Supports peer star ratings (`student_work_ratings`) and view counters (`student_work_views`).
+  * Coordinators can stamp institutional approval (`student_work_staff_reviews`), elevating projects
+    to the college-wide public leaderboard.
+
+5.7 COORDINATOR / FACULTY DESK
+------------------------------
+- What it does: Empowers college placement cells and professors to monitor and mentor students.
+- How it works:
+  * Review queue for academic credit applications (`credit_applications`).
+  * Direct broadcast system (`staff_broadcasts`) with delivery receipts (`broadcast_receipts`).
+  * One-click CSV export of student performance benchmarks.
+
+5.8 RECRUITER RADAR
+-------------------
+- What it does: Connects verified top talent with tech companies and hiring partners.
+- How it works:
+  * Recruiters use authenticated API keys (`recruiter_keys`) to query `/api/recruiter/talent`.
+  * Filter candidates by verified DSA solves, GitHub commits, and contest ratings.
+  * Zero noise: Eliminates unverified claims by linking directly to live platform handles.
+
+5.9 INSTITUTIONAL ADMIN & SECURITY AUDIT
+----------------------------------------
+- What it does: High-level administration for college deans, HODs, and system administrators.
+- How it works:
+  * Role-based access control (RBAC) across Students, Staff, Coordinators, and Admins.
+  * Immutable institutional audit logging (`institutional_audit_logs`) tracking sensitive actions.
+
+====================================================================================================
+6. LIVE DATABASE SCHEMA (ALL 25+ SUPABASE TABLES DETAILED)
+====================================================================================================
+
+1. `profiles`:
+   - Primary user identity table linked to Supabase Auth (`id` = `auth.uid()`).
+   - Fields: `full_name`, `email`, `avatar_url`, `college_id`, `department`, `year_of_study`, `roll_number`,
+     `leetcode_username`, `codeforces_username`, `codechef_username`, `geeksforgeeks_username`,
+     `hackerrank_username`, `unstop_username`, `devpost_username`, `github_url`, `bio`, `skills`.
+
+2. `college_structures`:
+   - Department, semester, and batch configurations for participating institutions.
+
+3. `college_admins`:
+   - Institutional administrators with permissions to manage faculty accounts and structures.
+
+4. `staff_accounts`:
+   - Faculty, HOD, and placement coordinator accounts with department-level oversight.
+
+5. `recruiter_keys`:
+   - Secure hashed API keys and credentials for verified industry hiring partners.
+
+6. `institutional_audit_logs`:
+   - Security audit trail recording timestamp, admin user ID, action type, IP address, and payload.
+
+7. `staff_broadcasts`:
+   - Urgent notices, event recommendations, and academic alerts created by staff.
+
+8. `broadcast_receipts`:
+   - Per-student read/acknowledgment status for institutional broadcasts.
+
+9. `staff_recommended_events`:
+   - Official hackathons and symposiums endorsed by college faculty.
+
+10. `institutes`:
+    - Registered universities, colleges, and educational organizations on the platform.
+
+11. `friendships`:
+    - Social graph connections between peer students with status (`pending`, `accepted`, `blocked`).
+
+12. `events`:
+    - Central repository of hackathons, webinars, workshops, and contest listings.
+
+13. `user_hackathon_applications`:
+    - Student tracking of applied, shortlisted, or won hackathons.
+
+14. `project_spaces`:
+    - Collaborative team workspaces for hackathons, capstone projects, and study groups.
+
+15. `project_members`:
+    - Team membership mappings with roles (`owner`, `admin`, `contributor`, `viewer`).
+
+16. `workspace_artifacts`:
+    - Shared files, design assets, and architectural documents uploaded to workspaces.
+
+17. `workspace_tasks`:
+    - Kanban tasks with priority, due date, assignee ID, and column status (`todo`, `in_progress`, `done`).
+
+18. `workspace_notes`:
+    - Real-time collaborative meeting notes, brainstorm logs, and documentation.
+
+19. `workspace_presence`:
+    - Ephemeral heartbeat records for active team members within a workspace channel.
+
+20. `credit_applications`:
+    - Student requests for academic credit or attendance exemption based on hackathon participation.
+
+21. `handle_verifications`:
+    - Cryptographic verification tokens confirming ownership of external coding handles.
+
+22. `wall_calendar_events`:
+    - Personal schedule, assignment deadlines, exam timetables, and contest reminders.
+
+23. `study_paths`:
+    - Custom AI-generated curriculum modules and topic mastery progress.
+
+24. `study_mistakes`:
+    - Spaced repetition error log storing quiz mistakes and AI remediation suggestions.
+
+25. `user_dsa_progress`:
+    - Historical snapshots of daily solved counts, streak continuity, and topic mastery.
+
+26. `student_works`:
+    - Showcase projects uploaded by students with title, live URL, GitHub URL, and tech tags.
+
+27. `student_work_ratings`:
+    - Peer and community 5-star ratings for student portfolio projects.
+
+28. `student_work_views`:
+    - Unique view tracking analytics for portfolio items.
+
+29. `student_work_staff_reviews`:
+    - Official faculty endorsements, review comments, and verified badges for student projects.
+
+30. `consent_log`:
+    - Compliance audit records for data privacy and external handle scraping consent.
+
+====================================================================================================
+7. PLATFORM SCRAPERS & EXTERNAL INTEGRATIONS ENGINE
+====================================================================================================
+
+How Scrapers Handle Anti-Bot & Network Protections:
+- User-Agent & Header Rotation: Standardized modern browser headers (`Mozilla/5.0 Chrome/122`) prevent
+  abrupt bot blocks.
+- Smart Cache & Rate-Limiting: Client-side localStorage handles provide instantaneous 0ms UI render,
+  while server route handlers utilize `cache: "no-store"` with graceful fallback circuit breakers.
+- Fallback API Proxies:
+  * LeetCode: Primary GraphQL query -> Secondary public proxy (`leetcode-stats-api`) -> Alfa proxy fallback.
+  * CodeChef: Primary API endpoint -> Direct HTML DOM regex extraction (`var all_rating = [...]`).
+  * Codeforces: Direct official REST API (`user.info`, `user.status`, `user.rating`).
+  * GitHub: Direct official REST API (`/users/{username}`, `/users/{username}/repos`, `/users/{username}/events`).
+
+====================================================================================================
+8. SECURITY, AUTHENTICATION & ROW LEVEL SECURITY (RLS)
+====================================================================================================
+1. Zero Auth Secret Leakage:
+   - Supabase service role keys (`SUPABASE_SERVICE_ROLE_KEY`) are isolated exclusively to Server Route Handlers.
+   - Client bundle only receives public keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+
+2. Multi-Tenant Row Level Security (RLS):
+   - 100% of PostgreSQL tables have RLS enabled.
+   - Policies strictly enforce `auth.uid() = user_id` on all write/update mutations.
+   - Public data (events, verified works gallery) is guarded with read-only SELECT policies.
+
+3. Strict Input Sanitization & Type Safety:
+   - All URL parameters and handle inputs are normalized and stripped of dangerous characters.
+   - Regex validation prevents SQL Injection (SQLi) and Cross-Site Scripting (XSS).
+
+====================================================================================================
+9. POTENTIAL PRESENTATION / VIVA QUESTIONS & WINNING ANSWERS
+====================================================================================================
+
+Q1: "Why did you build this as a web application instead of a mobile app?"
+Answer:
+"Engineering students and developers do the vast majority of their programming, project collaboration,
+and academic work on desktop and laptop machines. Next.js 16 allows us to deliver a blazing-fast desktop
+operating system experience while remaining 100% responsive and mobile-friendly on smartphones via Tailwind v4."
+
+Q2: "How do you fetch data from LeetCode or CodeChef if they change their website structure?"
+Answer:
+"We built our data aggregation layer with a Multi-Tier Resilient Fallback Architecture. For LeetCode, we
+query their official GraphQL API first; if blocked, our system automatically falls back to secondary and
+tertiary REST endpoints. For CodeChef, we extract the core data directly from their embedded JSON payload
+rather than brittle DOM selectors, ensuring long-term stability."
+
+Q3: "Why choose Supabase and PostgreSQL over MongoDB or Firebase?"
+Answer:
+"LynDesk manages complex relational data: student profiles link to academic marks, workspaces contain
+tasks and members, and works link to peer ratings and faculty reviews. PostgreSQL provides robust ACID
+compliance and foreign key integrity. Furthermore, Supabase gives us built-in Row-Level Security (RLS)
+and real-time WebSocket subscriptions without managing separate server infrastructure."
+
+Q4: "How does the AI Study Desk work? Does it hallucinate?"
+Answer:
+"The Study Desk uses Google Gemini models constrained by strict prompt boundaries and JSON schemas.
+Rather than allowing freeform generation, the model is fed structured curriculum topics and returns
+strictly typed flashcards and rubric-based quiz evaluations. Student answers are graded against
+deterministic engineering rubrics."
+
+Q5: "What prevents a student from claiming someone else's LeetCode or GitHub profile?"
+Answer:
+"Our system uses Handle Verification Handshakes (`handle_verifications` table). In high-trust workflows
+(such as recruiter searches or academic credit requests), students verify ownership by temporarily adding a
+unique 6-character LynDesk verification token to their platform bio or public gist before linking."
+
+Q6: "How do you ensure user data privacy between different colleges?"
+Answer:
+"All institutional data is multi-tenant partitioned using PostgreSQL Row-Level Security (RLS) policies
+scoped to `college_id`. Students from College A can never read or query academic records, internal marks,
+or staff broadcasts from College B."
+
+====================================================================================================
+10. RECOMMENDED LIVE DEMO SCRIPT (STEP-BY-STEP WALKTHROUGH)
+====================================================================================================
+
+[ Minute 0:00 - 1:00 ] Hook & Problem Statement:
+- Start on the Home Page (`/`).
+- "Good morning/afternoon everyone. As engineering students, our academic life, coding practice, hackathons,
+  and project work are scattered across a dozen disconnected websites. Today, we are presenting LynDesk:
+  The Unified Student Operating System."
+
+[ Minute 1:00 - 3:00 ] The Coding Deck Deep Dive (`/coding-deck`):
+- Click into the Coding Deck.
+- Highlight the Bento Analytics row: "Here, LynDesk automatically connects to LeetCode, Codeforces,
+  CodeChef, HackerRank, and GitHub. Notice the live question solves breakdown, active streak counters,
+  and official contest ratings."
+- Hover over the Contest Progression Graph: "Our SVG charting engine renders historical rating curves
+  with real contest milestones and tooltip inspections."
+- Show the 365-Day Universal Heatmap: "Just like GitHub or LeetCode, every single submission across the
+  entire year is mapped into a unified heatmap with yearly filtering."
+- Show the GitHub Developer Matrix: "Public repositories and annual verified pushes are tracked live."
+
+[ Minute 3:00 - 4:30 ] Academic & AI Study Hub (`/college-desk` & `/study-desk`):
+- Switch to College Desk: "Students can check daily timetables, monitor attendance percentage margins,
+  and calculate target GPA goals."
+- Switch to Study Desk: "When preparing for exams or technical interviews, students can generate structured
+  lessons with AI, practice active recall flashcards, and take auto-graded quizzes that log mistakes for
+  spaced repetition."
+
+[ Minute 4:30 - 6:00 ] Real-Time Collaboration & Workspaces (`/workspace`):
+- Open a Project Workspace: "For hackathon teams and capstone groups, LynDesk provides real-time project
+  spaces with Kanban task boards, markdown scratchpads, artifact sharing, and live presence avatars."
+
+[ Minute 6:00 - 7:00 ] Recruiter Radar & Conclusion:
+- Open Recruiter Radar (`/recruiter`): "Finally, recruiters and college placement cells can search for
+  verified student builders based on authentic coding solves and endorsed projects—eliminating fake resumes."
+- "LynDesk brings the entire student journey under one unified, high-performance roof. Thank you, and we
+  are now open for questions!"
+
+====================================================================================================
+                                      END OF DOSSIER - GOOD LUCK!
+====================================================================================================

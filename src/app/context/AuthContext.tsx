@@ -67,14 +67,14 @@ const resolveRole = (u: User | null): UserRole => {
   const metaRole = u?.user_metadata?.role || u?.user_metadata?.persona;
   if (metaRole === "recruiter" || metaRole === "employee" || u?.user_metadata?.company_key) return "recruiter";
   if (metaRole === "coordinator" || metaRole === "faculty" || u?.user_metadata?.registered_staff) return "coordinator";
-  if (metaRole === "developer" || metaRole === "solo") return "developer";
-  return "student";
+  if (metaRole === "student" && (u?.user_metadata?.college_name || u?.user_metadata?.college_id || u?.user_metadata?.institute_id)) return "student";
+  return "developer";
 };
 
 // 🏛️ Industry Gold-Standard: Synchronous Fast-Boot Pre-Hydration
 function getFastBootAuth(): { user: User | null; session: Session | null; role: UserRole; hasFastBoot: boolean } {
   if (typeof window === "undefined") {
-    return { user: null, session: null, role: "student", hasFastBoot: false };
+    return { user: null, session: null, role: "developer", hasFastBoot: false };
   }
   try {
     // 1. Direct LynDesk fast-boot cache
@@ -114,7 +114,7 @@ function getFastBootAuth(): { user: User | null; session: Session | null; role: 
   } catch {
     // Graceful fallback on restricted browsing environments / storage quota exceptions
   }
-  return { user: null, session: null, role: "student", hasFastBoot: false };
+  return { user: null, session: null, role: "developer", hasFastBoot: false };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -431,13 +431,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (data) {
+          const isCollegeConnected = Boolean(
+            data.institute_id || 
+            (data.college_name && typeof data.college_name === "string" && data.college_name.trim().length > 0 && data.college_name.toLowerCase() !== "none") ||
+            data.college_linked_status === "approved" || 
+            data.college_linked_status === "verified" ||
+            (data.college_key && typeof data.college_key === "string" && data.college_key.trim().length > 0)
+          );
+
+          const resolvedPersona: "developer" | "student" = isCollegeConnected ? "student" : ((data.persona as "developer" | "student") || "developer");
+          const resolvedRole: UserRole = isCollegeConnected 
+            ? "student" 
+            : (user.user_metadata?.role === "coordinator" || user.user_metadata?.role === "recruiter") 
+              ? user.user_metadata.role 
+              : "developer";
+
           const profData: UserProfileData = {
             id: data.id,
             full_name: data.full_name || user.user_metadata?.full_name || "Developer",
             username: data.username || "dev_user",
             avatar_url: data.avatar_url || user.user_metadata?.avatar_url || "",
             academic_credits: data.academic_credits || 0,
-            department: data.department || "Computer Science",
+            department: data.department || "",
             college_key: data.college_key || "",
             bio: data.bio || "",
             skills: data.skills || "",
@@ -453,9 +468,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             batch_code: data.batch_code,
             academic_year: data.academic_year,
             section: data.section,
-            persona: (data.persona as "developer" | "student") || (user.user_metadata?.role === "developer" ? "developer" : "student")
+            persona: resolvedPersona
           };
           setUserProfile(profData);
+          setUserRole(resolvedRole);
 
           if (data.avatar_url && typeof data.avatar_url === "string" && (data.avatar_url.startsWith("http") || data.avatar_url.startsWith("data:image/"))) {
             setProfileAvatar(data.avatar_url);
@@ -466,8 +482,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          // Auto-initialize profile row in database for newly registered user
-          const defaultFullName = user.user_metadata?.full_name || (user.email ? user.email.split("@")[0] : "Student");
+          // Auto-initialize profile row in database for newly registered user (default to developer)
+          const defaultFullName = user.user_metadata?.full_name || (user.email ? user.email.split("@")[0] : "Developer");
           const defaultUsername = user.user_metadata?.username || (user.email ? user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_") : `user_${user.id.slice(0, 6)}`);
           const defaultAvatar = user.user_metadata?.avatar_url || "";
 
@@ -477,15 +493,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             username: defaultUsername,
             avatar_url: defaultAvatar,
             academic_credits: 0,
-            department: "Computer Science",
+            department: "",
             college_key: "",
             bio: "",
             skills: "",
             college_linked_status: "none",
-            institute_id: undefined
+            institute_id: undefined,
+            persona: "developer"
           };
 
           setUserProfile(newProfileData);
+          setUserRole("developer");
 
           // Save to database
           try {
@@ -494,10 +512,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               full_name: defaultFullName,
               username: defaultUsername,
               avatar_url: defaultAvatar,
-              department: "Computer Science",
+              department: "",
               college_key: "",
               college_linked_status: "none",
               academic_credits: 0,
+              persona: "developer"
             });
           } catch (err) {
             console.error("Failed to auto-initialize profile in DB:", err);

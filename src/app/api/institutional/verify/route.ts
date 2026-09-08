@@ -20,6 +20,16 @@ const KNOWN_COLLEGE_KEYS: Record<string, { name: string; emailDomain: string; de
     emailDomain: "srmist.edu.in",
     defaultDept: "Information Technology"
   },
+  "COLLEGE_EASWARI": {
+    name: "SRM Easwari Engineering College",
+    emailDomain: "srmeaswari.edu.in",
+    defaultDept: "Computer Science and Engineering"
+  },
+  "COLLEGE_EEC": {
+    name: "SRM Easwari Engineering College",
+    emailDomain: "srmeaswari.edu.in",
+    defaultDept: "Computer Science and Engineering"
+  },
   "COLLEGE_MIT": {
     name: "Madras Institute of Technology (Anna University)",
     emailDomain: "mitindia.edu",

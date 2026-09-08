@@ -1,5 +1,427 @@
 
 # 🏛️ The Five Monks Council: Deliberation Briefing
+**Convened**: 2026-09-08T01:14:59.068Z
+**Proposal**: "Evaluate Implementation Plan: 1. Official Printable College Fee Voucher with verification hash & itemized breakdown in /college-desk. 2. Coordinator Management Loops: Coursework Assignment Publisher, Internal Marks Entry Spreadsheet Grid, and Priority Class Flash Alert in /coordinator. 3. Leaderboard Unified Scope Filter (My Section B, My Department CSE, My College SRM, All-India Grid) instead of separate segmented tabs in /explore. 4. Corporate Placement Drive Board with Recruiter Candidate Shortlist Tray and Campus Drive Application Board in /recruiter and /college-desk."
+
+---
+
+### 🥊 1. Chamber of The Contrarian (The Sceptic & Pre-Mortem Inquisitor)
+*Engine: `groq / qwen/qwen3.8-27b`*
+
+The system is dead. It has been dead for six months. You built a Rube Goldberg machine of "features" that looked impressive in the demo but collapsed under the weight of reality. Here is the autopsy report on your catastrophic failure:
+
+### 1. The "Printable Voucher" (The Data Integrity Time Bomb)
+*   **The SPOF:** You coupled a dynamic financial transaction with a static PDF generation service. When the payment gateway experienced a 4% latency spike during the peak fee deadline, the hash generation timed out.
+*   **The Result:** 5,000 students received vouchers with `NULL` or stale verification hashes. The "verification" is now a suggestion, not a fact.
+*   **Maintenance Debt:** You hardcoded the CSS for the print view. Every frontend design change requires a manual QA pass for the PDF renderer, which nobody has time for.
+*   **Security Risk:** The verification hash is client-side generated or exposed in the URL. A student changed their name in the database, re-printed the voucher, and now the hash no longer matches the backend record, causing a support ticket tsunami.
+
+### 2. Coordinator Management Loops (The Spreadsheet Nightmare)
+*   **Race Conditions:** The "Internal Marks Entry Spreadsheet Grid" allows concurrent writes. Two coordinators entered marks for the same section at 11:59 PM. The last-write-wins logic silently overwrote 200+ entries. There is no audit trail because you optimized for "speed" over consistency.
+*   **Scaling Bottleneck:** The "Priority Class Flash Alert" is polling the database every 2 seconds for every coordinator. With 500 coordinators, you are executing 1,000,000 unnecessary DB queries per minute. The database CPU is at 98%.
+*   **Edge-Case Crash:** A coordinator tried to publish a coursework assignment with a file size of 49MB. Your upload handler crashed, leaving the assignment in a "PENDING" state that is neither published nor draft. It is stuck in limbo.
+
+### 3. Leaderboard Unified Scope Filter (The Query Killer)
+*   **Performance Collapse:** You replaced segmented tabs with a single filterable grid. For "All-India Grid," you are doing a full table scan with complex `JOIN`s across three different schema domains (Student, Section, College) on every keystroke of the filter.
+*   **The Crash:** When a user selects "My Department CSE" and sorts by "GPA Desc," the query takes 12 seconds. The browser times out. The user refreshes. The query takes 15 seconds. The user refreshes again. You now have a stampede of 10,000 users hitting the same slow query, taking down the API gateway.
+*   **Data Leakage:** "My Section B" relies on session context. If a user’s session token expires mid-query, the filter defaults to "All-India" or returns unauthorized data due to a null check failure in the backend middleware.
+
+### 4. Corporate Placement Drive Board (The Trust Collapse)
+*   **The SPOF:** The "Recruiter Candidate Shortlist Tray" is a real-time socket connection. When the main university server went down for 10 minutes due to the Leaderboard query load, all recruiter connections dropped. Recruiters lost their shortlists.
+*   **Business Logic Failure:** A recruiter "shortlisted" a candidate while the candidate was simultaneously withdrawing their application. The system allowed the shortlist. The recruiter sent an offer to a candidate who no longer wanted the job. The college is now liable for a breach of contract.
+*   **Security Risk:** The "Campus Drive Application Board" exposes candidate email addresses and phone numbers
+
+---
+
+### 🎯 2. Chamber of The Principal Advisor (First-Principles & Anti-XY Inquisitor)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+### The Real Question Behind the List
+
+Your “implementation plan” reads like a laundry list of features that would look impressive on a roadmap, but what you’re really trying to solve is **one core bottleneck** that ripples through three very different stakeholder groups:
+
+| Stakeholder | Pain Point you’re trying to mask |
+|------------|-----------------------------------|
+| **Students** | Uncertainty / friction when proving they have paid fees (and getting a clean, verifiable receipt). |
+| **Coordinators / Faculty** | Manual, error‑prone loops for assigning coursework, entering marks, and reacting to priority alerts. |
+| **Placement Office / Recruiters** | Scattered, out‑of‑date candidate data that makes short‑listing and drive‑management a “hunt‑and‑peck” exercise. |
+
+If you can cut the friction in **any one** of those three flows, you’ll instantly lift the perceived value of the whole system. The rest of the items become “nice‑to‑have” polish rather than a prerequisite for success.
+
+---
+
+## 1. Are we looking at an **XY problem**?
+
+- **Surface request (X):** “Build a printable fee voucher with hash, a coordinator loop UI, a unified leaderboard, and a placement board.”
+- **Underlying need (Y):** “Give students a trustworthy proof of payment, let coordinators manage coursework/marks efficiently, and let recruiters see up‑to‑date candidate pools without chasing spreadsheets.”
+
+The **XY** here is that you are trying to **solve data‑trust & workflow‑visibility** by stacking a lot of UI components, when the real lever is **a single source‑of‑truth service** that can be queried by any consumer (student portal, coordinator dashboard, recruiter portal).  
+
+If you build that service first, the downstream UI pieces shrink dramatically.
+
+---
+
+## 2. 90 % of the value with 10 % of the complexity
+
+| Goal | Minimal Viable Implementation (MVI) | Expected Value |
+|------|-------------------------------------|----------------|
+| **Verifiable fee proof** | – Add a **payment‑record API** that returns a JSON payload with `studentId`, `amount`, `timestamp`, and a **HMAC‑SHA256** signature using a secret known only to the finance system.<br>– Expose a **single “Download Voucher”** endpoint that renders a PDF on‑the‑fly. | Students instantly get a tamper‑evident receipt; finance team does not need to maintain a separate printable template. |
+| **Coordinator workflow** | – Introduce a **single “Assignment/Marks” spreadsheet** stored in a cloud‑sheet (Google‑Sheets / Office‑365) that is **read‑only for students** and **editable for coordinators** via a shared link.<br>– Add a **Slack/Teams webhook** that fires a “Priority Class” alert when a row’s `priorityFlag` flips. | Eliminates the need to build a custom grid UI and a separate alert system; coordinators already work in familiar tools
+
+---
+
+### 🚀 3. Chamber of The Expansionist (Visionary & Leverage Multiplier)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## Executive Summary  
+
+| Component | Core Idea | Immediate Value | Asymmetric Upside (2‑nd/3‑rd order) | Risks / Mitigations | Quick‑Win KPI |
+|-----------|-----------|----------------|-----------------------------------|----------------------|---------------|
+| **1️⃣ Printable College‑Fee Voucher** | A cryptographically‑signed PDF (or web‑printable) that lists every fee line‑item plus a verification hash. | Reduces finance‑queries, speeds up student‑service calls, improves auditability. | **Leverage:** The same hash‑engine can be re‑used for any “official document” (transcripts, scholarship letters, internship offers). This creates a **document‑as‑service** platform that can be monetised to external colleges or corporate partners. | • Hash collisions or misuse of private keys.<br>• Student confusion if UI is not intuitive. | % reduction in finance‑desk tickets (target 30 % in 3 mo). |
+| **2️⃣ Coordinator Management Loops** | Three tightly‑coupled micro‑apps in `/coordinator`: (a) Coursework Assignment Publisher, (b) Internal Marks Entry Grid, (c) Priority‑Class Flash Alert. | Unifies the “teacher workflow” that is currently scattered across emails, LMS, and spreadsheets. | **Leverage:** The **loop** model (publish → collect → notify) can be abstracted into a **generic “task‑pipeline” engine** that other departments (research, admin, clubs) can plug into, turning the coordinator module into a **low‑code workflow hub**. This becomes a **developer‑velocity multiplier** for any new campus service. | • Over‑engineering the grid may cause performance bottlenecks.<br>• Alert fatigue if flash alerts are too frequent. | Time‑to‑publish assignment ↓ 40 %; marks‑entry latency ↓ 50 %. |
+| **3️⃣ Leaderboard Unified Scope Filter** | Replace fragmented tabs with a single, composable filter UI (`My Section B`, `My Department CSE`, `My College SRM`, `All‑India Grid`). | Improves discoverability of peer performance, reduces UI clutter, and enables cross‑section analytics. | **Leverage:** The unified filter can be **exposed as an API** for external dashboards (e.g., accreditation bodies, alumni networks). This opens a **data‑as‑product** revenue stream and also feeds machine‑learning models that predict dropout risk or recommend electives (future‑proofing). | • Privacy concerns around cross‑college data.<br>• Complex permission matrix. | Increase in leaderboard views per user ↑ 25 % (baseline). |
+| **4️⃣ Corporate Placement Drive Board** | Two new boards: (a) Recruiter Candidate Shortlist Tray (`/recruiter`), (b) Campus Drive Application Board (`/college-desk`). | Streamlines the end‑to‑end placement pipeline, gives recruiters a “Kanban” view of candidates, and gives students a single place to track applications. | **Leverage:** The board architecture can be **generalised** to any “matching market” (internships, research grants, hackathon teams). By adding a **matching engine** (score‑based, AI‑augmented), the platform becomes a **two‑
+
+---
+
+### 👁️ 4. Chamber of The Outsider (Clean-Slate & Naive User Observer)
+*Engine: `openrouter / openrouter/free`*
+
+User Safety: safe
+
+---
+
+### ⚙️ 5. Chamber of The Executor (Gold-Standard Pragmatist)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## Executive Summary  
+
+The four feature groups you listed can be delivered cleanly by **extending existing domain boundaries** (`/college‑desk`, `/coordinator`, `/explore`, `/recruiter`) while keeping **Zero‑Downtime** and **Zero Side‑Effect** guarantees.  
+Below is a **complete production‑grade implementation blueprint** that covers:
+
+| Area | What we deliver |
+|------|-----------------|
+| **Database schema** | New tables + migrations + audit columns |
+| **API contracts** | Versioned REST (or GraphQL) endpoints, request/response contracts, validation |
+| **TypeScript types** | Shared `@types` package, strict `readonly` and `exactOptionalPropertyTypes` |
+| **Next.js 16 / React 19** | RSC (Server‑Component) vs. Client‑Component boundaries, streaming, edge‑runtime usage |
+| **Error recovery** | Centralised error handling, retry policies, idempotency, Sentry/Logflare integration |
+| **Roll‑out sequence** | Feature‑flag gated, blue‑green DB migration, canary releases, automated rollback plan |
+
+---
+
+## 1️⃣ Feature‑by‑Feature Technical Breakdown  
+
+### 1. Official Printable College Fee Voucher (`/college‑desk`)
+
+| Concern | Decision |
+|---------|----------|
+| **Domain** | `fee_vouchers` (new aggregate) |
+| **DB Schema** | <details><summary>Click to expand</summary> <pre>CREATE TABLE fee_vouchers ( <br>  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), <br>  college_id UUID NOT NULL REFERENCES colleges(id), <br>  student_id UUID NOT NULL REFERENCES students(id), <br>  term VARCHAR(20) NOT NULL, <br>  total_amount NUMERIC(12,2) NOT NULL, <br>  currency CHAR(3) NOT NULL DEFAULT 'INR', <br>  breakdown JSONB NOT NULL,               -- [{item, amount, remarks}] <br>  verification_hash CHAR(64) NOT NULL,      -- SHA‑256 of canonical JSON <br>  issued_at TIMESTAMPTZ NOT NULL DEFAULT now(), <br>  expires_at TIMESTAMPTZ, <br>  created_by UUID NOT NULL REFERENCES users(id), <br>  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), <br>  deleted_at TIMESTAMPTZ, <br>  CONSTRAINT chk_breakdown_total CHECK ( (SELECT SUM((b->>'amount')::numeric) FROM jsonb_array_elements(breakdown) AS b) = total_amount ) <br>);<br>CREATE INDEX idx_fee_vouchers_student ON fee_vouchers(student_id);<br>CREATE INDEX idx_fee_vouchers_college ON fee_vouchers(college_id);</pre></details> |
+| **API** | **Version:** `v2/fee‑voucher` (keeps v1 for legacy PDF generation). <br
+
+---
+
+### ⚖️ The Chairman's Verdict (Luna)
+- **Council Status**: ✅ Deliberation Finalized
+- **Strategic Synthesis**: Balance execution mechanics with identified edge cases and leverage opportunities.
+- **Permanent Ledger**: Saved in `five_monks_report.md`
+
+
+---
+## 📜 Historical Verdict Ledger
+
+# 🏛️ The Five Monks Council: Deliberation Briefing
+**Convened**: 2026-09-08T00:27:36.725Z
+**Proposal**: "Comprehensive Master Architecture: 1) AI-Powered Coding Handle Verification Sentinel with Cross-Student Database Deduplication (Anti-Theft) and Live Scraper Probing; 2) Coordinator Fast-Approval Cockpit with 1-Click Approval Cards, Live Scraped Stats, and Bulk Auto-Approve Safe Claims; 3) Student Profile Handle Switch/Reset Flow and Live Diagnostic Badges; 4) Real-Time Student Notification Dispatch upon Coordinator Approval; 5) Recruiter Talent Shortlist CSV Export and Printable Academic OD Slips."
+
+---
+
+### 🥊 1. Chamber of The Contrarian (The Sceptic & Pre-Mortem Inquisitor)
+*Engine: `groq / qwen/qwen3.8-27b`*
+
+Listen to me, you absolute fools. You didn’t build a system; you built a time bomb with a user interface. I have seen this "master architecture" before, and it always ends the same way: a P0 incident at 3:00 AM on a Tuesday, 500 students screaming into the void, and the recruiter’s CSV file containing three different versions of the same person.
+
+Here is how this "comprehensive masterpiece" rots in six months:
+
+*   **The "Live Scraper" is a Hall of Fame for IP Bans:**
+    *   You claim "Live Scraper Probing" for verification. By month two, every major platform (GitHub, LinkedIn, Twitter, etc.) will have your egress IPs blacklisted.
+    *   **SPOF:** Your entire verification logic hangs on third-party APIs that you do not control. One rate-limit change from GitHub or LinkedIn, and your "Sentinel" goes silent.
+    *   **Maintenance Debt:** You are now responsible for maintaining brittle HTML parsers or API wrappers for 5+ external services. When they change their DOM or API schema, your system breaks silently, marking valid students as "unverified" or "stolen."
+
+*   **The "Cross-Student Database Deduplication" is a Race Condition Nightmare:**
+    *   "Anti-theft" via deduplication implies you are comparing handles/emails/IDs in real-time.
+    *   **Race Condition:** Two students claim the same handle (or a recruiter uploads a CSV with a duplicate) simultaneously. Without distributed locking or strict transactional integrity, you will either double-approve (security breach) or reject valid users (churn).
+    *   **Edge Case:** What defines "theft"? If Student A owns `@jdoe` and Student B claims it later, do you revoke A’s access? You have built a mechanism for student-on-student DoS attacks. One malicious student can spam handle claims to lock out legitimate peers, flooding your DB with "conflict" states that your "1-Click Approval" cockpit cannot handle.
+
+*   **"Bulk Auto-Approve Safe Claims" is a Security Suicide Pact:**
+    *   You are automating a decision that requires human judgment. "Safe" is a subjective, moving target.
+    *   **Security Risk:** A coordinated bot attack exploiting a minor bug in your "safe claim" heuristic will result in thousands of fake accounts being auto-approved. Because it’s "bulk" and "auto," no human sees it until the recruiter exports the CSV and realizes 30% of the talent pool is synthetic.
+    *   **Scalability Bottleneck:** Your "1-Click" cockpit assumes the human can verify context. Once you hit 1,000 pending claims, the "1-Click" becomes "1000-Clicks," and the UI freezes under the load of live-scraped stats for each card. You’ve created a UI that is useless exactly when you need it most.
+
+*   **The "Real-Time Notification Dispatch" Will Drown Your Queue:**
+    *   "Real-time" implies WebSockets or polling. If you scrape live stats for the notification, you are triggering N network calls per notification.
+    *   **Scalability Bottleneck:** A bulk approval of 500 students triggers 500 concurrent scrape requests + 500 email/webhook notifications. Your worker pool will saturate, causing notification latency to balloon from seconds to hours. Students will think the system is down.
+    *   **SPOF:** If your notification provider (SendGrid, etc.) throttles you, your "real-time" promise is a lie. You have no retry logic, no dead-letter queue, and no fallback. The message is
+
+---
+
+### 🎯 2. Chamber of The Principal Advisor (First-Principles & Anti-XY Inquisitor)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+### 1. What is the **real** problem you’re trying to solve?
+
+| Surface request | Under‑lying need (the “why”) |
+|----------------|------------------------------|
+| **AI‑powered “handle‑verification sentinel”** that scrapes the web, deduplicates across a student DB, and flags theft | **Prevent fraudulent or duplicated student identities** so that every handle truly belongs to a single, legitimate student. |
+| **Coordinator fast‑approval cockpit** with one‑click cards, live stats and bulk auto‑approve | **Speed up the admin decision loop** (coordinators spend too much time manually reviewing and approving student‑submitted claims). |
+| **Student profile handle‑switch/reset flow + diagnostic badges** | **Give students a safe, auditable way to correct a compromised handle** without breaking downstream links. |
+| **Real‑time notification dispatch** on approval | **Make sure the student knows instantly when something changes** (so they can act, e.g., start a job application). |
+| **Recruiter talent‑shortlist CSV export & printable slips** | **Provide recruiters a clean, trusted list of verified students** that can be used in external systems or printed for compliance. |
+
+If you strip away the buzzwords, the **core bottleneck** is **identity integrity + low‑friction approval & communication**. Everything else (AI scrapers, fancy dashboards, printable slips) is a *symptom* of that bottleneck.
+
+---
+
+### 2. Is this an **XY problem**?
+
+> **X** = “I need a massive AI‑driven scraper and deduplication engine.”  
+> **Y** = “I want to stop students from stealing each other’s handles and speed up approvals.”
+
+Most teams discover they’re building an elaborate “X” (AI, live scraping, custom dashboards) when the real pain point is **Y** (preventing duplicate/unauthorized handles and reducing manual admin effort). The AI‑scraper is likely over‑engineered for a problem that can be solved with far simpler controls.
+
+**Typical XY red‑flags in your list**
+
+| XY Indicator | Why it likely isn’t the real need |
+|--------------|-----------------------------------|
+| “Live scraper probing” | Scraping the public web is noisy, brittle, and often illegal; a deterministic, internal check (email/phone verification, unique ID) solves identity theft far more reliably. |
+| “AI‑powered coding handle verification” | A rule‑based whitelist/blacklist or a simple hash comparison gives >95
+
+---
+
+### 🚀 3. Chamber of The Expansionist (Visionary & Leverage Multiplier)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## The Expansionist’s Playbook  
+**Mission:** Turn the “Comprehensive Master Architecture” into a self‑reinforcing growth engine that delivers **asymmetric upside**, **2‑/3‑order leverage**, and **developer‑velocity multipliers** while future‑proofing the platform for the next 5‑10 years.  
+
+---
+
+## 1️⃣ AI‑Powered Coding‑Handle Verification Sentinel (V‑Sentinel)
+
+| **Core Feature** | **Hidden Super‑Power** | **Leverage Multipliers** | **Future‑Proof Hooks** |
+|------------------|------------------------|--------------------------|------------------------|
+| **Cross‑Student DB Deduplication** | *Identity‑graph* that treats each handle as a node in a global graph of “skill‑tokens”. Duplicate detection becomes a **graph‑matching problem** that scales O(N log N) instead of O(N²). | - **One‑click fraud removal** eliminates manual audit cost → +30 % developer time.<br>- **Graph‑analytics API** can be reused for alumni networks, mentorship matchmaking, and micro‑credential mapping. | - Store the graph in a **property‑graph DB** (Neo4j, TigerGraph) with **temporal versioning** → you can retro‑track handle changes for compliance and for “career‑trajectory analytics”. |
+| **Live Scraper Probing** | Real‑time “fingerprint” of a handle’s public footprint (GitHub, StackOverflow, personal sites). Turn raw HTML into **semantic embeddings** that feed the verification model. | - **Zero‑trust**: any new handle is automatically vetted, reducing “social‑engineering” risk.<br>- **Data‑as‑a‑service**: expose a **Handle‑Health Score** to recruiters (new revenue stream). | - Use **LLM‑powered semantic parsers** (e.g., OpenAI embeddings) that can be swapped out as models improve. <br>- Build a **plug‑and‑play scraper SDK** (Python + Node) so new data sources can be added in weeks, not months. |
+| **Anti‑Theft** | Detect “handle‑hijack” by monitoring sudden changes in code style, commit frequency, or language distribution. | - **Early‑warning alerts** to students → higher retention.<br>- **Insurance‑partner integration** (e.g., digital‑identity insurance) – a new B2B line. | - Store **style‑vectors** in a vector DB (Pinecone/Weaviate) with TTL; later you can add **behavior‑
+
+---
+
+### 👁️ 4. Chamber of The Outsider (Clean-Slate & Naive User Observer)
+*Engine: `luna-protocol / builtin-reasoner`*
+
+Deliberation evaluated against core project constraints for: "Comprehensive Master Architecture: 1) AI-Powered Coding Handle Verification Sentinel with Cross-Student Database Deduplication (Anti-Theft) and Live Scraper Probing; 2) Coordinator Fast-Approval Cockpit with 1-Click Approval Cards, Live Scraped Stats, and Bulk Auto-Approve Safe Claims; 3) Student Profile Handle Switch/Reset Flow and Live Diagnostic Badges; 4) Real-Time Student Notification Dispatch upon Coordinator Approval; 5) Recruiter Talent Shortlist CSV Export and Printable Academic OD Slips."
+
+---
+
+### ⚙️ 5. Chamber of The Executor (Gold-Standard Pragmatist)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+Below is a **production‑grade, end‑to‑end blueprint** that you can hand to engineering and ship with **zero‑downtime**.  
+It is split into five functional pillars (the list you supplied) and, for each pillar, it contains:
+
+| Section | What you’ll find |
+|---------|------------------|
+| **A. Data Model** | Exact PostgreSQL tables, indexes, constraints, migrations and audit trails. |
+| **B. API Contract** | OpenAPI‑v3 spec (request/response JSON schema, status codes, auth). |
+| **C. TypeScript Types** | Shared `@types` that are generated from the OpenAPI spec (via `openapi‑generator-cli`). |
+| **D. Next.js 16 / React 19 boundaries** | Server‑Components (RSC) vs Client‑Components, data‑fetching strategy, streaming, edge‑runtime usage. |
+| **E. Error‑Recovery & Observability** | Global error handling, retry policies, idempotency, Sentry/Datadog hooks. |
+| **F. Roll‑out Playbook** | Zero‑impact migration steps, feature‑flag plan, canary rollout, rollback checklist. |
+
+---
+
+## 1️⃣ AI‑Powered Coding Handle Verification Sentinel (Anti‑Theft) + Live Scraper Probing
+
+### A. Data Model
+
+| Table | Columns | Indexes / Constraints | Notes |
+|-------|---------|----------------------|-------|
+| `students` | `id PK`, `email UNIQUE`, `primary_handle VARCHAR(64)`, `handle_verified_at TIMESTAMP NULL`, `handle_verification_status ENUM('pending','verified','rejected')`, `created_at`, `updated_at` | `UNIQUE(email)`, `UNIQUE(primary_handle)` | Existing student table – we add verification fields. |
+| `handles` | `id PK`, `student_id FK → students.id`, `handle VARCHAR(64)`, `source ENUM('self','scraper','import')`, `verified BOOLEAN`, `last_scrape_at TIMESTAMP`, `scrape_hash CHAR(64)`, `created_at`, `updated_at` | `UNIQUE(handle)`, `INDEX(student_id)`, `INDEX(verified)` | One‑to‑many – a student may own several handles (old, revoked, etc.). |
+| `handle_scrape_log` | `id PK`, `handle_id FK → handles.id`, `scrape_at TIMESTAMP`, `status ENUM('success','failed','rate_limited')`, `payload JSONB`, `error_message TEXT` | `INDEX(handle_id, scrape_at DESC)` | Immutable audit log for every scrape attempt. |
+| `handle_dedup_job` | `id PK`, `started_at`, `finished_at`, `processed_rows
+
+---
+
+### ⚖️ The Chairman's Verdict (Luna)
+- **Council Status**: ✅ Deliberation Finalized
+- **Strategic Synthesis**: Balance execution mechanics with identified edge cases and leverage opportunities.
+- **Permanent Ledger**: Saved in `five_monks_report.md`
+
+
+---
+## 📜 Historical Verdict Ledger
+
+# 🏛️ The Five Monks Council: Deliberation Briefing
+**Convened**: 2026-09-08T00:12:48.872Z
+**Proposal**: "AI-Powered Handle Verification, Anti-Theft Deduplication Sentinel, and Staff Fast-Approval Engine for Student Coding Handles (LeetCode, CodeChef, Codeforces, HackerRank, GFG, Unstop, Devpost)"
+
+---
+
+### 🥊 1. Chamber of The Contrarian (The Sceptic & Pre-Mortem Inquisitor)
+*Engine: `groq / qwen/qwen3.8-27b`*
+
+Here is the post-mortem. It has been six months. The system is down, the trust model is broken, and the engineering team is in full incident response mode. Here is why your "AI-Powered Sentinel" failed catastrophically:
+
+*   **The "AI" is a Hallucination Liability Center:** You integrated an LLM to verify "coding authenticity" or "handle ownership." When a student’s handle was rejected because the AI *hallucinated* that their GitHub profile didn’t match their Codeforces username (or vice versa), you created a support nightmare. You cannot use non-deterministic AI for deterministic identity verification. The "confidence score" you built is a liability, not a feature. Users don’t care about your 85% confidence; they care about why they can’t submit their assignment.
+*   **API Rate-Limiting is the Hard Bottleneck:** You assumed you could poll LeetCode, Codeforces, and HackerRank in real-time for every handle submission. You are being throttled hard. LeetCode and Codeforces have strict, undocumented rate limits that trigger IP bans. Your "Sentinel" is now blacklisted on 4 out of 7 platforms. You are failing open (letting bad handles through) or failing closed (blocking all students) because you have no fallback mechanism when the upstream APIs go silent.
+*   **Race Conditions in the "Fast-Approval Engine":** The "Staff Fast-Approval" path is a security nightmare. You created a distinct code path for staff that bypasses your "deduplication sentinel." Attackers discovered this in Week 2. They registered handles with typosquatting variations (e.g., `user1` vs `user_l`) and flagged them for "staff review." Staff, under pressure to clear the queue, approved them manually. Now you have duplicate handles, split submission histories, and corrupted leaderboard data. The "fast" path was actually a "sloppy" path.
+*   **Single Point of Failure: The Centralized Deduplication DB:** You built a massive, monolithic database of "verified handles" across 7 platforms. When this DB suffers a schema migration failure or a replication lag during a peak submission window (exam season), your entire verification pipeline hangs. You have no local caching or edge-computation fallback. If the central DB is down, no one can verify *anything*. You turned a micro-service into a chokepoint.
+*   **Maintenance Debt: The "Platform Drift" Problem:** Unstop and Devpost change their API endpoints or JSON response structures without notice. Your "AI" doesn’t adapt; your parsers do. When GFG changed their profile URL structure in Month 3, 40% of verifications failed silently. Your error handling swallowed the exceptions, marking handles as "failed" when they were actually "unparseable." Students lost 3 weeks of work because the system didn’t distinguish between "handle doesn’t exist" and "our parser is broken."
+*   **Security Risk: Handle Enumeration and Scraping:** By building a "deduplication sentinel," you effectively built a massive, searchable index of student identities linked to their coding handles. This data was never encrypted at rest with per-user keys. A SQL injection in one of your less-monitored microservices (the "Fast-Approval" webhook) exposed the entire mapping table. Now, bots can scrape your API to build a list of all active students and their primary coding IDs, enabling targeted phishing or account theft on the external platforms.
+*   **False Positives Destroying User Trust:** Your "Anti-Theft" logic flagged legitimate handle changes (e.g., a student renaming their Codeforces account) as "theft." The system locked their submissions and required a manual appeal. With 10,000 students, this created a backlog of 500
+
+---
+
+### 🎯 2. Chamber of The Principal Advisor (First-Principles & Anti-XY Inquisitor)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+**The Principal Advisor’s Lens**
+
+Below is a stripped‑down, problem‑first analysis of what you’re really trying to achieve with the “AI‑Powered Handle Verification, Anti‑Theft Deduplication Sentinel, and Staff Fast‑Approval Engine.” I’m not writing code or architecture diagrams – I’m digging to the core bottleneck, exposing any XY‑problem, and showing how you can capture ≈ 90 % of the value with ≈ 10 % of the effort.
+
+---
+
+## 1. What is the *real* problem you’re solving?
+
+| Symptom (what you see) | Underlying Need (why it matters) |
+|------------------------|-----------------------------------|
+| **Students submit handles** from many coding sites (LeetCode, CodeChef, …) | You need a **trusted proof of identity / skill** that can be linked to your internal student record. |
+| **Staff spend minutes‑hours manually checking each handle** for authenticity, duplicates, or stolen accounts | You need **speed and consistency** in the verification workflow so staff can focus on higher‑value tasks. |
+| **Occasional “theft” or duplicate handles** (two students claim the same username) | You need a **single source of truth** that prevents or flags colliding claims and protects the integrity of your data. |
+| **Desire for “AI‑powered” detection** of fraudulent or spoofed handles | You suspect the problem is **complex enough** to need ML, but you may not have enough signal to justify it. |
+
+**Bottom‑line:** The core bottleneck is **trustworthy, low‑friction validation of external coding‑platform identities at scale**, coupled with a **quick, staff‑friendly approval loop**. Everything else (AI, fancy dedup heuristics, multi‑platform orchestration) is a *means* to that end.
+
+---
+
+## 2. Are we looking at an **XY problem**?
+
+> **X** = “Build an AI‑driven sentinel that can sniff out stolen or duplicate handles.”  
+> **Y** = “We need a fast, reliable way for staff to approve student handles.”
+
+If you spend months training a model to detect “theft” before you even have a reliable way to *prove* a handle belongs to a student, you’re solving **X** while the real
+
+---
+
+### 🚀 3. Chamber of The Expansionist (Visionary & Leverage Multiplier)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## The Expansionist Playbook  
+**Mission:** Uncover hidden super‑powers, asymmetric upside, and multi‑order leverage in the trio of tools you described—**AI‑Powered Handle Verification (AHV), Anti‑Theft Deduplication Sentinel (ATDS), and Staff Fast‑Approval Engine (SFAE)**—and turn them into a long‑term strategic moat for any education‑tech, recruiting, or talent‑marketplace platform.
+
+---
+
+## 1. Core Value Propositions (What the Tools Do)
+
+| Tool | Primary Function | Immediate Benefits |
+|------|------------------|--------------------|
+| **AI‑Powered Handle Verification (AHV)** | Confirms that a student’s public coding‑profile (LeetCode, CodeChef, etc.) truly belongs to them, using facial‑recognition, voice‑biometrics, activity‑pattern modeling, and cross‑platform metadata. | • Eliminates fake or purchased handles.<br>• Guarantees authenticity for recruiters and scholarships.<br>• Enables trust‑based gamification (leaderboards, badges). |
+| **Anti‑Theft Deduplication Sentinel (ATDS)** | Detects and merges duplicate or stolen handles across platforms, flagging identity theft, plagiarism, or “ghost” accounts. | • Cleans the talent‑pool data lake.<br>• Prevents double‑counting of achievements.<br>• Provides early warning for credential fraud. |
+| **Staff Fast‑Approval Engine (SFAE)** | Automates the internal review workflow for new student handle submissions, using AI‑driven risk scoring, policy‑based routing, and one‑click bulk actions. | • Cuts approval latency from days → minutes.<br>• Frees staff for higher‑value tasks (coaching, mentorship).<br>• Generates real‑time analytics on pipeline health. |
+
+---
+
+## 2. Hidden Super‑Powers (Asymmetric Upsides)
+
+| Super‑Power | How It Emerges | Why It’s Asymmetric |
+|------------|----------------|---------------------|
+| **Zero‑Trust Talent Fabric** | AHV + ATDS create a cryptographically‑linked identity graph that is **tamper‑evident** across all coding platforms. | Competitors must rebuild the entire graph from scratch; you already own the “golden record.” |
+| **Dynamic Reputation Engine** | Each verified handle feeds a **real‑time reputation score** (solved problems, contest rank, contribution velocity). The score updates automatically as the student codes. | Reputation becomes a live asset—students can “trade” it for scholarships, internships, or micro‑grants, turning reputation into a **liquidity source**. |
+| **Fraud‑Early‑Warning Network** | ATDS’s pattern‑recognition (e.g., identical solution timestamps, IP fingerprint overlap) triggers alerts that cascade to partner platforms (universities, hiring portals). | You become the **central hub** for fraud intelligence, opening a new B2B data‑as‑a‑service revenue stream. |
+| **AI‑Guided Talent Matching** | SFAE’s risk scores combine with AHV‑derived reputation to feed a **matching engine** that auto‑pairs students with mentors, projects, or recruiters. | Matching quality jumps from ~70 % to >95 % with minimal human oversight—drastically improves conversion and retention. |
+
+---
+
+### 👁️ 4. Chamber of The Outsider (Clean-Slate & Naive User Observer)
+*Engine: `luna-protocol / builtin-reasoner`*
+
+Deliberation evaluated against core project constraints for: "AI-Powered Handle Verification, Anti-Theft Deduplication Sentinel, and Staff Fast-Approval Engine for Student Coding Handles (LeetCode, CodeChef, Codeforces, HackerRank, GFG, Unstop, Devpost)"
+
+---
+
+### ⚙️ 5. Chamber of The Executor (Gold-Standard Pragmatist)
+*Engine: `groq / openai/gpt-oss-120b`*
+
+## Overview  
+
+We are building a **three‑layered service** that runs inside a modern Next.js 16 / React 19 stack:
+
+| Layer | Responsibility | Tech |
+|-------|----------------|------|
+| **1️⃣ Data & Identity** | Persist verified handles, track deduplication, store staff approval logs | PostgreSQL (or Aurora Serverless), Prisma ORM |
+| **2️⃣ Backend API** | Expose REST/GraphQL endpoints for verification, deduplication, fast‑approval, and audit | Next.js 16 API Routes (Edge‑ready), tRPC for type‑safe RPC, OpenAPI spec |
+| **3️⃣ Front‑end UI** | React Server Components (RSC) for read‑only pages, Client Components for interactive forms | Next.js 16 App Router, React 19 Server/Client component boundaries, SWR for data fetching |
+
+All three layers share **canonical TypeScript types** generated from a single source of truth (`schema.prisma` + `zod` contracts).  
+
+Below you will find:
+
+1. **Exact DB schema** (PostgreSQL + Prisma)  
+2. **API contracts** (OpenAPI + tRPC) with request/response payloads and error codes  
+3. **TypeScript type definitions** (shared across server & client)  
+4. **Next.js 16 / React 19 component boundaries** (RSC vs client)  
+5. **Error‑recovery & observability strategy** (retry, circuit‑breaker, logging, monitoring)  
+6. **Zero‑side‑effect rollout plan** (feature‑flags, migrations, canary, blue‑green)  
+
+---  
+
+## 1️⃣ Database Schema (PostgreSQL)  
+
+> **Why PostgreSQL?**  
+> - Strong ACID guarantees for deduplication logic (unique constraints + advisory locks).  
+> - Native JSONB for flexible third‑party profile blobs.  
+> - Excellent support in serverless environments (Aurora Serverless v2, Neon).  
+
+### Prisma Model Definitions  
+
+```prisma
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["clientExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * Core entity – a verified student handle on a given platform.
+ */
+model VerifiedHandle {
+  id                BigInt      @id @default(autoincrement())
+  studentId         BigInt      // FK to your existing Student table
+  platform          Platform    // enum (see below)
+  handle            String      // raw handle as entered by the user
+  normalizedHandle  String      // lower‑cased, stripped punctuation (for dedup)
+  profileUrl        String?     // optional link to the public profile
+  verificationMeta  Json?       // raw data returned from third‑party verification API
+
+---
+
+### ⚖️ The Chairman's Verdict (Luna)
+- **Council Status**: ✅ Deliberation Finalized
+- **Strategic Synthesis**: Balance execution mechanics with identified edge cases and leverage opportunities.
+- **Permanent Ledger**: Saved in `five_monks_report.md`
+
+
+---
+## 📜 Historical Verdict Ledger
+
+# 🏛️ The Five Monks Council: Deliberation Briefing
 **Convened**: 2026-09-06T04:21:19.269Z
 **Proposal**: "Evaluate the overhauled Code Desk live data architecture: migration from synthetic placeholders to 100% authentic upstream APIs (LeetCode GraphQL tag/language/contest, Codeforces rating API, CodeChef scrapers, GitHub API), dynamic milestone badges, and strict Zero-Fabrication enforcement. Are there any critical changes, edge-case defenses, or architectural improvements to make?"
 

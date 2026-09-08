@@ -280,6 +280,7 @@ export async function GET(request: Request) {
       const rawLcRating = statsData.data?.userContestRanking?.rating;
       const rating = rawLcRating ? Math.round(rawLcRating) : 0;
       const globalRank = statsData.data?.userContestRanking?.globalRanking || matchedUser.profile?.ranking || 0;
+      const attendedContestsCount = statsData.data?.userContestRanking?.attendedContestsCount || 0;
 
       let rank = "Top 25%";
       if (globalRank > 0) {
@@ -599,6 +600,7 @@ export async function GET(request: Request) {
         rank,
         rating,
         globalRank,
+        attendedContestsCount,
         leetcodeStreak,
         activeYears,
         submissionCalendar,
@@ -707,6 +709,7 @@ export async function GET(request: Request) {
       }
 
       let contestHistory: any[] = [];
+      let attendedContestsCount = 0;
       try {
         const ratingRes = await fetch(`https://codeforces.com/api/user.rating?handle=${cleanUsername}&t=${Date.now()}`, {
           cache: "no-store"
@@ -714,6 +717,7 @@ export async function GET(request: Request) {
         if (ratingRes.ok) {
           const ratingData = await ratingRes.json();
           if (ratingData.status === "OK" && Array.isArray(ratingData.result)) {
+            attendedContestsCount = ratingData.result.length;
             contestHistory = ratingData.result.map((r: any) => ({
               name: r.contestName || `Codeforces Round #${r.contestId}`,
               date: r.ratingUpdateTimeSeconds ? new Date(r.ratingUpdateTimeSeconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent",
@@ -741,6 +745,7 @@ export async function GET(request: Request) {
         rank,
         rating,
         globalRank: userInfo.maxRating || 0,
+        attendedContestsCount,
         submissionCalendar,
         contestHistory
       });
@@ -755,6 +760,7 @@ export async function GET(request: Request) {
       let countryRank = 0;
       let fetchedSuccessfully = false;
       let contestHistory: any[] = [];
+      let attendedContestsCount = 0;
 
       // Method 1: Try public CodeChef API endpoint first
       try {
@@ -772,6 +778,7 @@ export async function GET(request: Request) {
             globalRank = parseInt(apiData.globalRank || 0);
             countryRank = parseInt(apiData.countryRank || 0);
             if (Array.isArray(apiData.ratingData)) {
+              attendedContestsCount = apiData.ratingData.length;
               contestHistory = apiData.ratingData.map((c: any) => ({
                 name: c.name || c.code || "CodeChef Starters",
                 date: c.end_date ? new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : (c.getyear && c.getmonth && c.getday ? `${c.getday} ${c.getmonth} ${c.getyear}` : "Recent"),
@@ -804,31 +811,35 @@ export async function GET(request: Request) {
           if (response.ok) {
             const html = await response.text();
 
-            // Extract rating: 1) Try exact rating-number HTML DOM block first
+            // Extract rating & contestHistory: match all_rating, ratingData, or rating embedded JSON
+            const allRatingMatch = html.match(/var\s+all_rating\s*=\s*(\[[\s\S]*?\]);/) ||
+                                   html.match(/all_rating\s*=\s*(\[[\s\S]*?\]);/) ||
+                                   html.match(/ratingData\s*=\s*(\[[\s\S]*?\]);/) ||
+                                   html.match(/"rating"\s*:\s*\{\s*"all"\s*:\s*(\[[\s\S]*?\])/);
+            if (allRatingMatch) {
+              try {
+                const contestList = JSON.parse(allRatingMatch[1]);
+                if (Array.isArray(contestList) && contestList.length > 0) {
+                  attendedContestsCount = contestList.length;
+                  const latest = contestList[contestList.length - 1];
+                  if (latest?.rating) rating = parseInt(latest.rating);
+                  contestHistory = contestList.map((c: any) => ({
+                    name: c.name || c.code || "CodeChef Contest",
+                    date: c.end_date ? new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : (c.getyear && c.getmonth && c.getday ? `${c.getday} ${c.getmonth} ${c.getyear}` : "Recent"),
+                    timestamp: c.end_date ? new Date(c.end_date).getTime() : (c.getyear && c.getmonth && c.getday ? new Date(`${c.getyear}-${c.getmonth}-${c.getday}`).getTime() : 0),
+                    rating: parseInt(c.rating || 0),
+                    rank: parseInt(c.rank || 0),
+                    platform: "CodeChef"
+                  })).slice(-10);
+                }
+              } catch {}
+            }
+
+            // Fallback rating from DOM if not in JSON
             const ratingHeaderMatch = html.match(/rating-number[^>]*>\s*(\d+)/i) ||
-                                html.match(/class="rating-number"[^>]*>\s*(\d+)/i);
-            if (ratingHeaderMatch) {
+                                      html.match(/class="rating-number"[^>]*>\s*(\d+)/i);
+            if (ratingHeaderMatch && !rating) {
               rating = parseInt(ratingHeaderMatch[1]);
-            } else {
-              // 2) Try embedded contest JSON array (last element = current active rating)
-              const ratingAllMatch = html.match(/"rating"\s*:\s*\{\s*"all"\s*:\s*(\[[\s\S]*?\])/);
-              if (ratingAllMatch) {
-                try {
-                  const contestList = JSON.parse(ratingAllMatch[1]);
-                  if (Array.isArray(contestList) && contestList.length > 0) {
-                    const latest = contestList[contestList.length - 1];
-                    if (latest?.rating) rating = parseInt(latest.rating);
-                    contestHistory = contestList.map((c: any) => ({
-                      name: c.name || c.code || "CodeChef Starters",
-                      date: c.end_date ? new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : (c.getyear && c.getmonth && c.getday ? `${c.getday} ${c.getmonth} ${c.getyear}` : "Recent"),
-                      timestamp: c.end_date ? new Date(c.end_date).getTime() : 0,
-                      rating: parseInt(c.rating || 0),
-                      rank: parseInt(c.rank || 0),
-                      platform: "CodeChef"
-                    })).slice(-10);
-                  }
-                } catch {}
-              }
             }
 
             // Extract highest rating
@@ -882,6 +893,7 @@ export async function GET(request: Request) {
           highestRating: 0,
           globalRank: 0,
           countryRank: 0,
+          attendedContestsCount: 0,
           submissionCalendar: {},
           contestHistory: [],
           isFallback: true
@@ -900,6 +912,7 @@ export async function GET(request: Request) {
         highestRating: highestRating || rating || 0,
         globalRank: globalRank || 0,
         countryRank: countryRank || 0,
+        attendedContestsCount,
         submissionCalendar: {},
         contestHistory
       });

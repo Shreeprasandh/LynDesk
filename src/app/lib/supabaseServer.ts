@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 if (typeof window !== "undefined") {
   throw new Error("[Security Violation]: Supabase Admin client cannot be initialized on the client-side.");
@@ -9,7 +9,7 @@ if (typeof window !== "undefined") {
  * Standardizes administrative operations using process.env.SUPABASE_SERVICE_ROLE_KEY.
  * NEVER expose server admin credentials to client-side bundles.
  */
-export function createAdminClient() {
+export function createAdminClient(): SupabaseClient {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -27,3 +27,16 @@ export function createAdminClient() {
     }
   });
 }
+
+/**
+ * Lazy-initialized singleton proxy for direct `supabaseAdmin` imports across route handlers.
+ */
+let _adminInstance: SupabaseClient | null = null;
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    if (!_adminInstance) {
+      _adminInstance = createAdminClient();
+    }
+    return (_adminInstance as any)[prop];
+  }
+});

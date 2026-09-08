@@ -77,6 +77,8 @@ function CoordinatorConsoleContent() {
   const [verifSubTab, setVerifSubTab] = useState<"credits" | "handles" | "links" | "works">("credits");
   const [handleRequests, setHandleRequests] = useState<any[]>([]);
   const [selectedHandleRequest, setSelectedHandleRequest] = useState<any | null>(null);
+  const [handleAuditLoading, setHandleAuditLoading] = useState(false);
+  const [handleAuditResult, setHandleAuditResult] = useState<any | null>(null);
   const [linkRequests, setLinkRequests] = useState<any[]>([]);
   const [selectedLinkRequest, setSelectedLinkRequest] = useState<any | null>(null);
   const [worksReviewQueue, setWorksReviewQueue] = useState<any[]>([]);
@@ -87,7 +89,7 @@ function CoordinatorConsoleContent() {
   // Recruiter PINs & Opportunities States
   const [recruiterPins, setRecruiterPins] = useState<any[]>([]);
   const [newCompanyRecruiter, setNewCompanyRecruiter] = useState("");
-  const [oppSubTab, setOppSubTab] = useState<"broadcasts" | "opportunities">("broadcasts");
+  const [oppSubTab, setOppSubTab] = useState<"broadcasts" | "opportunities" | "assignments">("broadcasts");
   const [opportunities, setOpportunities] = useState<any[]>([]);
 
   // Create Opp form states
@@ -99,20 +101,33 @@ function CoordinatorConsoleContent() {
   const [newOppUrl, setNewOppUrl] = useState("");
   const [newOppDesc, setNewOppDesc] = useState("");
 
-  // Seed and load recruiter PINs & opportunities
+  // Coursework & Assignment form states
+  const [courseSubject, setCourseSubject] = useState("CS8501");
+  const [courseDept, setCourseDept] = useState("Computer Science");
+  const [courseYear, setCourseYear] = useState("3rd Year");
+  const [courseSection, setCourseSection] = useState("A");
+  const [coursePostType, setCoursePostType] = useState<"assignment" | "material" | "notice" | "discussion">("assignment");
+  const [courseTitle, setCourseTitle] = useState("");
+  const [courseContent, setCourseContent] = useState("");
+  const [courseDueDate, setCourseDueDate] = useState("");
+  const [courseAttachmentName, setCourseAttachmentName] = useState("");
+  const [courseAttachmentUrl, setCourseAttachmentUrl] = useState("");
+  const [coursePublishing, setCoursePublishing] = useState(false);
+  const [classroomPosts, setClassroomPosts] = useState<any[]>([]);
+
+  // Load recruiter PINs & opportunities
   useEffect(() => {
     if (typeof window !== "undefined") {
       const loadPins = () => {
         const stored = localStorage.getItem("ldk_recruiter_pins");
         if (stored) {
-          setRecruiterPins(JSON.parse(stored));
+          try {
+            setRecruiterPins(JSON.parse(stored));
+          } catch {
+            setRecruiterPins([]);
+          }
         } else {
-          const defaultPins = [
-            { id: "pin_1", company: "Google India", pin: "847291", date: "Oct 14" },
-            { id: "pin_2", company: "Microsoft", pin: "301984", date: "Oct 14" }
-          ];
-          setRecruiterPins(defaultPins);
-          localStorage.setItem("ldk_recruiter_pins", JSON.stringify(defaultPins));
+          setRecruiterPins([]);
         }
       };
       loadPins();
@@ -235,24 +250,69 @@ function CoordinatorConsoleContent() {
     }
   }, []);
 
-  // Load handle verification requests from localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("ldk_handle_verifications");
-      setTimeout(() => {
-        if (stored) {
-          setHandleRequests(JSON.parse(stored));
-        } else {
-          const defaultReqs = [
-            { id: "verify_1", studentId: "s1", studentName: "Alex Carter", studentEmail: "alexcarter@mit.edu", platform: "LeetCode", handle: "alexcarter", requestType: "new_verification", reason: "First-time competitive coding profile setup.", oldHandle: null, status: "pending", date: "Oct 14" },
-            { id: "verify_2", studentId: "s2", studentName: "Mira Sen", studentEmail: "mirasen@mit.edu", platform: "Codeforces", handle: "mira_cf", requestType: "handle_switch", reason: "Switched handles to match github username.", oldHandle: "mira_old_cf", status: "pending", date: "Oct 14" }
-          ];
-          setHandleRequests(defaultReqs);
-          localStorage.setItem("ldk_handle_verifications", JSON.stringify(defaultReqs));
+  // Load handle verification requests from DB + localStorage fallback
+  const fetchHandleRequests = useCallback(async () => {
+    try {
+      const res = await fetch("/api/institutional/handle-requests?status=all");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.requests && Array.isArray(data.requests) && data.requests.length > 0) {
+          setHandleRequests(data.requests);
+          localStorage.setItem("ldk_handle_verifications", JSON.stringify(data.requests));
+          return;
         }
-      }, 0);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch handle requests from API, falling back to local storage:", e);
+    }
+
+    const stored = localStorage.getItem("ldk_handle_verifications");
+    if (stored) {
+      setHandleRequests(JSON.parse(stored));
+    } else {
+      const defaultReqs = [
+        { id: "verify_1", studentId: "s1", studentName: "Alex Carter", studentEmail: "alexcarter@mit.edu", platform: "LeetCode", handle: "alexcarter", requestType: "new_verification", reason: "First-time competitive coding profile setup.", oldHandle: null, status: "pending", date: "Oct 14" },
+        { id: "verify_2", studentId: "s2", studentName: "Mira Sen", studentEmail: "mirasen@mit.edu", platform: "Codeforces", handle: "mira_cf", requestType: "handle_switch", reason: "Switched handles to match github username.", oldHandle: "mira_old_cf", status: "pending", date: "Oct 14" }
+      ];
+      setHandleRequests(defaultReqs);
+      localStorage.setItem("ldk_handle_verifications", JSON.stringify(defaultReqs));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      fetchHandleRequests();
+    }
+  }, [fetchHandleRequests]);
+
+  // Run live AI Deduplication Sentinel audit whenever selectedHandleRequest changes
+  useEffect(() => {
+    if (selectedHandleRequest) {
+      setHandleAuditLoading(true);
+      setHandleAuditResult(null);
+      fetch("/api/institutional/handle-ai-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: selectedHandleRequest.platform,
+          handle: selectedHandleRequest.handle,
+          userId: selectedHandleRequest.studentId
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          setHandleAuditResult(data);
+        })
+        .catch(err => {
+          console.warn("Handle audit fetch error:", err);
+        })
+        .finally(() => {
+          setHandleAuditLoading(false);
+        });
+    } else {
+      setHandleAuditResult(null);
+    }
+  }, [selectedHandleRequest]);
 
   // Load link verification requests from localStorage
   useEffect(() => {
@@ -1052,6 +1112,20 @@ useEffect(() => {
 
   const handleVerifyHandle = async (reqId: string, studentId: string, platform: string, handle: string, action: "approved" | "rejected") => {
     try {
+      // Call backend PATCH API
+      try {
+        await fetch("/api/institutional/handle-requests", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestId: reqId,
+            action: action === "approved" ? "approve" : "reject"
+          })
+        });
+      } catch (apiErr) {
+        console.warn("Handle request PATCH API call warning:", apiErr);
+      }
+
       if (action === "approved") {
         let columnName = "";
         const lowerPlat = platform.toLowerCase();
@@ -1063,7 +1137,7 @@ useEffect(() => {
         else if (lowerPlat.includes("unstop")) columnName = "unstop_verified";
         else if (lowerPlat.includes("devpost")) columnName = "devpost_verified";
 
-        if (columnName) {
+        if (columnName && studentId) {
           await supabase
             .from("profiles")
             .update({ [columnName]: true })
@@ -1106,6 +1180,44 @@ useEffect(() => {
 
     } catch (err) {
       console.error("Failed to update handle verification status:", err);
+    }
+  };
+
+  const handleBulkApproveSafeHandles = async () => {
+    const pendingReqs = handleRequests.filter(r => r.status === "pending");
+    if (pendingReqs.length === 0) return;
+
+    try {
+      const ids = pendingReqs.map(r => r.id);
+      await fetch("/api/institutional/handle-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "bulk_approve",
+          requestIds: ids
+        })
+      });
+
+      const updated = handleRequests.map(r => {
+        if (r.status === "pending") return { ...r, status: "approved" };
+        return r;
+      });
+      setHandleRequests(updated);
+      localStorage.setItem("ldk_handle_verifications", JSON.stringify(updated));
+
+      if (selectedHandleRequest && selectedHandleRequest.status === "pending") {
+        setSelectedHandleRequest((prev: any) => prev ? { ...prev, status: "approved" } : null);
+      }
+
+      addAuditLog(`Coordinator bulk-approved ${pendingReqs.length} pending student handle claims`);
+
+      setModalMessage({
+        isOpen: true,
+        title: "Bulk Verification Complete",
+        text: `Successfully verified and approved ${pendingReqs.length} student handle claims.`
+      });
+    } catch (err) {
+      console.error("Bulk approve error:", err);
     }
   };
 
@@ -1266,6 +1378,80 @@ useEffect(() => {
     window.dispatchEvent(new Event("ldk_opportunities_update"));
     
     addAuditLog(`${isRecommended ? "Recommended" : "Unrecommended"} opportunity: ${title}`);
+  };
+
+  const loadClassroomPosts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/college/classroom?department=${encodeURIComponent(courseDept)}&academicYear=${encodeURIComponent(courseYear)}&section=${encodeURIComponent(courseSection)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.posts && Array.isArray(data.posts)) {
+          setClassroomPosts(data.posts);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }, [courseDept, courseYear, courseSection]);
+
+  useEffect(() => {
+    if (activeTab === "broadcasts" && oppSubTab === "assignments") {
+      loadClassroomPosts();
+    }
+  }, [activeTab, oppSubTab, loadClassroomPosts]);
+
+  const handlePublishCoursework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseTitle.trim() || !courseContent.trim()) return;
+    setCoursePublishing(true);
+    try {
+      const res = await fetch("/api/college/classroom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          department: courseDept,
+          academicYear: courseYear,
+          section: courseSection,
+          postType: coursePostType,
+          title: courseTitle.trim(),
+          content: courseContent.trim(),
+          dueDate: courseDueDate ? courseDueDate : null,
+          attachmentName: courseAttachmentName.trim() || null,
+          attachmentUrl: courseAttachmentUrl.trim() || null,
+          subjectId: courseSubject,
+        }),
+      });
+
+      if (res.ok) {
+        setCourseTitle("");
+        setCourseContent("");
+        setCourseDueDate("");
+        setCourseAttachmentName("");
+        setCourseAttachmentUrl("");
+        loadClassroomPosts();
+        addAuditLog(`Published ${coursePostType}: "${courseTitle.trim()}" for ${courseDept} (${courseYear} - Sec ${courseSection})`);
+        setModalMessage({
+          isOpen: true,
+          title: "Coursework Published",
+          text: `Your ${coursePostType} has been published to student classroom feeds.`,
+        });
+      } else {
+        const errData = await res.json();
+        setModalMessage({
+          isOpen: true,
+          title: "Publication Error",
+          text: errData.error || "Failed to publish coursework.",
+        });
+      }
+    } catch {
+      setModalMessage({
+        isOpen: true,
+        title: "Publication Error",
+        text: "Failed to publish coursework to classroom feed.",
+      });
+    } finally {
+      setCoursePublishing(false);
+    }
   };
 
   const loadWorksReviewQueue = useCallback(async () => {
@@ -2016,8 +2202,9 @@ useEffect(() => {
                             </div>
 
                             <div className="text-[10.5px] text-txt-sub flex items-center gap-2">
-                              <span className="font-mono text-[9.5px] text-accent-main">
-                                📅 {app.target_date}{app.end_date && app.end_date !== app.target_date ? ` to ${app.end_date}` : ""}
+                              <span className="font-mono text-[9.5px] text-accent-main flex items-center gap-1">
+                                <Calendar size={11} />
+                                <span>{app.target_date}{app.end_date && app.end_date !== app.target_date ? ` to ${app.end_date}` : ""}</span>
                               </span>
                               <span>•</span>
                               <span className="font-mono text-[9.5px]">
@@ -2232,12 +2419,22 @@ useEffect(() => {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setOppSubTab("assignments")}
+                  className={`pb-1 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    oppSubTab === "assignments" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
+                  }`}
+                >
+                  <GraduationCap size={12} />
+                  Coursework &amp; Classroom Posts
+                </button>
+                <button
+                  type="button"
                   onClick={() => setOppSubTab("opportunities")}
                   className={`pb-1 border-b-2 transition-all cursor-pointer ${
                     oppSubTab === "opportunities" ? "border-accent-main text-accent-main font-bold" : "border-transparent text-txt-muted hover:text-txt-main"
                   }`}
                 >
-                  Manage Opportunities & News
+                  Manage Opportunities &amp; News
                 </button>
               </div>
 
@@ -2303,7 +2500,7 @@ useEffect(() => {
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[9px] text-txt-sub font-mono uppercase">Release Date</label>
                         <input 
-                          type="date"
+                          type="date" 
                           value={scheduledDate}
                           onChange={(e) => setScheduledDate(e.target.value)}
                           className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
@@ -2312,7 +2509,7 @@ useEffect(() => {
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[9px] text-txt-sub font-mono uppercase">Release Time</label>
                         <input 
-                          type="time"
+                          type="time" 
                           value={scheduledTime}
                           onChange={(e) => setScheduledTime(e.target.value)}
                           className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
@@ -2338,6 +2535,220 @@ useEffect(() => {
                     >
                       Send Instantly
                     </button>
+                  </div>
+                </div>
+              ) : oppSubTab === "assignments" ? (
+                /* Coursework & Classroom Posts view */
+                <div className="flex flex-col gap-5 animate-fade-in text-left">
+                  {/* Creator Form */}
+                  <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                      <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold font-semibold">
+                        Publish Coursework, Assignments &amp; Lecture Materials
+                      </span>
+                      <span className="font-mono text-[10px] text-accent-main uppercase font-bold">
+                        Target: {courseDept} • {courseYear} (Sec {courseSection})
+                      </span>
+                    </div>
+
+                    <form onSubmit={handlePublishCoursework} className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Subject</label>
+                          <select
+                            value={courseSubject}
+                            onChange={(e) => setCourseSubject(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="CS8501">CS8501: Theory of Computation</option>
+                            <option value="CS8591">CS8591: Computer Networks &amp; Security</option>
+                            <option value="CS8592">CS8592: OOAD</option>
+                            <option value="EC8691">EC8691: Microprocessors</option>
+                            <option value="CS8511">CS8511: Networks Laboratory</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Department</label>
+                          <select
+                            value={courseDept}
+                            onChange={(e) => setCourseDept(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Information Technology">Information Technology</option>
+                            <option value="Electrical Engineering">Electrical Engineering</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Academic Year</label>
+                          <select
+                            value={courseYear}
+                            onChange={(e) => setCourseYear(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="1st Year">1st Year</option>
+                            <option value="2nd Year">2nd Year</option>
+                            <option value="3rd Year">3rd Year</option>
+                            <option value="4th Year">4th Year</option>
+                          </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Section</label>
+                          <select
+                            value={courseSection}
+                            onChange={(e) => setCourseSection(e.target.value)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                            <option value="C">Section C</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Post Title</label>
+                          <input
+                            type="text"
+                            required
+                            value={courseTitle}
+                            onChange={(e) => setCourseTitle(e.target.value)}
+                            placeholder="e.g. Assignment 4: Syntax-Directed Translation Parser"
+                            className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Post Type</label>
+                          <select
+                            value={coursePostType}
+                            onChange={(e) => setCoursePostType(e.target.value as any)}
+                            className="h-9 px-2 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm cursor-pointer font-mono"
+                          >
+                            <option value="assignment">Assignment (With Due Date)</option>
+                            <option value="material">Lecture Notes / Slide Deck</option>
+                            <option value="notice">Section Flash Notice</option>
+                            <option value="discussion">Technical Discussion Topic</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Instructions &amp; Problem Statement</label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={courseContent}
+                          onChange={(e) => setCourseContent(e.target.value)}
+                          placeholder="Provide detailed instructions, problem specifications, or study resources..."
+                          className="p-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50 resize-none font-sans font-light"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {coursePostType === "assignment" && (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Submission Due Date</label>
+                            <input
+                              type="date"
+                              value={courseDueDate}
+                              onChange={(e) => setCourseDueDate(e.target.value)}
+                              className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm font-mono"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Attachment Name (Optional)</label>
+                          <input
+                            type="text"
+                            value={courseAttachmentName}
+                            onChange={(e) => setCourseAttachmentName(e.target.value)}
+                            placeholder="e.g. Lab_Manual_Exp_4.pdf"
+                            className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] text-txt-sub font-semibold font-mono uppercase">Attachment URL / Drive Link (Optional)</label>
+                          <input
+                            type="text"
+                            value={courseAttachmentUrl}
+                            onChange={(e) => setCourseAttachmentUrl(e.target.value)}
+                            placeholder="https://drive.google.com/..."
+                            className="h-9 px-3 border border-border-main bg-bg-base text-txt-main text-xs focus:outline-none focus:border-txt-main rounded-sm placeholder:text-txt-muted/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="submit"
+                          disabled={coursePublishing}
+                          className="h-9 px-5 bg-accent-main text-bg-base text-xs font-mono uppercase rounded-sm hover:opacity-90 disabled:opacity-50 font-bold cursor-pointer transition-opacity"
+                        >
+                          {coursePublishing ? "Publishing..." : "Publish to Student Classroom"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Active Classroom Feed */}
+                  <div className="border border-border-main/60 bg-bg-surface rounded-md">
+                    <div className="p-4 border-b border-border-main/40 flex items-center justify-between font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                      <span>Published Classroom Stream ({classroomPosts.length} Items)</span>
+                      <button
+                        type="button"
+                        onClick={loadClassroomPosts}
+                        className="text-accent-main hover:underline cursor-pointer"
+                      >
+                        ↻ Refresh Feed
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col divide-y divide-border-main/40 max-h-96 overflow-y-auto">
+                      {classroomPosts.length === 0 ? (
+                        <div className="p-8 text-center text-txt-muted font-mono text-[10px] uppercase">
+                          No coursework items published for {courseDept} ({courseYear} - {courseSection}).
+                        </div>
+                      ) : (
+                        classroomPosts.map((post) => (
+                          <div key={post.id} className="p-4 flex flex-col gap-2 hover:bg-bg-card/10 transition-colors">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded font-mono text-[9px] font-bold uppercase border ${
+                                  post.post_type === "assignment" ? "bg-amber-500/10 text-amber-400 border-amber-500/30" :
+                                  post.post_type === "material" ? "bg-blue-500/10 text-blue-400 border-blue-500/30" :
+                                  post.post_type === "notice" ? "bg-rose-500/10 text-rose-400 border-rose-500/30" :
+                                  "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                                }`}>
+                                  {post.post_type}
+                                </span>
+                                <span className="text-xs text-txt-main font-semibold">{post.title}</span>
+                              </div>
+                              {post.due_date && (
+                                <span className="font-mono text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded">
+                                  Due: {new Date(post.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-txt-muted font-light leading-relaxed line-clamp-2">
+                              {post.content}
+                            </p>
+                            {post.attachment_name && (
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-accent-main">
+                                <FileText size={11} />
+                                <span>{post.attachment_name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -2474,7 +2885,7 @@ useEffect(() => {
                                   : "border-border-main text-txt-sub hover:bg-bg-card"
                               }`}
                             >
-                              {opp.facultyRecommended ? "Recommended ★" : "Recommend"}
+                              {opp.facultyRecommended ? "Recommended" : "Recommend"}
                             </button>
                           </div>
                         ))
@@ -2595,7 +3006,26 @@ useEffect(() => {
                   )
                 ) : verifSubTab === "handles" ? (
                   /* Handles verifications sublist */
-                  <div className="flex flex-col divide-y divide-border-main/60">
+                  <div className="flex flex-col">
+                    <div className="p-3 bg-bg-card/40 border-b border-border-main/60 flex justify-between items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-accent-main" />
+                        <span className="text-[10px] font-mono uppercase font-bold text-txt-main">
+                          {handleRequests.filter(r => r.status === "pending").length} Pending Claims
+                        </span>
+                      </div>
+                      {handleRequests.some(r => r.status === "pending") && (
+                        <button
+                          type="button"
+                          onClick={handleBulkApproveSafeHandles}
+                          className="px-2.5 py-1 bg-accent-main/15 hover:bg-accent-main text-accent-main hover:text-bg-base border border-accent-main/40 text-[9px] font-mono uppercase font-bold rounded transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Sparkles size={11} />
+                          Auto-Approve Safe Claims
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col divide-y divide-border-main/60">
                     {handleRequests.map((req) => (
                       <div 
                         key={req.id} 
@@ -2639,6 +3069,7 @@ useEffect(() => {
                         </div>
                       </div>
                     ))}
+                    </div>
                   </div>
                 ) : verifSubTab === "links" ? (
                   /* Institutional Links verifications sublist */
@@ -3493,6 +3924,78 @@ useEffect(() => {
                         &ldquo;{selectedHandleRequest.reason}&rdquo;
                       </p>
                     </div>
+                  </div>
+
+                  {/* AI Deduplication & Live Scraper Sentinel Card */}
+                  <div className="border border-border-main/70 bg-bg-surface p-4 rounded-sm flex flex-col gap-3">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles size={13} className="text-accent-main" />
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
+                          AI Deduplication Sentinel
+                        </span>
+                      </div>
+                      {handleAuditLoading ? (
+                        <span className="text-[9px] font-mono text-txt-muted animate-pulse">Running live probe...</span>
+                      ) : handleAuditResult ? (
+                        <span className={`text-[8.5px] font-mono uppercase font-bold px-1.5 py-0.5 rounded border ${
+                          handleAuditResult.verdict === "SAFE"
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                            : handleAuditResult.verdict === "CONFLICT"
+                            ? "bg-red-500/10 text-red-500 border-red-500/30"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                        }`}>
+                          {handleAuditResult.verdict === "SAFE" ? "Verified Safe to Approve" : handleAuditResult.verdict === "CONFLICT" ? "Conflict Detected" : "Attention Required"}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {handleAuditLoading ? (
+                      <div className="h-14 flex items-center justify-center font-mono text-[10px] text-txt-muted animate-pulse">
+                        Probing platform & checking student duplicates...
+                      </div>
+                    ) : handleAuditResult ? (
+                      <div className="flex flex-col gap-2.5">
+                        {/* Live Platform Stats Preview */}
+                        {handleAuditResult.liveStats && (
+                          <div className="grid grid-cols-3 gap-2 bg-bg-card/40 p-2 rounded border border-border-main/40 text-center font-mono">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Total Solved</span>
+                              <span className="text-xs font-bold text-accent-main">{handleAuditResult.liveStats.solved ?? 0}</span>
+                            </div>
+                            <div className="flex flex-col border-x border-border-main/30 px-1">
+                              <span className="text-[8px] text-txt-muted uppercase">Contest Rating</span>
+                              <span className="text-xs font-bold text-txt-main">
+                                {handleAuditResult.liveStats.rating ? Math.round(handleAuditResult.liveStats.rating) : "Unrated"}
+                              </span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] text-txt-muted uppercase">Active Status</span>
+                              <span className={`text-[10px] font-bold ${handleAuditResult.liveStats.active ? "text-emerald-400" : "text-amber-400"}`}>
+                                {handleAuditResult.liveStats.active ? "Active" : "Quiet"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Audit Message */}
+                        <p className={`text-[11px] leading-relaxed p-2.5 rounded border font-sans ${
+                          handleAuditResult.verdict === "SAFE"
+                            ? "bg-emerald-500/5 text-emerald-300 border-emerald-500/20"
+                            : handleAuditResult.verdict === "CONFLICT"
+                            ? "bg-red-500/10 text-red-300 border-red-500/30"
+                            : "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                        }`}>
+                          {handleAuditResult.message || handleAuditResult.summary}
+                        </p>
+
+                        {handleAuditResult.conflictDetails && (
+                          <div className="text-[10px] font-mono bg-red-500/10 border border-red-500/20 p-2 rounded text-red-200">
+                            <strong>Conflicting Student:</strong> {handleAuditResult.conflictDetails.studentName} ({handleAuditResult.conflictDetails.maskedRollNumber}) • {handleAuditResult.conflictDetails.department}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Actions */}

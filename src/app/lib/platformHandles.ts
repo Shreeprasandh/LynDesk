@@ -16,7 +16,8 @@ export type CodingPlatform =
   | "GFG" 
   | "Codeforces" 
   | "Unstop" 
-  | "Devpost";
+  | "Devpost"
+  | "GitHub";
 
 const PLATFORM_IGNORED_SEGMENTS: Record<string, Set<string>> = {
   LeetCode: new Set(["u", "problems", "contest", "tag", "explore", "submissions", "discuss", "studyplan", "problemset"]),
@@ -26,7 +27,8 @@ const PLATFORM_IGNORED_SEGMENTS: Record<string, Set<string>> = {
   GFG: new Set(["user", "profile", "practice", "courses", "articles", "contests", "problem-of-the-day"]),
   Codeforces: new Set(["profile", "contest", "gym", "problemset", "groups", "rating", "edu"]),
   Unstop: new Set(["u", "user", "profile", "competitions", "hackathons", "quizzes", "internships", "jobs", "courses", "awards"]),
-  Devpost: new Set(["user", "hackathons", "challenges", "software", "projects"])
+  Devpost: new Set(["user", "hackathons", "challenges", "software", "projects"]),
+  GitHub: new Set(["orgs", "topics", "features", "pricing", "marketplace", "explore", "settings", "pulls", "issues"])
 };
 
 export function extractPlatformHandle(input: string, platform: CodingPlatform | string): PlatformExtractResult {
@@ -164,6 +166,17 @@ export function extractPlatformHandle(input: string, platform: CodingPlatform | 
         }
         if (!username) {
           return { handle: "", error: "Could not extract Devpost username from URL." };
+        }
+        return { handle: username.replace(/^@/, "").trim() };
+      }
+
+      if (normPlatform === "github") {
+        if (!host.includes("github")) {
+          return { handle: "", error: "Invalid GitHub URL. Must be a github.com profile link." };
+        }
+        let username = pathSegments[0] || "";
+        if (!username || PLATFORM_IGNORED_SEGMENTS.GitHub?.has(username)) {
+          return { handle: "", error: "Could not extract GitHub username from URL." };
         }
         return { handle: username.replace(/^@/, "").trim() };
       }

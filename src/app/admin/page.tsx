@@ -15,10 +15,15 @@ import {
   Clock, 
   Lock, 
   LogOut, 
-  ChevronRight,
-  Eye,
-  EyeOff,
-  BookOpen
+  ChevronRight, 
+  Eye, 
+  EyeOff, 
+  BookOpen, 
+  Upload, 
+  FileText,
+  Palette,
+  Sparkles,
+  ExternalLink
 } from "lucide-react";
 
 interface AdminProfile {
@@ -41,7 +46,18 @@ export default function AdminConsolePage() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"overview" | "structure" | "curriculum" | "radar" | "staff" | "recruiters" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "identity" | "structure" | "curriculum" | "radar" | "staff" | "recruiters" | "audit">("overview");
+
+  // Campus Identity & Branding State
+  const [identityName, setIdentityName] = useState("");
+  const [identityLogoUrl, setIdentityLogoUrl] = useState("");
+  const [identityAccreditation, setIdentityAccreditation] = useState("");
+  const [identityAddress, setIdentityAddress] = useState("");
+  const [identitySignatory, setIdentitySignatory] = useState("");
+  const [identityContactEmail, setIdentityContactEmail] = useState("");
+  const [identityWebsite, setIdentityWebsite] = useState("");
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identitySaving, setIdentitySaving] = useState(false);
 
   // Data States
   const [structures, setStructures] = useState<any[]>([]);
@@ -59,6 +75,10 @@ export default function AdminConsolePage() {
 
   // Modals & Form States
   const [isAddStructOpen, setIsAddStructOpen] = useState(false);
+  const [isBulkCsvOpen, setIsBulkCsvOpen] = useState(false);
+  const [csvContent, setCsvContent] = useState("");
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
   const [newSubCode, setNewSubCode] = useState("");
   const [newSubName, setNewSubName] = useState("");
@@ -66,12 +86,12 @@ export default function AdminConsolePage() {
   const [newSubSem, setNewSubSem] = useState(5);
   const [newSubCredits, setNewSubCredits] = useState(3);
   const [newSubFaculty, setNewSubFaculty] = useState("");
-  const [newYear, setNewYear] = useState("3rd Year");
+  const [newYear, setNewYear] = useState("1st Year");
   const [newDept, setNewDept] = useState("Information Technology");
-  const [newSec, setNewSec] = useState("Section E");
-  const [newRollStart, setNewRollStart] = useState("RA2311003010261");
-  const [newRollEnd, setNewRollEnd] = useState("RA2311003010325");
-  const [newExpectedCount, setNewExpectedCount] = useState(65);
+  const [newSec, setNewSec] = useState("Section A");
+  const [newRollStart, setNewRollStart] = useState("");
+  const [newRollEnd, setNewRollEnd] = useState("");
+  const [newExpectedCount, setNewExpectedCount] = useState(60);
 
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [newStaffName, setNewStaffName] = useState("");
@@ -144,6 +164,24 @@ export default function AdminConsolePage() {
           const aData = await auditRes.json();
           if (aData.logs) setAuditLogs(aData.logs);
         }
+
+        if (activeTab === "identity" || activeTab === "overview") {
+          setIdentityLoading(true);
+          try {
+            const identRes = await fetch("/api/admin/identity");
+            const identData = await identRes.json();
+            if (identData?.identity) {
+              setIdentityName(identData.identity.name || "");
+              setIdentityLogoUrl(identData.identity.logoUrl || "");
+              setIdentityAccreditation(identData.identity.accreditation || "");
+              setIdentityAddress(identData.identity.address || "");
+              setIdentitySignatory(identData.identity.signatoryTitle || "");
+              setIdentityContactEmail(identData.identity.contactEmail || "");
+              setIdentityWebsite(identData.identity.websiteUrl || "");
+            }
+          } catch {}
+          setIdentityLoading(false);
+        }
       } catch (err) {
         console.warn("Data load note:", err);
       }
@@ -151,6 +189,45 @@ export default function AdminConsolePage() {
 
     loadData();
   }, [admin, activeTab]);
+
+  const handleSaveIdentity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identityName.trim()) {
+      showToast("College / Institute Name is required.", "error");
+      return;
+    }
+
+    setIdentitySaving(true);
+    try {
+      const res = await fetch("/api/admin/identity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: identityName.trim(),
+          logoUrl: identityLogoUrl.trim() || null,
+          accreditation: identityAccreditation.trim(),
+          address: identityAddress.trim(),
+          signatoryTitle: identitySignatory.trim(),
+          contactEmail: identityContactEmail.trim() || undefined,
+          websiteUrl: identityWebsite.trim() || undefined,
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast("Campus branding & identity updated successfully!");
+        if (admin) {
+          setAdmin({ ...admin, instituteName: identityName.trim() });
+        }
+      } else {
+        showToast(data.error || "Failed saving identity settings.", "error");
+      }
+    } catch {
+      showToast("Network error saving identity.", "error");
+    } finally {
+      setIdentitySaving(false);
+    }
+  };
 
   // Login handler
   const handleLogin = async (e: React.FormEvent) => {
@@ -216,6 +293,67 @@ export default function AdminConsolePage() {
       }
     } catch {
       showToast("Error adding campus structure.", "error");
+    }
+  };
+
+  // Bulk CSV import handler
+  const handleBulkCsvImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!csvContent.trim()) {
+      showToast("Please enter or paste CSV content.", "error");
+      return;
+    }
+
+    const lines = csvContent.trim().split("\n");
+    const parsedRows: any[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      // Skip header line if detected
+      if (i === 0 && (line.toLowerCase().includes("academic") || line.toLowerCase().includes("department") || line.toLowerCase().includes("year"))) {
+        continue;
+      }
+      const parts = line.split(",").map(p => p.trim());
+      if (parts.length >= 5) {
+        parsedRows.push({
+          academic_year: parts[0],
+          department: parts[1],
+          section: parts[2],
+          roll_start: parts[3],
+          roll_end: parts[4],
+          expected_students: parts[5] ? parseInt(parts[5], 10) || 60 : 60
+        });
+      }
+    }
+
+    if (parsedRows.length === 0) {
+      showToast("No valid rows found. Format: Year, Department, Section, Roll Start, Roll End, Expected Count", "error");
+      return;
+    }
+
+    setIsImportingCsv(true);
+    try {
+      const res = await fetch("/api/admin/structure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ structures: parsedRows })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`Successfully imported ${data.count} campus structures!`);
+        setIsBulkCsvOpen(false);
+        setCsvContent("");
+        // Reload structures
+        const refreshRes = await fetch("/api/admin/structure");
+        const refreshData = await refreshRes.json();
+        if (refreshData.structures) setStructures(refreshData.structures);
+      } else {
+        showToast(data.error || "Failed bulk importing structures.", "error");
+      }
+    } catch {
+      showToast("Error processing bulk CSV import.", "error");
+    } finally {
+      setIsImportingCsv(false);
     }
   };
 
@@ -468,6 +606,7 @@ export default function AdminConsolePage() {
         <div className="flex items-center gap-2 border-b border-border-main/60 overflow-x-auto pb-1">
           {[
             { id: "overview", label: "Executive Overview", icon: ShieldCheck },
+            { id: "identity", label: "Branding & Identity", icon: Palette },
             { id: "radar", label: "Missing Student Radar", icon: Radio },
             { id: "structure", label: "Campus Architecture", icon: Building2 },
             { id: "curriculum", label: "Curriculum & Subjects", icon: BookOpen },
@@ -584,6 +723,215 @@ export default function AdminConsolePage() {
           </div>
         )}
 
+        {/* --- TAB: CAMPUS IDENTITY & BRANDING STUDIO --- */}
+        {activeTab === "identity" && (
+          <div className="flex flex-col gap-6 animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-main/40 pb-4">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-base font-bold text-txt-main">Campus Identity &amp; Branding Studio</h2>
+                  <span className="text-[9px] font-mono uppercase bg-accent-main/10 text-accent-main border border-accent-main/30 px-2 py-0.5 rounded font-semibold">
+                    Live Institutional System
+                  </span>
+                </div>
+                <p className="text-xs text-txt-muted font-light leading-relaxed">
+                  Configure the official college crest, accreditation statement, campus address, and authorized signatory. These settings dynamically brand all student fee payment receipts, On-Duty passes, semester transcripts, and recruiter dossiers across LynDesk.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Form Configurator (7 cols) */}
+              <form onSubmit={handleSaveIdentity} className="lg:col-span-7 border border-border-main/70 bg-bg-surface p-6 rounded-md flex flex-col gap-5">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                  <span className="font-mono text-xs font-semibold text-txt-main uppercase tracking-wider">
+                    Institutional Metadata Editor
+                  </span>
+                  {identityLoading && (
+                    <span className="text-[10px] font-mono text-accent-main animate-pulse">Loading identity...</span>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                    Official College / University Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={identityName}
+                    onChange={(e) => setIdentityName(e.target.value)}
+                    placeholder="e.g. SRM Easwari Engineering College"
+                    required
+                    className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                  />
+                  <span className="text-[9.5px] text-txt-muted font-mono">Appears prominently at the top of all official transcripts &amp; payment vouchers.</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                    College Crest / Seal / Logo URL
+                  </label>
+                  <input
+                    type="text"
+                    value={identityLogoUrl}
+                    onChange={(e) => setIdentityLogoUrl(e.target.value)}
+                    placeholder="e.g. https://institution.edu/assets/crest.png or /logos/college_seal.png"
+                    className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                  />
+                  <span className="text-[9.5px] text-txt-muted font-mono">Accepts HTTPS URL or local static asset path. High-resolution PNG/SVG recommended.</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                    Accreditation &amp; Affiliation Statement
+                  </label>
+                  <input
+                    type="text"
+                    value={identityAccreditation}
+                    onChange={(e) => setIdentityAccreditation(e.target.value)}
+                    placeholder="e.g. Autonomous Institution • Approved by AICTE • NAAC Accredited A++ • Affiliated to Anna University"
+                    className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                    Campus Address &amp; Location
+                  </label>
+                  <input
+                    type="text"
+                    value={identityAddress}
+                    onChange={(e) => setIdentityAddress(e.target.value)}
+                    placeholder="e.g. Bharathi Salai, Ramapuram, Chennai - 600089, Tamil Nadu, India"
+                    className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                      Authorized Signatory Title
+                    </label>
+                    <input
+                      type="text"
+                      value={identitySignatory}
+                      onChange={(e) => setIdentitySignatory(e.target.value)}
+                      placeholder="e.g. Dean of Academic Affairs & Registrar"
+                      className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                      Institutional Registry Email
+                    </label>
+                    <input
+                      type="email"
+                      value={identityContactEmail}
+                      onChange={(e) => setIdentityContactEmail(e.target.value)}
+                      placeholder="e.g. registrar@institution.edu"
+                      className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10.5px] font-mono uppercase text-txt-sub font-semibold">
+                    Official Website URL
+                  </label>
+                  <input
+                    type="url"
+                    value={identityWebsite}
+                    onChange={(e) => setIdentityWebsite(e.target.value)}
+                    placeholder="e.g. https://www.institution.edu"
+                    className="h-10 px-3.5 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-txt-main"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-border-main/40 flex items-center justify-end">
+                  <button
+                    type="submit"
+                    disabled={identitySaving || !identityName.trim()}
+                    className="h-10 px-6 bg-accent-main hover:opacity-90 disabled:opacity-40 text-bg-base font-mono text-xs uppercase tracking-wider font-bold rounded transition-opacity flex items-center gap-2 cursor-pointer shadow-md"
+                  >
+                    {identitySaving ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-bg-base border-t-transparent rounded-full animate-spin" />
+                        Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={14} />
+                        Save Campus Identity
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Live Document Attestation Preview Card (5 cols) */}
+              <div className="lg:col-span-5 flex flex-col gap-4">
+                <div className="border border-border-main/70 bg-bg-surface p-5 rounded-md flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-border-main/40 pb-3">
+                    <span className="font-mono text-xs font-semibold text-accent-main uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles size={13} /> Live Official Document Header
+                    </span>
+                    <span className="text-[9px] font-mono text-txt-muted uppercase">Preview</span>
+                  </div>
+
+                  {/* Simulated Paper Header */}
+                  <div className="p-4 bg-white text-slate-900 rounded-md border border-slate-300 flex flex-col gap-3 shadow-inner">
+                    <div className="flex items-start gap-3 border-b-2 border-slate-900 pb-3">
+                      {identityLogoUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img 
+                          src={identityLogoUrl} 
+                          alt="Crest Preview" 
+                          className="w-12 h-12 object-contain rounded border border-slate-200 p-0.5 shrink-0" 
+                          onError={(e) => { (e.target as any).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded bg-slate-100 border border-slate-800 flex items-center justify-center text-slate-900 shrink-0 font-serif font-black text-sm">
+                          {(identityName || "COL").split(" ").map(w => w[0]).slice(0, 3).join("")}
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="font-serif font-black text-xs text-slate-950 uppercase leading-snug truncate">
+                          {identityName || "University Institute of Technology"}
+                        </span>
+                        <span className="text-[8.5px] font-mono uppercase text-slate-700 font-semibold line-clamp-1">
+                          {identityAccreditation || "Autonomous Institution • Approved by AICTE • NAAC Accredited A++"}
+                        </span>
+                        <span className="text-[8px] text-slate-500 font-light truncate">
+                          {identityAddress || "Main University Campus, Institutional Area, India"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="py-1 px-2.5 bg-slate-900 text-white rounded text-[9px] font-mono font-bold uppercase tracking-wider flex items-center justify-between">
+                      <span>Official Fee Voucher Sample</span>
+                      <span className="text-slate-300">2025-2026</span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200 text-[8px] font-mono text-slate-600">
+                      <span>Attestation: <strong>{identitySignatory || "Dean of Academic Affairs"}</strong></span>
+                      <span className="text-emerald-700 font-bold">● Digitally Sealed</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-bg-base/40 border border-border-main/50 rounded flex flex-col gap-1.5 font-mono text-[9.5px] text-txt-muted">
+                    <span className="font-semibold text-txt-sub uppercase">Dynamic Integration Scope:</span>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-emerald-400 shrink-0" /> Student Fee Payment Receipts (`/college-desk`)</span>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-emerald-400 shrink-0" /> On-Duty (OD) Gate Passes (`/college-desk`)</span>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-emerald-400 shrink-0" /> Verified Academic Dossiers (`/profile`)</span>
+                    <span className="flex items-center gap-1.5"><CheckCircle2 size={10} className="text-emerald-400 shrink-0" /> Semester Grade Transcripts (`/coordinator`)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* --- TAB 2: MISSING STUDENT RADAR --- */}
         {activeTab === "radar" && (
           <div className="flex flex-col gap-6 animate-fade-in">
@@ -653,13 +1001,78 @@ export default function AdminConsolePage() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setIsAddStructOpen(true)}
-                className="h-9 px-4 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider font-semibold rounded transition-opacity flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus size={14} /> Add Section Range
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => setIsBulkCsvOpen(true)}
+                  className="h-9 px-3.5 border border-border-main hover:bg-bg-card text-txt-main text-xs font-mono uppercase tracking-wider rounded transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload size={13} /> Bulk CSV Import
+                </button>
+                <button
+                  onClick={() => setIsAddStructOpen(true)}
+                  className="h-9 px-4 bg-accent-main hover:opacity-90 text-bg-base text-xs font-mono uppercase tracking-wider font-semibold rounded transition-opacity flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={14} /> Add Section Range
+                </button>
+              </div>
             </div>
+
+            {/* Bulk CSV Import Modal */}
+            {isBulkCsvOpen && (
+              <div className="p-5 border border-accent-main/40 bg-bg-surface rounded-md flex flex-col gap-4 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-border-main/40 pb-2">
+                  <div className="flex flex-col">
+                    <h3 className="font-display text-sm font-semibold text-txt-main flex items-center gap-2">
+                      <FileText size={16} className="text-accent-main" /> Bulk Import Campus Structures via CSV
+                    </h3>
+                    <span className="text-[10px] text-txt-muted font-mono">Paste raw CSV data with comma-separated column values.</span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleBulkCsvImport} className="flex flex-col gap-3 font-mono">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-txt-sub">
+                      CSV Data (Format: <code className="text-accent-main">Academic Year, Department, Section, Roll Start, Roll End, Expected Count</code>)
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={csvContent}
+                      onChange={(e) => setCsvContent(e.target.value)}
+                      placeholder={`3rd Year, Information Technology, Section A, RA2311003010001, RA2311003010065, 65\n3rd Year, Computer Science, Section B, RA2311001010001, RA2311001010070, 70`}
+                      required
+                      className="p-3 border border-border-main/80 bg-bg-base text-txt-main rounded text-xs font-mono focus:outline-none focus:border-accent-main resize-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkCsvOpen(false)}
+                      className="h-8 px-3 border border-border-main text-xs font-mono uppercase rounded hover:bg-bg-card transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isImportingCsv}
+                      className="h-8 px-4 bg-accent-main text-bg-base text-xs font-mono uppercase rounded font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {isImportingCsv ? (
+                        <>
+                          <span className="w-3 h-3 border border-bg-base border-t-transparent rounded-full animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={12} />
+                          Import Campus Roster
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
 
             {/* Structure Add Modal */}
             {isAddStructOpen && (

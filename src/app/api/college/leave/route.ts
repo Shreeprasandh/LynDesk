@@ -178,6 +178,27 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    // Dispatch Real-time Notification to Student
+    try {
+      if (appData.student_id) {
+        const notifType = status === "approved" ? "od_approved" : "od_rejected";
+        const appLabel = appData.application_type === "od" ? "On-Duty (OD)" : "Leave";
+        await supabaseAdmin.from("user_notifications").insert([
+          {
+            user_id: appData.student_id,
+            type: notifType,
+            title: `${appLabel} Request ${status === "approved" ? "Approved" : "Declined"}`,
+            message: `Your ${appLabel} application for "${appData.title}" on ${appData.target_date} was ${status} by faculty.`,
+            link: "/college-desk",
+            is_read: false,
+            created_at: new Date().toISOString()
+          }
+        ]);
+      }
+    } catch (notifErr) {
+      console.warn("Notification dispatch error on leave review:", notifErr);
+    }
+
     return NextResponse.json({
       success: true,
       message: `Application marked as ${status}.`,

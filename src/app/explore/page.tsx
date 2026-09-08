@@ -49,6 +49,7 @@ import {
   Clock,
   Sparkles,
   Lock,
+  Building2,
 } from "lucide-react";
 import PreferencePresetModal from "../components/PreferencePresetModal";
 
@@ -186,8 +187,15 @@ export default function ExplorePage() {
   const { user, userProfile, userRole, loading: authLoading, authStatusMessage } = useAuth();
   const { showToast } = useToast();
 
-  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer";
-  const isCollegeLinked = userProfile?.college_linked_status === "linked" && !!userProfile?.institute_id;
+  const isCollegeConnected = Boolean(
+    userProfile?.institute_id || 
+    (userProfile?.college_name && typeof userProfile.college_name === "string" && userProfile.college_name.trim().length > 0 && userProfile.college_name.toLowerCase() !== "none") || 
+    userProfile?.college_linked_status === "approved" || 
+    userProfile?.college_linked_status === "verified" ||
+    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0)
+  );
+  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer" || !isCollegeConnected;
+  const isCollegeLinked = (userProfile?.college_linked_status === "linked" || userProfile?.college_linked_status === "approved" || userProfile?.college_linked_status === "verified") && !!userProfile?.institute_id;
 
   // Two Main Sub-Tabs: "events" | "friends" | "works"
   const [activeTab, setActiveTab] = useState<"events" | "friends" | "works">("events");
@@ -372,11 +380,32 @@ export default function ExplorePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchMessage, setSearchMessage] = useState<string | null>(null);
 
-  // Lists
+  // Lists & Scope Filter
   const [friendsList, setFriendsList] = useState<Friendship[]>([]);
   const [requestsList, setRequestsList] = useState<Friendship[]>([]);
   const [outgoingRequestsList, setOutgoingRequestsList] = useState<Friendship[]>([]);
   const [loadingList, setLoadingList] = useState(true);
+  const [leaderboardScope, setLeaderboardScope] = useState<"all" | "college" | "department" | "section">("college");
+
+  // Filtered Friends List based on Selected Scope Filter
+  const filteredFriendsList = React.useMemo(() => {
+    return friendsList.filter((f) => {
+      if (leaderboardScope === "all") return true;
+      if (leaderboardScope === "college") {
+        if (!userProfile?.college_name) return true;
+        return (f.friend.college_name || "").toLowerCase().includes(userProfile.college_name.toLowerCase()) ||
+               (userProfile.college_name || "").toLowerCase().includes((f.friend.college_name || "").toLowerCase());
+      }
+      if (leaderboardScope === "department") {
+        if (!userProfile?.department) return true;
+        return (f.friend.department || "").toLowerCase() === userProfile.department.toLowerCase();
+      }
+      if (leaderboardScope === "section") {
+        return true;
+      }
+      return true;
+    });
+  }, [friendsList, leaderboardScope, userProfile]);
 
   // Selected friend details
   const [selectedFriend, setSelectedFriend] = useState<FriendProfile | null>(null);
@@ -1338,8 +1367,8 @@ export default function ExplorePage() {
               </span>
             )}
 
-            {/* Inner Friends Sub-Nav (My Friends vs Requests) */}
-            <div className="flex items-center justify-between border-b border-border-main/40 pb-3 gap-2">
+            {/* Inner Friends Sub-Nav (My Friends vs Requests & Unified Scope Filter) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-main/40 pb-3 gap-3">
               <div className="flex items-center gap-2 font-mono text-[10px] uppercase">
                 <button
                   onClick={() => setFriendsSubTab("friends")}
@@ -1349,7 +1378,7 @@ export default function ExplorePage() {
                       : "text-txt-sub hover:text-txt-main"
                   }`}
                 >
-                  My Friends ({friendsList.length})
+                  Network &amp; Leaderboard ({filteredFriendsList.length})
                 </button>
                 <button
                   onClick={() => setFriendsSubTab("requests")}
@@ -1367,6 +1396,35 @@ export default function ExplorePage() {
                   )}
                 </button>
               </div>
+
+              {/* Unified Leaderboard Scope Filter Pills */}
+              {friendsSubTab === "friends" && (
+                <div className="flex items-center gap-1.5 overflow-x-auto font-mono text-[10px]">
+                  <span className="text-txt-muted uppercase font-bold text-[9px] mr-1">Scope:</span>
+                  {[
+                    { id: "college", label: userProfile?.college_name ? `My College` : "My College", icon: GraduationCap },
+                    { id: "department", label: userProfile?.department ? `My Department` : "My Department", icon: Building2 },
+                    { id: "section", label: userProfile?.section ? `Section ${userProfile.section}` : "My Section", icon: Users },
+                    { id: "all", label: "All-India Grid", icon: Globe },
+                  ].map((item) => {
+                    const ScopeIcon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setLeaderboardScope(item.id as any)}
+                        className={`px-2.5 py-1 rounded transition-all cursor-pointer whitespace-nowrap border flex items-center gap-1.5 ${
+                          leaderboardScope === item.id
+                            ? "bg-accent-main text-bg-base font-bold border-accent-main shadow-xs"
+                            : "bg-bg-card/40 border-border-main/50 text-txt-sub hover:text-txt-main"
+                        }`}
+                      >
+                        <ScopeIcon size={11} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* MAIN FRIENDS & REQUESTS CONTENT */}
@@ -1375,7 +1433,7 @@ export default function ExplorePage() {
                 
                 {/* Friends List (7 cols) */}
                 <div className="lg:col-span-7 flex flex-col gap-3">
-                  {friendsList.map((f) => (
+                  {filteredFriendsList.map((f) => (
                     <div
                       key={f.id}
                       onClick={() => setSelectedFriend(f.friend)}

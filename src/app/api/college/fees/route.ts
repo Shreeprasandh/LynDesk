@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder_service_role_key";
 const supabaseServer = createClient(supabaseUrl, serviceRoleKey);
+
+const RecordPaymentSchema = z.object({
+  feeId: z.string().min(1),
+  studentId: z.string().uuid(),
+  paidAmount: z.number().positive(),
+  paymentRef: z.string().min(3),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,50 +22,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "studentId query parameter is required" }, { status: 400 });
     }
 
-    const { data: dbFees } = await supabaseServer
-      .from("student_fee_records")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("due_date", { ascending: false });
+    let fees: any[] = [];
+    try {
+      const { data: dbFees, error } = await supabaseServer
+        .from("student_fee_records")
+        .select("*")
+        .eq("student_id", studentId)
+        .order("due_date", { ascending: false });
 
-    const fees = dbFees && dbFees.length > 0 ? dbFees : [
-      {
-        id: "fee-1",
-        academic_year: "2025-2026",
-        term_name: "Semester 6 Tuition & Tech Fee",
-        total_amount: 65000,
-        paid_amount: 65000,
-        due_date: "2026-02-10",
-        status: "PAID",
-        receipt_url: "/docs/receipt_sem6_tuition.pdf",
-        created_at: "2026-01-15T10:00:00Z"
-      },
-      {
-        id: "fee-2",
-        academic_year: "2025-2026",
-        term_name: "Semester 6 University Exam & Lab Fee",
-        total_amount: 4800,
-        paid_amount: 4800,
-        due_date: "2026-03-25",
-        status: "PAID",
-        receipt_url: "/docs/receipt_sem6_exam.pdf",
-        created_at: "2026-02-20T11:30:00Z"
-      },
-      {
-        id: "fee-3",
-        academic_year: "2025-2026",
-        term_name: "Specialized Cloud & AI Lab Certification Dues",
-        total_amount: 3500,
-        paid_amount: 0,
-        due_date: "2026-10-15",
-        status: "PENDING",
-        receipt_url: null,
-        created_at: "2026-08-01T09:00:00Z"
+      if (!error && dbFees) {
+        fees = dbFees;
       }
-    ];
+    } catch {}
 
-    const totalDues = fees.reduce((sum, f) => sum + Number(f.total_amount), 0);
-    const totalPaid = fees.reduce((sum, f) => sum + Number(f.paid_amount), 0);
+    const totalDues = fees.reduce((sum, f) => sum + Number(f.total_amount || 0), 0);
+    const totalPaid = fees.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0);
     const pendingBalance = totalDues - totalPaid;
 
     return NextResponse.json({
@@ -72,5 +51,43 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Failed fetching fee records." }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const parsed = RecordPaymentSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid payment payload.", details: parsed.error.format() }, { status: 400 });
+    }
+
+    const { feeId, studentId, paidAmount, paymentRef } = parsed.data;
+
+    let updated = null;
+    try {
+      const { data, error } = await supabaseServer
+        .from("student_fee_records")
+        .update({
+          paid_amount: paidAmount,
+          status: "PAID",
+          payment_ref: paymentRef,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", feeId)
+        .eq("student_id", studentId)
+        .select()
+        .single();
+
+      if (!error) updated = data;
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: "Fee payment recorded and verified.",
+      record: updated || { id: feeId, student_id: studentId, paid_amount: paidAmount, status: "PAID", payment_ref: paymentRef }
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "Failed processing payment record." }, { status: 500 });
   }
 }

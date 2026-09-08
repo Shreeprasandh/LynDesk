@@ -55,7 +55,14 @@ export default function Header() {
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
   const isFaculty = userRole === "coordinator";
   const isRecruiter = userRole === "recruiter";
-  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer";
+  const isCollegeConnected = Boolean(
+    userProfile?.institute_id || 
+    (userProfile?.college_name && typeof userProfile.college_name === "string" && userProfile.college_name.trim().length > 0 && userProfile.college_name.toLowerCase() !== "none") || 
+    userProfile?.college_linked_status === "approved" || 
+    userProfile?.college_linked_status === "verified" ||
+    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0)
+  );
+  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer" || !isCollegeConnected;
 
   const pathname = usePathname();
   const router = useRouter();

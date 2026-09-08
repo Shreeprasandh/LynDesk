@@ -30,6 +30,7 @@ export interface PlatformStatsData {
   rank?: string;
   rating?: number;
   globalRank?: number;
+  attendedContestsCount?: number;
   submissionCalendar?: Record<string, number> | string;
   submissionCalendarPrivate?: boolean;
   acceptedSubmissions?: number;
@@ -84,6 +85,8 @@ export interface CodingDeckDashboardProps {
 export default function CodingDeckDashboard({
   stats,
   handles,
+  onOpenConnectModal,
+  onSwitchToIntegrations
 }: CodingDeckDashboardProps) {
   const [selectedLcYear, setSelectedLcYear] = useState<number | null>(null);
   const [showBadgesModal, setShowBadgesModal] = useState(false);
@@ -106,9 +109,18 @@ export default function CodingDeckDashboard({
     const hardSolved = stats.leetcode?.solvedHard || 0;
 
     // Contests attended count
-    const ccContests = stats.codechef?.rating ? 1 : 0;
-    const lcContests = stats.leetcode?.rating && stats.leetcode.rating > 1400 ? 1 : 0;
-    const cfContests = stats.codeforces?.rating ? 1 : 0;
+    const ccContests = typeof stats.codechef?.attendedContestsCount === "number"
+      ? stats.codechef.attendedContestsCount
+      : (stats.codechef?.contestHistory?.length || (stats.codechef?.rating ? 1 : 0));
+
+    const lcContests = typeof stats.leetcode?.attendedContestsCount === "number"
+      ? stats.leetcode.attendedContestsCount
+      : (stats.leetcode?.contestHistory?.length || (stats.leetcode?.rating && stats.leetcode.rating > 1400 ? 1 : 0));
+
+    const cfContests = typeof stats.codeforces?.attendedContestsCount === "number"
+      ? stats.codeforces.attendedContestsCount
+      : (stats.codeforces?.contestHistory?.length || (stats.codeforces?.rating ? 1 : 0));
+
     const totalContests = ccContests + lcContests + cfContests;
 
     // Connected count
@@ -320,46 +332,25 @@ export default function CodingDeckDashboard({
     };
   }, [stats, summary.totalSolved, summary.activeStreak, selectedLcYear]);
 
-  // Real Contest Rating Progression Timeline Data Points
+  // Real Contest Rating Progression Timeline Data Points (Strictly Authentic Verified Contests)
   const contestTimeline = useMemo(() => {
     const list: Array<{ id: number; name: string; date: string; timestamp?: number; rating: number; rank: number; platform: string }> = [];
 
-    if (Array.isArray(stats.codechef?.contestHistory) && stats.codechef.contestHistory.length > 0) {
-      stats.codechef.contestHistory.forEach(c => list.push(c as any));
-    } else if (stats.codechef?.rating) {
-      list.push({
-        id: 1,
-        name: "CodeChef Starters",
-        date: "Recent",
-        rating: stats.codechef.rating,
-        rank: stats.codechef.globalRank ? parseInt(String(stats.codechef.globalRank).replace(/\D/g, ""), 10) || 887 : 887,
-        platform: "CodeChef"
+    if (Array.isArray(stats.codechef?.contestHistory)) {
+      stats.codechef.contestHistory.forEach(c => {
+        if (c.rating && c.rating > 0) list.push(c as any);
       });
     }
 
-    if (Array.isArray(stats.leetcode?.contestHistory) && stats.leetcode.contestHistory.length > 0) {
-      stats.leetcode.contestHistory.forEach(c => list.push(c as any));
-    } else if (stats.leetcode?.rating) {
-      list.push({
-        id: 2,
-        name: "LeetCode Contest",
-        date: "Recent",
-        rating: Math.round(stats.leetcode.rating),
-        rank: stats.leetcode.globalRank || 2400,
-        platform: "LeetCode"
+    if (Array.isArray(stats.leetcode?.contestHistory)) {
+      stats.leetcode.contestHistory.forEach(c => {
+        if (c.rating && c.rating > 0) list.push(c as any);
       });
     }
 
-    if (Array.isArray(stats.codeforces?.contestHistory) && stats.codeforces.contestHistory.length > 0) {
-      stats.codeforces.contestHistory.forEach(c => list.push(c as any));
-    } else if (stats.codeforces?.rating) {
-      list.push({
-        id: 3,
-        name: "Codeforces Round",
-        date: "Recent",
-        rating: stats.codeforces.rating,
-        rank: 1500,
-        platform: "Codeforces"
+    if (Array.isArray(stats.codeforces?.contestHistory)) {
+      stats.codeforces.contestHistory.forEach(c => {
+        if (c.rating && c.rating > 0) list.push(c as any);
       });
     }
 
@@ -367,7 +358,7 @@ export default function CodingDeckDashboard({
     list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     return list.map((item, idx) => ({ ...item, id: idx + 1 }));
-  }, [stats.codechef?.contestHistory, stats.codechef?.rating, stats.codechef?.globalRank, stats.leetcode?.contestHistory, stats.leetcode?.rating, stats.leetcode?.globalRank, stats.codeforces?.contestHistory, stats.codeforces?.rating]);
+  }, [stats.codechef?.contestHistory, stats.leetcode?.contestHistory, stats.codeforces?.contestHistory]);
 
   // DSA Topic Analysis Distribution (Genuine empirical problem counts from LeetCode / Platforms)
   const topicData = useMemo(() => {
@@ -379,7 +370,7 @@ export default function CodingDeckDashboard({
 
   const maxTopicSolved = Math.max(...topicData.map(t => t.solved), 1);
 
-  // Language Mastery Distribution (Genuine solves per language from LeetCode & GitHub repos)
+  // Language Mastery Distribution (Genuine problem solves per language from LeetCode only)
   const languageData = useMemo(() => {
     const map: Record<string, number> = {};
 
@@ -391,20 +382,12 @@ export default function CodingDeckDashboard({
       });
     }
 
-    if (Array.isArray(stats.github?.languages)) {
-      stats.github.languages.forEach((l: any) => {
-        if (l.name && l.solved > 0 && !map[l.name]) {
-          map[l.name] = (map[l.name] || 0) + l.solved;
-        }
-      });
-    }
-
     const list = Object.entries(map)
       .map(([name, solved]) => ({ name, solved }))
       .sort((a, b) => b.solved - a.solved);
 
     return list.slice(0, 6);
-  }, [stats.leetcode?.languages, stats.github?.languages]);
+  }, [stats.leetcode?.languages]);
 
   const maxLanguageSolved = Math.max(...languageData.map(l => l.solved), 1);
 
@@ -795,129 +778,132 @@ export default function CodingDeckDashboard({
                   <span className="text-xs font-mono font-medium text-txt-main">No Rated Contests Synced</span>
                   <span className="text-[10px] text-txt-sub">Connect your CodeChef, LeetCode, or Codeforces accounts to plot your rating curve</span>
                 </div>
-              ) : (
-                <>
-                  {/* Floating Micro-Tooltip Positioned Directly Above Active Node */}
-                  {hoveredContestIndex !== null && contestTimeline[hoveredContestIndex] && (
-                    <div 
-                      style={{
-                        left: `${(hoveredContestIndex / Math.max(1, contestTimeline.length - 1)) * 80 + 10}%`,
-                        top: "12px"
-                      }}
-                      className="absolute -translate-x-1/2 z-20 bg-bg-surface border border-border-main/80 px-2.5 py-1.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 text-center whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
-                    >
-                      <span className="font-mono text-[10px] font-bold text-txt-main">
-                        {contestTimeline[hoveredContestIndex].name}
-                      </span>
-                      <div className="flex items-center gap-2 text-[9px] font-mono text-txt-muted">
-                        <span className="text-accent-main font-bold">Rating: {contestTimeline[hoveredContestIndex].rating}</span>
-                        <span>•</span>
-                        <span>Rank: #{contestTimeline[hoveredContestIndex].rank}</span>
-                        <span>•</span>
-                        <span>{contestTimeline[hoveredContestIndex].date}</span>
+              ) : (() => {
+                const ratings = contestTimeline.map(n => n.rating).filter(r => typeof r === "number" && !isNaN(r));
+                const rawMax = ratings.length > 0 ? Math.max(...ratings) : 2000;
+                const rawMin = ratings.length > 0 ? Math.min(...ratings) : 800;
+                const padding = Math.max(30, Math.round((rawMax - rawMin) * 0.15) || 50);
+                const minR = Math.max(0, rawMin - padding);
+                const maxR = rawMax + padding;
+                const range = Math.max(1, maxR - minR);
+
+                const getNodeCoords = (node: typeof contestTimeline[0], i: number) => {
+                  const cx = contestTimeline.length === 1 ? 250 : 30 + (i / (contestTimeline.length - 1)) * 440;
+                  const cy = 110 - ((node.rating - minR) / range) * 90;
+                  return { cx, cy };
+                };
+
+                const pointsStr = contestTimeline.map((node, i) => {
+                  const { cx, cy } = getNodeCoords(node, i);
+                  return `${cx},${cy}`;
+                }).join(" ");
+
+                const areaPoints = contestTimeline.length === 1
+                  ? `30,${getNodeCoords(contestTimeline[0], 0).cy} 470,${getNodeCoords(contestTimeline[0], 0).cy} 470,125 30,125`
+                  : `${pointsStr} 470,125 30,125`;
+
+                const linePoints = contestTimeline.length === 1
+                  ? `30,${getNodeCoords(contestTimeline[0], 0).cy} 470,${getNodeCoords(contestTimeline[0], 0).cy}`
+                  : pointsStr;
+
+                return (
+                  <>
+                    {/* Floating Micro-Tooltip Positioned Directly Above Active Node */}
+                    {hoveredContestIndex !== null && contestTimeline[hoveredContestIndex] && (
+                      <div 
+                        style={{
+                          left: `${contestTimeline.length === 1 ? 50 : (hoveredContestIndex / (contestTimeline.length - 1)) * 80 + 10}%`,
+                          top: "12px"
+                        }}
+                        className="absolute -translate-x-1/2 z-20 bg-bg-surface border border-border-main/80 px-2.5 py-1.5 rounded shadow-xl pointer-events-none flex flex-col items-center gap-0.5 text-center whitespace-nowrap animate-in fade-in zoom-in-95 duration-100"
+                      >
+                        <span className="font-mono text-[10px] font-bold text-txt-main">
+                          {contestTimeline[hoveredContestIndex].name}
+                        </span>
+                        <div className="flex items-center gap-2 text-[9px] font-mono text-txt-muted">
+                          <span className="text-accent-main font-bold">Rating: {contestTimeline[hoveredContestIndex].rating}</span>
+                          <span>•</span>
+                          <span>Rank: #{contestTimeline[hoveredContestIndex].rank}</span>
+                          <span>•</span>
+                          <span>{contestTimeline[hoveredContestIndex].date}</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="relative h-40 w-full">
-                    <svg className="w-full h-full overflow-visible" viewBox="0 0 500 130" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="ratingSubtleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0.18" />
-                          <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      
-                      {/* Grid lines */}
-                      <line x1="0" y1="20" x2="500" y2="20" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
-                      <line x1="0" y1="65" x2="500" y2="65" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
-                      <line x1="0" y1="110" x2="500" y2="110" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                    <div className="relative h-40 w-full">
+                      <svg className="w-full h-full overflow-visible" viewBox="0 0 500 130" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="ratingSubtleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity="0.18" />
+                            <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        
+                        {/* Grid lines */}
+                        <line x1="0" y1="20" x2="500" y2="20" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                        <line x1="0" y1="65" x2="500" y2="65" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
+                        <line x1="0" y1="110" x2="500" y2="110" stroke="currentColor" strokeOpacity="0.06" strokeDasharray="3 3" />
 
-                      {/* Area */}
-                      <polygon
-                        points={
-                          contestTimeline.length === 1 
-                            ? "30,65 470,65 470,125 30,125" 
-                            : contestTimeline.map((node, i) => {
-                                const cx = 30 + (i / (contestTimeline.length - 1)) * 440;
-                                const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
-                                const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
-                                const range = Math.max(1, maxR - minR);
-                                const cy = 110 - ((node.rating - minR) / range) * 90;
-                                return `${cx},${cy}`;
-                              }).join(" ") + ` 470,125 30,125`
-                        }
-                        fill="url(#ratingSubtleGrad)"
-                      />
+                        {/* Area */}
+                        <polygon
+                          points={areaPoints}
+                          fill="url(#ratingSubtleGrad)"
+                        />
 
-                      {/* Line */}
-                      <polyline
-                        fill="none"
-                        stroke="hsl(var(--accent))"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={
-                          contestTimeline.length === 1
-                            ? "30,65 470,65"
-                            : contestTimeline.map((node, i) => {
-                                const cx = 30 + (i / (contestTimeline.length - 1)) * 440;
-                                const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
-                                const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
-                                const range = Math.max(1, maxR - minR);
-                                const cy = 110 - ((node.rating - minR) / range) * 90;
-                                return `${cx},${cy}`;
-                              }).join(" ")
-                        }
-                      />
+                        {/* Line */}
+                        <polyline
+                          fill="none"
+                          stroke="hsl(var(--accent))"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          points={linePoints}
+                        />
 
-                      {/* Interactive Nodes */}
-                      {contestTimeline.map((node, i) => {
-                        const cx = contestTimeline.length === 1 ? 250 : 30 + (i / (contestTimeline.length - 1)) * 440;
-                        const maxR = Math.max(...contestTimeline.map(n => n.rating), 2000);
-                        const minR = Math.min(...contestTimeline.map(n => n.rating), 800);
-                        const range = Math.max(1, maxR - minR);
-                        const cy = contestTimeline.length === 1 ? 65 : 110 - ((node.rating - minR) / range) * 90;
-                        const isHovered = hoveredContestIndex === i;
-                        return (
-                          <g 
-                            key={node.id} 
-                            className="cursor-pointer"
-                            onMouseEnter={() => setHoveredContestIndex(i)}
-                            onMouseLeave={() => setHoveredContestIndex(null)}
-                          >
-                            <circle
-                              cx={cx}
-                              cy={cy}
-                              r={isHovered ? "6.5" : "4.5"}
-                              className="fill-bg-surface stroke-accent-main transition-all"
-                              strokeWidth="2"
-                            />
-                            <text
-                              x={cx}
-                              y={cy - 10}
-                              textAnchor="middle"
-                              className="fill-txt-main text-[9px] font-mono font-semibold select-none"
+                        {/* Interactive Nodes */}
+                        {contestTimeline.map((node, i) => {
+                          const { cx, cy } = getNodeCoords(node, i);
+                          const isHovered = hoveredContestIndex === i;
+                          return (
+                            <g 
+                              key={node.id} 
+                              className="cursor-pointer"
+                              onMouseEnter={() => setHoveredContestIndex(i)}
+                              onMouseLeave={() => setHoveredContestIndex(null)}
                             >
-                              {node.rating}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </svg>
-                  </div>
+                              <circle
+                                cx={cx}
+                                cy={cy}
+                                r={isHovered ? "6.5" : "4.5"}
+                                className="fill-bg-surface stroke-accent-main transition-all"
+                                strokeWidth="2"
+                              />
+                              <text
+                                x={cx}
+                                y={cy - 10}
+                                textAnchor="middle"
+                                className="fill-txt-main text-[9px] font-mono font-semibold select-none"
+                              >
+                                {node.rating}
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
 
-                  {/* Timeline Bottom Labels */}
-                  <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted px-1 pt-2 border-t border-border-main/30">
-                    {contestTimeline.map((node) => (
-                      <div key={node.id} className="flex flex-col items-center text-center">
-                        <span className="font-medium text-txt-sub truncate max-w-[85px]">{node.name}</span>
-                        <span className="text-[8px] text-txt-muted">{node.date}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                    {/* Timeline Bottom Labels */}
+                    <div className="flex justify-between items-center text-[9px] font-mono text-txt-muted px-1 pt-2 border-t border-border-main/30">
+                      {contestTimeline.map((node) => (
+                        <div key={node.id} className="flex flex-col items-center text-center">
+                          <span className="font-medium text-txt-sub truncate max-w-[85px]">{node.name}</span>
+                          <span className="text-[8px] text-txt-muted">{node.date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -937,38 +923,46 @@ export default function CodingDeckDashboard({
             </div>
 
             {/* 4 Badges Preview Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {previewAwards.map(award => {
-                const IconComp = award.icon;
-                return (
-                  <div 
-                    key={award.id}
-                    className="border border-border-main/70 bg-bg-card/40 hover:bg-bg-card/80 p-3.5 rounded-md flex flex-col justify-between gap-2.5 transition-colors shadow-2xs group"
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className="w-7 h-7 rounded flex items-center justify-center border border-border-main bg-bg-surface text-txt-main">
-                        <IconComp size={14} />
-                      </span>
-                      <span className="text-[9px] font-mono text-txt-muted border border-border-main/50 bg-bg-surface px-1.5 py-0.5 rounded">
-                        {award.issuer}
-                      </span>
+            {previewAwards.length === 0 ? (
+              <div className="py-6 flex flex-col items-center justify-center text-center text-txt-muted gap-1">
+                <Award size={20} className="opacity-40 mb-1" />
+                <span className="text-xs font-mono font-medium text-txt-main">No Milestone Badges Unlocked</span>
+                <span className="text-[10px] text-txt-sub">Solve problems and participate in contests to unlock verified milestone badges</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {previewAwards.map(award => {
+                  const IconComp = award.icon;
+                  return (
+                    <div 
+                      key={award.id}
+                      className="border border-border-main/70 bg-bg-card/40 hover:bg-bg-card/80 p-3.5 rounded-md flex flex-col justify-between gap-2.5 transition-colors shadow-2xs group"
+                    >
+                      <div className="flex items-start justify-between">
+                        <span className="w-7 h-7 rounded flex items-center justify-center border border-border-main bg-bg-surface text-txt-main">
+                          <IconComp size={14} />
+                        </span>
+                        <span className="text-[9px] font-mono text-txt-muted border border-border-main/50 bg-bg-surface px-1.5 py-0.5 rounded">
+                          {award.issuer}
+                        </span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-txt-main group-hover:text-accent-main transition-colors">
+                          {award.title}
+                        </h4>
+                        <p className="text-[10px] text-txt-sub mt-0.5 leading-relaxed line-clamp-2">
+                          {award.desc}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between pt-1.5 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
+                        <span>{award.category}</span>
+                        <span>{award.date}</span>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-txt-main group-hover:text-accent-main transition-colors">
-                        {award.title}
-                      </h4>
-                      <p className="text-[10px] text-txt-sub mt-0.5 leading-relaxed line-clamp-2">
-                        {award.desc}
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-between pt-1.5 border-t border-border-main/30 text-[9px] font-mono text-txt-muted">
-                      <span>{award.category}</span>
-                      <span>{award.date}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Small View More Button */}
             <button
@@ -1153,7 +1147,7 @@ export default function CodingDeckDashboard({
               <div className="py-6 flex flex-col items-center justify-center text-center text-txt-muted gap-1">
                 <Terminal size={20} className="opacity-40 mb-1" />
                 <span className="text-xs font-mono font-medium text-txt-main">No Language Metrics Synced</span>
-                <span className="text-[10px] text-txt-sub">Connect your LeetCode or GitHub profile to view your programming language breakdown</span>
+                <span className="text-[10px] text-txt-sub">Connect your LeetCode profile to view your programming language solve breakdown</span>
               </div>
             ) : (
               <div className="flex flex-col gap-3 pt-1">
@@ -1163,7 +1157,7 @@ export default function CodingDeckDashboard({
                     <div key={i} className="flex flex-col gap-1">
                       <div className="flex items-center justify-between text-xs font-mono">
                         <span className="text-txt-main font-medium">{lang.name}</span>
-                        <span className="text-txt-sub font-semibold">{lang.solved} {lang.solved === 1 ? "solve / repo" : "solves / repos"}</span>
+                        <span className="text-txt-sub font-semibold">{lang.solved} {lang.solved === 1 ? "solve" : "solves"}</span>
                       </div>
                       <div className="w-full bg-border-main/30 h-1.5 rounded-full overflow-hidden">
                         <div 
@@ -1192,7 +1186,7 @@ export default function CodingDeckDashboard({
                   </span>
                 </div>
               </div>
-              {handles.github && (
+              {handles.github ? (
                 <a
                   href={`https://github.com/${handles.github}`}
                   target="_blank"
@@ -1202,6 +1196,14 @@ export default function CodingDeckDashboard({
                   <span>Open Profile</span>
                   <ExternalLink size={10} />
                 </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onOpenConnectModal?.("GitHub" as any)}
+                  className="h-7 px-2.5 rounded-sm border border-border-main hover:bg-bg-card text-txt-main text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span>Link GitHub</span>
+                </button>
               )}
             </div>
 
@@ -1210,14 +1212,14 @@ export default function CodingDeckDashboard({
               <div className="border border-border-main/40 bg-bg-card/40 p-3 rounded flex flex-col gap-0.5">
                 <span className="text-[9px] font-mono text-txt-muted uppercase">Public Repos</span>
                 <span className="text-xl font-semibold text-txt-main font-display">
-                  {stats.github?.repos ?? (handles.github ? "0" : "—")}
+                  {typeof stats.github?.repos === "number" ? stats.github.repos : (handles.github ? 0 : "—")}
                 </span>
                 <span className="text-[9px] text-txt-sub font-mono">Code repositories</span>
               </div>
               <div className="border border-border-main/40 bg-bg-card/40 p-3 rounded flex flex-col gap-0.5">
                 <span className="text-[9px] font-mono text-txt-muted uppercase">Annual Commits</span>
                 <span className="text-xl font-semibold text-accent-main font-display">
-                  {typeof stats.github?.commits === "number" ? stats.github.commits : (handles.github ? "0" : "—")}
+                  {typeof stats.github?.commits === "number" ? stats.github.commits : (handles.github ? 0 : "—")}
                 </span>
                 <span className="text-[9px] text-txt-sub font-mono">Verified pushes</span>
               </div>

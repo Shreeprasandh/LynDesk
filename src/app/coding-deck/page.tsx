@@ -36,6 +36,7 @@ interface PlatformStats {
   rank: string;
   rating: number;
   globalRank: number;
+  attendedContestsCount?: number;
   submissionCalendar?: Record<string, number>;
   submissionCalendarPrivate?: boolean;
   acceptedSubmissions?: number;
@@ -135,6 +136,12 @@ export default function CodingDeckPage() {
     }
     return "";
   });
+  const [githubUser, setGithubUser] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ldk_github_handle") || "";
+    }
+    return "";
+  });
   const [showAllContests, setShowAllContests] = useState(false);
   const [showLeetieGuide, setShowLeetieGuide] = useState(false);
   const [realAppliedCounts, setRealAppliedCounts] = useState({ total: 0, unstop: 0, devpost: 0 });
@@ -169,6 +176,7 @@ export default function CodingDeckPage() {
     else if (platform === "Codeforces") currentVal = codeforcesUser;
     else if (platform === "Unstop") currentVal = unstopUser;
     else if (platform === "Devpost") currentVal = devpostUser;
+    else if (platform === "GitHub") currentVal = githubUser;
 
     setConnectModalPlatform(platform);
     setConnectInputHandle(currentVal);
@@ -246,6 +254,7 @@ export default function CodingDeckPage() {
     else if (platform === "Codeforces") setCodeforcesUser(cleanHandle);
     else if (platform === "Unstop") setUnstopUser(cleanHandle);
     else if (platform === "Devpost") setDevpostUser(cleanHandle);
+    else if (platform === "GitHub") setGithubUser(cleanHandle);
 
     if (user?.id) {
       try {
@@ -258,16 +267,20 @@ export default function CodingDeckPage() {
           Codeforces: "codeforces_username",
           Unstop: "unstop_username",
           Devpost: "devpost_username",
+          GitHub: "github_url"
         };
         const col = colMap[platform];
         if (col) {
+          const valToSave = platform === "GitHub" 
+            ? (cleanHandle ? `https://github.com/${cleanHandle}` : null)
+            : (cleanHandle || null);
           await supabase.from("profiles").update({
-            [col]: cleanHandle || null
+            [col]: valToSave
           }).eq("id", user.id);
+          await supabase.auth.updateUser({
+            data: { ...user.user_metadata, [col]: valToSave }
+          });
         }
-        await supabase.auth.updateUser({
-          data: { ...user.user_metadata, [col]: cleanHandle || null }
-        });
       } catch (err) {
         console.warn("Error saving platform handle:", err);
       }
@@ -523,6 +536,7 @@ export default function CodingDeckPage() {
         const userCfKey = user?.id ? `ldk_codeforces_handle_${user.id}` : "ldk_codeforces_handle";
         const userUnKey = user?.id ? `ldk_unstop_handle_${user.id}` : "ldk_unstop_handle";
         const userDpKey = user?.id ? `ldk_devpost_handle_${user.id}` : "ldk_devpost_handle";
+        const userGhKey = user?.id ? `ldk_github_handle_${user.id}` : "ldk_github_handle";
 
         const localLc = typeof window !== "undefined" ? (localStorage.getItem(userLcKey) || localStorage.getItem("ldk_leetcode_handle") || "") : "";
         const localCc = typeof window !== "undefined" ? (localStorage.getItem(userCcKey) || localStorage.getItem("ldk_codechef_handle") || "") : "";
@@ -531,6 +545,7 @@ export default function CodingDeckPage() {
         const localCf = typeof window !== "undefined" ? (localStorage.getItem(userCfKey) || localStorage.getItem("ldk_codeforces_handle") || "") : "";
         const localUn = typeof window !== "undefined" ? (localStorage.getItem(userUnKey) || localStorage.getItem("ldk_unstop_handle") || "") : "";
         const localDp = typeof window !== "undefined" ? (localStorage.getItem(userDpKey) || localStorage.getItem("ldk_devpost_handle") || "") : "";
+        const localGh = typeof window !== "undefined" ? (localStorage.getItem(userGhKey) || localStorage.getItem("ldk_github_handle") || "") : "";
 
         let dbLc = "";
         let dbCc = "";
@@ -539,12 +554,13 @@ export default function CodingDeckPage() {
         let dbCf = "";
         let dbUn = "";
         let dbDp = "";
+        let dbGh = "";
 
         if (user?.id) {
           try {
             const { data: dbProfile } = await supabase
               .from("profiles")
-              .select("leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, devpost_username")
+              .select("leetcode_username, codechef_username, hackerrank_username, geeksforgeeks_username, codeforces_username, unstop_username, devpost_username, github_url")
               .eq("id", user.id)
               .single();
 
@@ -556,6 +572,7 @@ export default function CodingDeckPage() {
               dbCf = dbProfile.codeforces_username || "";
               dbUn = dbProfile.unstop_username || "";
               dbDp = dbProfile.devpost_username || "";
+              dbGh = dbProfile.github_url || "";
             }
           } catch {}
         }
@@ -567,6 +584,8 @@ export default function CodingDeckPage() {
         const cf = dbCf || meta.codeforces_username || localCf;
         const un = dbUn || meta.unstop_username || localUn;
         const dp = dbDp || meta.devpost_username || localDp;
+        const rawGh = dbGh || meta.github_url || meta.user_name || meta.preferred_username || localGh || "";
+        const gh = rawGh ? (extractPlatformHandle("github" as CodingPlatform, rawGh).handle || rawGh).replace(/^https?:\/\/(www\.)?github\.com\//i, "").replace(/\/$/, "") : "";
 
         setLeetcodeUser(lc);
         setCodechefUser(cc);
@@ -575,6 +594,11 @@ export default function CodingDeckPage() {
         setCodeforcesUser(cf);
         setUnstopUser(un);
         setDevpostUser(dp);
+        setGithubUser(gh);
+        if (typeof window !== "undefined" && gh) {
+          localStorage.setItem(userGhKey, gh);
+          localStorage.setItem("ldk_github_handle", gh);
+        }
 
         const fetchStats = async (platform: string, username: string, year?: number | null) => {
           if (!username) return null;
@@ -598,14 +622,15 @@ export default function CodingDeckPage() {
           return null;
         };
 
-        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats, unstopStats, devpostStats] = await Promise.all([
+        const [leetcodeStats, codechefStats, hackerrankStats, geeksforgeeksStats, codeforcesStats, unstopStats, devpostStats, githubStats] = await Promise.all([
           fetchStats("leetcode", lc, selectedLcYear),
           fetchStats("codechef", cc),
           fetchStats("hackerrank", hr),
           fetchStats("geeksforgeeks", gfg),
           fetchStats("codeforces", cf),
           fetchStats("unstop", un),
-          fetchStats("devpost", dp)
+          fetchStats("devpost", dp),
+          fetchStats("github", gh)
         ]);
 
         let realUnstopCount = 0;
@@ -640,7 +665,8 @@ export default function CodingDeckPage() {
           geeksforgeeks: geeksforgeeksStats,
           codeforces: codeforcesStats,
           unstop: unstopStats || (un ? { participations: realUnstopCount, points: 0, badgesCount: 0, certificatesCount: 0 } : null),
-          devpost: devpostStats || null
+          devpost: devpostStats || null,
+          github: githubStats || null
         };
 
         if (typeof window !== "undefined") {
@@ -739,12 +765,16 @@ export default function CodingDeckPage() {
       const cc = codechefUser;
       const hr = hackerrankUser;
       const cf = codeforcesUser;
+      const gfg = geeksforgeeksUser;
+      const un = unstopUser;
+      const dp = devpostUser;
+      const gh = githubUser;
 
       const fetchStats = async (platform: string, username: string, year?: number | null) => {
         if (!username) return null;
         try {
           const yearQuery = year && platform === "leetcode" ? `&year=${year}` : "";
-          const res = await fetch(`/api/coding-stats?platform=${platform}&username=${username}${yearQuery}&t=${Date.now()}`, {
+          const res = await fetch(`/api/coding-stats?platform=${platform}&username=${encodeURIComponent(username)}${yearQuery}&t=${Date.now()}`, {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache" }
           });
@@ -755,11 +785,15 @@ export default function CodingDeckPage() {
         return null;
       };
 
-      const [leetcodeStats, codechefStats, hackerrankStats, codeforcesStats] = await Promise.all([
+      const [leetcodeStats, codechefStats, hackerrankStats, codeforcesStats, gfgStats, unstopStats, devpostStats, githubStats] = await Promise.all([
         lc ? fetchStats("leetcode", lc, selectedLcYear) : Promise.resolve(null),
         cc ? fetchStats("codechef", cc) : Promise.resolve(null),
         hr ? fetchStats("hackerrank", hr) : Promise.resolve(null),
-        cf ? fetchStats("codeforces", cf) : Promise.resolve(null)
+        cf ? fetchStats("codeforces", cf) : Promise.resolve(null),
+        gfg ? fetchStats("geeksforgeeks", gfg) : Promise.resolve(null),
+        un ? fetchStats("unstop", un) : Promise.resolve(null),
+        dp ? fetchStats("devpost", dp) : Promise.resolve(null),
+        gh ? fetchStats("github", gh) : Promise.resolve(null)
       ]);
 
       setStats(prev => ({
@@ -768,6 +802,10 @@ export default function CodingDeckPage() {
         codechef: codechefStats || prev.codechef,
         hackerrank: hackerrankStats || prev.hackerrank,
         codeforces: codeforcesStats || prev.codeforces,
+        geeksforgeeks: gfgStats || prev.geeksforgeeks,
+        unstop: unstopStats || prev.unstop,
+        devpost: devpostStats || prev.devpost,
+        github: githubStats || prev.github
       }));
       setMessage({ text: "Live coding platform stats synced!", type: "success" });
     } finally {
@@ -787,7 +825,7 @@ export default function CodingDeckPage() {
         const hr = hackerrankUser;
         const gfg = geeksforgeeksUser;
         const un = unstopUser;
-        const gh = user?.user_metadata?.user_name || user?.user_metadata?.preferred_username || "";
+        const gh = githubUser || user?.user_metadata?.user_name || user?.user_metadata?.preferred_username || "";
         
         if (!lc && !cf && !cc && !hr && !gfg && !un && !gh) return;
         
@@ -1322,7 +1360,7 @@ export default function CodingDeckPage() {
               codechef: codechefUser,
               geeksforgeeks: geeksforgeeksUser,
               hackerrank: hackerrankUser,
-              github: user?.user_metadata?.user_name || ""
+              github: githubUser || user?.user_metadata?.user_name || ""
             }}
             onOpenConnectModal={handleOpenConnectModal}
             onSwitchToIntegrations={() => handleToggleViewMode("integrations")}

@@ -3468,7 +3468,7 @@ export default function WorkspacePage({ params }: { params: Promise<{ id: string
                 const isCompleted = isPassed || idx < activeIdx;
                 const isActive = !isCompleted && idx === activeIdx;
 
-                let cleanDisplayDate = liveDate.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
+                const cleanDisplayDate = liveDate.replace(/^(Completed|Target|\s*|\(|\))*/gi, "").replace(/\)$/g, "").trim();
                 const displayDate = isCompleted
                   ? `Completed (${cleanDisplayDate || liveDate})`
                   : `Target ${cleanDisplayDate || liveDate}`;
