@@ -55,14 +55,32 @@ export default function Header() {
   const [drawerTab, setDrawerTab] = useState<"alerts" | "updates">("alerts");
   const isFaculty = userRole === "coordinator";
   const isRecruiter = userRole === "recruiter";
+  // Check local profile fast-cache in browser as well
+  let localCacheCollege = false;
+  if (typeof window !== "undefined" && user?.id) {
+    try {
+      const raw = localStorage.getItem(`ldk_public_profile_${user.id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.college_name || parsed?.college_key || parsed?.institute_id) {
+          localCacheCollege = true;
+        }
+      }
+    } catch {}
+  }
+
   const isCollegeConnected = Boolean(
     userProfile?.institute_id || 
     (userProfile?.college_name && typeof userProfile.college_name === "string" && userProfile.college_name.trim().length > 0 && userProfile.college_name.toLowerCase() !== "none") || 
     userProfile?.college_linked_status === "approved" || 
     userProfile?.college_linked_status === "verified" ||
-    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0)
+    userProfile?.college_linked_status === "linked" ||
+    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0) ||
+    Boolean(user?.user_metadata?.college_name || user?.user_metadata?.college_key || user?.user_metadata?.institute_id) ||
+    localCacheCollege
   );
-  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer" || !isCollegeConnected;
+  const showCollegeDesk = isCollegeConnected || userProfile?.persona === "student" || userRole === "student";
+  const isDeveloper = !showCollegeDesk && (userRole === "developer" || userProfile?.persona === "developer");
 
   const pathname = usePathname();
   const router = useRouter();
@@ -1396,7 +1414,7 @@ const POPULAR_LOCATIONS = [
                   <Link href="/event-desk" className={`pb-0.5 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                   <Link href="/coding-desk" className={`pb-0.5 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                   <Link href="/study-desk" className={`pb-0.5 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
-                  {!isDeveloper && (
+                  {showCollegeDesk && (
                     <Link href="/college-desk" className={`pb-0.5 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
                   )}
                   <Link href="/explore" className={`pb-0.5 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>
@@ -1533,7 +1551,7 @@ const POPULAR_LOCATIONS = [
                     <Link href="/event-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/event-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Event Desk</Link>
                     <Link href="/coding-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/coding-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Code Desk</Link>
                     <Link href="/study-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/study-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Study Desk</Link>
-                    {!isDeveloper && (
+                    {showCollegeDesk && (
                       <Link href="/college-desk" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/college-desk") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>College Desk</Link>
                     )}
                     <Link href="/explore" onClick={() => setMobileMenuOpen(false)} className={`py-1 border-b border-border-main/30 transition-opacity ${isNavActive("/explore") ? "text-txt-main opacity-100 font-medium" : "text-txt-main opacity-50 hover:opacity-100"}`}>Explore</Link>

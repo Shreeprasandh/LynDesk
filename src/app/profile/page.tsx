@@ -173,7 +173,7 @@ export function normalizeSocialUrl(input: string, platform: "github" | "linkedin
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, authStatusMessage, requestPasswordResetOtp, updateUserPassword } = useAuth();
+  const { user, loading: authLoading, authStatusMessage, requestPasswordResetOtp, updateUserPassword, updateUserProfile } = useAuth();
   const { showToast } = useToast();
 
   // Security & Password Management States
@@ -1400,6 +1400,16 @@ export default function ProfilePage() {
         setUnstopVerified(nextUsVerified);
         setDevpostVerified(nextDpVerified);
 
+        const isConnectedToCollege = Boolean(
+          instituteId ||
+          (cleanCollege && cleanCollege.length > 0 && cleanCollege.toLowerCase() !== "none") ||
+          collegeLinkedStatus === "approved" ||
+          collegeLinkedStatus === "verified" ||
+          collegeLinkedStatus === "linked" ||
+          (collegeKey && collegeKey.trim().length > 0)
+        );
+        const resolvedPersona = isConnectedToCollege ? "student" : "developer";
+
         const { error: profileError } = await supabase
           .from("profiles")
           .update({
@@ -1408,6 +1418,7 @@ export default function ProfilePage() {
             department: cleanDept,
             college_name: cleanCollege || null,
             college_key: collegeKey.trim() || null,
+            persona: resolvedPersona,
             avatar_url: avatarUrl || null,
             github_url: githubUrl.trim() || null,
             linkedin_url: linkedinUrl.trim() || null,
@@ -1502,6 +1513,23 @@ export default function ProfilePage() {
             localStorage.removeItem(`ldk_avatar_url_${user.id}`);
           }
         }
+
+        // Synchronously update AuthContext so Header and navigation adapt immediately
+        updateUserProfile({
+          username: cleanUsername,
+          full_name: cleanFullName,
+          department: cleanDept,
+          college_name: cleanCollege || undefined,
+          college_key: collegeKey.trim() || undefined,
+          institute_id: instituteId || undefined,
+          college_linked_status: collegeLinkedStatus,
+          roll_number: rollNumber.trim() || undefined,
+          graduation_year: gradYear.trim() || undefined,
+          batch_code: batchCode.trim() || undefined,
+          academic_year: academicYear.trim() || undefined,
+          section: section.trim() || undefined,
+          persona: resolvedPersona
+        });
       } catch (dbErr) {
         console.warn("Database profiles table write exception. Proceeding with Auth Metadata fallback.", dbErr);
       }

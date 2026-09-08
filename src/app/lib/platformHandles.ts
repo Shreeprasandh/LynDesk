@@ -174,7 +174,7 @@ export function extractPlatformHandle(input: string, platform: CodingPlatform | 
         if (!host.includes("github")) {
           return { handle: "", error: "Invalid GitHub URL. Must be a github.com profile link." };
         }
-        let username = pathSegments[0] || "";
+        const username = pathSegments[0] || "";
         if (!username || PLATFORM_IGNORED_SEGMENTS.GitHub?.has(username)) {
           return { handle: "", error: "Could not extract GitHub username from URL." };
         }

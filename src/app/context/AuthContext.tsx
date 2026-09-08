@@ -436,6 +436,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             (data.college_name && typeof data.college_name === "string" && data.college_name.trim().length > 0 && data.college_name.toLowerCase() !== "none") ||
             data.college_linked_status === "approved" || 
             data.college_linked_status === "verified" ||
+            data.college_linked_status === "linked" ||
             (data.college_key && typeof data.college_key === "string" && data.college_key.trim().length > 0)
           );
 

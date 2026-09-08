@@ -69,14 +69,16 @@ export async function POST(req: NextRequest) {
 
       const { data: dbKey, error } = await supabaseServer
         .from("recruiter_keys")
-        .select("id, company_name, access_pin_hash, institute_id, expires_at, is_active, institutes(id, name)")
+        .select("id, company_name, pin_hash, institute_id, expires_at, is_active, institutes(id, name)")
         .eq("is_active", true);
 
       if (!error && dbKey && dbKey.length > 0) {
         const matched = dbKey.find(k => {
-          const pinMatch = k.access_pin_hash === computedHash || k.access_pin_hash === cleanPin;
+          const pinMatch = (k.pin_hash && (k.pin_hash === computedHash || k.pin_hash === cleanPin)) ||
+                           ((k as any).access_pin_hash && ((k as any).access_pin_hash === computedHash || (k as any).access_pin_hash === cleanPin));
           const companyMatch = !cleanCompany || k.company_name.toLowerCase().includes(cleanCompany);
-          return pinMatch && companyMatch;
+          const notExpired = !k.expires_at || new Date(k.expires_at).getTime() > Date.now();
+          return pinMatch && companyMatch && notExpired;
         });
 
         if (matched) {

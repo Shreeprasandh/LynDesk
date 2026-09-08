@@ -192,9 +192,11 @@ export default function ExplorePage() {
     (userProfile?.college_name && typeof userProfile.college_name === "string" && userProfile.college_name.trim().length > 0 && userProfile.college_name.toLowerCase() !== "none") || 
     userProfile?.college_linked_status === "approved" || 
     userProfile?.college_linked_status === "verified" ||
-    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0)
+    userProfile?.college_linked_status === "linked" ||
+    (userProfile?.college_key && typeof userProfile.college_key === "string" && userProfile.college_key.trim().length > 0) ||
+    Boolean(user?.user_metadata?.college_name || user?.user_metadata?.college_key || user?.user_metadata?.institute_id)
   );
-  const isDeveloper = userRole === "developer" || userProfile?.persona === "developer" || !isCollegeConnected;
+  const isDeveloper = !isCollegeConnected && (userRole === "developer" || userProfile?.persona === "developer");
   const isCollegeLinked = (userProfile?.college_linked_status === "linked" || userProfile?.college_linked_status === "approved" || userProfile?.college_linked_status === "verified") && !!userProfile?.institute_id;
 
   // Two Main Sub-Tabs: "events" | "friends" | "works"

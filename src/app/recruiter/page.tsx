@@ -21,10 +21,7 @@ import {
   Star,
   Plus,
   X,
-  Briefcase,
-  FileText,
-  Check,
-  ExternalLink
+  Briefcase
 } from "lucide-react";
 
 interface Candidate {
