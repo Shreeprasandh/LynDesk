@@ -1662,7 +1662,7 @@ useEffect(() => {
   const pendingCount = claims.filter(c => c.status === "pending").length;
   const approvedPoints = claims.filter(c => c.status === "approved").reduce((sum, c) => sum + c.points, 0);
 
-  if (authLoading) {
+  if (authLoading && !currentStaff) {
     return (
       <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
         <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
@@ -1671,26 +1671,43 @@ useEffect(() => {
     );
   }
 
-  if (!user) return null;
+  if (!user && !currentStaff) {
+    return (
+      <div className="h-screen bg-bg-base flex flex-col items-center justify-center font-mono text-xs text-txt-muted gap-2">
+        <div className="w-4 h-4 border-2 border-accent-main border-t-transparent rounded-full animate-spin" />
+        <span>Authenticating coordinator session...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header (Unified Navigation & Notifications Drawer) */}
       <Header />
 
       {/* Main split grid */}
-       <main className="flex-1 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0">
+       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0">
         
         {/* ================= LEFT CONSOLE: APPLICATION LIST (7 Columns) ================= */}
-        <section className="lg:col-span-8 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col h-auto lg:h-full bg-bg-base overflow-hidden p-6 gap-6">
-          <Link 
-            href="/"
-            className="flex items-center gap-2 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase self-start"
-          >
-            <ArrowLeft size={12} />
-            Back to Portal
-          </Link>
+        <section className="lg:col-span-8 border-b lg:border-b-0 lg:border-r border-border-main/50 flex flex-col bg-bg-base p-6 gap-6">
+          <div className="flex items-center gap-3 self-start">
+            <Link 
+              href="/"
+              className="flex items-center gap-1.5 text-[10px] text-txt-muted hover:text-txt-main transition-colors font-mono tracking-wider uppercase"
+            >
+              <ArrowLeft size={12} />
+              Back to Portal
+            </Link>
+            <span className="text-border-main text-xs font-mono">•</span>
+            <Link 
+              href="/admin"
+              className="flex items-center gap-1.5 text-[10px] text-accent-main hover:opacity-80 transition-opacity font-mono tracking-wider uppercase font-semibold"
+            >
+              <Building2 size={12} />
+              Master Admin Console (Structure & Headcount)
+            </Link>
+          </div>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border-main/40 pb-4 gap-4">
             <div className="flex flex-col gap-1 text-left">
               <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">
@@ -3508,7 +3525,7 @@ useEffect(() => {
         </section>
 
         {/* ================= RIGHT PANEL: INSPECTOR (5 Columns) ================= */}
-        <section className="lg:col-span-4 bg-bg-surface/30 flex flex-col h-auto lg:h-full overflow-y-auto p-6 gap-6">
+        <section className="lg:col-span-4 bg-bg-surface/30 flex flex-col p-6 gap-6">
           
           <div className="flex flex-col gap-0.5 border-b border-border-main/40 pb-4">
             <span className="font-mono text-[9px] uppercase tracking-widest text-txt-muted font-bold">

@@ -1123,7 +1123,27 @@ export default function Home() {
     setError(null);
 
     try {
-      // Check recruiter key first
+      // 1. Attempt Institutional Administrator authentication first
+      try {
+        const adminRes = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+        const adminData = await adminRes.json();
+        if (adminRes.ok && adminData.success) {
+          localStorage.setItem("faculty_staff_member", JSON.stringify({
+            name: adminData.admin?.name || "Dr. K. Rangarajan (Dean)",
+            key: staffKey.trim() || "ADMIN"
+          }));
+          window.location.href = "/coordinator";
+          return;
+        }
+      } catch (adminErr) {
+        console.warn("Institutional auth fallback to user auth:", adminErr);
+      }
+
+      // 2. Check recruiter key
       if (staffKey.trim().toLowerCase() === "recruit2026") {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -1150,6 +1170,7 @@ export default function Home() {
         }
       }
 
+      // 3. Fall back to standard Supabase User Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,

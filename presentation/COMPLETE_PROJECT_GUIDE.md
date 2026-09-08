@@ -2,7 +2,7 @@
 
 > **Project Name**: LynDesk (`eventtracker`)  
 > **Core Architecture**: Next.js 16.2 (App Router + Turbopack) • React 19 • TypeScript Strict Mode • Tailwind CSS v4 • Supabase (PostgreSQL 15+ with RLS) • Google Gemini 1.5/2.0 AI  
-> **Test & Build Health**: 115 / 115 Tests Passing (`vitest`) • 94 / 94 Production Routes Compiled • 0 TypeScript Errors  
+> **Test & Build Health**: 120 / 120 Tests Passing (`vitest`) • 96 / 96 Production Routes Compiled • 0 TypeScript Errors  
 
 ---
 
@@ -22,7 +22,7 @@
    - 5.8 [Recruiter Radar (Authentic Talent Discovery)](#58-recruiter-radar)
    - 5.9 [Institutional Administration & Audit Grid](#59-institutional-administration--audit-grid)
    - 5.10 [Social Network & Peer Graph](#510-social-network--peer-graph)
-6. [Live Database Architecture (All 25+ Tables Documented)](#6-live-database-architecture)
+6. [Live Database Architecture (All 30 Tables Documented)](#6-live-database-architecture)
 7. [Upstream Data Scrapers & Resilience Strategies](#7-upstream-data-scrapers--resilience-strategies)
 8. [Security, Authentication & Row Level Security (RLS)](#8-security-authentication--row-level-security)
 9. [Viva / Jury / Evaluator Q&A Defense (Tough Questions & Exact Answers)](#9-viva--jury--evaluator-qa-defense)
@@ -262,7 +262,7 @@ Engineering students face extreme digital fragmentation:
    - `SUPABASE_SERVICE_ROLE_KEY` is strictly confined to Next.js server-side route handlers.
    - Client applications only receive the public anonymous key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`).
 2. **100% PostgreSQL RLS Enforcement**:
-   - All 25+ tables have RLS enabled with granular SELECT, INSERT, UPDATE, and DELETE policies.
+   - All 30 tables have RLS enabled with granular SELECT, INSERT, UPDATE, and DELETE policies.
 3. **Cryptographic Password & Token Hashing**:
    - Recruiter keys and session tokens use secure SHA-256 / bcrypt cryptographic hashing.
 4. **Input Sanitization & Attack Prevention**:

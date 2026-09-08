@@ -11,7 +11,7 @@ export default function PrivacyPolicy() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
+    <div className="min-h-screen flex flex-col font-sans selection:bg-accent-main selection:text-bg-base">
       
       {/* Header */}
       <header className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12 bg-bg-surface/80 backdrop-blur-md border-b border-border-main/60 transition-colors duration-150 flex-shrink-0">

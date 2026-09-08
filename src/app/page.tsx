@@ -341,6 +341,27 @@ export default function Home() {
     setAuthError(null);
 
     try {
+      // 1. Attempt Institutional Administrator authentication first
+      try {
+        const adminRes = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim(), password })
+        });
+        const adminData = await adminRes.json();
+        if (adminRes.ok && adminData.success) {
+          localStorage.setItem("faculty_staff_member", JSON.stringify({
+            name: adminData.admin?.name || "Dr. K. Rangarajan (Dean)",
+            key: staffKey.trim() || "ADMIN"
+          }));
+          window.location.href = "/coordinator";
+          return;
+        }
+      } catch (adminErr) {
+        console.warn("Institutional auth fallback to user auth:", adminErr);
+      }
+
+      // 2. Fall back to standard Supabase User Auth
       const targetEmail = await resolveEmailFromInput(email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email: targetEmail,
@@ -891,10 +912,10 @@ export default function Home() {
   // Unauthenticated Landing & Authentication Portal Page
   if (!user) {
     return (
-      <div className="h-screen overflow-hidden flex flex-col font-sans bg-bg-base text-txt-main selection:bg-accent-main selection:text-bg-base">
+      <div className="min-h-screen flex flex-col font-sans bg-bg-base text-txt-main selection:bg-accent-main selection:text-bg-base">
         <Header />
 
-        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-3 lg:py-4 overflow-y-auto lg:overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 md:px-12 py-6 lg:py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
           
           {/* Left Column: Typographic layout */}
           <section className="lg:col-span-7 flex flex-col items-start gap-6 lg:gap-8 lg:pr-6">
