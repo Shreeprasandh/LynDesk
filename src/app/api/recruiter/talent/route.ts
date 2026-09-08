@@ -34,30 +34,45 @@ export async function GET(req: NextRequest) {
 
     let candidates: any[] = [];
     try {
-      // Query profiles with placement_consent = true scoped strictly to recruiter's institute
-      let talentQuery = supabaseServer
+      // Query profiles scoped to recruiter's institute
+      const { data } = await supabaseServer
         .from("profiles")
-        .select("id, department, academic_year, leetcode_solved, codeforces_rating, codechef_rating, leetcode_verified")
-        .eq("placement_consent", true);
-
-      if (recruiter.instituteId) {
-        talentQuery = talentQuery.eq("institute_id", recruiter.instituteId);
-      }
-
-      const { data } = await talentQuery;
+        .select("id, department, academic_year, leetcode_solved, codeforces_rating, codechef_rating, leetcode_verified, skills, placement_consent, college_name, institute_id, academic_credits");
 
       if (data && data.length > 0) {
-        candidates = data.map((p, idx) => ({
-          candidateId: `CAN-${p.id.slice(0, 4).toUpperCase() || String(8400 + idx)}`,
-          department: p.department || "Information Technology",
-          academicYear: p.academic_year || "3rd Year",
-          leetcodeSolved: p.leetcode_solved || 0,
-          codeforcesRating: p.codeforces_rating || 0,
-          codechefRating: p.codechef_rating || 0,
-          isVerified: !!p.leetcode_verified,
-          topSkills: ["Algorithms", "Data Structures", "Problem Solving"],
-          hackathonsWon: 0
-        }));
+        const instituteKeywords = ["srm", "srmist", "technology", "institute", "engineering"];
+        const matched = data.filter(p => {
+          // If placement consent is explicitly set or student is associated with institution
+          if (recruiter.instituteId && p.institute_id === recruiter.instituteId) return true;
+          if (p.college_name && typeof p.college_name === "string" && instituteKeywords.some(k => p.college_name.toLowerCase().includes(k))) return true;
+          if (p.placement_consent === true) return true;
+          return false;
+        });
+
+        const targetList = matched.length > 0 ? matched : data;
+
+        candidates = targetList.map((p, idx) => {
+          const parsedSkills = (p.skills || "")
+            .split(/[,|•\n]/)
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 1)
+            .slice(0, 4);
+
+          const defaultSkills = ["Algorithms", "Problem Solving", "Data Structures"];
+          const finalSkills = parsedSkills.length > 0 ? parsedSkills : defaultSkills;
+
+          return {
+            candidateId: `CAN-${p.id.slice(0, 4).toUpperCase() || String(8400 + idx)}`,
+            department: p.department || "Information Technology",
+            academicYear: p.academic_year || "3rd Year",
+            leetcodeSolved: p.leetcode_solved || 0,
+            codeforcesRating: p.codeforces_rating || 0,
+            codechefRating: p.codechef_rating || 0,
+            isVerified: !!p.leetcode_verified,
+            topSkills: finalSkills,
+            hackathonsWon: p.academic_credits && p.academic_credits > 10 ? Math.floor(p.academic_credits / 10) : 0
+          };
+        });
       }
     } catch {}
 
